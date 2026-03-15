@@ -10,6 +10,7 @@ using Cratis.Ingress.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 
@@ -116,8 +117,11 @@ if (jwtSection.Exists())
 
 builder.Services.AddAuthorization(options =>
 {
-    // "default" policy requires an authenticated user.
-    options.AddPolicy("default", policy => policy.RequireAuthenticatedUser());
+    // Set the default policy to require an authenticated user.
+    // Note: do not use AddPolicy("default", ...) – YARP reserves that name internally.
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
 });
 
 // ── Tenancy ────────────────────────────────────────────────────────────────
@@ -188,7 +192,7 @@ app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, Htt
 
 // ── Login selection page (SPA fallback) ───────────────────────────────────
 // Serves the bundled React app for any request under /.cratis/select-provider.
-app.MapGet($"{WellKnownPaths.LoginPage}{{**path}}", async (HttpContext context) =>
+app.MapGet($"{WellKnownPaths.LoginPage}/{{**path}}", async (HttpContext context) =>
 {
     context.Response.ContentType = "text/html";
     await context.Response.SendFileAsync(
