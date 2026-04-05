@@ -2,16 +2,19 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
+using Cratis.Arc.Identity;
 using Cratis.Ingress.Configuration;
+using Cratis.Json;
 using Microsoft.Extensions.Options;
 
 namespace Cratis.Ingress.Identity;
 
 /// <summary>
 /// Calls every microservice's <c>/.cratis/me</c> endpoint to retrieve application-specific
-/// identity details, merges the JSON results and stores them in the <c>.cratis-identity</c>
-/// response cookie as a base64-encoded JSON string.
+/// identity details, merges the JSON results, converts them to an <see cref="IdentityProviderResult"/>
+/// and stores it in the <c>.cratis-identity</c> response cookie as a base64-encoded JSON string.
 /// </summary>
 /// <param name="config">The ingress configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
@@ -21,13 +24,20 @@ public class IdentityDetailsResolver(
     IHttpClientFactory httpClientFactory,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
+    static readonly JsonSerializerOptions _cookieSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Converters = { new ConceptAsJsonConverterFactory() }
+    };
+
     /// <inheritdoc/>
-    public async Task<bool> Resolve(HttpContext context, ClientPrincipal principal, Guid tenantId)
+    public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, Guid tenantId)
     {
         // Skip when the identity cookie is already present for this request.
         if (context.Request.Cookies.ContainsKey(Cookies.Identity))
         {
-            return true;
+            return BuildAuthorizedResult(principal, details: null);
         }
 
         var mergedDetails = new JsonObject();
@@ -53,7 +63,7 @@ public class IdentityDetailsResolver(
             if (result is null)
             {
                 // 403 – stop processing.
-                return false;
+                return IdentityProviderResult.Unauthorized;
             }
 
             // Merge top-level properties from this microservice into the combined result.
@@ -63,22 +73,34 @@ public class IdentityDetailsResolver(
             }
         }
 
-        if (mergedDetails.Count > 0)
+        var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
+        WriteIdentityCookie(context, identityResult);
+        logger.IdentityDetailsCookieWritten(principal.UserId);
+
+        return identityResult;
+    }
+
+    IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>
+        new(
+            principal.UserId,
+            principal.UserDetails,
+            IsAuthenticated: true,
+            IsAuthorized: true,
+            principal.UserRoles,
+            details!);
+
+    void WriteIdentityCookie(HttpContext context, IdentityProviderResult result)
+    {
+        var json = JsonSerializer.Serialize(result, _cookieSerializerOptions);
+        var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+
+        context.Response.Cookies.Append(Cookies.Identity, encoded, new CookieOptions
         {
-            var json = mergedDetails.ToJsonString();
-            var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
-            context.Response.Cookies.Append(Cookies.Identity, encoded, new CookieOptions
-            {
-                HttpOnly = false,   // Must be readable by the frontend JS.
-                SameSite = SameSiteMode.Lax,
-                Secure = context.Request.IsHttps,
-                Expires = null,     // Session cookie.
-            });
-
-            logger.IdentityDetailsCookieWritten(principal.UserId);
-        }
-
-        return true;
+            HttpOnly = false,   // Must be readable by the frontend JS.
+            SameSite = SameSiteMode.Lax,
+            Secure = context.Request.IsHttps,
+            Expires = null,     // Session cookie.
+        });
     }
 
     async Task<JsonObject?> CallIdentityEndpoint(
@@ -137,3 +159,4 @@ public class IdentityDetailsResolver(
         }
     }
 }
+

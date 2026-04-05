@@ -15,6 +15,11 @@ namespace Cratis.Ingress;
 ///   <item>Call <c>/.cratis/me</c> on configured microservices and write the identity cookie.</item>
 /// </list>
 /// </summary>
+/// <param name="next">The next middleware in the pipeline.</param>
+/// <param name="config">The ingress configuration monitor.</param>
+/// <param name="tenantResolver">The tenant resolver.</param>
+/// <param name="identityDetailsResolver">The identity details resolver.</param>
+/// <param name="logger">The logger.</param>
 public class TenancyMiddleware(
     RequestDelegate next,
     IOptionsMonitor<IngressConfig> config,
@@ -25,6 +30,11 @@ public class TenancyMiddleware(
     /// <summary>Key used to store the resolved tenant ID in <see cref="HttpContext.Items"/>.</summary>
     public const string TenantIdItemKey = "Cratis.TenantId";
 
+    /// <summary>
+    /// Executes the tenancy middleware for the given <paramref name="context"/>.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
     public async Task InvokeAsync(HttpContext context)
     {
         // 1. Always strip inbound spoofable headers before any downstream sees them.
@@ -63,8 +73,8 @@ public class TenancyMiddleware(
         var principal = context.BuildClientPrincipal();
         if (principal is not null && tenantId != Guid.Empty)
         {
-            var allowed = await identityDetailsResolver.Resolve(context, principal, tenantId);
-            if (!allowed)
+            var result = await identityDetailsResolver.Resolve(context, principal, tenantId);
+            if (!result.IsAuthorized)
             {
                 // 403 already written by the resolver.
                 return;
