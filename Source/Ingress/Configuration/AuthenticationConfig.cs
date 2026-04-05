@@ -14,4 +14,15 @@ public class AuthenticationConfig
     /// browser requests to the login selection page instead of challenging directly.
     /// </summary>
     public IList<OidcProviderConfig> OidcProviders { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the list of regular OAuth 2.0 providers (non-OIDC) available for login.
+    /// Use this for providers such as GitHub that do not expose an OIDC discovery document.
+    /// </summary>
+    public IList<OAuthProviderConfig> OAuthProviders { get; set; } = [];
+
+    /// <summary>
+    /// Gets the combined count of all configured authentication providers.
+    /// </summary>
+    public int TotalProviderCount => OidcProviders.Count + OAuthProviders.Count;
 }
