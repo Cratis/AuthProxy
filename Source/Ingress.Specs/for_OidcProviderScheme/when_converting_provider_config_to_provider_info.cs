@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-
 namespace Cratis.Ingress.for_OidcProviderScheme;
 
 public class when_converting_provider_config_to_provider_info : Specification

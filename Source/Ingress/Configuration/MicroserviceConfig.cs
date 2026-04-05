@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.ComponentModel.DataAnnotations;
-
 namespace Cratis.Ingress.Configuration;
 
 /// <summary>
@@ -22,7 +20,7 @@ public class MicroserviceConfig
 
     /// <summary>
     /// Gets or sets whether to call the <c>/.cratis/me</c> identity endpoint on this microservice
-    /// to enrich the identity details cookie. Defaults to <c>true</c> when a Backend is configured.
+    /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
     public bool? ResolveIdentityDetails { get; set; }
 }

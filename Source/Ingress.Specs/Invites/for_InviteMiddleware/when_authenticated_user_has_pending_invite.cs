@@ -2,9 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
-using System.Net.Http;
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
 
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
@@ -30,7 +27,11 @@ public class when_authenticated_user_has_pending_invite : Specification
             new System.Net.Http.HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
         _middleware = new InviteMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             tokenValidator,
             optionsMonitor,
             httpClientFactory,
@@ -45,11 +46,11 @@ public class when_authenticated_user_has_pending_invite : Specification
         _context.User = new System.Security.Claims.ClaimsPrincipal(identity);
 
         // Simulate pending invite cookie.
-        _context.Request.Headers["Cookie"] = $"{Cookies.InviteToken}=pending-invite-token";
+        _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_delete_invite_cookie() => _context.Response.Headers["Set-Cookie"].ToString().ShouldContain(Cookies.InviteToken);
+    [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 }

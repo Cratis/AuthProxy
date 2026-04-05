@@ -1,11 +1,13 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Arc.Identity;
+
 namespace Cratis.Ingress.for_TenancyMiddleware;
 
 public class when_everything_succeeds : Specification
 {
-    static readonly Guid _tenantId = new("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    static readonly Guid _tenantId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
 
     TenancyMiddleware _middleware;
     DefaultHttpContext _context;
@@ -20,15 +22,23 @@ public class when_everything_succeeds : Specification
         var tenantResolver = Substitute.For<ITenantResolver>();
         tenantResolver
             .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>())
-            .Returns(call => { call[1] = _tenantId; return true; });
+            .Returns(call =>
+            {
+                call[1] = _tenantId;
+                return true;
+            });
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
         identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<Guid>())
-            .Returns(Task.FromResult(true));
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>())
+            .Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
 
         _middleware = new TenancyMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             optionsMonitor,
             tenantResolver,
             identityResolver,

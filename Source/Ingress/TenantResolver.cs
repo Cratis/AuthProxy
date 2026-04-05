@@ -12,6 +12,9 @@ namespace Cratis.Ingress;
 /// until one succeeds, then matching the resulting source identifier against the
 /// tenant map in <see cref="IngressConfig.Tenants"/>.
 /// </summary>
+/// <param name="config">The options monitor providing the current ingress configuration.</param>
+/// <param name="strategies">The collection of available source identifier resolution strategies.</param>
+/// <param name="logger">The logger.</param>
 public class TenantResolver(
     IOptionsMonitor<IngressConfig> config,
     IEnumerable<ISourceIdentifierStrategy> strategies,

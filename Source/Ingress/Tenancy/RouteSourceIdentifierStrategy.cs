@@ -30,7 +30,7 @@ public class RouteSourceIdentifierStrategy : ISourceIdentifierStrategy
         }
 
         var path = context.Request.Path.Value ?? string.Empty;
-        var match = Regex.Match(path, pattern, RegexOptions.IgnoreCase);
+        var match = Regex.Match(path, pattern, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
         if (!match.Success)
         {
             return false;

@@ -1,10 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Security.Claims;
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
-
 namespace Cratis.Ingress.Invites.for_InviteTokenValidator;
 
 public class when_getting_claim_from_token_that_has_the_claim : Specification

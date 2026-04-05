@@ -15,7 +15,8 @@ public class when_building_from_authenticated_context_falling_back_to_sub_claim 
         [
             new Claim("sub", "subject-id"),
             new Claim("name", "John Doe")
-        ], "jwt");
+        ],
+        "jwt");
         _context.User = new ClaimsPrincipal(identity);
     }
 

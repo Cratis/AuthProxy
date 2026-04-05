@@ -2,9 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
-using System.Net.Http;
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
 
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
@@ -23,7 +20,11 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
         tokenValidator.TryGetClaim(Arg.Any<string>(), TenantClaimType, out Arg.Any<string>())
-            .Returns(x => { x[2] = _tokenTenantId.ToString(); return true; });
+            .Returns(x =>
+            {
+                x[2] = _tokenTenantId.ToString();
+                return true;
+            });
 
         var config = new IngressConfig
         {
@@ -45,7 +46,11 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
             new System.Net.Http.HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
         _middleware = new InviteMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             tokenValidator,
             optionsMonitor,
             httpClientFactory,
@@ -58,7 +63,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
             [new System.Security.Claims.Claim("sub", "user-123")], "aad");
         _context.User = new System.Security.Claims.ClaimsPrincipal(identity);
 
-        _context.Request.Headers["Cookie"] = $"{Cookies.InviteToken}=pending-invite-token";
+        _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
         _context.Items[TenancyMiddleware.TenantIdItemKey] = _resolvedTenantId;
     }
 
@@ -66,5 +71,5 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
     [Fact] void should_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(LobbyUrl);
-    [Fact] void should_delete_invite_cookie() => _context.Response.Headers["Set-Cookie"].ToString().ShouldContain(Cookies.InviteToken);
+    [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 }

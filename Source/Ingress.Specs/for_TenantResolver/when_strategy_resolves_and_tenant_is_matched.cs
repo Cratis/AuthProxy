@@ -5,7 +5,7 @@ namespace Cratis.Ingress.for_TenantResolver;
 
 public class when_strategy_resolves_and_tenant_is_matched : Specification
 {
-    static readonly Guid _expectedTenantId = new("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    static readonly Guid _expectedTenantId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     TenantResolver _resolver;
     DefaultHttpContext _context;

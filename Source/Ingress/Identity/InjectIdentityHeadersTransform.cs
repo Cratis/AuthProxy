@@ -13,6 +13,7 @@ namespace Cratis.Ingress.Identity;
 /// </summary>
 public class InjectIdentityHeadersTransform : RequestTransform
 {
+    /// <inheritdoc/>
     public override ValueTask ApplyAsync(RequestTransformContext context)
     {
         var httpContext = context.HttpContext;

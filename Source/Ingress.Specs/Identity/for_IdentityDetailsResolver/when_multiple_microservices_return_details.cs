@@ -2,7 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
-using System.Text;
+using Cratis.Arc.Identity;
 
 namespace Cratis.Ingress.Identity.for_IdentityDetailsResolver;
 
@@ -10,7 +10,7 @@ public class when_multiple_microservices_return_details : Specification
 {
     IdentityDetailsResolver _resolver;
     DefaultHttpContext _context;
-    bool _result;
+    IdentityProviderResult _result;
 
     void Establish()
     {
@@ -35,6 +35,6 @@ public class when_multiple_microservices_return_details : Specification
 
     async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid());
 
-    [Fact] void should_return_true() => Assert.True(_result);
-    [Fact] void should_write_the_merged_identity_cookie() => Assert.NotEmpty(_context.Response.Headers["Set-Cookie"].ToString());
+    [Fact] void should_be_authorized() => Assert.True(_result.IsAuthorized);
+    [Fact] void should_write_the_merged_identity_cookie() => Assert.NotEmpty(_context.Response.Headers.SetCookie.ToString());
 }

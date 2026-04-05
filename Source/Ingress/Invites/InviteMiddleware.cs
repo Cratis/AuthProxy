@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using Cratis.Ingress.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -23,6 +22,11 @@ namespace Cratis.Ingress.Invites;
 ///   </item>
 /// </list>
 /// </summary>
+/// <param name="next">The next middleware in the pipeline.</param>
+/// <param name="tokenValidator">The validator for invite JWT tokens.</param>
+/// <param name="config">The ingress configuration monitor.</param>
+/// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
+/// <param name="logger">The logger.</param>
 public class InviteMiddleware(
     RequestDelegate next,
     IInviteTokenValidator tokenValidator,

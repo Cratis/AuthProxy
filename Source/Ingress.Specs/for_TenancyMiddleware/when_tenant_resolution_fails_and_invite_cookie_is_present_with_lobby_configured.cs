@@ -30,7 +30,11 @@ public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobb
         tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>()).Returns(false);
 
         _middleware = new TenancyMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             optionsMonitor,
             tenantResolver,
             Substitute.For<IIdentityDetailsResolver>(),
@@ -38,7 +42,7 @@ public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobb
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/some-page";
-        _context.Request.Headers["Cookie"] = $"{Cookies.InviteToken}=pending-token";
+        _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-token";
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

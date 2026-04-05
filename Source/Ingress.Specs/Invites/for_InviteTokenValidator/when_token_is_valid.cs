@@ -1,9 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
-
 namespace Cratis.Ingress.Invites.for_InviteTokenValidator;
 
 public class when_token_is_valid : Specification

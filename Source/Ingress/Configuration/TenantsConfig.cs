@@ -6,6 +6,4 @@ namespace Cratis.Ingress.Configuration;
 /// <summary>
 /// Represents the configuration for all tenants, keyed by tenant ID.
 /// </summary>
-public class TenantsConfig : Dictionary<Guid, TenantConfig>
-{
-}
+public class TenantsConfig : Dictionary<Guid, TenantConfig>;

@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Arc.Identity;
+
 namespace Cratis.Ingress.for_TenancyMiddleware;
 
 public class when_request_has_spoofed_identity_headers : Specification
@@ -18,7 +20,7 @@ public class when_request_has_spoofed_identity_headers : Specification
         tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>()).Returns(true);
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
-        identityResolver.Resolve(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<Guid>()).Returns(Task.FromResult(true));
+        identityResolver.Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>()).Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
 
         _middleware = new TenancyMiddleware(
             _ => Task.CompletedTask,

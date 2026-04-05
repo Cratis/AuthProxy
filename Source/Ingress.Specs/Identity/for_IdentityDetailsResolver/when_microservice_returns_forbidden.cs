@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
+using Cratis.Arc.Identity;
 
 namespace Cratis.Ingress.Identity.for_IdentityDetailsResolver;
 
@@ -9,7 +10,7 @@ public class when_microservice_returns_forbidden : Specification
 {
     IdentityDetailsResolver _resolver;
     DefaultHttpContext _context;
-    bool _result;
+    IdentityProviderResult _result;
 
     void Establish()
     {
@@ -33,6 +34,6 @@ public class when_microservice_returns_forbidden : Specification
 
     async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid());
 
-    [Fact] void should_return_false() => Assert.False(_result);
+    [Fact] void should_not_be_authorized() => Assert.False(_result.IsAuthorized);
     [Fact] void should_set_403_on_response() => Assert.Equal(StatusCodes.Status403Forbidden, _context.Response.StatusCode);
 }

@@ -17,7 +17,8 @@ public class when_building_from_authenticated_context_with_oid_claim : Specifica
             new Claim("preferred_username", "user@example.com"),
             new Claim(ClaimTypes.Role, "admin"),
             new Claim("tid", "tenant-abc")
-        ], "aad");
+        ],
+        "aad");
         _context.User = new ClaimsPrincipal(identity);
     }
 

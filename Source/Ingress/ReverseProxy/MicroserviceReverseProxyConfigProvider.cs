@@ -2,10 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Identity;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
-using Yarp.ReverseProxy.Transforms;
 
 namespace Cratis.Ingress.ReverseProxy;
 
@@ -26,6 +24,7 @@ namespace Cratis.Ingress.ReverseProxy;
 /// microservice works without any special client configuration.
 /// </para>
 /// </summary>
+/// <param name="config">The options monitor providing the current ingress configuration.</param>
 public class MicroserviceReverseProxyConfigProvider(
     IOptionsMonitor<IngressConfig> config) : IProxyConfigProvider
 {
@@ -40,10 +39,6 @@ public class MicroserviceReverseProxyConfigProvider(
 
     /// <inheritdoc/>
     public IProxyConfig GetConfig() => _inner.GetConfig();
-
-    // -------------------------------------------------------------------------
-    // Route construction
-    // -------------------------------------------------------------------------
 
     static List<RouteConfig> BuildRoutes(IngressConfig config)
     {
@@ -62,7 +57,7 @@ public class MicroserviceReverseProxyConfigProvider(
 
             if (ms.Frontend is not null)
             {
-                routes.AddRange(FrontendRoutes(key, isSingleMicroservice));
+                routes.AddRange(FrontendRoutes(key));
             }
         }
 
@@ -162,7 +157,7 @@ public class MicroserviceReverseProxyConfigProvider(
         }
     }
 
-    static IEnumerable<RouteConfig> FrontendRoutes(string microserviceKey, bool isSingle)
+    static IEnumerable<RouteConfig> FrontendRoutes(string microserviceKey)
     {
         // Header-matched frontend route
         yield return new RouteConfig
@@ -211,10 +206,6 @@ public class MicroserviceReverseProxyConfigProvider(
         };
     }
 
-    // -------------------------------------------------------------------------
-    // Cluster construction
-    // -------------------------------------------------------------------------
-
     static List<ClusterConfig> BuildClusters(IngressConfig config)
     {
         var clusters = new List<ClusterConfig>();
@@ -249,10 +240,6 @@ public class MicroserviceReverseProxyConfigProvider(
 
         return clusters;
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
 
     static string BackendClusterId(string key) => $"{key}-backend-cluster";
     static string FrontendClusterId(string key) => $"{key}-frontend-cluster";

@@ -25,7 +25,11 @@ public class when_tenant_resolution_fails_and_resolutions_are_configured : Speci
         tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>()).Returns(false);
 
         _middleware = new TenancyMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             optionsMonitor,
             tenantResolver,
             Substitute.For<IIdentityDetailsResolver>(),

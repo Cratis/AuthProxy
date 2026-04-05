@@ -6,7 +6,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 var testApp = builder.AddProject<Projects.TestApp>("testapp")
     .WithHttpEndpoint(port: 5001);
 
-var web = builder.AddNpmApp("web", "../Web")
+builder.AddNpmApp("web", "../Web")
     .WithHttpEndpoint(port: 9100, env: "PORT");
 
 builder.AddProject<Projects.Ingress>("ingress")
@@ -14,4 +14,4 @@ builder.AddProject<Projects.Ingress>("ingress")
     .WithReference(testApp)
     .WaitFor(testApp);
 
-builder.Build().Run();
+await builder.Build().RunAsync();

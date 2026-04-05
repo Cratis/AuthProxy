@@ -12,6 +12,7 @@ namespace Cratis.Ingress.Invites;
 /// <summary>
 /// Validates invite JWT tokens issued by Cratis Studio using a pinned RSA public key.
 /// </summary>
+/// <param name="config">The options monitor providing the current ingress configuration.</param>
 public class InviteTokenValidator(IOptionsMonitor<IngressConfig> config) : IInviteTokenValidator
 {
     /// <inheritdoc/>
@@ -26,9 +27,17 @@ public class InviteTokenValidator(IOptionsMonitor<IngressConfig> config) : IInvi
         RsaSecurityKey securityKey;
         try
         {
-            var rsa = RSA.Create();
-            rsa.ImportFromPem(invite.PublicKeyPem);
-            securityKey = new RsaSecurityKey(rsa);
+            RSA? rsa = null;
+            try
+            {
+                rsa = RSA.Create();
+                rsa.ImportFromPem(invite.PublicKeyPem);
+                securityKey = new RsaSecurityKey(rsa.ExportParameters(false));
+            }
+            finally
+            {
+                rsa?.Dispose();
+            }
         }
         catch
         {

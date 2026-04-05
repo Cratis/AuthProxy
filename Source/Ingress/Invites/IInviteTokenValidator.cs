@@ -12,7 +12,7 @@ public interface IInviteTokenValidator
     /// Validates the invite <paramref name="token"/> against the configured public key and claims.
     /// </summary>
     /// <param name="token">The raw JWT string to validate.</param>
-    /// <returns><c>true</c> if the token is valid; otherwise <c>false</c>.</returns>
+    /// <returns><see langword="true"/> if the token is valid; otherwise <see langword="false"/>.</returns>
     bool Validate(string token);
 
     /// <summary>
@@ -21,6 +21,6 @@ public interface IInviteTokenValidator
     /// <param name="token">The raw JWT string.</param>
     /// <param name="claimType">The claim type to look up.</param>
     /// <param name="claimValue">The claim value if found; empty string otherwise.</param>
-    /// <returns><c>true</c> if the claim was found; otherwise <c>false</c>.</returns>
+    /// <returns><see langword="true"/> if the claim was found; otherwise <see langword="false"/>.</returns>
     bool TryGetClaim(string token, string claimType, out string claimValue);
 }

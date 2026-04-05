@@ -7,6 +7,8 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Cratis.Ingress.Composition</RootNamespace>
     <UserSecretsId>9f60d479-1589-4c32-b49a-075cfd3f6149</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;MA0048</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

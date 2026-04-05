@@ -14,8 +14,13 @@ public static class ClientPrincipalExtensions
     /// <summary>
     /// Builds a <see cref="ClientPrincipal"/> from the authenticated
     /// <see cref="ClaimsPrincipal"/> on the given <paramref name="context"/>.
-    /// Returns <c>null</c> when the user is not authenticated.
+    /// Returns <see langword="null"/> when the user is not authenticated.
     /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to read the claims from.</param>
+    /// <returns>
+    /// A populated <see cref="ClientPrincipal"/> when the user is authenticated;
+    /// <see langword="null"/> otherwise.
+    /// </returns>
     public static ClientPrincipal? BuildClientPrincipal(this HttpContext context)
     {
         var user = context.User;
@@ -62,6 +67,8 @@ public static class ClientPrincipalExtensions
     /// Adds the three Microsoft Identity Platform headers to an
     /// <see cref="HttpRequest"/> from the given <paramref name="principal"/>.
     /// </summary>
+    /// <param name="request">The <see cref="HttpRequest"/> to enrich with identity headers.</param>
+    /// <param name="principal">The <see cref="ClientPrincipal"/> whose identity to forward.</param>
     public static void SetMicrosoftIdentityHeaders(this HttpRequest request, ClientPrincipal principal)
     {
         request.Headers[Headers.Principal] = principal.ToBase64();
@@ -73,6 +80,8 @@ public static class ClientPrincipalExtensions
     /// Adds the three Microsoft Identity Platform headers to an
     /// <see cref="System.Net.Http.HttpRequestMessage"/> from the given <paramref name="principal"/>.
     /// </summary>
+    /// <param name="requestMessage">The outgoing HTTP request message to enrich.</param>
+    /// <param name="principal">The <see cref="ClientPrincipal"/> whose identity to forward.</param>
     public static void SetMicrosoftIdentityHeaders(this System.Net.Http.HttpRequestMessage requestMessage, ClientPrincipal principal)
     {
         requestMessage.Headers.Remove(Headers.Principal);

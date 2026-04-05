@@ -20,7 +20,8 @@ public class when_using_custom_claim_type_from_options : Specification
         var identity = new ClaimsIdentity(
         [
             new Claim("custom_tenant_claim", "custom-tenant-value")
-        ], "aad");
+        ],
+        "aad");
         _context.User = new ClaimsPrincipal(identity);
     }
 

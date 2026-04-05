@@ -13,6 +13,6 @@ public interface ITenantResolver
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="tenantId">The resolved tenant ID, or <see cref="Guid.Empty"/> when unresolved.</param>
-    /// <returns><c>true</c> if a tenant was resolved; otherwise <c>false</c>.</returns>
+    /// <returns><see langword="true"/> if a tenant was resolved; otherwise <see langword="false"/>.</returns>
     bool TryResolve(HttpContext context, out Guid tenantId);
 }

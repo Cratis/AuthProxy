@@ -5,7 +5,7 @@ namespace Cratis.Ingress.for_TenantResolver;
 
 public class when_specified_strategy_resolves_directly_to_tenant_id : Specification
 {
-    static readonly Guid _expectedTenantId = new("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    static readonly Guid _expectedTenantId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
     TenantResolver _resolver;
     DefaultHttpContext _context;

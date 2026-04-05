@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Arc.Identity;
+
 namespace Cratis.Ingress.for_TenancyMiddleware;
 
 public class when_identity_resolver_denies_access : Specification
@@ -11,7 +13,7 @@ public class when_identity_resolver_denies_access : Specification
 
     void Establish()
     {
-        var tenantId = new Guid("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var tenantId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
         var config = new IngressConfig();
         var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
@@ -20,15 +22,23 @@ public class when_identity_resolver_denies_access : Specification
         var tenantResolver = Substitute.For<ITenantResolver>();
         tenantResolver
             .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>())
-            .Returns(call => { call[1] = tenantId; return true; });
+            .Returns(call =>
+            {
+                call[1] = tenantId;
+                return true;
+            });
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
         identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<Guid>())
-            .Returns(Task.FromResult(false));
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>())
+            .Returns(Task.FromResult(IdentityProviderResult.Unauthorized));
 
         _middleware = new TenancyMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             optionsMonitor,
             tenantResolver,
             identityResolver,

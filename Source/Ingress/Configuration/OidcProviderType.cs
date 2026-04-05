@@ -9,17 +9,17 @@ namespace Cratis.Ingress.Configuration;
 public enum OidcProviderType
 {
     /// <summary>A generic / unknown provider.</summary>
-    Custom,
+    Custom = 0,
 
     /// <summary>Microsoft identity platform (Azure AD / Entra ID).</summary>
-    Microsoft,
+    Microsoft = 1,
 
     /// <summary>Google identity.</summary>
-    Google,
+    Google = 2,
 
     /// <summary>GitHub OAuth / OIDC.</summary>
-    GitHub,
+    GitHub = 3,
 
     /// <summary>Apple Sign-In.</summary>
-    Apple
+    Apple = 4
 }

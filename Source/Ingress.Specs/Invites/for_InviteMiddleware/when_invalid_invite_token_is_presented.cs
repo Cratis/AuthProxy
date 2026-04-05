@@ -1,9 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
-
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
 public class when_invalid_invite_token_is_presented : Specification
@@ -22,7 +19,11 @@ public class when_invalid_invite_token_is_presented : Specification
         optionsMonitor.CurrentValue.Returns(config);
 
         _middleware = new InviteMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             tokenValidator,
             optionsMonitor,
             Substitute.For<IHttpClientFactory>(),

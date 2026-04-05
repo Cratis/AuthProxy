@@ -42,19 +42,11 @@ public class ClientPrincipal
     public IEnumerable<ClientPrincipalClaim> Claims { get; set; } = [];
 
     /// <summary>
-    /// Serialises the principal to a UTF-8 JSON byte array.
-    /// </summary>
-    public byte[] ToJsonBytes() => JsonSerializer.SerializeToUtf8Bytes(this, _serializerOptions);
-
-    /// <summary>
-    /// Serialises the principal to a base64-encoded JSON string suitable for
-    /// the <c>x-ms-client-principal</c> header.
-    /// </summary>
-    public string ToBase64() => Convert.ToBase64String(ToJsonBytes());
-
-    /// <summary>
     /// Attempts to deserialise a <see cref="ClientPrincipal"/> from a base64-encoded header value.
     /// </summary>
+    /// <param name="base64">The base64-encoded JSON string to deserialise.</param>
+    /// <param name="principal">The deserialised <see cref="ClientPrincipal"/>, or <see langword="null"/> when unsuccessful.</param>
+    /// <returns><see langword="true"/> if deserialisation succeeded; otherwise <see langword="false"/>.</returns>
     public static bool TryFromBase64(string? base64, out ClientPrincipal? principal)
     {
         principal = null;
@@ -74,4 +66,17 @@ public class ClientPrincipal
             return false;
         }
     }
+
+    /// <summary>
+    /// Serialises the principal to a UTF-8 JSON byte array.
+    /// </summary>
+    /// <returns>The UTF-8 encoded JSON bytes of this principal.</returns>
+    public byte[] ToJsonBytes() => JsonSerializer.SerializeToUtf8Bytes(this, _serializerOptions);
+
+    /// <summary>
+    /// Serialises the principal to a base64-encoded JSON string suitable for
+    /// the <c>x-ms-client-principal</c> header.
+    /// </summary>
+    /// <returns>A base64-encoded JSON string representing this principal.</returns>
+    public string ToBase64() => Convert.ToBase64String(ToJsonBytes());
 }

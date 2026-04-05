@@ -1,10 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Net;
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
-
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
 public class when_valid_invite_token_is_presented : Specification
@@ -26,7 +22,11 @@ public class when_valid_invite_token_is_presented : Specification
         optionsMonitor.CurrentValue.Returns(config);
 
         _middleware = new InviteMiddleware(
-            _ => { _nextCalled = true; return Task.CompletedTask; },
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
             tokenValidator,
             optionsMonitor,
             Substitute.For<IHttpClientFactory>(),
@@ -48,5 +48,5 @@ public class when_valid_invite_token_is_presented : Specification
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_set_invite_cookie() => _context.Response.Headers["Set-Cookie"].ToString().ShouldContain(Cookies.InviteToken);
+    [Fact] void should_set_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 }

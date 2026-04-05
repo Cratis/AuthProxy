@@ -15,6 +15,8 @@ public static class ReverseProxyExtensions
     /// Registers the YARP reverse proxy, the custom config provider and
     /// the <see cref="InjectIdentityHeadersTransform"/> transform.
     /// </summary>
+    /// <param name="builder">The <see cref="WebApplicationBuilder"/> to configure.</param>
+    /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<MicroserviceReverseProxyConfigProvider>();
@@ -30,10 +32,7 @@ public static class ReverseProxyExtensions
                 handler.KeepAlivePingTimeout = TimeSpan.FromMinutes(2);
                 handler.ConnectTimeout = TimeSpan.FromMinutes(3);
             })
-            .AddTransforms(ctx =>
-            {
-                ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
-            });
+            .AddTransforms(ctx => ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform()));
 
         return builder;
     }
@@ -41,6 +40,8 @@ public static class ReverseProxyExtensions
     /// <summary>
     /// Maps the YARP reverse proxy middleware into the pipeline.
     /// </summary>
+    /// <param name="app">The <see cref="WebApplication"/> to configure.</param>
+    /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>
     public static WebApplication UseReverseProxy(this WebApplication app)
     {
         app.MapReverseProxy();

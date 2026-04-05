@@ -21,6 +21,6 @@ public interface ISourceIdentifierStrategy
     /// <param name="context">Current HTTP context.</param>
     /// <param name="options">Strategy-specific options from configuration.</param>
     /// <param name="sourceIdentifier">The extracted source identifier, or empty string.</param>
-    /// <returns><c>true</c> when a source identifier was extracted.</returns>
+    /// <returns><see langword="true"/> when a source identifier was extracted.</returns>
     bool TryResolveSourceIdentifier(HttpContext context, JsonObject options, out string sourceIdentifier);
 }

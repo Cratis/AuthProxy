@@ -17,7 +17,8 @@ public class when_claim_exists_on_claims_principal : Specification
         var identity = new ClaimsIdentity(
         [
             new Claim("http://schemas.microsoft.com/identity/claims/tenantid", "my-aad-tenant")
-        ], "aad");
+        ],
+        "aad");
         _context.User = new ClaimsPrincipal(identity);
     }
 
