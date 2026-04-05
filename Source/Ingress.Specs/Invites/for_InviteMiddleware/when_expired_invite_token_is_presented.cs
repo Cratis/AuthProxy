@@ -3,7 +3,7 @@
 
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
-public class when_invalid_invite_token_is_presented : Specification
+public class when_expired_invite_token_is_presented : Specification
 {
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
@@ -13,7 +13,7 @@ public class when_invalid_invite_token_is_presented : Specification
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
-        tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Invalid);
+        tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Expired);
 
         var config = new IngressConfig();
         var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
@@ -34,15 +34,15 @@ public class when_invalid_invite_token_is_presented : Specification
             Substitute.For<ILogger<InviteMiddleware>>());
 
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/invite/bad-token";
+        _context.Request.Path = "/invite/expired-token";
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_serve_invitation_invalid_page() =>
+    [Fact] void should_serve_invitation_expired_page() =>
         _errorPageProvider.Received(1).WriteErrorPageAsync(
             _context,
-            WellKnownPageNames.InvitationInvalid,
+            WellKnownPageNames.InvitationExpired,
             StatusCodes.Status401Unauthorized);
 }

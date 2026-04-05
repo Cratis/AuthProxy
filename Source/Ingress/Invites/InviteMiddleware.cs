@@ -3,6 +3,7 @@
 
 using System.Net.Http.Headers;
 using Cratis.Ingress.Configuration;
+using Cratis.Ingress.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,8 @@ namespace Cratis.Ingress.Invites;
 ///   <item>
 ///     Handles <c>/invite/{token}</c> – validates the token, stores it in a short-lived
 ///     HTTP-only cookie and redirects the user to the OIDC login.
+///     If the token is expired the <c>invitation-expired.html</c> error page is returned.
+///     If the token is malformed or has an invalid signature the <c>invitation-invalid.html</c> page is returned.
 ///   </item>
 ///   <item>
 ///     After a successful OIDC login – detects the pending invite cookie, calls the Studio
@@ -26,12 +29,14 @@ namespace Cratis.Ingress.Invites;
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
 /// <param name="config">The ingress configuration monitor.</param>
 /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
+/// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
 public class InviteMiddleware(
     RequestDelegate next,
     IInviteTokenValidator tokenValidator,
     IOptionsMonitor<IngressConfig> config,
     IHttpClientFactory httpClientFactory,
+    IErrorPageProvider errorPageProvider,
     ILogger<InviteMiddleware> logger)
 {
     /// <summary>The route prefix that triggers invite handling.</summary>
@@ -50,10 +55,19 @@ public class InviteMiddleware(
                 return;
             }
 
-            if (!tokenValidator.Validate(token))
+            var validationResult = tokenValidator.ValidateDetailed(token);
+            if (validationResult != InviteTokenValidationResult.Valid)
             {
                 logger.InviteTokenValidationFailed(context.Request.Path);
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+                var pageName = validationResult == InviteTokenValidationResult.Expired
+                    ? WellKnownPageNames.InvitationExpired
+                    : WellKnownPageNames.InvitationInvalid;
+
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    pageName,
+                    StatusCodes.Status401Unauthorized);
                 return;
             }
 

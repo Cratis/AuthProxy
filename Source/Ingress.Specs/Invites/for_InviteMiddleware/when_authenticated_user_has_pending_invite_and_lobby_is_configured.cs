@@ -44,6 +44,7 @@ public class when_authenticated_user_has_pending_invite_and_lobby_is_configured 
             tokenValidator,
             optionsMonitor,
             httpClientFactory,
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
 
         _context = new DefaultHttpContext();

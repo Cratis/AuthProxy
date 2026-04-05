@@ -37,7 +37,9 @@ public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobb
             },
             optionsMonitor,
             tenantResolver,
+            Substitute.For<ITenantVerifier>(),
             Substitute.For<IIdentityDetailsResolver>(),
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();

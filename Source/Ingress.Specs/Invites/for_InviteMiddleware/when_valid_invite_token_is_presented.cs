@@ -12,7 +12,7 @@ public class when_valid_invite_token_is_presented : Specification
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
-        tokenValidator.Validate(Arg.Any<string>()).Returns(true);
+        tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Valid);
 
         var config = new IngressConfig
         {
@@ -30,6 +30,7 @@ public class when_valid_invite_token_is_presented : Specification
             tokenValidator,
             optionsMonitor,
             Substitute.For<IHttpClientFactory>(),
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
 
         _context = new DefaultHttpContext();
