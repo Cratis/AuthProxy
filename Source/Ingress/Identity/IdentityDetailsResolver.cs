@@ -13,6 +13,9 @@ namespace Cratis.Ingress.Identity;
 /// identity details, merges the JSON results and stores them in the <c>.cratis-identity</c>
 /// response cookie as a base64-encoded JSON string.
 /// </summary>
+/// <param name="config">The ingress configuration.</param>
+/// <param name="httpClientFactory">The HTTP client factory.</param>
+/// <param name="logger">The logger.</param>
 public class IdentityDetailsResolver(
     IOptionsMonitor<IngressConfig> config,
     IHttpClientFactory httpClientFactory,
@@ -33,7 +36,7 @@ public class IdentityDetailsResolver(
         foreach (var (name, microservice) in microservices)
         {
             var shouldResolve = microservice.ResolveIdentityDetails
-                ?? microservice.Backend is not null;
+                ?? (microservice.Backend is not null);
 
             if (!shouldResolve || microservice.Backend is null)
             {
@@ -72,7 +75,7 @@ public class IdentityDetailsResolver(
                 Expires = null,     // Session cookie.
             });
 
-            logger.LogDebug("Identity details resolved and stored in cookie for user {UserId}.", principal.UserId);
+            logger.IdentityDetailsCookieWritten(principal.UserId);
         }
 
         return true;
@@ -86,7 +89,7 @@ public class IdentityDetailsResolver(
         HttpResponse response)
     {
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
-        logger.LogDebug("Calling identity endpoint {Url} for microservice '{Microservice}'.", url, microserviceName);
+        logger.CallingIdentityEndpoint(url, microserviceName);
 
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -100,26 +103,20 @@ public class IdentityDetailsResolver(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error calling identity endpoint for microservice '{Microservice}'.", microserviceName);
+            logger.ErrorCallingIdentityEndpoint(ex, microserviceName);
             return new JsonObject();    // Non-fatal – continue without details.
         }
 
         if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
         {
-            logger.LogWarning(
-                "Microservice '{Microservice}' returned 403 for user {UserId} – access denied.",
-                microserviceName,
-                principal.UserId);
+            logger.IdentityEndpointForbidden(microserviceName, principal.UserId);
             response.StatusCode = StatusCodes.Status403Forbidden;
             return null;
         }
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            logger.LogWarning(
-                "Identity endpoint for '{Microservice}' returned {StatusCode}. Identity details skipped.",
-                microserviceName,
-                httpResponse.StatusCode);
+            logger.IdentityEndpointUnsuccessful(microserviceName, (int)httpResponse.StatusCode);
             return new JsonObject();
         }
 
@@ -135,7 +132,7 @@ public class IdentityDetailsResolver(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Could not parse identity response from '{Microservice}'.", microserviceName);
+            logger.CouldNotParseIdentityResponse(ex, microserviceName);
             return new JsonObject();
         }
     }

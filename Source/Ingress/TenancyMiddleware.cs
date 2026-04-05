@@ -44,14 +44,14 @@ public class TenancyMiddleware(
                 && !context.Request.Path.StartsWithSegments(WellKnownPaths.InvitePathPrefix)
                 && !context.Request.Cookies.ContainsKey(Cookies.InviteToken))
             {
-                logger.LogDebug("No tenant resolved for {Path}. Redirecting to lobby.", context.Request.Path);
+                logger.RedirectingToLobby(context.Request.Path);
                 context.Response.Redirect(lobbyUrl);
                 return;
             }
 
             if (config.CurrentValue.TenantResolutions.Count > 0)
             {
-                logger.LogWarning("Could not resolve tenant for request {Path}. Returning 401.", context.Request.Path);
+                logger.CouldNotResolveTenant(context.Request.Path);
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
