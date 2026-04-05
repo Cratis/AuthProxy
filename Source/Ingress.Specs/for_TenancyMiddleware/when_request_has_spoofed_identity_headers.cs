@@ -26,7 +26,9 @@ public class when_request_has_spoofed_identity_headers : Specification
             _ => Task.CompletedTask,
             optionsMonitor,
             tenantResolver,
+            Substitute.For<ITenantVerifier>(),
             identityResolver,
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();

@@ -1,16 +1,15 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Arc.Identity;
-
 namespace Cratis.Ingress.for_TenancyMiddleware;
 
-public class when_everything_succeeds : Specification
+public class when_tenant_does_not_exist : Specification
 {
-    static readonly Guid _tenantId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    static readonly Guid _tenantId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
     TenancyMiddleware _middleware;
     DefaultHttpContext _context;
+    IErrorPageProvider _errorPageProvider;
     bool _nextCalled;
 
     void Establish()
@@ -28,13 +27,10 @@ public class when_everything_succeeds : Specification
                 return true;
             });
 
-        var identityResolver = Substitute.For<IIdentityDetailsResolver>();
-        identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>())
-            .Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
-
         var tenantVerifier = Substitute.For<ITenantVerifier>();
-        tenantVerifier.VerifyAsync(Arg.Any<Guid>()).Returns(Task.FromResult(true));
+        tenantVerifier.VerifyAsync(_tenantId).Returns(Task.FromResult(false));
+
+        _errorPageProvider = Substitute.For<IErrorPageProvider>();
 
         _middleware = new TenancyMiddleware(
             _ =>
@@ -45,17 +41,19 @@ public class when_everything_succeeds : Specification
             optionsMonitor,
             tenantResolver,
             tenantVerifier,
-            identityResolver,
-            Substitute.For<IErrorPageProvider>(),
+            Substitute.For<IIdentityDetailsResolver>(),
+            _errorPageProvider,
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();
-        var identity = new ClaimsIdentity([new Claim("oid", "user-id")], "aad");
-        _context.User = new ClaimsPrincipal(identity);
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_call_next() => Assert.True(_nextCalled);
-    [Fact] void should_store_tenant_id_in_context_items() => Assert.Equal(_tenantId, _context.Items[TenancyMiddleware.TenantIdItemKey]);
+    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
+    [Fact] void should_serve_tenant_not_found_page() =>
+        _errorPageProvider.Received(1).WriteErrorPageAsync(
+            _context,
+            WellKnownPageNames.TenantNotFound,
+            StatusCodes.Status404NotFound);
 }

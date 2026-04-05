@@ -16,6 +16,18 @@ public interface IInviteTokenValidator
     bool Validate(string token);
 
     /// <summary>
+    /// Validates the invite <paramref name="token"/> and returns a detailed <see cref="InviteTokenValidationResult"/>
+    /// that distinguishes between a well-formed but expired token and one that is outright invalid.
+    /// </summary>
+    /// <param name="token">The raw JWT string to validate.</param>
+    /// <returns>
+    /// <see cref="InviteTokenValidationResult.Valid"/> if the token passes all checks;
+    /// <see cref="InviteTokenValidationResult.Expired"/> if the token was validly signed but has expired;
+    /// <see cref="InviteTokenValidationResult.Invalid"/> for any other failure (bad signature, malformed, etc.).
+    /// </returns>
+    InviteTokenValidationResult ValidateDetailed(string token);
+
+    /// <summary>
     /// Reads the value of a named claim directly from the token payload without re-validating the signature.
     /// </summary>
     /// <param name="token">The raw JWT string.</param>

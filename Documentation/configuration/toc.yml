@@ -8,3 +8,5 @@
   href: microservices.md
 - name: Invites & Lobby
   href: invites.md
+- name: Error Pages
+  href: error-pages.md

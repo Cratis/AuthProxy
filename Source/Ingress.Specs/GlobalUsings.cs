@@ -4,6 +4,7 @@
 global using System.Security.Claims;
 global using System.Text.Json.Nodes;
 global using Cratis.Ingress.Configuration;
+global using Cratis.Ingress.ErrorPages;
 global using Cratis.Ingress.Identity;
 global using Cratis.Ingress.Tenancy;
 global using Cratis.Specifications;

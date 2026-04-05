@@ -35,6 +35,7 @@ public class when_authenticated_user_has_pending_invite : Specification
             tokenValidator,
             optionsMonitor,
             httpClientFactory,
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
 
         _context = new DefaultHttpContext();

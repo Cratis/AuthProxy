@@ -16,12 +16,16 @@ namespace Cratis.Ingress.Invites;
 public class InviteTokenValidator(IOptionsMonitor<IngressConfig> config) : IInviteTokenValidator
 {
     /// <inheritdoc/>
-    public bool Validate(string token)
+    public bool Validate(string token) =>
+        ValidateDetailed(token) == InviteTokenValidationResult.Valid;
+
+    /// <inheritdoc/>
+    public InviteTokenValidationResult ValidateDetailed(string token)
     {
         var invite = config.CurrentValue.Invite;
         if (invite is null || string.IsNullOrWhiteSpace(invite.PublicKeyPem))
         {
-            return false;
+            return InviteTokenValidationResult.Invalid;
         }
 
         RsaSecurityKey securityKey;
@@ -41,7 +45,7 @@ public class InviteTokenValidator(IOptionsMonitor<IngressConfig> config) : IInvi
         }
         catch
         {
-            return false;
+            return InviteTokenValidationResult.Invalid;
         }
 
         var handler = new JsonWebTokenHandler();
@@ -58,7 +62,15 @@ public class InviteTokenValidator(IOptionsMonitor<IngressConfig> config) : IInvi
         };
 
         var result = handler.ValidateTokenAsync(token, parameters).GetAwaiter().GetResult();
-        return result.IsValid;
+
+        if (result.IsValid)
+        {
+            return InviteTokenValidationResult.Valid;
+        }
+
+        return result.Exception is SecurityTokenExpiredException
+            ? InviteTokenValidationResult.Expired
+            : InviteTokenValidationResult.Invalid;
     }
 
     /// <inheritdoc/>

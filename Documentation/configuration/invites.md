@@ -12,9 +12,12 @@ redirected while they complete the onboarding process.
 
 1. A user receives a link in the form `https://your-ingress/invite/<token>`.
 2. Ingress validates the token against the configured RSA public key.
-3. If valid, the token is stored in a short-lived HTTP-only cookie and the user is redirected to
-   the OIDC login.
-4. If invalid, Ingress returns `401 Unauthorized`.
+3. If the token is **valid**, it is stored in a short-lived HTTP-only cookie and the user is
+   redirected to the OIDC login.
+4. If the token has **expired** (valid signature but past its `exp` claim), Ingress serves
+   `invitation-expired.html` with HTTP 401.
+5. If the token is **invalid** (malformed, bad signature, or unparseable), Ingress serves
+   `invitation-invalid.html` with HTTP 401.
 
 ### Phase 2 – Post-login exchange
 
@@ -102,3 +105,20 @@ Recommended claims:
 | Path | Description |
 |------|-------------|
 | `/invite/<token>` | Phase 1 – validates the token and starts the OIDC flow. |
+
+---
+
+## Invitation error pages
+
+Ingress distinguishes between two token failure modes and serves a dedicated page for each:
+
+| Page file | Condition |
+|-----------|-----------|
+| `invitation-expired.html` | The token had a valid signature but has passed its `exp` claim. |
+| `invitation-invalid.html` | The token is malformed, carries an invalid signature, or cannot be parsed. |
+
+Both pages are served with HTTP 401.
+These pages use full descriptive names rather than numeric error codes because they represent
+application-level conditions, not generic HTTP errors.
+
+See [Error pages](error-pages.md) for how to override these pages with your own custom versions.

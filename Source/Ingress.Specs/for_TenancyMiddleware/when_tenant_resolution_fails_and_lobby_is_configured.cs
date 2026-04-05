@@ -41,7 +41,9 @@ public class when_tenant_resolution_fails_and_lobby_is_configured : Specificatio
             },
             optionsMonitor,
             tenantResolver,
+            Substitute.For<ITenantVerifier>(),
             Substitute.For<IIdentityDetailsResolver>(),
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();

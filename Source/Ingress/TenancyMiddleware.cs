@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Ingress.Configuration;
+using Cratis.Ingress.ErrorPages;
 using Cratis.Ingress.Identity;
+using Cratis.Ingress.Tenancy;
 using Microsoft.Extensions.Options;
 
 namespace Cratis.Ingress;
@@ -12,19 +14,24 @@ namespace Cratis.Ingress;
 /// <list type="number">
 ///   <item>Strip inbound identity headers so clients cannot spoof them.</item>
 ///   <item>Resolve the tenant from the request and store it in <see cref="HttpContext.Items"/>.</item>
+///   <item>Verify the resolved tenant exists (when verification is configured).</item>
 ///   <item>Call <c>/.cratis/me</c> on configured microservices and write the identity cookie.</item>
 /// </list>
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The ingress configuration monitor.</param>
 /// <param name="tenantResolver">The tenant resolver.</param>
+/// <param name="tenantVerifier">The tenant existence verifier.</param>
 /// <param name="identityDetailsResolver">The identity details resolver.</param>
+/// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
 public class TenancyMiddleware(
     RequestDelegate next,
     IOptionsMonitor<IngressConfig> config,
     ITenantResolver tenantResolver,
+    ITenantVerifier tenantVerifier,
     IIdentityDetailsResolver identityDetailsResolver,
+    IErrorPageProvider errorPageProvider,
     ILogger<TenancyMiddleware> logger)
 {
     /// <summary>Key used to store the resolved tenant ID in <see cref="HttpContext.Items"/>.</summary>
@@ -67,20 +74,37 @@ public class TenancyMiddleware(
             }
         }
 
+        // 3. Verify the resolved tenant exists (when verification is configured).
+        if (tenantId != Guid.Empty && !await tenantVerifier.VerifyAsync(tenantId))
+        {
+            logger.TenantDoesNotExist(tenantId, SanitizePath(context.Request.Path));
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.TenantNotFound,
+                StatusCodes.Status404NotFound);
+            return;
+        }
+
         context.Items[TenantIdItemKey] = tenantId;
 
-        // 3. If the user is authenticated, resolve identity details (call /.cratis/me).
+        // 4. If the user is authenticated, resolve identity details (call /.cratis/me).
         var principal = context.BuildClientPrincipal();
         if (principal is not null && tenantId != Guid.Empty)
         {
             var result = await identityDetailsResolver.Resolve(context, principal, tenantId);
             if (!result.IsAuthorized)
             {
-                // 403 already written by the resolver.
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    WellKnownPageNames.Forbidden,
+                    StatusCodes.Status403Forbidden);
                 return;
             }
         }
 
         await next(context);
     }
+
+    static string SanitizePath(PathString path) =>
+        (path.Value ?? string.Empty).Replace('\r', '_').Replace('\n', '_');
 }

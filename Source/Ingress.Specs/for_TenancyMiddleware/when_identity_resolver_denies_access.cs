@@ -33,6 +33,9 @@ public class when_identity_resolver_denies_access : Specification
             .Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>())
             .Returns(Task.FromResult(IdentityProviderResult.Unauthorized));
 
+        var tenantVerifier = Substitute.For<ITenantVerifier>();
+        tenantVerifier.VerifyAsync(Arg.Any<Guid>()).Returns(Task.FromResult(true));
+
         _middleware = new TenancyMiddleware(
             _ =>
             {
@@ -41,7 +44,9 @@ public class when_identity_resolver_denies_access : Specification
             },
             optionsMonitor,
             tenantResolver,
+            tenantVerifier,
             identityResolver,
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();

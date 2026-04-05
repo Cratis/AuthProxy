@@ -14,4 +14,8 @@
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Pages/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

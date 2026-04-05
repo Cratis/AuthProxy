@@ -2,10 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Ingress.Configuration;
+using Cratis.Ingress.ErrorPages;
 using Cratis.Ingress.Invites;
 using Cratis.Ingress.ReverseProxy;
+using Cratis.Ingress.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 
 namespace Cratis.Ingress;
@@ -43,6 +46,10 @@ public static class IngressExtensions
             options.KnownProxies.Clear();
         });
 
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
+        builder.Services.AddSingleton<IErrorPageProvider, ErrorPageProvider>();
+
         return builder;
     }
 
@@ -57,6 +64,7 @@ public static class IngressExtensions
     {
         app.UseForwardedHeaders();
         app.UseStaticFiles();
+        UsePagesStaticFiles(app);
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseMiddleware<TenancyMiddleware>();
@@ -66,6 +74,26 @@ public static class IngressExtensions
         app.UseReverseProxy();
 
         return app;
+    }
+
+    static void UsePagesStaticFiles(WebApplication app)
+    {
+        var config = app.Services.GetRequiredService<IOptionsMonitor<IngressConfig>>();
+        var configured = config.CurrentValue.PagesPath;
+        var pagesDirectory = !string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured)
+            ? configured
+            : Path.Combine(app.Environment.ContentRootPath, "Pages");
+
+        if (!Directory.Exists(pagesDirectory))
+        {
+            return;
+        }
+
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(pagesDirectory),
+            RequestPath = "/_pages",
+        });
     }
 
     static void MapIngressEndpoints(this WebApplication app)
