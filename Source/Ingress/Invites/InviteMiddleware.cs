@@ -48,7 +48,7 @@ public class InviteMiddleware(
 
             if (!tokenValidator.Validate(token))
             {
-                logger.LogWarning("Invite token validation failed for path {Path}.", context.Request.Path);
+                logger.InviteTokenValidationFailed(context.Request.Path);
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
@@ -106,7 +106,7 @@ public class InviteMiddleware(
         var exchangeUrl = config.CurrentValue.Invite?.ExchangeUrl;
         if (string.IsNullOrWhiteSpace(exchangeUrl))
         {
-            logger.LogWarning("Invite exchange URL is not configured – skipping invite exchange.");
+            logger.InviteExchangeUrlNotConfigured();
             return false;
         }
 
@@ -126,20 +126,17 @@ public class InviteMiddleware(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to call invite exchange endpoint at {Url}.", exchangeUrl);
+            logger.FailedToCallInviteExchangeEndpoint(ex, exchangeUrl);
             return false;
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            logger.LogWarning(
-                "Invite exchange endpoint returned {StatusCode} for subject {Subject}.",
-                response.StatusCode,
-                subject);
+            logger.InviteExchangeEndpointFailed((int)response.StatusCode, subject);
             return false;
         }
 
-        logger.LogInformation("Invite exchanged successfully for subject {Subject}.", subject);
+        logger.InviteExchangedSuccessfully(subject);
         return true;
     }
 

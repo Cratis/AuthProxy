@@ -47,7 +47,7 @@ public class TenantResolver(
                 && Guid.TryParse(sourceIdentifier, out var specifiedId))
             {
                 tenantId = specifiedId;
-                logger.LogDebug("Tenant resolved via Specified strategy to {TenantId}.", tenantId);
+                logger.TenantResolvedViaSpecifiedStrategy(tenantId);
                 return true;
             }
 
@@ -58,22 +58,15 @@ public class TenantResolver(
                     || tenantConfig.SourceIdentifiers.Contains(sourceIdentifier, StringComparer.OrdinalIgnoreCase))
                 {
                     tenantId = id;
-                    logger.LogDebug(
-                        "Tenant resolved via {Strategy} strategy using source identifier '{SourceIdentifier}' to {TenantId}.",
-                        resolution.Strategy,
-                        sourceIdentifier,
-                        tenantId);
+                    logger.TenantResolved(resolution.Strategy, sourceIdentifier, tenantId);
                     return true;
                 }
             }
 
-            logger.LogWarning(
-                "Source identifier '{SourceIdentifier}' resolved by {Strategy} strategy but matched no configured tenant.",
-                sourceIdentifier,
-                resolution.Strategy);
+            logger.SourceIdentifierMatchedNoTenant(sourceIdentifier, resolution.Strategy);
         }
 
-        logger.LogWarning("None of the configured tenant resolution strategies could resolve a tenant.");
+        logger.NoStrategyResolvedTenant();
         return false;
     }
 }
