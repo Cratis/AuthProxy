@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Net.Http.Headers;
+using System.Security.Claims;
 using Cratis.Ingress;
 using Cratis.Ingress.Configuration;
 using Cratis.Ingress.Identity;
@@ -10,6 +12,7 @@ using Cratis.Ingress.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
@@ -38,10 +41,7 @@ builder.Services
 // Both can be active simultaneously; the middleware challenges with OIDC for
 // browser requests and with Bearer for API calls.
 var authBuilder = builder.Services
-    .AddAuthentication(options =>
-    {
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    })
+    .AddAuthentication(options => options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
     {
         options.Cookie.HttpOnly = true;
@@ -86,43 +86,87 @@ var oidcProviders = builder.Configuration
 foreach (var provider in oidcProviders)
 {
     var schemeName = OidcProviderScheme.FromName(provider.Name);
-    authBuilder.AddOpenIdConnect(schemeName, options =>
-    {
-        options.Authority = provider.Authority;
-        options.ClientId = provider.ClientId;
-        options.ClientSecret = provider.ClientSecret;
-        options.ResponseType = "code";
-        options.SaveTokens = true;
-        options.GetClaimsFromUserInfoEndpoint = true;
-        options.Scope.Add("openid");
-        options.Scope.Add("profile");
-        options.Scope.Add("email");
-        foreach (var scope in provider.Scopes)
-        {
-            options.Scope.Add(scope);
-        }
 
-        options.CallbackPath = $"/signin-{schemeName}";
-    });
+    // GitHub uses OAuth 2.0, not OpenID Connect — it has no OIDC discovery endpoint.
+    // Detect GitHub by authority URL so the check works regardless of the configured Type value.
+    // Register it with AddOAuth and map claims from the GitHub user-info API manually.
+    if (provider.Authority.StartsWith("https://github.com", StringComparison.OrdinalIgnoreCase))
+    {
+        authBuilder.AddOAuth(schemeName, options =>
+        {
+            options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
+            options.TokenEndpoint = "https://github.com/login/oauth/access_token";
+            options.UserInformationEndpoint = "https://api.github.com/user";
+            options.ClientId = provider.ClientId;
+            options.ClientSecret = provider.ClientSecret;
+            options.CallbackPath = $"/signin-{schemeName}";
+            options.SaveTokens = true;
+
+            // Request the minimal scopes needed to read the user's profile and email.
+            options.Scope.Add("user:email");
+            foreach (var scope in provider.Scopes)
+            {
+                options.Scope.Add(scope);
+            }
+
+            // Map the GitHub user-info JSON fields to standard claims.
+            options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
+            options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
+            options.ClaimActions.MapJsonKey("urn:github:name", "name");
+            options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
+            options.ClaimActions.MapJsonKey("urn:github:avatar", "avatar_url");
+
+            options.Events = new OAuthEvents
+            {
+                OnCreatingTicket = async ctx =>
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
+                    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
+
+                    var response = await ctx.Backchannel.SendAsync(request, ctx.HttpContext.RequestAborted);
+                    response.EnsureSuccessStatusCode();
+
+                    using var user = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
+                    ctx.RunClaimActions(user.RootElement);
+                }
+            };
+        });
+    }
+    else
+    {
+        authBuilder.AddOpenIdConnect(schemeName, options =>
+        {
+            options.Authority = provider.Authority;
+            options.ClientId = provider.ClientId;
+            options.ClientSecret = provider.ClientSecret;
+            options.ResponseType = "code";
+            options.SaveTokens = true;
+            options.GetClaimsFromUserInfoEndpoint = true;
+            options.Scope.Add("openid");
+            options.Scope.Add("profile");
+            options.Scope.Add("email");
+            foreach (var scope in provider.Scopes)
+            {
+                options.Scope.Add(scope);
+            }
+
+            options.CallbackPath = $"/signin-{schemeName}";
+        });
+    }
 }
 
 var jwtSection = builder.Configuration.GetSection("Authentication:JwtBearer");
 if (jwtSection.Exists())
 {
-    authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
-    {
-        jwtSection.Bind(options);
-    });
+    authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, jwtSection.Bind);
 }
 
-builder.Services.AddAuthorization(options =>
-{
-    // Set the default policy to require an authenticated user.
-    // Note: do not use AddPolicy("default", ...) – YARP reserves that name internally.
-    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
-        .Build();
-});
+        .Build());
 
 // ── Tenancy ────────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<ISourceIdentifierStrategy, HostSourceIdentifierStrategy>();
