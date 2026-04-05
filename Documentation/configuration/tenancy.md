@@ -107,3 +107,42 @@ See [Invites & Lobby](invites.md) for details.
 
 If no lobby is configured and `TenantResolutions` is non-empty, Ingress returns `401 Unauthorized`.
 When `TenantResolutions` is empty (not configured), the request proceeds without a tenant.
+
+---
+
+## Tenant verification
+
+After a tenant has been resolved Ingress can verify that it actually **exists** in your platform
+before forwarding the request. This is an opt-in feature — when not configured all resolved
+tenants are accepted without a remote check.
+
+### How it works
+
+Ingress issues an HTTP GET to a configurable URL. The remote service must return:
+
+- **200** – tenant exists, request proceeds.
+- **404** – tenant does not exist; Ingress serves `tenant-not-found.html` with HTTP 404.
+- Any other status or network error – Ingress treats the tenant as not found and serves the same page.
+
+### Configuration
+
+```json
+{
+  "Ingress": {
+    "TenantVerification": {
+      "UrlTemplate": "https://platform.example.com/api/tenants/{tenantId}"
+    }
+  }
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `UrlTemplate` | `string` | URL to call for verification. Use `{tenantId}` as a placeholder for the resolved tenant GUID. |
+
+The `{tenantId}` placeholder is replaced at runtime with the resolved tenant ID.
+
+### Tenant not found page
+
+When verification fails, the `tenant-not-found.html` page is served.
+See [Error pages](error-pages.md) for how to override this page with your own custom version.
