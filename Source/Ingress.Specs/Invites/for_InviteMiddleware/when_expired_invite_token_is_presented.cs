@@ -29,6 +29,7 @@ public class when_expired_invite_token_is_presented : Specification
             },
             tokenValidator,
             optionsMonitor,
+            CreateEmptyAuthConfig(),
             Substitute.For<IHttpClientFactory>(),
             _errorPageProvider,
             Substitute.For<ILogger<InviteMiddleware>>());
@@ -45,4 +46,11 @@ public class when_expired_invite_token_is_presented : Specification
             _context,
             WellKnownPageNames.InvitationExpired,
             StatusCodes.Status401Unauthorized);
+
+    static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
+    {
+        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
+        monitor.CurrentValue.Returns(new AuthenticationConfig());
+        return monitor;
+    }
 }

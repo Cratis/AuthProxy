@@ -17,6 +17,7 @@ condition is detected:
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
 | `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
+| `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 
 ---
 
@@ -79,6 +80,62 @@ passed its `exp` claim. The user should request a fresh invitation.
 
 Served when the token on an `/invite/<token>` link is malformed, carries an invalid signature,
 or cannot be parsed at all. This typically indicates a truncated or otherwise corrupted link.
+
+### `invitation-select-provider.html`
+
+Served when a valid invite link is followed and **two or more** identity providers are configured.
+Before serving the page, Ingress injects the `.cratis-providers` cookie (see below) so the page
+can render a sign-in button for each available provider without an additional HTTP round-trip.
+
+The built-in page reads the cookie with JavaScript and renders one sign-in button per provider.
+You can override it with a custom branded version by placing your own `invitation-select-provider.html`
+in the configured pages directory.
+
+---
+
+## Provider info cookie (`.cratis-providers`)
+
+When Ingress serves the `invitation-select-provider.html` page it sets a short-lived, **non-HTTP-only**
+cookie named `.cratis-providers`.  The cookie value is a URL-encoded JSON array where each element
+describes one configured identity provider:
+
+```json
+[
+  {
+    "name": "Microsoft",
+    "type": "Microsoft",
+    "loginUrl": "/.cratis/login/microsoft"
+  },
+  {
+    "name": "Google",
+    "type": "Google",
+    "loginUrl": "/.cratis/login/google"
+  }
+]
+```
+
+| Field | Description |
+|-------|-------------|
+| `name` | Display name of the provider (from `Authentication:OidcProviders[].Name`). |
+| `type` | Provider type hint — `Microsoft`, `Google`, `GitHub`, `Apple`, or `Custom`. |
+| `loginUrl` | Ingress-relative URL that initiates the OIDC/OAuth challenge for the provider. |
+
+A custom `invitation-select-provider.html` page can read this cookie with JavaScript:
+
+```javascript
+function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+var providers = JSON.parse(getCookie('.cratis-providers') || '[]');
+providers.forEach(function(provider) {
+    var a = document.createElement('a');
+    a.href = provider.loginUrl;
+    a.textContent = 'Sign in with ' + provider.name;
+    document.getElementById('providers').appendChild(a);
+});
+```
 
 ---
 

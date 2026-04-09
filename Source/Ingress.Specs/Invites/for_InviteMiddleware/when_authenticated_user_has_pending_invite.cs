@@ -34,6 +34,7 @@ public class when_authenticated_user_has_pending_invite : Specification
             },
             tokenValidator,
             optionsMonitor,
+            CreateEmptyAuthConfig(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
@@ -54,4 +55,11 @@ public class when_authenticated_user_has_pending_invite : Specification
 
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
+
+    static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
+    {
+        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
+        monitor.CurrentValue.Returns(new AuthenticationConfig());
+        return monitor;
+    }
 }
