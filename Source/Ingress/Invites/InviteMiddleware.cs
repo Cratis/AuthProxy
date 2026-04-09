@@ -151,6 +151,11 @@ public class InviteMiddleware(
         await next(context);
     }
 
+    /// <summary>
+    /// Aggregates all configured OIDC and OAuth providers into a single enumerable of <see cref="OidcProviderInfo"/>.
+    /// </summary>
+    /// <param name="config">The authentication configuration containing the provider lists.</param>
+    /// <returns>An enumerable of <see cref="OidcProviderInfo"/> for every configured provider.</returns>
     static IEnumerable<OidcProviderInfo> GetAllProviders(AuthenticationConfig config) =>
         config.OidcProviders.Select(OidcProviderScheme.ToProviderInfo)
             .Concat(config.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo));
