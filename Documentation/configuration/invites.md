@@ -12,8 +12,10 @@ redirected while they complete the onboarding process.
 
 1. A user receives a link in the form `https://your-ingress/invite/<token>`.
 2. Ingress validates the token against the configured RSA public key.
-3. If the token is **valid**, it is stored in a short-lived HTTP-only cookie and the user is
-   redirected to the OIDC login.
+3. If the token is **valid**, it is stored in a short-lived HTTP-only cookie.
+   - If **only one** identity provider is configured, the user is redirected directly to that provider's login.
+   - If **multiple** identity providers are configured, Ingress serves `invitation-select-provider.html`
+     with a `.cratis-providers` cookie so the user can choose which provider to log in with.
 4. If the token has **expired** (valid signature but past its `exp` claim), Ingress serves
    `invitation-expired.html` with HTTP 401.
 5. If the token is **invalid** (malformed, bad signature, or unparseable), Ingress serves
@@ -116,9 +118,15 @@ Ingress distinguishes between two token failure modes and serves a dedicated pag
 |-----------|-----------|
 | `invitation-expired.html` | The token had a valid signature but has passed its `exp` claim. |
 | `invitation-invalid.html` | The token is malformed, carries an invalid signature, or cannot be parsed. |
+| `invitation-select-provider.html` | The token is valid and multiple identity providers are configured. |
 
-Both pages are served with HTTP 401.
+All error pages are served with HTTP 401 except `invitation-select-provider.html` which uses HTTP 200.
 These pages use full descriptive names rather than numeric error codes because they represent
 application-level conditions, not generic HTTP errors.
 
-See [Error pages](error-pages.md) for how to override these pages with your own custom versions.
+See [Error pages](error-pages.md) for how to override these pages with your own custom versions
+and for details on the `.cratis-providers` cookie injected into the provider-selection page.
+
+For a full walkthrough of creating a branded custom provider-selection page, including the cookie
+format, JavaScript reading pattern, asset deployment, and a complete end-to-end flow diagram, see
+[Custom Invitation Provider-Selection Page](invitation-provider-selection.md).

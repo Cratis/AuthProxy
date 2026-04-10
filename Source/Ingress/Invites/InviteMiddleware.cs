@@ -16,6 +16,8 @@ namespace Cratis.Ingress.Invites;
 ///   <item>
 ///     Handles <c>/invite/{token}</c> – validates the token, stores it in a short-lived
 ///     HTTP-only cookie and redirects the user to the OIDC login.
+///     If multiple identity providers are configured the invitation provider-selection page
+///     is served so the user can choose which provider to use.
 ///     If the token is expired the <c>invitation-expired.html</c> error page is returned.
 ///     If the token is malformed or has an invalid signature the <c>invitation-invalid.html</c> page is returned.
 ///   </item>
@@ -28,6 +30,7 @@ namespace Cratis.Ingress.Invites;
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
 /// <param name="config">The ingress configuration monitor.</param>
+/// <param name="authConfig">The authentication configuration monitor, used to determine how many providers are available.</param>
 /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
@@ -35,12 +38,19 @@ public class InviteMiddleware(
     RequestDelegate next,
     IInviteTokenValidator tokenValidator,
     IOptionsMonitor<IngressConfig> config,
+    IOptionsMonitor<AuthenticationConfig> authConfig,
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
     ILogger<InviteMiddleware> logger)
 {
     /// <summary>The route prefix that triggers invite handling.</summary>
     public const string InvitePathPrefix = WellKnownPaths.InvitePathPrefix;
+
+    static readonly JsonSerializerOptions _providerSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -80,7 +90,29 @@ public class InviteMiddleware(
                 MaxAge = TimeSpan.FromMinutes(15),
             });
 
-            // Trigger OIDC login – the challenge will redirect the user to the IdP.
+            var currentAuthConfig = authConfig.CurrentValue;
+            var providers = GetAllProviders(currentAuthConfig).ToList();
+
+            if (providers.Count > 1)
+            {
+                // Multiple providers: inject the providers cookie and serve the selection page.
+                var providersJson = JsonSerializer.Serialize(providers, _providerSerializerOptions);
+                context.Response.Cookies.Append(Cookies.Providers, providersJson, new CookieOptions
+                {
+                    HttpOnly = false,
+                    SameSite = SameSiteMode.Lax,
+                    Secure = context.Request.IsHttps,
+                    MaxAge = TimeSpan.FromMinutes(15),
+                });
+
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    WellKnownPageNames.InvitationSelectProvider,
+                    StatusCodes.Status200OK);
+                return;
+            }
+
+            // Single provider or no provider: trigger OIDC login directly.
             await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme);
             return;
         }
@@ -118,6 +150,15 @@ public class InviteMiddleware(
 
         await next(context);
     }
+
+    /// <summary>
+    /// Aggregates all configured OIDC and OAuth providers into a single enumerable of <see cref="OidcProviderInfo"/>.
+    /// </summary>
+    /// <param name="config">The authentication configuration containing the provider lists.</param>
+    /// <returns>An enumerable of <see cref="OidcProviderInfo"/> for every configured provider.</returns>
+    static IEnumerable<OidcProviderInfo> GetAllProviders(AuthenticationConfig config) =>
+        config.OidcProviders.Select(OidcProviderScheme.ToProviderInfo)
+            .Concat(config.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo));
 
     async Task<bool> ExchangeInvite(HttpContext context, string inviteToken)
     {

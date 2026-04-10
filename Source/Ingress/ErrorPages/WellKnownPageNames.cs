@@ -32,4 +32,11 @@ public static class WellKnownPageNames
     /// The page returned when an invitation token is presented that is malformed or has an invalid signature.
     /// </summary>
     public const string InvitationInvalid = "invitation-invalid.html";
+
+    /// <summary>
+    /// The page served when a valid invitation token is presented and multiple identity providers
+    /// are configured.  The page reads the <c>.cratis-providers</c> cookie injected by the proxy
+    /// and renders a sign-in button for each available provider.
+    /// </summary>
+    public const string InvitationSelectProvider = "invitation-select-provider.html";
 }
