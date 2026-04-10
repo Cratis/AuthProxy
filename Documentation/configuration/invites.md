@@ -126,3 +126,7 @@ application-level conditions, not generic HTTP errors.
 
 See [Error pages](error-pages.md) for how to override these pages with your own custom versions
 and for details on the `.cratis-providers` cookie injected into the provider-selection page.
+
+For a full walkthrough of creating a branded custom provider-selection page, including the cookie
+format, JavaScript reading pattern, asset deployment, and a complete end-to-end flow diagram, see
+[Custom Invitation Provider-Selection Page](invitation-provider-selection.md).
