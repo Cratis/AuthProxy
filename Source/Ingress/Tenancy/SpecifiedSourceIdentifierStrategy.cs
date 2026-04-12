@@ -12,7 +12,7 @@ namespace Cratis.Ingress.Tenancy;
 public class SpecifiedSourceIdentifierStrategy : ISourceIdentifierStrategy
 {
     /// <inheritdoc/>
-    public Configuration.TenantSourceIdentifierResolverType Type => Cratis.Ingress.Configuration.TenantSourceIdentifierResolverType.Specified;
+    public Configuration.TenantSourceIdentifierResolverType Type => Configuration.TenantSourceIdentifierResolverType.Specified;
 
     /// <inheritdoc/>
     public bool TryResolveSourceIdentifier(HttpContext context, JsonObject options, out string sourceIdentifier)

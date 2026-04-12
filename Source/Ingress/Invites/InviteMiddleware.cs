@@ -161,6 +161,7 @@ public class InviteMiddleware(
 
             // No providers configured - let Phase 2 or later middleware handle it.
             await next(context);
+            return;
         }
 
         await next(context);

@@ -7,6 +7,7 @@ public class when_valid_invite_token_is_presented : Specification
 {
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
+    Microsoft.AspNetCore.Authentication.IAuthenticationService _authService;
     bool _nextCalled;
 
     void Establish()
@@ -38,12 +39,12 @@ public class when_valid_invite_token_is_presented : Specification
         _context.Request.Path = "/invite/some-token";
 
         // Provide a minimal authentication service so ChallengeAsync does not throw.
-        var authService = Substitute.For<Microsoft.AspNetCore.Authentication.IAuthenticationService>();
-        authService
+        _authService = Substitute.For<Microsoft.AspNetCore.Authentication.IAuthenticationService>();
+        _authService
             .ChallengeAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<Microsoft.AspNetCore.Authentication.AuthenticationProperties>())
             .Returns(Task.CompletedTask);
         var serviceProvider = Substitute.For<IServiceProvider>();
-        serviceProvider.GetService(typeof(Microsoft.AspNetCore.Authentication.IAuthenticationService)).Returns(authService);
+        serviceProvider.GetService(typeof(Microsoft.AspNetCore.Authentication.IAuthenticationService)).Returns(_authService);
         _context.RequestServices = serviceProvider;
     }
 
@@ -51,6 +52,11 @@ public class when_valid_invite_token_is_presented : Specification
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
     [Fact] void should_set_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
+    [Fact] void should_challenge_the_single_provider_scheme() =>
+        _authService.Received(1).ChallengeAsync(
+            _context,
+            OidcProviderScheme.FromName("Microsoft"),
+            Arg.Is<Microsoft.AspNetCore.Authentication.AuthenticationProperties>(properties => properties.RedirectUri == "/invite/some-token"));
 
     static IOptionsMonitor<AuthenticationConfig> CreateSingleProviderAuthConfig()
     {
