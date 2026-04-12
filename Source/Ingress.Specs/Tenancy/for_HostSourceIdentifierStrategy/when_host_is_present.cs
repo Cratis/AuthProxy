@@ -1,12 +1,15 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.Ingress.Tenancy;
+
 namespace Cratis.Ingress.Tenancy.for_HostSourceIdentifierStrategy;
 
 public class when_host_is_present : Specification
 {
     HostSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
+    object _options;
     bool _succeeded;
     string _sourceIdentifier;
 
@@ -14,11 +17,12 @@ public class when_host_is_present : Specification
     {
         _strategy = new HostSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
-        _context.Request.Host = new HostString("my-tenant.example.com");
+        _options = null;
+        _context.Request.Host = new HostString("test.example.net");
     }
 
-    void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, [], out _sourceIdentifier);
+    void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 
-    [Fact] void should_succeed() => Assert.True(_succeeded);
-    [Fact] void should_return_the_host_name() => Assert.Equal("my-tenant.example.com", _sourceIdentifier);
+    [Fact] void should_succeed() => _succeeded.ShouldBeTrue();
+    [Fact] void should_resolve_host() => _sourceIdentifier.ShouldEqual("test.example.net");
 }
