@@ -30,7 +30,7 @@ public class when_identity_resolver_denies_access : Specification
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
         identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>())
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<Guid>())
             .Returns(Task.FromResult(IdentityProviderResult.Unauthorized));
 
         var tenantVerifier = Substitute.For<ITenantVerifier>();

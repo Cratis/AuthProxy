@@ -24,7 +24,7 @@ public class when_authenticated_user_has_pending_invite : Specification
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
-            new System.Net.Http.HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
+            new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
         _middleware = new InviteMiddleware(
             _ =>
@@ -43,9 +43,9 @@ public class when_authenticated_user_has_pending_invite : Specification
         _context.Request.Path = "/";
 
         // Simulate authenticated user.
-        var identity = new System.Security.Claims.ClaimsIdentity(
-            [new System.Security.Claims.Claim("sub", "user-123")], "aad");
-        _context.User = new System.Security.Claims.ClaimsPrincipal(identity);
+        var identity = new ClaimsIdentity(
+            [new Claim("sub", "user-123")], "aad");
+        _context.User = new ClaimsPrincipal(identity);
 
         // Simulate pending invite cookie.
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";

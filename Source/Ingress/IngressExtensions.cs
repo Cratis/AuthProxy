@@ -107,7 +107,11 @@ public static class IngressExtensions
             var oauthProviders = current.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo);
 
             return Results.Json(oidcProviders.Concat(oauthProviders));
-        });
+        })
+        .AllowAnonymous();
+
+        app.MapMethods(WellKnownPaths.Providers, [HttpMethods.Head], () => Results.Ok())
+            .AllowAnonymous();
 
         // Initiates the challenge for the requested provider scheme.
         app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<AuthenticationConfig> authConfig) =>
@@ -126,7 +130,26 @@ public static class IngressExtensions
             var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
             var properties = new AuthenticationProperties { RedirectUri = returnUrl };
             await context.ChallengeAsync(scheme, properties);
-        });
+        })
+        .AllowAnonymous();
+
+        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], async (string scheme, HttpContext context, IOptionsMonitor<AuthenticationConfig> authConfig) =>
+        {
+            var config = authConfig.CurrentValue;
+            var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
+                || config.OAuthProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme);
+
+            if (!providerExists)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
+            var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+            await context.ChallengeAsync(scheme, properties);
+        })
+        .AllowAnonymous();
 
         // Serves the bundled React login-selection SPA.
         var indexHtmlPath = Path.Combine(app.Environment.WebRootPath, "index.html");
@@ -134,6 +157,7 @@ public static class IngressExtensions
         {
             context.Response.ContentType = "text/html";
             await context.Response.SendFileAsync(indexHtmlPath);
-        });
+        })
+        .AllowAnonymous();
     }
 }

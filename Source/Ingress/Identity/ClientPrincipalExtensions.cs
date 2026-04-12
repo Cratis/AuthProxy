@@ -78,11 +78,11 @@ public static class ClientPrincipalExtensions
 
     /// <summary>
     /// Adds the three Microsoft Identity Platform headers to an
-    /// <see cref="System.Net.Http.HttpRequestMessage"/> from the given <paramref name="principal"/>.
+    /// <see cref="HttpRequestMessage"/> from the given <paramref name="principal"/>.
     /// </summary>
     /// <param name="requestMessage">The outgoing HTTP request message to enrich.</param>
     /// <param name="principal">The <see cref="ClientPrincipal"/> whose identity to forward.</param>
-    public static void SetMicrosoftIdentityHeaders(this System.Net.Http.HttpRequestMessage requestMessage, ClientPrincipal principal)
+    public static void SetMicrosoftIdentityHeaders(this HttpRequestMessage requestMessage, ClientPrincipal principal)
     {
         requestMessage.Headers.Remove(Headers.Principal);
         requestMessage.Headers.Remove(Headers.PrincipalId);

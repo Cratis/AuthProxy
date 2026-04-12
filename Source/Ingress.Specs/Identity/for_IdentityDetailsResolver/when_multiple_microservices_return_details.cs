@@ -27,7 +27,7 @@ public class when_multiple_microservices_return_details : Specification
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
-            new System.Net.Http.HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, "{\"propA\":\"valueA\",\"propB\":\"valueB\"}")));
+            new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, "{\"propA\":\"valueA\",\"propB\":\"valueB\"}")));
 
         _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, Substitute.For<ILogger<IdentityDetailsResolver>>());
         _context = new DefaultHttpContext();

@@ -26,7 +26,7 @@ public class when_microservice_returns_forbidden : Specification
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
-            new System.Net.Http.HttpClient(new FakeHttpMessageHandler(HttpStatusCode.Forbidden)));
+            new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.Forbidden)));
 
         _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, Substitute.For<ILogger<IdentityDetailsResolver>>());
         _context = new DefaultHttpContext();
