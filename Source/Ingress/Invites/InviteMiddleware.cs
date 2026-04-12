@@ -148,7 +148,9 @@ public class InviteMiddleware(
             }
 
             // Single provider or no provider: trigger OIDC login directly.
-            await context.ChallengeAsync();
+            var returnUrl = $"{context.Request.Path}{context.Request.QueryString}";
+            var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+            await context.ChallengeAsync(properties);
             return;
         }
 
