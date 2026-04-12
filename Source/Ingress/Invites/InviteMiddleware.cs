@@ -5,7 +5,6 @@ using System.Net.Http.Headers;
 using Cratis.Ingress.Configuration;
 using Cratis.Ingress.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
 
 namespace Cratis.Ingress.Invites;
@@ -55,6 +54,42 @@ public class InviteMiddleware(
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
+        // ── Phase 2: post-login invite exchange ───────────────────────────────
+        // Run this first so authenticated callbacks that return to /invite/{token}
+        // do not get re-challenged and end up in a redirect loop.
+        if (context.User.Identity?.IsAuthenticated == true
+            && context.Request.Cookies.TryGetValue(Cookies.InviteToken, out var inviteToken))
+        {
+            var exchangeSucceeded = await ExchangeInvite(context, inviteToken);
+
+            // Always delete the invite cookie regardless of exchange outcome so
+            // the user is never stuck in a retry loop.
+            context.Response.Cookies.Delete(Cookies.InviteToken);
+
+            // After a successful exchange redirect the user to the lobby so they
+            // can enter the application with their newly assigned tenant – unless
+            // the invite is a tenant-issued invite that matches the resolved tenant,
+            // in which case the user passes directly through to the microservice.
+            if (exchangeSucceeded)
+            {
+                if (IsTenantIssuedInvite(inviteToken, context))
+                {
+                    await next(context);
+                    return;
+                }
+
+                var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+                if (!string.IsNullOrWhiteSpace(lobbyUrl))
+                {
+                    context.Response.Redirect(lobbyUrl);
+                    return;
+                }
+            }
+
+            await next(context);
+            return;
+        }
+
         // ── Phase 1: incoming invite URL ──────────────────────────────────────
         if (context.Request.Path.StartsWithSegments(InvitePathPrefix, out var remaining))
         {
@@ -113,39 +148,8 @@ public class InviteMiddleware(
             }
 
             // Single provider or no provider: trigger OIDC login directly.
-            await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme);
+            await context.ChallengeAsync();
             return;
-        }
-
-        // ── Phase 2: post-login invite exchange ───────────────────────────────
-        if (context.User.Identity?.IsAuthenticated == true
-            && context.Request.Cookies.TryGetValue(Cookies.InviteToken, out var inviteToken))
-        {
-            var exchangeSucceeded = await ExchangeInvite(context, inviteToken);
-
-            // Always delete the invite cookie regardless of exchange outcome so
-            // the user is never stuck in a retry loop.
-            context.Response.Cookies.Delete(Cookies.InviteToken);
-
-            // After a successful exchange redirect the user to the lobby so they
-            // can enter the application with their newly assigned tenant – unless
-            // the invite is a tenant-issued invite that matches the resolved tenant,
-            // in which case the user passes directly through to the microservice.
-            if (exchangeSucceeded)
-            {
-                if (IsTenantIssuedInvite(inviteToken, context))
-                {
-                    await next(context);
-                    return;
-                }
-
-                var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
-                if (!string.IsNullOrWhiteSpace(lobbyUrl))
-                {
-                    context.Response.Redirect(lobbyUrl);
-                    return;
-                }
-            }
         }
 
         await next(context);
