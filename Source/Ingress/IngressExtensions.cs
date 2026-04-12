@@ -110,8 +110,19 @@ public static class IngressExtensions
         });
 
         // Initiates the challenge for the requested provider scheme.
-        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context) =>
+        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<AuthenticationConfig> authConfig) =>
         {
+            var config = authConfig.CurrentValue;
+            var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
+                || config.OAuthProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme);
+
+            if (!providerExists)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                await context.Response.WriteAsync($"Provider '{scheme}' is not configured.");
+                return;
+            }
+
             var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
             var properties = new AuthenticationProperties { RedirectUri = returnUrl };
             await context.ChallengeAsync(scheme, properties);

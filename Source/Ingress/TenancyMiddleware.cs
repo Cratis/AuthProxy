@@ -57,8 +57,12 @@ public class TenancyMiddleware(
             // frontend – unless this is an invite path (handled by InviteMiddleware) or the
             // user already has a pending invite cookie (so the Phase 2 exchange can proceed).
             var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+            var isAuthPath = context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPrefix)
+                || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage)
+                || context.Request.Path.StartsWithSegments(WellKnownPaths.Providers);
             if (!string.IsNullOrWhiteSpace(lobbyUrl)
                 && !context.Request.Path.StartsWithSegments(WellKnownPaths.InvitePathPrefix)
+                && !isAuthPath
                 && !context.Request.Cookies.ContainsKey(Cookies.InviteToken))
             {
                 logger.RedirectingToLobby(context.Request.Path);
@@ -66,7 +70,7 @@ public class TenancyMiddleware(
                 return;
             }
 
-            if (config.CurrentValue.TenantResolutions.Count > 0)
+            if (config.CurrentValue.TenantResolutions.Count > 0 && !isAuthPath)
             {
                 logger.CouldNotResolveTenant(context.Request.Path);
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;

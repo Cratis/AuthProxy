@@ -57,7 +57,7 @@ public static class AuthenticationServiceCollectionExtensions
 
         // Redirect unauthenticated users to the provider selection page (multiple providers)
         // or directly to the single provider login endpoint.
-        options.Events.OnRedirectToLogin = ctx =>
+        options.Events.OnRedirectToLogin = async ctx =>
         {
             var authConfig = ctx.HttpContext.RequestServices
                 .GetRequiredService<IOptionsMonitor<AuthenticationConfig>>()
@@ -68,25 +68,29 @@ public static class AuthenticationServiceCollectionExtensions
             if (authConfig.TotalProviderCount > 1)
             {
                 ctx.Response.Redirect($"{WellKnownPaths.LoginPage}?returnUrl={Uri.EscapeDataString(returnUrl)}");
-                return Task.CompletedTask;
+                return;
             }
 
             if (authConfig.OidcProviders.Count == 1)
             {
                 var scheme = OidcProviderScheme.FromName(authConfig.OidcProviders[0].Name);
                 ctx.Response.Redirect($"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString(returnUrl)}");
-                return Task.CompletedTask;
+                return;
             }
 
             if (authConfig.OAuthProviders.Count == 1)
             {
                 var scheme = OidcProviderScheme.FromName(authConfig.OAuthProviders[0].Name);
                 ctx.Response.Redirect($"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString(returnUrl)}");
-                return Task.CompletedTask;
+                return;
             }
 
-            ctx.Response.Redirect(ctx.RedirectUri);
-            return Task.CompletedTask;
+            // No providers configured — return 500 with diagnostic message
+            ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            await ctx.Response.WriteAsync(
+                "Authentication is not configured. " +
+                "Please configure at least one OIDC or OAuth provider (GitHub, Microsoft, Google, Apple) " +
+                "via environment variables or application configuration.");
         };
     }
 
