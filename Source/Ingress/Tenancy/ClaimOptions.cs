@@ -8,6 +8,6 @@ namespace Cratis.Ingress.Tenancy;
 /// </summary>
 public record ClaimOptions
 {
-        /// <summary>Gets the claim type to use for resolving the tenant identifier. Defaults to the Microsoft standard tenant claim.</summary>
+    /// <summary>Gets the claim type to use for resolving the tenant identifier. Defaults to the Microsoft standard tenant claim.</summary>
     public string? ClaimType { get; init; }
 }

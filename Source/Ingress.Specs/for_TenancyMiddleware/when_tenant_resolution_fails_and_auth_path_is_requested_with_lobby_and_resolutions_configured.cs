@@ -17,7 +17,7 @@ public class when_tenant_resolution_fails_and_auth_path_is_requested_with_lobby_
         {
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = Configuration.TenantSourceIdentifierResolverType.Host }
+                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
             ],
             Invite = new InviteConfig
             {

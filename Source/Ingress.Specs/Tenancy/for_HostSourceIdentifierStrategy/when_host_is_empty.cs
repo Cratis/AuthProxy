@@ -1,15 +1,13 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Tenancy;
-
 namespace Cratis.Ingress.Tenancy.for_HostSourceIdentifierStrategy;
 
 public class when_host_is_empty : Specification
 {
     HostSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
-    object _options;
+    object? _options;
     bool _succeeded;
     string _sourceIdentifier;
 

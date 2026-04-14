@@ -13,34 +13,34 @@ namespace Cratis.Ingress.Tenancy;
 /// </summary>
 public class RouteSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<RouteOptions>
 {
-     /// <inheritdoc/>
+    /// <inheritdoc/>
     public TenantSourceIdentifierResolverType Type => TenantSourceIdentifierResolverType.Route;
 
-         /// <inheritdoc/>
-    public bool TryResolveSourceIdentifier(HttpContext context, RouteOptions options, out string sourceIdentifier)
-          {
+    /// <inheritdoc/>
+    public bool TryResolveSourceIdentifier(HttpContext context, RouteOptions typedOptions, out string sourceIdentifier)
+    {
         sourceIdentifier = string.Empty;
 
-        var pattern = options.Pattern;
+        var pattern = typedOptions.Pattern;
         if (string.IsNullOrWhiteSpace(pattern))
-              {
+        {
             return false;
-               }
+        }
 
         var path = context.Request.Path.Value ?? string.Empty;
-        var match = System.Text.RegularExpressions.Regex.Match(path, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase, System.TimeSpan.FromSeconds(1));
+        var match = System.Text.RegularExpressions.Regex.Match(path, pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1));
         if (!match.Success)
-              {
+        {
             return false;
-               }
+        }
 
         var group = match.Groups["sourceIdentifier"];
         if (!group.Success)
-              {
+        {
             return false;
-               }
+        }
 
         sourceIdentifier = group.Value;
         return !string.IsNullOrEmpty(sourceIdentifier);
-          }
+    }
 }

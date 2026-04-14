@@ -12,7 +12,7 @@ namespace Cratis.Ingress.Tenancy;
 /// </summary>
 public interface ISourceIdentifierStrategy
 {
-      /// <summary>Gets the strategy type this implementation handles.</summary>
+    /// <summary>Gets the strategy type this implementation handles.</summary>
     TenantSourceIdentifierResolverType Type { get; }
 }
 
@@ -22,13 +22,13 @@ public interface ISourceIdentifierStrategy
 /// <typeparam name="TOptions">The typed options for this strategy.</typeparam>
 public interface ISourceIdentifierStrategyTyped<TOptions> : ISourceIdentifierStrategy
 {
-      /// <summary>
-        /// Tries to extract a source identifier string from the current request using typed options.
-        /// </summary>
-        /// <param name="context">Current HTTP context.</param>
-        /// <param name="typedOptions">Strategy-specific typed options.</param>
-        /// <param name="sourceIdentifier">The extracted source identifier, or empty string.</param>
-        /// <returns><see langword="true"/> when a source identifier was extracted.</returns>
+    /// <summary>
+    /// Tries to extract a source identifier string from the current request using typed options.
+    /// </summary>
+    /// <param name="context">Current HTTP context.</param>
+    /// <param name="typedOptions">Strategy-specific typed options.</param>
+    /// <param name="sourceIdentifier">The extracted source identifier, or empty string.</param>
+    /// <returns><see langword="true"/> when a source identifier was extracted.</returns>
     bool TryResolveSourceIdentifier(HttpContext context, TOptions typedOptions, out string sourceIdentifier);
 }
 #pragma warning restore MA0048 // File name must match type name

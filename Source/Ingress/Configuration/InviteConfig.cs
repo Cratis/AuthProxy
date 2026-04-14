@@ -41,6 +41,19 @@ public class InviteConfig
     public string TenantClaim { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the invitation ID from the invite token (<c>jti</c>)
+    /// should be appended to the lobby redirect URL query string after a successful invite exchange.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool AppendInvitationIdToQueryString { get; set; }
+
+    /// <summary>
+    /// Gets or sets the query-string key used when <see cref="AppendInvitationIdToQueryString"/> is enabled.
+    /// Defaults to <c>invitationId</c>.
+    /// </summary>
+    public string InvitationIdQueryStringKey { get; set; } = "invitationId";
+
+    /// <summary>
     /// Gets or sets the lobby microservice configuration.
     /// When set, requests from users without a resolved tenant are forwarded to this microservice's frontend,
     /// and users are redirected here after a successful invite exchange.

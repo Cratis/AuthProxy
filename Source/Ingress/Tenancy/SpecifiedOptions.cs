@@ -8,6 +8,6 @@ namespace Cratis.Ingress.Tenancy;
 /// </summary>
 public record SpecifiedOptions
 {
-        /// <summary>Gets the tenant identifier.</summary>
+    /// <summary>Gets the tenant identifier.</summary>
     public string? TenantId { get; init; }
 }

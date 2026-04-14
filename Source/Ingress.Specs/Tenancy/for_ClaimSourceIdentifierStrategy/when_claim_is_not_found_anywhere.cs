@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Tenancy;
-
 namespace Cratis.Ingress.Tenancy.for_ClaimSourceIdentifierStrategy;
 
 public class when_claim_is_not_found_anywhere : Specification
@@ -14,11 +12,11 @@ public class when_claim_is_not_found_anywhere : Specification
     string _sourceIdentifier;
 
     void Establish()
-        {
+    {
         _strategy = new ClaimSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
         _options = new ClaimOptions { ClaimType = "nonexistent_claim" };
-        }
+    }
 
     void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 

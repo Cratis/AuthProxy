@@ -57,9 +57,11 @@ public class when_valid_invite_token_is_presented_with_multiple_providers : Spec
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
     [Fact] void should_set_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
     [Fact] void should_set_providers_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.Providers);
-    [Fact] void should_include_provider_names_in_providers_cookie() =>
+    [Fact]
+    void should_include_provider_names_in_providers_cookie() =>
         _context.Response.Headers.SetCookie.ToString().ShouldContain("Microsoft");
-    [Fact] void should_serve_invitation_select_provider_page() =>
+    [Fact]
+    void should_serve_invitation_select_provider_page() =>
         _errorPageProvider.Received(1).WriteErrorPageAsync(
             _context,
             WellKnownPageNames.InvitationSelectProvider,

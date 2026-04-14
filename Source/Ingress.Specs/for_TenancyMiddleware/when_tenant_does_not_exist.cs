@@ -51,7 +51,8 @@ public class when_tenant_does_not_exist : Specification
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_serve_tenant_not_found_page() =>
+    [Fact]
+    void should_serve_tenant_not_found_page() =>
         _errorPageProvider.Received(1).WriteErrorPageAsync(
             _context,
             WellKnownPageNames.TenantNotFound,

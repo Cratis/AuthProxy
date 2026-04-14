@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Tenancy;
-
 namespace Cratis.Ingress.Tenancy.for_RouteSourceIdentifierStrategy;
 
 public class when_no_pattern_is_configured : Specification
@@ -14,11 +12,11 @@ public class when_no_pattern_is_configured : Specification
     string _sourceIdentifier;
 
     void Establish()
-          {
+    {
         _strategy = new RouteSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
         _options = new RouteOptions { Pattern = null };
-         }
+    }
 
     void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 

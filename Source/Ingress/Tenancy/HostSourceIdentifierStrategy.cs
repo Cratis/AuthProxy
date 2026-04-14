@@ -10,13 +10,13 @@ namespace Cratis.Ingress.Tenancy;
 /// </summary>
 public class HostSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<object>
 {
-         /// <inheritdoc/>
+    /// <inheritdoc/>
     public TenantSourceIdentifierResolverType Type => TenantSourceIdentifierResolverType.Host;
 
-          /// <inheritdoc/>
-    public bool TryResolveSourceIdentifier(HttpContext context, object options, out string sourceIdentifier)
-                 {
+    /// <inheritdoc/>
+    public bool TryResolveSourceIdentifier(HttpContext context, object typedOptions, out string sourceIdentifier)
+    {
         sourceIdentifier = context.Request.Host.Host;
         return !string.IsNullOrEmpty(sourceIdentifier);
-                 }
+    }
 }

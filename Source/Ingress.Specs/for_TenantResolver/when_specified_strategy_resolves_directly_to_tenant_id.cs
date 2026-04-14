@@ -20,7 +20,7 @@ public class when_specified_strategy_resolves_directly_to_tenant_id : Specificat
             [
                 new TenantResolutionConfig
                 {
-                    Strategy = Configuration.TenantSourceIdentifierResolverType.Specified,
+                    Strategy = TenantSourceIdentifierResolverType.Specified,
                     Options = new JsonObject { ["tenantId"] = _expectedTenantId.ToString() }
                 }
             ]

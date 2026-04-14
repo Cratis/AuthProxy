@@ -17,7 +17,7 @@ public class when_tenant_resolution_fails_and_lobby_is_configured : Specificatio
         {
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = Configuration.TenantSourceIdentifierResolverType.Host }
+                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
             ],
             Invite = new InviteConfig
             {

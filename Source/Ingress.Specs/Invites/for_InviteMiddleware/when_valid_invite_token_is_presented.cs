@@ -52,7 +52,8 @@ public class when_valid_invite_token_is_presented : Specification
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
     [Fact] void should_set_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
-    [Fact] void should_challenge_the_single_provider_scheme() =>
+    [Fact]
+    void should_challenge_the_single_provider_scheme() =>
         _authService.Received(1).ChallengeAsync(
             _context,
             OidcProviderScheme.FromName("Microsoft"),

@@ -82,7 +82,8 @@ public class InviteMiddleware(
                 var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
                 if (!string.IsNullOrWhiteSpace(lobbyUrl))
                 {
-                    context.Response.Redirect(lobbyUrl);
+                    var redirectUrl = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
+                    context.Response.Redirect(redirectUrl);
                     return;
                 }
             }
@@ -248,5 +249,27 @@ public class InviteMiddleware(
         }
 
         return tokenTenantId != Guid.Empty && tokenTenantId == resolvedTenantId;
+    }
+
+    string BuildLobbyRedirectUrlWithInvitationId(string lobbyUrl, string inviteToken)
+    {
+        var inviteConfig = config.CurrentValue.Invite;
+        if (inviteConfig?.AppendInvitationIdToQueryString != true)
+        {
+            return lobbyUrl;
+        }
+
+        var queryKey = string.IsNullOrWhiteSpace(inviteConfig.InvitationIdQueryStringKey)
+            ? "invitationId"
+            : inviteConfig.InvitationIdQueryStringKey;
+
+        if (!tokenValidator.TryGetClaim(inviteToken, "jti", out var invitationId)
+            || string.IsNullOrWhiteSpace(invitationId))
+        {
+            return lobbyUrl;
+        }
+
+        var separator = lobbyUrl.Contains('?') ? '&' : '?';
+        return $"{lobbyUrl}{separator}{Uri.EscapeDataString(queryKey)}={Uri.EscapeDataString(invitationId)}";
     }
 }

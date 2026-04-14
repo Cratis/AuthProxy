@@ -8,6 +8,6 @@ namespace Cratis.Ingress.Tenancy;
 /// </summary>
 public record RouteOptions
 {
-        /// <summary>Gets the regular expression pattern to match against the request path. The pattern must contain a named group called 'sourceIdentifier'.</summary>
+    /// <summary>Gets the regular expression pattern to match against the request path. The pattern must contain a named group called 'sourceIdentifier'.</summary>
     public string? Pattern { get; init; }
 }

@@ -3,7 +3,6 @@
 
 using Cratis.Ingress.Configuration;
 using Cratis.Ingress.Identity;
-using System.Text.Json.Nodes;
 
 namespace Cratis.Ingress.Tenancy;
 
@@ -18,38 +17,38 @@ public class ClaimSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<Clai
 {
     const string DefaultClaimType = "http://schemas.microsoft.com/identity/claims/tenantid";
 
-      /// <inheritdoc/>
+    /// <inheritdoc/>
     public TenantSourceIdentifierResolverType Type => TenantSourceIdentifierResolverType.Claim;
 
-      /// <inheritdoc/>
-    public bool TryResolveSourceIdentifier(HttpContext context, ClaimOptions options, out string sourceIdentifier)
-     {
+    /// <inheritdoc/>
+    public bool TryResolveSourceIdentifier(HttpContext context, ClaimOptions typedOptions, out string sourceIdentifier)
+    {
         sourceIdentifier = string.Empty;
 
-        var claimType = options.ClaimType ?? DefaultClaimType;
+        var claimType = typedOptions.ClaimType ?? DefaultClaimType;
 
-         // Try from the authenticated ClaimsPrincipal first (richest source).
+        // Try from the authenticated ClaimsPrincipal first (richest source).
         var claimValue = context.User.FindFirst(claimType)?.Value;
         if (!string.IsNullOrEmpty(claimValue))
-          {
+        {
             sourceIdentifier = claimValue;
             return true;
-          }
+        }
 
-         // Fall back to the x-ms-client-principal header if present.
+        // Fall back to the x-ms-client-principal header if present.
         var base64Header = context.Request.Headers[Headers.Principal].FirstOrDefault();
         if (ClientPrincipal.TryFromBase64(base64Header, out var principal))
-          {
+        {
             var match = principal?.Claims.FirstOrDefault(c =>
                  string.Equals(c.Type, claimType, StringComparison.OrdinalIgnoreCase));
 
             if (match is not null)
-               {
+            {
                 sourceIdentifier = match.Value;
                 return true;
-               }
-          }
+            }
+        }
 
         return false;
-      }
+    }
 }
