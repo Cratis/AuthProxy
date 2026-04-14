@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
-using Cratis.Ingress.Configuration;
+using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress.Tenancy;
+namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
 /// Verifies tenant existence by issuing an HTTP GET to a configurable URL template.

@@ -3,7 +3,7 @@
 
 using Yarp.ReverseProxy.Transforms;
 
-namespace Cratis.Ingress.Identity;
+namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// A YARP <see cref="RequestTransform"/> that injects the three Microsoft Identity Platform

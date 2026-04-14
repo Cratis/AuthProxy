@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.Ingress;
+namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Defines the contract for resolving the tenant ID from an incoming HTTP request.

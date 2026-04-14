@@ -3,7 +3,7 @@
 
 using System.ComponentModel.DataAnnotations;
 
-namespace Cratis.Ingress.Configuration;
+namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
 /// Represents the configuration for a regular OAuth 2.0 provider (non-OIDC) such as GitHub.

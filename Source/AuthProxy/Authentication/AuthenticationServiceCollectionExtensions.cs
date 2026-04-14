@@ -2,14 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
-using Cratis.Ingress.Configuration;
+using Cratis.AuthProxy.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress.Authentication;
+namespace Cratis.AuthProxy.Authentication;
 
 /// <summary>
 /// Extension methods for registering authentication services on <see cref="WebApplicationBuilder"/>.
@@ -52,7 +52,7 @@ public static class AuthenticationServiceCollectionExtensions
     static void ConfigureCookieOptions(CookieAuthenticationOptions options)
     {
         options.Cookie.HttpOnly = true;
-        options.Cookie.Name = ".Cratis.Ingress.Auth.v2";
+        options.Cookie.Name = ".Cratis.AuthProxy.Auth.v2";
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.Cookie.SecurePolicy = CookieSecurePolicy.None;
 

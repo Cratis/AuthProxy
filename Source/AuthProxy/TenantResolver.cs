@@ -3,11 +3,11 @@
 
 using Microsoft.Extensions.Options;
 
-using C = Cratis.Ingress.Configuration;
-using T = Cratis.Ingress.Tenancy;
-using Type = Cratis.Ingress.Configuration.TenantSourceIdentifierResolverType;
+using C = Cratis.AuthProxy.Configuration;
+using T = Cratis.AuthProxy.Tenancy;
+using Type = Cratis.AuthProxy.Configuration.TenantSourceIdentifierResolverType;
 
-namespace Cratis.Ingress;
+namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Resolves the tenant ID by running the configured resolution strategies in order

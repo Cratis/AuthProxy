@@ -1,13 +1,13 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.ErrorPages;
-using Cratis.Ingress.Identity;
-using Cratis.Ingress.Tenancy;
+using Cratis.AuthProxy.Configuration;
+using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.Identity;
+using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress;
+namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Middleware that runs after authentication on every request to:

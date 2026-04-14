@@ -1,10 +1,10 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Identity;
+using Cratis.AuthProxy.Identity;
 using Yarp.ReverseProxy.Configuration;
 
-namespace Cratis.Ingress.ReverseProxy;
+namespace Cratis.AuthProxy.ReverseProxy;
 
 /// <summary>
 /// Extension methods for wiring up the YARP reverse proxy.

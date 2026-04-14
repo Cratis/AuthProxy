@@ -1,9 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
+using Cratis.AuthProxy.Configuration;
 
-namespace Cratis.Ingress.Tenancy;
+namespace Cratis.AuthProxy.Tenancy;
 
 #pragma warning disable MA0048 // File name must match type name
 /// <summary>

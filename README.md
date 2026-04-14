@@ -1,4 +1,4 @@
-# Ingress
+# AuthProxy
 
 ## Lightweight gateway service built with .NET
 
@@ -6,7 +6,10 @@
 [![C# Build](https://github.com/einari/ingress/actions/workflows/dotnet-build.yml/badge.svg)](https://github.com/einari/ingress/actions/workflows/dotnet-build.yml)
 [![Publish](https://github.com/einari/ingress/actions/workflows/publish.yml/badge.svg)](https://github.com/einari/ingress/actions/workflows/publish.yml)
 
-Cratis Ingress is a lightweight gateway service for routing and managing traffic.
+Cratis AuthProxy is a lightweight gateway service for routing and managing traffic and handling of common scenarios such as:
+
+- Authentication
+- Invitation flows
 
 Read the documentation on our site for all the details.
 For general guidance on the core values and principles we adhere to, read more [here](https://github.com/Cratis/.github/blob/main/profile/README.md).

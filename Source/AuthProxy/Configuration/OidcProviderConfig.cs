@@ -3,7 +3,7 @@
 
 using System.ComponentModel.DataAnnotations;
 
-namespace Cratis.Ingress.Configuration;
+namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
 /// Represents the configuration for a single OIDC provider.

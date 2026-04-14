@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.Ingress.ErrorPages;
+namespace Cratis.AuthProxy.ErrorPages;
 
 /// <summary>
 /// Holds the well-known file names for the custom error pages served by the ingress.

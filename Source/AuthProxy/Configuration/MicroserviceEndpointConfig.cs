@@ -3,7 +3,7 @@
 
 using System.ComponentModel.DataAnnotations;
 
-namespace Cratis.Ingress.Configuration;
+namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
 /// Represents the URL endpoint of a microservice part (backend or frontend).

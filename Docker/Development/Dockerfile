@@ -11,7 +11,7 @@ FROM node:20-alpine AS frontend-builder
 WORKDIR /src
 # Copy Web source and Ingress destination so the relative output path works
 COPY Source/Web/ ./Web/
-COPY Source/Ingress/ ./Ingress/
+COPY Source/AuthProxy/ ./Ingress/
 
 WORKDIR /src/Web
 RUN npm ci && npm run build
@@ -23,11 +23,11 @@ ARG VERSION
 WORKDIR /build
 
 COPY Directory.Build.props Directory.Packages.props ./
-COPY Source/Ingress/ ./Source/Ingress/
+COPY Source/AuthProxy/ ./Source/AuthProxy/
 # Copy the compiled frontend assets into the wwwroot directory
-COPY --from=frontend-builder /src/Ingress/wwwroot ./Source/Ingress/wwwroot
+COPY --from=frontend-builder /src/Ingress/wwwroot ./Source/AuthProxy/wwwroot
 
-RUN dotnet publish Source/Ingress/Ingress.csproj \
+RUN dotnet publish Source/AuthProxy/AuthProxy.csproj \
     -c Release \
     -o /out \
     /p:Version=${VERSION:-0.0.0}
@@ -53,4 +53,4 @@ WORKDIR /app
 
 COPY --from=backend-builder /out ./
 
-ENTRYPOINT ["/usr/bin/tini", "--", "dotnet", "/app/Ingress.dll"]
+ENTRYPOINT ["/usr/bin/tini", "--", "dotnet", "/app/AuthProxy.dll"]

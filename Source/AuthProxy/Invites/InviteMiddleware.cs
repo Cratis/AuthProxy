@@ -3,12 +3,12 @@
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.ErrorPages;
+using Cratis.AuthProxy.Configuration;
+using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress.Invites;
+namespace Cratis.AuthProxy.Invites;
 
 /// <summary>
 /// Middleware that implements the two-phase invite flow:

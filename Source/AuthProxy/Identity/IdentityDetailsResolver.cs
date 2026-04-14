@@ -5,12 +5,12 @@ using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Invites;
+using Cratis.AuthProxy.Configuration;
+using Cratis.AuthProxy.Invites;
 using Cratis.Json;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress.Identity;
+namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// Calls every microservice's <c>/.cratis/me</c> endpoint to retrieve application-specific

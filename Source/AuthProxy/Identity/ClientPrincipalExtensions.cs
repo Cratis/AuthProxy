@@ -3,7 +3,7 @@
 
 using System.Security.Claims;
 
-namespace Cratis.Ingress.Identity;
+namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// Extension methods for building a <see cref="ClientPrincipal"/> from an

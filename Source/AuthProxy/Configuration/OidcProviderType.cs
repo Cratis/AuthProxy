@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.Ingress.Configuration;
+namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
 /// Represents the type / brand of an OIDC provider, used by the login page to pick the correct logo.

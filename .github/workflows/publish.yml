@@ -61,7 +61,7 @@ jobs:
         run: dotnet build --configuration Release
 
       - name: Publish
-        run: dotnet publish Source/Ingress/Ingress.csproj --configuration Release -o Source/Ingress/out
+        run: dotnet publish Source/AuthProxy/AuthProxy.csproj --configuration Release -o Source/AuthProxy/out
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

@@ -9,7 +9,7 @@ var testApp = builder.AddProject<Projects.TestApp>("testapp")
 builder.AddNpmApp("web", "../Web")
     .WithHttpEndpoint(port: 9100, env: "PORT");
 
-builder.AddProject<Projects.Ingress>("ingress")
+builder.AddProject<Projects.AuthProxy>("authproxy")
     .WithHttpEndpoint(port: 8080)
     .WithReference(testApp)
     .WaitFor(testApp);

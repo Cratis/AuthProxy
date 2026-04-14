@@ -1,10 +1,10 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
+using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress.ErrorPages;
+namespace Cratis.AuthProxy.ErrorPages;
 
 /// <summary>
 /// Serves custom error pages from a configurable directory on disk.

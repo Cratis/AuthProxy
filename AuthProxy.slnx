@@ -1,8 +1,8 @@
 <Solution>
   <Folder Name="/Source/">
-    <Project Path="Source/Ingress/Ingress.csproj" />
+    <Project Path="Source/AuthProxy/AuthProxy.csproj" />
     <Project Path="Source/Composition/Composition.csproj" />
-    <Project Path="Source/Ingress.Specs/Ingress.Specs.csproj" />
+    <Project Path="Source/AuthProxy.Specs/AuthProxy.Specs.csproj" />
     <Project Path="Source/TestApp/TestApp.csproj" />
   </Folder>
 </Solution>

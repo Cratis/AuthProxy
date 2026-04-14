@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Cryptography;
-using Cratis.Ingress.Configuration;
+using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace Cratis.Ingress.Invites;
+namespace Cratis.AuthProxy.Invites;
 
 /// <summary>
 /// Validates invite JWT tokens issued by Cratis Studio using a pinned RSA public key.

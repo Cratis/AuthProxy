@@ -1,17 +1,17 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.ErrorPages;
-using Cratis.Ingress.Invites;
-using Cratis.Ingress.ReverseProxy;
-using Cratis.Ingress.Tenancy;
+using Cratis.AuthProxy.Configuration;
+using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.Invites;
+using Cratis.AuthProxy.ReverseProxy;
+using Cratis.AuthProxy.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 
-namespace Cratis.Ingress;
+namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Extension methods for registering ingress services and configuring the application pipeline

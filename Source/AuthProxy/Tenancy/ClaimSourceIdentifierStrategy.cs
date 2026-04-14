@@ -1,10 +1,10 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Identity;
+using Cratis.AuthProxy.Configuration;
+using Cratis.AuthProxy.Identity;
 
-namespace Cratis.Ingress.Tenancy;
+namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
 /// Resolves the tenant source identifier from a claim in the <c>x-ms-client-principal</c>

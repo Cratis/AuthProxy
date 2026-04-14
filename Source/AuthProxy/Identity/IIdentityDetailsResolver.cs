@@ -3,7 +3,7 @@
 
 using Cratis.Arc.Identity;
 
-namespace Cratis.Ingress.Identity;
+namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// Defines the contract for resolving additional identity details from a microservice's

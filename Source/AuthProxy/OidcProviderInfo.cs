@@ -1,9 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
+using Cratis.AuthProxy.Configuration;
 
-namespace Cratis.Ingress;
+namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Represents the details of a single OIDC provider as returned by the providers endpoint.
