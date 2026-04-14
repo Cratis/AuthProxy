@@ -3,12 +3,12 @@
 
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
-public class when_valid_invite_token_is_presented_with_multiple_providers : Specification
+public class when_valid_invite_token_is_presented_and_no_providers_are_configured : Specification
 {
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
-    IErrorPageProvider _errorPageProvider;
     bool _nextCalled;
+    int _nextCallCount;
 
     void Establish()
     {
@@ -22,30 +22,21 @@ public class when_valid_invite_token_is_presented_with_multiple_providers : Spec
         var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
         optionsMonitor.CurrentValue.Returns(config);
 
-        var authConfig = new AuthenticationConfig
-        {
-            OidcProviders =
-            [
-                new OidcProviderConfig { Name = "Microsoft", Authority = "https://login.microsoftonline.com/tenant/v2.0", ClientId = "client-id", ClientSecret = "secret" },
-                new OidcProviderConfig { Name = "Google", Authority = "https://accounts.google.com", ClientId = "google-id", ClientSecret = "google-secret" }
-            ]
-        };
         var authConfigMonitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        authConfigMonitor.CurrentValue.Returns(authConfig);
-
-        _errorPageProvider = Substitute.For<IErrorPageProvider>();
+        authConfigMonitor.CurrentValue.Returns(new AuthenticationConfig());
 
         _middleware = new InviteMiddleware(
             _ =>
             {
                 _nextCalled = true;
+                _nextCallCount++;
                 return Task.CompletedTask;
             },
             tokenValidator,
             optionsMonitor,
             authConfigMonitor,
             Substitute.For<IHttpClientFactory>(),
-            _errorPageProvider,
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
 
         _context = new DefaultHttpContext();
@@ -54,16 +45,7 @@ public class when_valid_invite_token_is_presented_with_multiple_providers : Spec
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
+    [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
+    [Fact] void should_call_next_only_once() => _nextCallCount.ShouldEqual(1);
     [Fact] void should_set_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
-    [Fact] void should_set_providers_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.Providers);
-    [Fact]
-    void should_include_provider_names_in_providers_cookie() =>
-        _context.Response.Headers.SetCookie.ToString().ShouldContain("Microsoft");
-    [Fact]
-    void should_serve_invitation_select_provider_page() =>
-        _errorPageProvider.Received(1).WriteErrorPageAsync(
-            _context,
-            WellKnownPageNames.InvitationSelectProvider,
-            StatusCodes.Status200OK);
 }

@@ -7,7 +7,7 @@ public class when_tenant_id_is_configured : Specification
 {
     SpecifiedSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
-    JsonObject _options;
+    SpecifiedOptions _options;
     bool _succeeded;
     string _sourceIdentifier;
 
@@ -15,7 +15,7 @@ public class when_tenant_id_is_configured : Specification
     {
         _strategy = new SpecifiedSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
-        _options = new JsonObject { ["tenantId"] = "11111111-1111-1111-1111-111111111111" };
+        _options = new SpecifiedOptions { TenantId = "11111111-1111-1111-1111-111111111111" };
     }
 
     void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);

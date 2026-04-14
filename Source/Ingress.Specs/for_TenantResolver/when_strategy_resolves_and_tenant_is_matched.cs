@@ -22,7 +22,7 @@ public class when_strategy_resolves_and_tenant_is_matched : Specification
             },
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = Configuration.TenantSourceIdentifierResolverType.Host }
+                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
             ]
         };
 

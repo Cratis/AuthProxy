@@ -1,23 +1,25 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Ingress.Configuration;
-using Cratis.Ingress.Tenancy;
 using Microsoft.Extensions.Options;
+
+using C = Cratis.Ingress.Configuration;
+using T = Cratis.Ingress.Tenancy;
+using Type = Cratis.Ingress.Configuration.TenantSourceIdentifierResolverType;
 
 namespace Cratis.Ingress;
 
 /// <summary>
 /// Resolves the tenant ID by running the configured resolution strategies in order
 /// until one succeeds, then matching the resulting source identifier against the
-/// tenant map in <see cref="IngressConfig.Tenants"/>.
+/// tenant map.
 /// </summary>
 /// <param name="config">The options monitor providing the current ingress configuration.</param>
 /// <param name="strategies">The collection of available source identifier resolution strategies.</param>
 /// <param name="logger">The logger.</param>
 public class TenantResolver(
-    IOptionsMonitor<IngressConfig> config,
-    IEnumerable<ISourceIdentifierStrategy> strategies,
+    IOptionsMonitor<C.IngressConfig> config,
+    IEnumerable<T.ISourceIdentifierStrategy> strategies,
     ILogger<TenantResolver> logger) : ITenantResolver
 {
     /// <inheritdoc/>
@@ -40,36 +42,106 @@ public class TenantResolver(
                 continue;
             }
 
-            if (!strategy.TryResolveSourceIdentifier(context, resolution.Options, out var sourceIdentifier))
+            // Claim strategy
+            if (strategy is T.ISourceIdentifierStrategyTyped<T.ClaimOptions> claimStrategy)
             {
-                continue;
-            }
-
-            // Specified strategy returns a fixed Guid directly.
-            if (resolution.Strategy == TenantSourceIdentifierResolverType.Specified
-                && Guid.TryParse(sourceIdentifier, out var specifiedId))
-            {
-                tenantId = specifiedId;
-                logger.TenantResolvedViaSpecifiedStrategy(tenantId);
-                return true;
-            }
-
-            // For all other strategies, look up the source identifier in the tenant map.
-            foreach (var (id, tenantConfig) in config.CurrentValue.Tenants)
-            {
-                if (tenantConfig.Domains.Contains(sourceIdentifier, StringComparer.OrdinalIgnoreCase)
-                    || tenantConfig.SourceIdentifiers.Contains(sourceIdentifier, StringComparer.OrdinalIgnoreCase))
+                var claimOptions = new T.ClaimOptions
                 {
-                    tenantId = id;
-                    logger.TenantResolved(resolution.Strategy, sourceIdentifier, tenantId);
+                    ClaimType = resolution.Options["claimType"]?.GetValue<string>()
+                };
+
+                if (!claimStrategy.TryResolveSourceIdentifier(context, claimOptions, out var sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
                     return true;
                 }
             }
 
-            logger.SourceIdentifierMatchedNoTenant(sourceIdentifier, resolution.Strategy);
+            // Specified strategy
+            else if (strategy is T.ISourceIdentifierStrategyTyped<T.SpecifiedOptions> specifiedStrategy)
+            {
+                var specifiedOptions = new T.SpecifiedOptions
+                {
+                    TenantId = resolution.Options["tenantId"]?.GetValue<string>()
+                };
+
+                if (!specifiedStrategy.TryResolveSourceIdentifier(context, specifiedOptions, out var sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
+                    return true;
+                }
+            }
+            else if (strategy is T.ISourceIdentifierStrategyTyped<T.RouteOptions> routeStrategy)
+            {
+                var routeOptions = new T.RouteOptions
+                {
+                    Pattern = resolution.Options["pattern"]?.GetValue<string>()
+                };
+
+                if (!routeStrategy.TryResolveSourceIdentifier(context, routeOptions, out var sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
+                    return true;
+                }
+            }
+            else if (strategy is T.ISourceIdentifierStrategyTyped<object>)
+            {
+                var sourceIdentifier = context.Request.Host.Host;
+                if (string.IsNullOrEmpty(sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
+                    return true;
+                }
+            }
         }
 
         logger.NoStrategyResolvedTenant();
+        return false;
+    }
+
+    private static bool HandleResolvedSourceIdentifier(
+          Type strategyType,
+          string sourceIdentifier,
+          out Guid tenantId,
+          C.IngressConfig config)
+    {
+        tenantId = Guid.Empty;
+
+        // Specified strategy returns a fixed Guid directly.
+        if (strategyType == Type.Specified
+                 && Guid.TryParse(sourceIdentifier, out var specifiedId))
+        {
+            tenantId = specifiedId;
+            return true;
+        }
+
+        // For all other strategies, look up the source identifier in the tenant map.
+        foreach (var (id, tenantConfig) in config.Tenants)
+        {
+            if (tenantConfig.Domains.Contains(sourceIdentifier, StringComparer.OrdinalIgnoreCase)
+                     || tenantConfig.SourceIdentifiers.Contains(sourceIdentifier, StringComparer.OrdinalIgnoreCase))
+            {
+                tenantId = id;
+                return true;
+            }
+        }
+
         return false;
     }
 }

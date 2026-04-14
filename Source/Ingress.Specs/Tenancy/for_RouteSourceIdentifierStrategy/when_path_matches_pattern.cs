@@ -7,7 +7,7 @@ public class when_path_matches_pattern : Specification
 {
     RouteSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
-    JsonObject _options;
+    RouteOptions _options;
     bool _succeeded;
     string _sourceIdentifier;
 
@@ -15,12 +15,14 @@ public class when_path_matches_pattern : Specification
     {
         _strategy = new RouteSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/acme-corp/api/orders";
-        _options = new JsonObject { ["regularExpression"] = @"\/(?<sourceIdentifier>[\w-]+)\/" };
+
+        // Pattern extracts tenant from /{tenant}/api pattern
+        _options = new RouteOptions { Pattern = "/(?<sourceIdentifier>[^/]+)/" };
+        _context.Request.Path = "/tenant-abc/api";
     }
 
     void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 
-    [Fact] void should_succeed() => Assert.True(_succeeded);
-    [Fact] void should_return_the_matched_segment() => Assert.Equal("acme-corp", _sourceIdentifier);
+    [Fact] void should_succeed() => _succeeded.ShouldBeTrue();
+    [Fact] void should_resolve_path_based_on_tenant_regex() => _sourceIdentifier.ShouldEqual("tenant-abc");
 }

@@ -5,24 +5,21 @@ using System.Net;
 
 namespace Cratis.Ingress.Invites.for_InviteMiddleware;
 
-public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_not_match : Specification
+public class when_authenticated_user_has_pending_invite_and_lobby_query_append_is_enabled : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
-    const string TenantClaimType = "tenant_id";
-    static readonly Guid _tokenTenantId = Guid.NewGuid();
-    static readonly Guid _resolvedTenantId = Guid.NewGuid();
+    const string InvitationId = "7cf1cec4-3fdf-4dc1-9b0c-04d42d928f6e";
 
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
-    bool _nextCalled;
 
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
-        tokenValidator.TryGetClaim(Arg.Any<string>(), TenantClaimType, out Arg.Any<string>())
-            .Returns(x =>
+        tokenValidator.TryGetClaim("pending-invite-token", "jti", out Arg.Any<string>())
+            .Returns(callInfo =>
             {
-                x[2] = _tokenTenantId.ToString();
+                callInfo[2] = InvitationId;
                 return true;
             });
 
@@ -31,13 +28,15 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
             Invite = new InviteConfig
             {
                 ExchangeUrl = "http://studio/internal/invites/exchange",
-                TenantClaim = TenantClaimType,
                 Lobby = new MicroserviceConfig
                 {
                     Frontend = new MicroserviceEndpointConfig { BaseUrl = LobbyUrl }
-                }
+                },
+                AppendInvitationIdToQueryString = true,
+                InvitationIdQueryStringKey = "inviteId"
             }
         };
+
         var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
         optionsMonitor.CurrentValue.Returns(config);
 
@@ -46,11 +45,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
         _middleware = new InviteMiddleware(
-            _ =>
-            {
-                _nextCalled = true;
-                return Task.CompletedTask;
-            },
+            _ => Task.CompletedTask,
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
@@ -61,19 +56,17 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
 
-        var identity = new ClaimsIdentity(
-            [new Claim("sub", "user-123")], "aad");
+        var identity = new ClaimsIdentity([new Claim("sub", "user-123")], "aad");
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
-        _context.Items[TenancyMiddleware.TenantIdItemKey] = _resolvedTenantId;
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(LobbyUrl);
-    [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
+    [Fact]
+    void should_redirect_to_lobby_with_configured_query_key() =>
+        _context.Response.Headers.Location.ToString().ShouldEqual($"{LobbyUrl}?inviteId={InvitationId}");
 
     static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
     {

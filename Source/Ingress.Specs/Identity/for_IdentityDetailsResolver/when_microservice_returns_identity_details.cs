@@ -26,7 +26,7 @@ public class when_microservice_returns_identity_details : Specification
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
-            new System.Net.Http.HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, "{\"displayName\":\"John Doe\"}")));
+            new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, /*lang=json,strict*/ "{\"displayName\":\"John Doe\"}")));
 
         _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, Substitute.For<ILogger<IdentityDetailsResolver>>());
         _context = new DefaultHttpContext();

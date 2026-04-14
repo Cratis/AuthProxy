@@ -3,7 +3,7 @@
 
 namespace Cratis.Ingress.for_TenancyMiddleware;
 
-public class when_tenant_resolution_fails_and_lobby_is_configured : Specification
+public class when_tenant_resolution_fails_and_auth_path_is_requested_with_lobby_and_resolutions_configured : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
 
@@ -47,11 +47,12 @@ public class when_tenant_resolution_fails_and_lobby_is_configured : Specificatio
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/some-page";
+        _context.Request.Path = WellKnownPaths.Providers;
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(LobbyUrl);
+    [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
+    [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(string.Empty);
+    [Fact] void should_not_return_401() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status200OK);
 }

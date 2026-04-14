@@ -15,7 +15,7 @@ public class when_tenant_resolution_fails_and_resolutions_are_configured : Speci
         {
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = Configuration.TenantSourceIdentifierResolverType.Host }
+                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
             ]
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();

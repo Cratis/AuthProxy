@@ -7,7 +7,7 @@ public class when_using_custom_claim_type_from_options : Specification
 {
     ClaimSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
-    JsonObject _options;
+    ClaimOptions _options;
     bool _succeeded;
     string _sourceIdentifier;
 
@@ -15,13 +15,13 @@ public class when_using_custom_claim_type_from_options : Specification
     {
         _strategy = new ClaimSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
-        _options = new JsonObject { ["claimType"] = "custom_tenant_claim" };
+        _options = new ClaimOptions { ClaimType = "custom_tenant_claim" };
 
         var identity = new ClaimsIdentity(
-        [
-            new Claim("custom_tenant_claim", "custom-tenant-value")
-        ],
-        "aad");
+            [
+                new Claim("custom_tenant_claim", "custom-tenant-value")
+            ],
+            "aad");
         _context.User = new ClaimsPrincipal(identity);
     }
 

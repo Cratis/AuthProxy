@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using System.Security.Claims;
 using Cratis.Ingress.Configuration;
 using Cratis.Ingress.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
@@ -81,7 +82,8 @@ public class InviteMiddleware(
                 var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
                 if (!string.IsNullOrWhiteSpace(lobbyUrl))
                 {
-                    context.Response.Redirect(lobbyUrl);
+                    var redirectUrl = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
+                    context.Response.Redirect(redirectUrl);
                     return;
                 }
             }
@@ -147,10 +149,19 @@ public class InviteMiddleware(
                 return;
             }
 
-            // Single provider or no provider: trigger OIDC login directly.
-            var returnUrl = $"{context.Request.Path}{context.Request.QueryString}";
-            var properties = new AuthenticationProperties { RedirectUri = returnUrl };
-            await context.ChallengeAsync(properties);
+            // Single provider: trigger OIDC login directly for that provider.
+            // No providers: would require error handling (skipped for now).
+            if (providers.Count == 1)
+            {
+                var scheme = OidcProviderScheme.FromName(providers[0].Name);
+                var returnUrl = $"{context.Request.Path}{context.Request.QueryString}";
+                var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+                await context.ChallengeAsync(scheme, properties);
+                return;
+            }
+
+            // No providers configured - let Phase 2 or later middleware handle it.
+            await next(context);
             return;
         }
 
@@ -177,12 +188,20 @@ public class InviteMiddleware(
 
         var subject = context.User.FindFirst("sub")?.Value
             ?? context.User.FindFirst("oid")?.Value
+            ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? context.User.FindFirst("id")?.Value
+            ?? string.Empty;
+
+        var identityProvider = context.User.FindFirst("iss")?.Value
+            ?? context.User.FindFirst("identity_provider")?.Value
+            ?? context.User.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
+            ?? context.User.Identity?.AuthenticationType
             ?? string.Empty;
 
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, exchangeUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", inviteToken);
-        request.Content = JsonContent.Create(new { subject });
+        request.Content = JsonContent.Create(new { subject, identityProvider });
 
         HttpResponseMessage response;
         try
@@ -230,5 +249,27 @@ public class InviteMiddleware(
         }
 
         return tokenTenantId != Guid.Empty && tokenTenantId == resolvedTenantId;
+    }
+
+    string BuildLobbyRedirectUrlWithInvitationId(string lobbyUrl, string inviteToken)
+    {
+        var inviteConfig = config.CurrentValue.Invite;
+        if (inviteConfig?.AppendInvitationIdToQueryString != true)
+        {
+            return lobbyUrl;
+        }
+
+        var queryKey = string.IsNullOrWhiteSpace(inviteConfig.InvitationIdQueryStringKey)
+            ? "invitationId"
+            : inviteConfig.InvitationIdQueryStringKey;
+
+        if (!tokenValidator.TryGetClaim(inviteToken, "jti", out var invitationId)
+            || string.IsNullOrWhiteSpace(invitationId))
+        {
+            return lobbyUrl;
+        }
+
+        var separator = lobbyUrl.Contains('?') ? '&' : '?';
+        return $"{lobbyUrl}{separator}{Uri.EscapeDataString(queryKey)}={Uri.EscapeDataString(invitationId)}";
     }
 }

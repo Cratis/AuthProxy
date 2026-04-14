@@ -30,7 +30,7 @@ public class when_everything_succeeds : Specification
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
         identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Cratis.Ingress.Identity.ClientPrincipal>(), Arg.Any<Guid>())
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<Guid>())
             .Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
 
         var tenantVerifier = Substitute.For<ITenantVerifier>();

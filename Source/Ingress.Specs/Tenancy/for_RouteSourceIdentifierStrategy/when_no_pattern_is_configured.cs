@@ -7,6 +7,7 @@ public class when_no_pattern_is_configured : Specification
 {
     RouteSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
+    RouteOptions _options;
     bool _succeeded;
     string _sourceIdentifier;
 
@@ -14,11 +15,11 @@ public class when_no_pattern_is_configured : Specification
     {
         _strategy = new RouteSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/some/path";
+        _options = new RouteOptions { Pattern = null };
     }
 
-    void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, [], out _sourceIdentifier);
+    void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 
-    [Fact] void should_not_succeed() => Assert.False(_succeeded);
-    [Fact] void should_return_empty_source_identifier() => Assert.Empty(_sourceIdentifier);
+    [Fact] void should_fail() => Assert.False(_succeeded);
+    [Fact] void should_return_empty_string() => Assert.Equal("", _sourceIdentifier);
 }

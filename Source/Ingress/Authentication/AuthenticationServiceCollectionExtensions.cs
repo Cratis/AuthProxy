@@ -52,8 +52,9 @@ public static class AuthenticationServiceCollectionExtensions
     static void ConfigureCookieOptions(CookieAuthenticationOptions options)
     {
         options.Cookie.HttpOnly = true;
+        options.Cookie.Name = ".Cratis.Ingress.Auth.v2";
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.None;
 
         // Redirect unauthenticated users to the provider selection page (multiple providers)
         // or directly to the single provider login endpoint.
@@ -63,7 +64,15 @@ public static class AuthenticationServiceCollectionExtensions
                 .GetRequiredService<IOptionsMonitor<AuthenticationConfig>>()
                 .CurrentValue;
 
-            var returnUrl = ctx.Request.Path + ctx.Request.QueryString;
+            var requestPath = ctx.Request.Path;
+            var isAuthBootstrapPath = requestPath.StartsWithSegments(WellKnownPaths.LoginPrefix)
+                || requestPath.StartsWithSegments(WellKnownPaths.LoginPage)
+                || requestPath.StartsWithSegments(WellKnownPaths.Providers)
+                || requestPath.StartsWithSegments("/signin-");
+
+            var returnUrl = isAuthBootstrapPath
+                ? "/"
+                : ctx.Request.Path + ctx.Request.QueryString;
 
             if (authConfig.TotalProviderCount > 1)
             {
@@ -117,6 +126,12 @@ public static class AuthenticationServiceCollectionExtensions
                 }
 
                 options.CallbackPath = $"/signin-{scheme}";
+
+                // Support local HTTP development callback flows.
+                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.NonceCookie.SameSite = SameSiteMode.Lax;
+                options.NonceCookie.SecurePolicy = CookieSecurePolicy.None;
             });
         }
     }
@@ -137,6 +152,10 @@ public static class AuthenticationServiceCollectionExtensions
                 options.ClientSecret = capturedProvider.ClientSecret;
                 options.CallbackPath = $"/signin-{scheme}";
                 options.SaveTokens = true;
+
+                // Support local HTTP development callback flows.
+                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
 
                 foreach (var scope in capturedProvider.Scopes)
                 {
