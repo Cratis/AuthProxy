@@ -6,6 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
 using Cratis.Ingress.Configuration;
+using Cratis.Ingress.Invites;
 using Cratis.Json;
 using Microsoft.Extensions.Options;
 
@@ -18,10 +19,12 @@ namespace Cratis.Ingress.Identity;
 /// </summary>
 /// <param name="config">The ingress configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
+/// <param name="inviteTokenValidator">The invite token validator.</param>
 /// <param name="logger">The logger.</param>
 public class IdentityDetailsResolver(
     IOptionsMonitor<IngressConfig> config,
     IHttpClientFactory httpClientFactory,
+    IInviteTokenValidator inviteTokenValidator,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
@@ -34,11 +37,15 @@ public class IdentityDetailsResolver(
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, Guid tenantId)
     {
-        // Skip when the identity cookie is already present for this request.
-        if (context.Request.Cookies.ContainsKey(Cookies.Identity))
+        var hasPendingInviteToken = context.Request.Cookies.ContainsKey(Cookies.InviteToken);
+
+        // Skip only when identity is already present and we are not in an invite flow.
+        if (context.Request.Cookies.ContainsKey(Cookies.Identity) && !hasPendingInviteToken)
         {
             return BuildAuthorizedResult(principal, details: null);
         }
+
+        var principalForIdentityResolution = CreatePrincipalForIdentityResolution(context, principal);
 
         var mergedDetails = new JsonObject();
         var microservices = config.CurrentValue.Microservices;
@@ -56,7 +63,7 @@ public class IdentityDetailsResolver(
             var result = await CallIdentityEndpoint(
                 name,
                 microservice.Backend.BaseUrl,
-                principal,
+                principalForIdentityResolution,
                 tenantId,
                 context.Response);
 
@@ -78,6 +85,30 @@ public class IdentityDetailsResolver(
         logger.IdentityDetailsCookieWritten(principal.UserId);
 
         return identityResult;
+    }
+
+    ClientPrincipal CreatePrincipalForIdentityResolution(HttpContext context, ClientPrincipal principal)
+    {
+        if (!context.Request.Cookies.TryGetValue(Cookies.InviteToken, out var inviteToken)
+            || string.IsNullOrWhiteSpace(inviteToken))
+        {
+            return principal;
+        }
+
+        if (!inviteTokenValidator.TryGetClaim(inviteToken, "jti", out var invitationId)
+            || string.IsNullOrWhiteSpace(invitationId))
+        {
+            return principal;
+        }
+
+        return new ClientPrincipal
+        {
+            IdentityProvider = principal.IdentityProvider,
+            UserId = invitationId,
+            UserDetails = principal.UserDetails,
+            UserRoles = principal.UserRoles,
+            Claims = principal.Claims,
+        };
     }
 
     IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>
