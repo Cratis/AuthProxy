@@ -11,14 +11,17 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Debug, "Calling identity endpoint {Url} for microservice '{Microservice}'")]
     internal static partial void CallingIdentityEndpoint(this ILogger logger, string url, string microservice);
 
+    [LoggerMessage(LogLevel.Debug, "Calling identity endpoint for microservice '{Microservice}' with UserId={UserId} (InviteToken present: {HasInviteToken})")]
+    internal static partial void CallingIdentityEndpointWithPrincipal(this ILogger logger, string microservice, string userId, bool hasInviteToken);
+
     [LoggerMessage(LogLevel.Error, "Error calling identity endpoint for microservice '{Microservice}'")]
     internal static partial void ErrorCallingIdentityEndpoint(this ILogger logger, Exception exception, string microservice);
 
     [LoggerMessage(LogLevel.Warning, "Microservice '{Microservice}' returned 403 for user {UserId} - access denied")]
     internal static partial void IdentityEndpointForbidden(this ILogger logger, string microservice, string userId);
 
-    [LoggerMessage(LogLevel.Warning, "Identity endpoint for '{Microservice}' returned {StatusCode}. Identity details skipped")]
-    internal static partial void IdentityEndpointUnsuccessful(this ILogger logger, string microservice, int statusCode);
+    [LoggerMessage(LogLevel.Warning, "Identity endpoint for '{Microservice}' returned {StatusCode}. Identity details skipped. Response body: {Body}")]
+    internal static partial void IdentityEndpointUnsuccessful(this ILogger logger, string microservice, int statusCode, string body);
 
     [LoggerMessage(LogLevel.Warning, "Could not parse identity response from '{Microservice}'")]
     internal static partial void CouldNotParseIdentityResponse(this ILogger logger, Exception exception, string microservice);

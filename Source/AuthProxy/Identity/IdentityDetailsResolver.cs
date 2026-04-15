@@ -60,6 +60,8 @@ public class IdentityDetailsResolver(
                 continue;
             }
 
+            logger.CallingIdentityEndpointWithPrincipal(name, principalForIdentityResolution.UserId, hasPendingInviteToken);
+
             var result = await CallIdentityEndpoint(
                 name,
                 microservice.Backend.BaseUrl,
@@ -169,7 +171,8 @@ public class IdentityDetailsResolver(
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            logger.IdentityEndpointUnsuccessful(microserviceName, (int)httpResponse.StatusCode);
+            var errorBody = await httpResponse.Content.ReadAsStringAsync();
+            logger.IdentityEndpointUnsuccessful(microserviceName, (int)httpResponse.StatusCode, errorBody);
             return new JsonObject();
         }
 
@@ -181,7 +184,8 @@ public class IdentityDetailsResolver(
 
         try
         {
-            return JsonNode.Parse(body)?.AsObject() ?? new JsonObject();
+            var parsed = JsonNode.Parse(body)?.AsObject() ?? new JsonObject();
+            return parsed["details"]?.AsObject() ?? parsed;
         }
         catch (Exception ex)
         {
