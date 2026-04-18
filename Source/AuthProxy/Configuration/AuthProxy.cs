@@ -4,15 +4,25 @@
 namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
-/// Represents the root configuration for the ingress.
+/// Represents the root configuration for the auth proxy.
 /// </summary>
-public class IngressConfig
+public class AuthProxy
 {
+    /// <summary>
+    /// The configuration section key for the root auth proxy settings.
+    /// </summary>
+    public const string SectionKey = "Cratis:AuthProxy";
+
+    /// <summary>
+    /// Gets or sets the authentication configuration.
+    /// </summary>
+    public Authentication Authentication { get; set; } = new();
+
     /// <summary>
     /// Gets or sets the invite system configuration.
     /// Set this section to enable invite-based onboarding.
     /// </summary>
-    public InviteConfig? Invite { get; set; }
+    public Invite? Invite { get; set; }
 
     /// <summary>
     /// Gets or sets the tenant verification configuration.
@@ -20,7 +30,7 @@ public class IngressConfig
     /// tenant exists before forwarding the request.
     /// Leave unset to skip tenant verification.
     /// </summary>
-    public TenantVerificationConfig? TenantVerification { get; set; }
+    public TenantVerification? TenantVerification { get; set; }
 
     /// <summary>
     /// Gets or sets the absolute path to a directory containing custom error pages.
@@ -32,19 +42,19 @@ public class IngressConfig
     public string PagesPath { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the <see cref="TenantsConfig"/>.
+    /// Gets or sets the <see cref="Tenants"/>.
     /// Tenants are keyed by tenant ID (GUID).
     /// </summary>
-    public TenantsConfig Tenants { get; set; } = new();
+    public Tenants Tenants { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the tenant resolution strategies applied in order until one resolves.
     /// </summary>
-    public IList<TenantResolutionConfig> TenantResolutions { get; set; } = [];
+    public IList<TenantResolution> TenantResolutions { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the microservices configuration.
-    /// Microservices are keyed by a friendly name (e.g. "portal", "catalog").
+    /// Gets or sets the services configuration.
+    /// Services are keyed by a friendly name (e.g. "portal", "catalog").
     /// </summary>
-    public IDictionary<string, MicroserviceConfig> Microservices { get; set; } = new Dictionary<string, MicroserviceConfig>();
+    public IDictionary<string, Service> Services { get; set; } = new Dictionary<string, Service>();
 }

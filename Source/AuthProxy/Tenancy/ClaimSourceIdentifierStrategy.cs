@@ -1,8 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
 using Cratis.AuthProxy.Identity;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
 
@@ -18,7 +18,7 @@ public class ClaimSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<Clai
     const string DefaultClaimType = "http://schemas.microsoft.com/identity/claims/tenantid";
 
     /// <inheritdoc/>
-    public TenantSourceIdentifierResolverType Type => TenantSourceIdentifierResolverType.Claim;
+    public C.TenantSourceIdentifierResolverType Type => C.TenantSourceIdentifierResolverType.Claim;
 
     /// <inheritdoc/>
     public bool TryResolveSourceIdentifier(HttpContext context, ClaimOptions typedOptions, out string sourceIdentifier)

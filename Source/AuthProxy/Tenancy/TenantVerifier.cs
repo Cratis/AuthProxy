@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
-using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
 
@@ -11,14 +11,14 @@ namespace Cratis.AuthProxy.Tenancy;
 /// Verifies tenant existence by issuing an HTTP GET to a configurable URL template.
 /// </summary>
 /// <remarks>
-/// When <see cref="TenantVerificationConfig.UrlTemplate"/> is empty or not configured the
+/// When <see cref="Cratis.AuthProxy.Configuration.TenantVerification.UrlTemplate"/> is empty or not configured the
 /// verifier returns <see langword="true"/> for all tenants (verification is disabled).
 /// </remarks>
-/// <param name="config">The ingress configuration monitor.</param>
+/// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="httpClientFactory">The factory used to create the HTTP client for verification calls.</param>
 /// <param name="logger">The logger.</param>
 public class TenantVerifier(
-    IOptionsMonitor<IngressConfig> config,
+    IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
     ILogger<TenantVerifier> logger) : ITenantVerifier
 {

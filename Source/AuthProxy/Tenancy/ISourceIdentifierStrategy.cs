@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
 
@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Tenancy;
 public interface ISourceIdentifierStrategy
 {
     /// <summary>Gets the strategy type this implementation handles.</summary>
-    TenantSourceIdentifierResolverType Type { get; }
+    C.TenantSourceIdentifierResolverType Type { get; }
 }
 
 /// <summary>

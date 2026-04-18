@@ -29,7 +29,7 @@ public static class Headers
     public const string TenantId = "Tenant-ID";
 
     /// <summary>
-    /// Microservice identifier used to route requests to the appropriate microservice.
+    /// Service identifier used to route requests to the appropriate service.
     /// </summary>
-    public const string MicroserviceId = "Microservice-ID";
+    public const string ServiceId = "Service-ID";
 }

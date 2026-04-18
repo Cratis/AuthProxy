@@ -13,7 +13,9 @@ public class when_tenant_id_is_not_configured : Specification
 
     void Establish()
     {
-        _strategy = new SpecifiedSourceIdentifierStrategy();
+        var configMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        configMonitor.CurrentValue.Returns(new C.AuthProxy());
+        _strategy = new SpecifiedSourceIdentifierStrategy(configMonitor);
         _context = new DefaultHttpContext();
         _options = new SpecifiedOptions { TenantId = null };
     }

@@ -13,17 +13,17 @@ public class when_tenant_resolution_fails_and_invite_path_is_requested_with_lobb
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig
+            Invite = new C.Invite
             {
-                Lobby = new MicroserviceConfig
+                Lobby = new C.Service
                 {
-                    Frontend = new MicroserviceEndpointConfig { BaseUrl = LobbyUrl }
+                    Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
                 }
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();

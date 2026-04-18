@@ -1,7 +1,7 @@
 # Invites & Lobby
 
 Ingress includes a two-phase invite flow that lets you onboard new users via signed JWT invite
-tokens, and an optional **lobby** microservice to which users without a resolved tenant are
+tokens, and an optional **lobby** service to which users without a resolved tenant are
 redirected while they complete the onboarding process.
 
 ---
@@ -10,7 +10,7 @@ redirected while they complete the onboarding process.
 
 ### Phase 1 – Invite link
 
-1. A user receives a link in the form `https://your-ingress/invite/<token>`.
+1. A user receives a link in the form `https://your-authproxy/invite/<token>`.
 2. Ingress validates the token against the configured RSA public key.
 3. If the token is **valid**, it is stored in a short-lived HTTP-only cookie.
    - If **only one** identity provider is configured, the user is redirected directly to that provider's login.
@@ -26,7 +26,7 @@ redirected while they complete the onboarding process.
 1. After a successful OIDC login the user is redirected back.
 2. Ingress detects the invite cookie, calls the configured `ExchangeUrl` with the token and the
    authenticated user's subject, then deletes the cookie.
-3. If the exchange succeeds and a **lobby** microservice is configured, the user is redirected to
+3. If the exchange succeeds and a **lobby** service is configured, the user is redirected to
    the lobby's frontend so they can enter the application with their newly assigned tenant.
 
 ### Lobby – no-tenant redirect
@@ -44,15 +44,16 @@ When Ingress cannot resolve a tenant for a request it checks whether a lobby is 
 
 ## Configuration
 
-All invite and lobby settings live under `Ingress:Invite`:
+All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
 
 ```json
 {
-  "Ingress": {
+  "Cratis": {
+    "AuthProxy": {
     "Invite": {
       "PublicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
       "Issuer": "https://studio.example.com",
-      "Audience": "ingress",
+      "Audience": "authproxy",
       "ExchangeUrl": "https://studio.example.com/internal/invites/exchange",
       "Lobby": {
         "Frontend": { "BaseUrl": "http://lobby-service:3000/" },
@@ -71,11 +72,11 @@ All invite and lobby settings live under `Ingress:Invite`:
 | `Issuer` | `string` | Expected `iss` claim. Leave empty to skip issuer validation. |
 | `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
 | `ExchangeUrl` | `string` | Absolute URL of the invite-exchange endpoint, e.g. `https://studio.example.com/internal/invites/exchange`. |
-| `Lobby` | `MicroserviceConfig` | Optional lobby microservice. See below. |
+| `Lobby` | `ServiceConfig` | Optional lobby service. See below. |
 
-### Lobby microservice
+### Lobby service
 
-The `Lobby` property accepts a standard [`MicroserviceConfig`](microservices.md) object.
+The `Lobby` property accepts a standard [`ServiceConfig`](microservices.md) object.
 Only the `Frontend.BaseUrl` is required for the lobby redirect; a `Backend` endpoint is optional
 and can be used if the lobby needs an API.
 
@@ -89,7 +90,7 @@ and can be used if the lobby needs an API.
 ## Invite token format
 
 Invite tokens are standard JWTs signed with an RSA private key held by the issuing service
-(e.g. Cratis Studio).  The ingress only needs the matching **public key** to validate signatures.
+(e.g. Cratis Studio).  The auth proxy only needs the matching **public key** to validate signatures.
 
 Recommended claims:
 

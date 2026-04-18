@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
-using Cratis.AuthProxy.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authentication;
 
@@ -29,13 +29,13 @@ public static class AuthenticationServiceCollectionExtensions
             .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookieOptions);
 
         var authConfig = builder.Configuration
-            .GetSection("Authentication")
-            .Get<AuthenticationConfig>() ?? new AuthenticationConfig();
+            .GetSection(C.Authentication.SectionKey)
+            .Get<C.Authentication>() ?? new();
 
         RegisterOidcProviders(authBuilder, authConfig.OidcProviders);
         RegisterOAuthProviders(authBuilder, authConfig.OAuthProviders);
 
-        var jwtSection = builder.Configuration.GetSection("Authentication:JwtBearer");
+        var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
         if (jwtSection.Exists())
         {
             authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, jwtSection.Bind);
@@ -61,7 +61,7 @@ public static class AuthenticationServiceCollectionExtensions
         options.Events.OnRedirectToLogin = async ctx =>
         {
             var authConfig = ctx.HttpContext.RequestServices
-                .GetRequiredService<IOptionsMonitor<AuthenticationConfig>>()
+                .GetRequiredService<IOptionsMonitor<C.Authentication>>()
                 .CurrentValue;
 
             var requestPath = ctx.Request.Path;
@@ -103,7 +103,7 @@ public static class AuthenticationServiceCollectionExtensions
         };
     }
 
-    static void RegisterOidcProviders(AuthenticationBuilder authBuilder, IList<OidcProviderConfig> providers)
+    static void RegisterOidcProviders(AuthenticationBuilder authBuilder, IList<C.OidcProvider> providers)
     {
         foreach (var provider in providers)
         {
@@ -136,7 +136,7 @@ public static class AuthenticationServiceCollectionExtensions
         }
     }
 
-    static void RegisterOAuthProviders(AuthenticationBuilder authBuilder, IList<OAuthProviderConfig> providers)
+    static void RegisterOAuthProviders(AuthenticationBuilder authBuilder, IList<C.OAuthProvider> providers)
     {
         foreach (var provider in providers)
         {

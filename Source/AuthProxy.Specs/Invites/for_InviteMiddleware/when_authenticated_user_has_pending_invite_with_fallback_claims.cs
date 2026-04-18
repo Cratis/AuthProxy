@@ -16,11 +16,11 @@ public class when_authenticated_user_has_pending_invite_with_fallback_claims : S
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { ExchangeUrl = "http://studio/internal/invites/exchange" }
+            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _messageHandler = new CapturingHttpMessageHandler();
@@ -56,10 +56,10 @@ public class when_authenticated_user_has_pending_invite_with_fallback_claims : S
     [Fact] void should_send_the_authentication_type_as_identity_provider() => _messageHandler.IdentityProvider.ShouldEqual("aad");
     [Fact] void should_send_the_invite_token_as_bearer_authentication() => _messageHandler.AuthorizationParameter.ShouldEqual("pending-invite-token");
 
-    static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
+    static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {
-        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        monitor.CurrentValue.Returns(new AuthenticationConfig());
+        var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        monitor.CurrentValue.Returns(new C.Authentication());
         return monitor;
     }
 

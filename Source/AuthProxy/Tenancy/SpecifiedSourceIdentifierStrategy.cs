@@ -1,7 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
+using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
 
@@ -9,43 +10,37 @@ namespace Cratis.AuthProxy.Tenancy;
 /// Always resolves to the tenant ID specified in the <c>tenantId</c> option.
 /// Used for single-tenant deployments.
 /// </summary>
-public class SpecifiedSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<SpecifiedOptions>
+/// <param name="config">The options monitor providing the current auth proxy configuration.</param>
+public class SpecifiedSourceIdentifierStrategy(IOptionsMonitor<C.AuthProxy> config) : ISourceIdentifierStrategyTyped<SpecifiedOptions>
 {
     /// <inheritdoc/>
-    public TenantSourceIdentifierResolverType Type => TenantSourceIdentifierResolverType.Specified;
+    public C.TenantSourceIdentifierResolverType Type => C.TenantSourceIdentifierResolverType.Specified;
 
     /// <inheritdoc/>
     public bool TryResolveSourceIdentifier(HttpContext context, SpecifiedOptions typedOptions, out string sourceIdentifier)
     {
         sourceIdentifier = typedOptions.TenantId
-             ?? ResolveTenantIdFromConfiguration(context)
+             ?? ResolveTenantIdFromOptions()
              ?? string.Empty;
 
         return !string.IsNullOrEmpty(sourceIdentifier);
     }
 
-    static string? ResolveTenantIdFromConfiguration(HttpContext context)
+    string? ResolveTenantIdFromOptions()
     {
-        if (context.RequestServices is null)
+        foreach (var resolution in config.CurrentValue.TenantResolutions)
         {
-            return null;
-        }
-
-        foreach (var resolution in context.RequestServices.GetService<IConfiguration>()?.GetSection("Ingress:TenantResolutions").GetChildren() ?? [])
-        {
-            if (!string.Equals(resolution["Strategy"], "Specified", StringComparison.OrdinalIgnoreCase))
+            if (resolution.Strategy != C.TenantSourceIdentifierResolverType.Specified)
             {
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(resolution["Options:tenantId"]))
-            {
-                return resolution["Options:tenantId"];
-            }
+            var tenantId = resolution.Options["tenantId"]?.ToString()
+                ?? resolution.Options["TenantId"]?.ToString();
 
-            if (!string.IsNullOrWhiteSpace(resolution["Options:TenantId"]))
+            if (!string.IsNullOrWhiteSpace(tenantId))
             {
-                return resolution["Options:TenantId"];
+                return tenantId;
             }
         }
 

@@ -17,16 +17,16 @@ public class when_token_signature_is_invalid : Specification
 
         _token = TokenFixture.CreateToken(signingKey, "test-issuer", "test-audience");
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig
+            Invite = new C.Invite
             {
                 PublicKeyPem = publicKeyPem,
                 Issuer = "test-issuer",
                 Audience = "test-audience",
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _validator = new InviteTokenValidator(optionsMonitor);

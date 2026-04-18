@@ -13,7 +13,9 @@ public class when_tenant_id_is_configured : Specification
 
     void Establish()
     {
-        _strategy = new SpecifiedSourceIdentifierStrategy();
+        var configMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        configMonitor.CurrentValue.Returns(new C.AuthProxy());
+        _strategy = new SpecifiedSourceIdentifierStrategy(configMonitor);
         _context = new DefaultHttpContext();
         _options = new SpecifiedOptions { TenantId = "11111111-1111-1111-1111-111111111111" };
     }

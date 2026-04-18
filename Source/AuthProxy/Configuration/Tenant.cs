@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Configuration;
 /// <summary>
 /// Represents the configuration for a single tenant.
 /// </summary>
-public record TenantConfig
+public record Tenant
 {
     /// <summary>
     /// Gets the display name of the tenant.

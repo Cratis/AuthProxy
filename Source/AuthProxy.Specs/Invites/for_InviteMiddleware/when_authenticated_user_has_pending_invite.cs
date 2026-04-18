@@ -15,11 +15,11 @@ public class when_authenticated_user_has_pending_invite : Specification
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { ExchangeUrl = "http://studio/internal/invites/exchange" }
+            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
@@ -56,10 +56,10 @@ public class when_authenticated_user_has_pending_invite : Specification
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 
-    static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
+    static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {
-        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        monitor.CurrentValue.Returns(new AuthenticationConfig());
+        var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        monitor.CurrentValue.Returns(new C.Authentication());
         return monitor;
     }
 }

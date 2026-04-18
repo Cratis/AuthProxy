@@ -11,13 +11,13 @@ public enum TenantSourceIdentifierResolverType
     /// <summary>No tenant resolution – tenant ID is left unset.</summary>
     None = 0,
 
-    /// <summary>Resolve the tenant from the request host name, matched against <see cref="TenantConfig.Domains"/>.</summary>
+    /// <summary>Resolve the tenant from the request host name, matched against <see cref="Tenant.Domains"/>.</summary>
     Host = 1,
 
-    /// <summary>Resolve the tenant from a claim in the <c>x-ms-client-principal</c>, matched against <see cref="TenantConfig.SourceIdentifiers"/>.</summary>
+    /// <summary>Resolve the tenant from a claim in the <c>x-ms-client-principal</c>, matched against <see cref="Tenant.SourceIdentifiers"/>.</summary>
     Claim = 2,
 
-    /// <summary>Resolve the tenant from a route segment extracted via a named-group regular expression, matched against <see cref="TenantConfig.SourceIdentifiers"/>.</summary>
+    /// <summary>Resolve the tenant from a route segment extracted via a named-group regular expression, matched against <see cref="Tenant.SourceIdentifiers"/>.</summary>
     Route = 3,
 
     /// <summary>Always resolve to a specific, pre-configured tenant ID (single-tenant deployments).</summary>

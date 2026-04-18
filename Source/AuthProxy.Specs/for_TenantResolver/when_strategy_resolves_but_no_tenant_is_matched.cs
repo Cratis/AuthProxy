@@ -12,19 +12,19 @@ public class when_strategy_resolves_but_no_tenant_is_matched : Specification
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Tenants = new TenantsConfig
+            Tenants = new C.Tenants
             {
-                [Guid.NewGuid()] = new TenantConfig { Name = "Acme", Domains = ["acme.example.com"] }
+                [Guid.NewGuid()] = new C.Tenant { Name = "Acme", Domains = ["acme.example.com"] }
             },
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
+                new C.TenantResolution { Strategy = C.TenantSourceIdentifierResolverType.Host }
             ]
         };
 
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _context = new DefaultHttpContext();

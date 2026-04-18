@@ -15,15 +15,15 @@ public class when_valid_invite_token_is_presented_and_no_providers_are_configure
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
         tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Valid);
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { ExchangeUrl = "http://studio/internal/invites/exchange" }
+            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
-        var authConfigMonitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        authConfigMonitor.CurrentValue.Returns(new AuthenticationConfig());
+        var authConfigMonitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        authConfigMonitor.CurrentValue.Returns(new C.Authentication());
 
         _middleware = new InviteMiddleware(
             _ =>

@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Configuration;
 /// <summary>
 /// Represents a single tenant resolution strategy configuration.
 /// </summary>
-public class TenantResolutionConfig
+public class TenantResolution
 {
     /// <summary>
     /// Gets or sets the strategy type to use for resolving the tenant source identifier.

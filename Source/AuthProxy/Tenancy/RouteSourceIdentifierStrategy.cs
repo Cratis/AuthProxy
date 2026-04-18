@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
 
@@ -14,7 +14,7 @@ namespace Cratis.AuthProxy.Tenancy;
 public class RouteSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<RouteOptions>
 {
     /// <inheritdoc/>
-    public TenantSourceIdentifierResolverType Type => TenantSourceIdentifierResolverType.Route;
+    public C.TenantSourceIdentifierResolverType Type => C.TenantSourceIdentifierResolverType.Route;
 
     /// <inheritdoc/>
     public bool TryResolveSourceIdentifier(HttpContext context, RouteOptions typedOptions, out string sourceIdentifier)

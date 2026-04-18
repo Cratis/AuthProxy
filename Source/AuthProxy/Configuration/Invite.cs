@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Configuration;
 /// <summary>
 /// Represents the configuration for the invite system.
 /// </summary>
-public class InviteConfig
+public class Invite
 {
     /// <summary>
     /// Gets or sets the RSA public key PEM used to verify invite token signatures.
@@ -54,9 +54,9 @@ public class InviteConfig
     public string InvitationIdQueryStringKey { get; set; } = "invitationId";
 
     /// <summary>
-    /// Gets or sets the lobby microservice configuration.
-    /// When set, requests from users without a resolved tenant are forwarded to this microservice's frontend,
+    /// Gets or sets the lobby service configuration.
+    /// When set, requests from users without a resolved tenant are forwarded to this service's frontend,
     /// and users are redirected here after a successful invite exchange.
     /// </summary>
-    public MicroserviceConfig? Lobby { get; set; }
+    public Service? Lobby { get; set; }
 }

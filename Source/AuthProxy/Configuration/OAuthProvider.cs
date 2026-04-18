@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Configuration;
 /// Represents the configuration for a regular OAuth 2.0 provider (non-OIDC) such as GitHub.
 /// Unlike OIDC providers, OAuth providers require explicit endpoint URLs instead of an authority discovery document.
 /// </summary>
-public class OAuthProviderConfig
+public class OAuthProvider
 {
     /// <summary>
     /// Gets or sets the display name shown on the login page (e.g. "GitHub").

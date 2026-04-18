@@ -1,15 +1,15 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ReverseProxy;
 
 /// <summary>
 /// Builds and serves the YARP <see cref="IProxyConfig"/> dynamically from the
-/// <see cref="IngressConfig.Microservices"/> configuration section.
+/// <see cref="Cratis.AuthProxy.Configuration.AuthProxy.Services"/> configuration section.
 ///
 /// <para>
 /// Each microservice generates routes that are matched by either:
@@ -24,9 +24,9 @@ namespace Cratis.AuthProxy.ReverseProxy;
 /// microservice works without any special client configuration.
 /// </para>
 /// </summary>
-/// <param name="config">The options monitor providing the current ingress configuration.</param>
+/// <param name="config">The options monitor providing the current auth proxy configuration.</param>
 public class MicroserviceReverseProxyConfigProvider(
-    IOptionsMonitor<IngressConfig> config) : IProxyConfigProvider
+    IOptionsMonitor<C.AuthProxy> config) : IProxyConfigProvider
 {
     static readonly ClusterConfig _baseCluster = new()
     {
@@ -40,13 +40,13 @@ public class MicroserviceReverseProxyConfigProvider(
     /// <inheritdoc/>
     public IProxyConfig GetConfig() => _inner.GetConfig();
 
-    static List<RouteConfig> BuildRoutes(IngressConfig config)
+    static List<RouteConfig> BuildRoutes(C.AuthProxy config)
     {
         var routes = new List<RouteConfig>();
-        var microservices = config.Microservices;
-        var isSingleMicroservice = microservices.Count == 1;
+        var services = config.Services;
+        var isSingleMicroservice = services.Count == 1;
 
-        foreach (var (name, ms) in microservices)
+        foreach (var (name, ms) in services)
         {
             var key = name.ToLowerInvariant();
 
@@ -65,7 +65,7 @@ public class MicroserviceReverseProxyConfigProvider(
         // frontend is reachable without any routing header or query parameter.
         if (isSingleMicroservice)
         {
-            var (name, ms) = microservices.First();
+            var (name, ms) = services.First();
             var key = name.ToLowerInvariant();
 
             if (ms.Frontend is not null)
@@ -110,7 +110,7 @@ public class MicroserviceReverseProxyConfigProvider(
                 [
                     new RouteHeader
                     {
-                        Name = Headers.MicroserviceId,
+                        Name = Headers.ServiceId,
                         Mode = HeaderMatchMode.ExactHeader,
                         IsCaseSensitive = false,
                         Values = [microserviceKey],
@@ -133,7 +133,7 @@ public class MicroserviceReverseProxyConfigProvider(
                 [
                     new RouteQueryParameter
                     {
-                        Name = "microservice",
+                        Name = "service",
                         Mode = QueryParameterMatchMode.Exact,
                         IsCaseSensitive = false,
                         Values = [microserviceKey],
@@ -172,7 +172,7 @@ public class MicroserviceReverseProxyConfigProvider(
                 [
                     new RouteHeader
                     {
-                        Name = Headers.MicroserviceId,
+                        Name = Headers.ServiceId,
                         Mode = HeaderMatchMode.ExactHeader,
                         IsCaseSensitive = false,
                         Values = [microserviceKey],
@@ -195,7 +195,7 @@ public class MicroserviceReverseProxyConfigProvider(
                 [
                     new RouteQueryParameter
                     {
-                        Name = "microservice",
+                        Name = "service",
                         Mode = QueryParameterMatchMode.Exact,
                         IsCaseSensitive = false,
                         Values = [microserviceKey],
@@ -206,10 +206,10 @@ public class MicroserviceReverseProxyConfigProvider(
         };
     }
 
-    static List<ClusterConfig> BuildClusters(IngressConfig config)
+    static List<ClusterConfig> BuildClusters(C.AuthProxy config)
     {
         var clusters = new List<ClusterConfig>();
-        foreach (var (name, ms) in config.Microservices)
+        foreach (var (name, ms) in config.Services)
         {
             var key = name.ToLowerInvariant();
 

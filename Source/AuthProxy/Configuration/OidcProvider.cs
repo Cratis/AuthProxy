@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Configuration;
 /// <summary>
 /// Represents the configuration for a single OIDC provider.
 /// </summary>
-public class OidcProviderConfig
+public class OidcProvider
 {
     /// <summary>
     /// Gets or sets the display name shown on the login page (e.g. "Contoso AD").

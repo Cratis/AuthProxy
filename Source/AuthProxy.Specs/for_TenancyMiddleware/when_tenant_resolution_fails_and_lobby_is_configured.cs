@@ -13,21 +13,21 @@ public class when_tenant_resolution_fails_and_lobby_is_configured : Specificatio
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
+                new C.TenantResolution { Strategy = C.TenantSourceIdentifierResolverType.Host }
             ],
-            Invite = new InviteConfig
+            Invite = new C.Invite
             {
-                Lobby = new MicroserviceConfig
+                Lobby = new C.Service
                 {
-                    Frontend = new MicroserviceEndpointConfig { BaseUrl = LobbyUrl }
+                    Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
                 }
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();

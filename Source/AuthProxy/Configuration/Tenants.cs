@@ -6,4 +6,4 @@ namespace Cratis.AuthProxy.Configuration;
 /// <summary>
 /// Represents the configuration for all tenants, keyed by tenant ID.
 /// </summary>
-public class TenantsConfig : Dictionary<Guid, TenantConfig>;
+public class Tenants : Dictionary<Guid, Tenant>;

@@ -36,5 +36,11 @@ public static class WellKnownPaths
     /// Append the token to complete the URL (e.g. <c>/invite/&lt;token&gt;</c>).
     /// </summary>
     public const string InvitePathPrefix = "/invite";
+
+    /// <summary>
+    /// The request path prefix under which custom pages (error pages, login UI, etc.) are served as static files.
+    /// All requests under this prefix are always allowed anonymously.
+    /// </summary>
+    public const string Pages = "/_pages";
 }
 

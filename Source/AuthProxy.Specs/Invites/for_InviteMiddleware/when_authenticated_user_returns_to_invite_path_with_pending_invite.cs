@@ -15,19 +15,19 @@ public class when_authenticated_user_returns_to_invite_path_with_pending_invite 
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { ExchangeUrl = "http://studio/internal/invites/exchange" }
+            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
-        var authConfig = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        authConfig.CurrentValue.Returns(new AuthenticationConfig());
+        var authConfig = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        authConfig.CurrentValue.Returns(new C.Authentication());
 
         _middleware = new InviteMiddleware(
             _ =>
