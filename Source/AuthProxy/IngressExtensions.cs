@@ -92,12 +92,18 @@ public static class IngressExtensions
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new PhysicalFileProvider(pagesDirectory),
-            RequestPath = "/_pages",
+            RequestPath = WellKnownPaths.Pages,
         });
     }
 
     static void MapIngressEndpoints(this WebApplication app)
     {
+        // All requests under /_pages are served as static files (anonymous by design).
+        // Any path not matched by the static file middleware is returned as 404 without
+        // requiring authentication, so the pages are never subject to auth challenges.
+        app.Map($"{WellKnownPaths.Pages}/{{**path}}", () => Results.NotFound())
+            .AllowAnonymous();
+
         // Returns a JSON array of all configured providers (OIDC + OAuth) used by the login page.
         app.MapGet(WellKnownPaths.Providers, (IOptionsMonitor<AuthenticationConfig> config) =>
         {
