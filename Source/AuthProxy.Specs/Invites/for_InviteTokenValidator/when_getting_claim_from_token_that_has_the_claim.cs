@@ -20,11 +20,11 @@ public class when_getting_claim_from_token_that_has_the_claim : Specification
             privateKey,
             additionalClaims: [new Claim(ClaimType, ClaimValue)]);
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { PublicKeyPem = publicKeyPem }
+            Invite = new C.Invite { PublicKeyPem = publicKeyPem }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _validator = new InviteTokenValidator(optionsMonitor);

@@ -5,24 +5,24 @@ using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
-using Cratis.AuthProxy.Configuration;
 using Cratis.AuthProxy.Invites;
 using Cratis.Json;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
-/// Calls every microservice's <c>/.cratis/me</c> endpoint to retrieve application-specific
+/// Calls every service's <c>/.cratis/me</c> endpoint to retrieve application-specific
 /// identity details, merges the JSON results, converts them to an <see cref="IdentityProviderResult"/>
 /// and stores it in the <c>.cratis-identity</c> response cookie as a base64-encoded JSON string.
 /// </summary>
-/// <param name="config">The ingress configuration.</param>
+/// <param name="config">The auth proxy configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="inviteTokenValidator">The invite token validator.</param>
 /// <param name="logger">The logger.</param>
 public class IdentityDetailsResolver(
-    IOptionsMonitor<IngressConfig> config,
+    IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
     IInviteTokenValidator inviteTokenValidator,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
@@ -48,14 +48,14 @@ public class IdentityDetailsResolver(
         var principalForIdentityResolution = CreatePrincipalForIdentityResolution(context, principal);
 
         var mergedDetails = new JsonObject();
-        var microservices = config.CurrentValue.Microservices;
+        var services = config.CurrentValue.Services;
 
-        foreach (var (name, microservice) in microservices)
+        foreach (var (name, service) in services)
         {
-            var shouldResolve = microservice.ResolveIdentityDetails
-                ?? (microservice.Backend is not null);
+            var shouldResolve = service.ResolveIdentityDetails
+                ?? (service.Backend is not null);
 
-            if (!shouldResolve || microservice.Backend is null)
+            if (!shouldResolve || service.Backend is null)
             {
                 continue;
             }
@@ -64,7 +64,7 @@ public class IdentityDetailsResolver(
 
             var result = await CallIdentityEndpoint(
                 name,
-                microservice.Backend.BaseUrl,
+                service.Backend.BaseUrl,
                 principalForIdentityResolution,
                 tenantId,
                 context.Response);
@@ -75,7 +75,7 @@ public class IdentityDetailsResolver(
                 return IdentityProviderResult.Unauthorized;
             }
 
-            // Merge top-level properties from this microservice into the combined result.
+            // Merge top-level properties from this service into the combined result.
             foreach (var property in result)
             {
                 mergedDetails[property.Key] = property.Value?.DeepClone();
@@ -137,14 +137,14 @@ public class IdentityDetailsResolver(
     }
 
     async Task<JsonObject?> CallIdentityEndpoint(
-        string microserviceName,
+        string serviceName,
         string baseUrl,
         ClientPrincipal principal,
         Guid tenantId,
         HttpResponse response)
     {
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
-        logger.CallingIdentityEndpoint(url, microserviceName);
+        logger.CallingIdentityEndpoint(url, serviceName);
 
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -158,13 +158,13 @@ public class IdentityDetailsResolver(
         }
         catch (Exception ex)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, microserviceName);
+            logger.ErrorCallingIdentityEndpoint(ex, serviceName);
             return new JsonObject();    // Non-fatal – continue without details.
         }
 
         if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
         {
-            logger.IdentityEndpointForbidden(microserviceName, principal.UserId);
+            logger.IdentityEndpointForbidden(serviceName, principal.UserId);
             response.StatusCode = StatusCodes.Status403Forbidden;
             return null;
         }
@@ -172,7 +172,7 @@ public class IdentityDetailsResolver(
         if (!httpResponse.IsSuccessStatusCode)
         {
             var errorBody = await httpResponse.Content.ReadAsStringAsync();
-            logger.IdentityEndpointUnsuccessful(microserviceName, (int)httpResponse.StatusCode, errorBody);
+            logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode, errorBody);
             return new JsonObject();
         }
 
@@ -189,7 +189,7 @@ public class IdentityDetailsResolver(
         }
         catch (Exception ex)
         {
-            logger.CouldNotParseIdentityResponse(ex, microserviceName);
+            logger.CouldNotParseIdentityResponse(ex, serviceName);
             return new JsonObject();
         }
     }

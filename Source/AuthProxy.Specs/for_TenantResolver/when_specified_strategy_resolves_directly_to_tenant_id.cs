@@ -14,24 +14,24 @@ public class when_specified_strategy_resolves_directly_to_tenant_id : Specificat
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
             TenantResolutions =
             [
-                new TenantResolutionConfig
+                new C.TenantResolution
                 {
-                    Strategy = TenantSourceIdentifierResolverType.Specified,
+                    Strategy = C.TenantSourceIdentifierResolverType.Specified,
                     Options = new JsonObject { ["tenantId"] = _expectedTenantId.ToString() }
                 }
             ]
         };
 
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _context = new DefaultHttpContext();
 
-        _resolver = new TenantResolver(optionsMonitor, [new SpecifiedSourceIdentifierStrategy()], Substitute.For<ILogger<TenantResolver>>());
+        _resolver = new TenantResolver(optionsMonitor, [new SpecifiedSourceIdentifierStrategy(optionsMonitor)], Substitute.For<ILogger<TenantResolver>>());
     }
 
     void Because() => _succeeded = _resolver.TryResolve(_context, out _tenantId);

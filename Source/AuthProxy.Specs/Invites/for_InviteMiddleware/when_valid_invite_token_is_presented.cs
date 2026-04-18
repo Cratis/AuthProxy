@@ -15,11 +15,11 @@ public class when_valid_invite_token_is_presented : Specification
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
         tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Valid);
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { ExchangeUrl = "http://studio/internal/invites/exchange" }
+            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _middleware = new InviteMiddleware(
@@ -59,12 +59,12 @@ public class when_valid_invite_token_is_presented : Specification
             OidcProviderScheme.FromName("Microsoft"),
             Arg.Is<Microsoft.AspNetCore.Authentication.AuthenticationProperties>(properties => properties.RedirectUri == "/invite/some-token"));
 
-    static IOptionsMonitor<AuthenticationConfig> CreateSingleProviderAuthConfig()
+    static IOptionsMonitor<C.Authentication> CreateSingleProviderAuthConfig()
     {
-        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        monitor.CurrentValue.Returns(new AuthenticationConfig
+        var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        monitor.CurrentValue.Returns(new C.Authentication
         {
-            OidcProviders = [new OidcProviderConfig { Name = "Microsoft", Authority = "https://login.microsoftonline.com/tenant/v2.0", ClientId = "client-id", ClientSecret = "secret" }]
+            OidcProviders = [new C.OidcProvider { Name = "Microsoft", Authority = "https://login.microsoftonline.com/tenant/v2.0", ClientId = "client-id", ClientSecret = "secret" }]
         });
         return monitor;
     }

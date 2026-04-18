@@ -15,8 +15,8 @@ public class when_identity_resolver_denies_access : Specification
     {
         var tenantId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
 
-        var config = new IngressConfig();
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var config = new C.AuthProxy();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();

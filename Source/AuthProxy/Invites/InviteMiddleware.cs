@@ -3,10 +3,10 @@
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
-using Cratis.AuthProxy.Configuration;
 using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Invites;
 
@@ -29,7 +29,7 @@ namespace Cratis.AuthProxy.Invites;
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
-/// <param name="config">The ingress configuration monitor.</param>
+/// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="authConfig">The authentication configuration monitor, used to determine how many providers are available.</param>
 /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
@@ -37,8 +37,8 @@ namespace Cratis.AuthProxy.Invites;
 public class InviteMiddleware(
     RequestDelegate next,
     IInviteTokenValidator tokenValidator,
-    IOptionsMonitor<IngressConfig> config,
-    IOptionsMonitor<AuthenticationConfig> authConfig,
+    IOptionsMonitor<C.AuthProxy> config,
+    IOptionsMonitor<C.Authentication> authConfig,
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
     ILogger<InviteMiddleware> logger)
@@ -70,7 +70,7 @@ public class InviteMiddleware(
             // After a successful exchange redirect the user to the lobby so they
             // can enter the application with their newly assigned tenant – unless
             // the invite is a tenant-issued invite that matches the resolved tenant,
-            // in which case the user passes directly through to the microservice.
+            // in which case the user passes directly through to the service.
             if (exchangeSucceeded)
             {
                 if (IsTenantIssuedInvite(inviteToken, context))
@@ -173,7 +173,7 @@ public class InviteMiddleware(
     /// </summary>
     /// <param name="config">The authentication configuration containing the provider lists.</param>
     /// <returns>An enumerable of <see cref="OidcProviderInfo"/> for every configured provider.</returns>
-    static IEnumerable<OidcProviderInfo> GetAllProviders(AuthenticationConfig config) =>
+    static IEnumerable<OidcProviderInfo> GetAllProviders(C.Authentication config) =>
         config.OidcProviders.Select(OidcProviderScheme.ToProviderInfo)
             .Concat(config.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo));
 

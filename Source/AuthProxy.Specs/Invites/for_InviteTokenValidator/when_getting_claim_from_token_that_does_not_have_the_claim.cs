@@ -15,11 +15,11 @@ public class when_getting_claim_from_token_that_does_not_have_the_claim : Specif
         var (privateKey, publicKeyPem) = TokenFixture.GenerateKeyPair();
         _token = TokenFixture.CreateToken(privateKey);
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig { PublicKeyPem = publicKeyPem }
+            Invite = new C.Invite { PublicKeyPem = publicKeyPem }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _validator = new InviteTokenValidator(optionsMonitor);

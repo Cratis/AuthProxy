@@ -15,14 +15,14 @@ public class when_identity_cookie_is_already_present : Specification
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Microservices = new Dictionary<string, MicroserviceConfig>
+            Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new MicroserviceEndpointConfig { BaseUrl = "http://backend" } }
+                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://backend" } }
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _httpClientFactory = Substitute.For<IHttpClientFactory>();

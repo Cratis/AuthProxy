@@ -12,8 +12,8 @@ public class when_request_has_spoofed_identity_headers : Specification
 
     void Establish()
     {
-        var config = new IngressConfig();
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var config = new C.AuthProxy();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();

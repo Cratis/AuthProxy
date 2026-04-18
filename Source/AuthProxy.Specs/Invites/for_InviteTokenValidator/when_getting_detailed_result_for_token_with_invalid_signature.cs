@@ -17,16 +17,16 @@ public class when_getting_detailed_result_for_token_with_invalid_signature : Spe
 
         _token = TokenFixture.CreateToken(signingKey, "test-issuer", "test-audience");
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig
+            Invite = new C.Invite
             {
                 PublicKeyPem = publicKeyPem,
                 Issuer = "test-issuer",
                 Audience = "test-audience",
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _validator = new InviteTokenValidator(optionsMonitor);

@@ -3,7 +3,6 @@
 
 global using System.Security.Claims;
 global using System.Text.Json.Nodes;
-global using Cratis.AuthProxy.Configuration;
 global using Cratis.AuthProxy.ErrorPages;
 global using Cratis.AuthProxy.Identity;
 global using Cratis.AuthProxy.Tenancy;
@@ -13,3 +12,4 @@ global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Options;
 global using NSubstitute;
 global using Xunit;
+global using C = Cratis.AuthProxy.Configuration;

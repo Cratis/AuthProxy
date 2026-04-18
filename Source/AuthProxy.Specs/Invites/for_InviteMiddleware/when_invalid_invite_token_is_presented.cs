@@ -15,8 +15,8 @@ public class when_invalid_invite_token_is_presented : Specification
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
         tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Invalid);
 
-        var config = new IngressConfig();
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var config = new C.AuthProxy();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _errorPageProvider = Substitute.For<IErrorPageProvider>();
@@ -48,10 +48,10 @@ public class when_invalid_invite_token_is_presented : Specification
             WellKnownPageNames.InvitationInvalid,
             StatusCodes.Status401Unauthorized);
 
-    static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
+    static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {
-        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        monitor.CurrentValue.Returns(new AuthenticationConfig());
+        var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        monitor.CurrentValue.Returns(new C.Authentication());
         return monitor;
     }
 }

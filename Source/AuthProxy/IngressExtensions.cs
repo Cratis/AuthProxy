@@ -1,7 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.ReverseProxy;
@@ -10,6 +9,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
 
@@ -28,14 +28,14 @@ public static class IngressExtensions
     public static WebApplicationBuilder AddIngressConfiguration(this WebApplicationBuilder builder)
     {
         builder.Services
-            .AddOptions<IngressConfig>()
-            .BindConfiguration("Ingress")
+            .AddOptions<C.AuthProxy>()
+            .BindConfiguration(C.AuthProxy.SectionKey)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
         builder.Services
-            .AddOptions<AuthenticationConfig>()
-            .BindConfiguration("Authentication")
+            .AddOptions<C.Authentication>()
+            .BindConfiguration(C.Authentication.SectionKey)
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
@@ -78,7 +78,7 @@ public static class IngressExtensions
 
     static void UsePagesStaticFiles(WebApplication app)
     {
-        var config = app.Services.GetRequiredService<IOptionsMonitor<IngressConfig>>();
+        var config = app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>();
         var configured = config.CurrentValue.PagesPath;
         var pagesDirectory = !string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured)
             ? configured
@@ -92,16 +92,22 @@ public static class IngressExtensions
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new PhysicalFileProvider(pagesDirectory),
-            RequestPath = "/_pages",
+            RequestPath = WellKnownPaths.Pages,
         });
     }
 
     static void MapIngressEndpoints(this WebApplication app)
     {
+        // All requests under /_pages are served as static files (anonymous by design).
+        // Any path not matched by the static file middleware is returned as 404 without
+        // requiring authentication, so the pages are never subject to auth challenges.
+        app.Map($"{WellKnownPaths.Pages}/{{**path}}", () => Results.NotFound())
+            .AllowAnonymous();
+
         // Returns a JSON array of all configured providers (OIDC + OAuth) used by the login page.
-        app.MapGet(WellKnownPaths.Providers, (IOptionsMonitor<AuthenticationConfig> config) =>
+        app.MapGet(WellKnownPaths.Providers, (IOptionsMonitor<C.AuthProxy> config) =>
         {
-            var current = config.CurrentValue;
+            var current = config.CurrentValue.Authentication;
 
             var oidcProviders = current.OidcProviders.Select(OidcProviderScheme.ToProviderInfo);
             var oauthProviders = current.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo);
@@ -114,7 +120,7 @@ public static class IngressExtensions
             .AllowAnonymous();
 
         // Initiates the challenge for the requested provider scheme.
-        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<AuthenticationConfig> authConfig) =>
+        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig) =>
         {
             var config = authConfig.CurrentValue;
             var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
@@ -133,7 +139,7 @@ public static class IngressExtensions
         })
         .AllowAnonymous();
 
-        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], async (string scheme, HttpContext context, IOptionsMonitor<AuthenticationConfig> authConfig) =>
+        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig) =>
         {
             var config = authConfig.CurrentValue;
             var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)

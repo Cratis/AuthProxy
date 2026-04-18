@@ -11,14 +11,14 @@ public class when_tenant_resolution_fails_and_resolutions_are_configured : Speci
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
             TenantResolutions =
             [
-                new TenantResolutionConfig { Strategy = TenantSourceIdentifierResolverType.Host }
+                new C.TenantResolution { Strategy = C.TenantSourceIdentifierResolverType.Host }
             ]
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();

@@ -15,15 +15,15 @@ public class when_multiple_microservices_return_details : Specification
 
     void Establish()
     {
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Microservices = new Dictionary<string, MicroserviceConfig>
+            Services = new Dictionary<string, C.Service>
             {
-                ["service-a"] = new() { Backend = new MicroserviceEndpointConfig { BaseUrl = "http://service-a/" } },
-                ["service-b"] = new() { Backend = new MicroserviceEndpointConfig { BaseUrl = "http://service-b/" } }
+                ["service-a"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://service-a/" } },
+                ["service-b"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://service-b/" } }
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();

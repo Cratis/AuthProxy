@@ -2,18 +2,18 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Cryptography;
-using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Invites;
 
 /// <summary>
 /// Validates invite JWT tokens issued by Cratis Studio using a pinned RSA public key.
 /// </summary>
-/// <param name="config">The options monitor providing the current ingress configuration.</param>
-public class InviteTokenValidator(IOptionsMonitor<IngressConfig> config) : IInviteTokenValidator
+/// <param name="config">The options monitor providing the current auth proxy configuration.</param>
+public class InviteTokenValidator(IOptionsMonitor<C.AuthProxy> config) : IInviteTokenValidator
 {
     /// <inheritdoc/>
     public bool Validate(string token) =>

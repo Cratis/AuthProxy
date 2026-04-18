@@ -6,9 +6,9 @@ using System.ComponentModel.DataAnnotations;
 namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
-/// Represents the URL endpoint of a microservice part (backend or frontend).
+/// Represents the URL endpoint of a service (backend or frontend).
 /// </summary>
-public class MicroserviceEndpointConfig
+public class ServiceEndpoint
 {
     /// <summary>
     /// Gets or sets the base URL of the endpoint (e.g. <c>http://my-service:8080/</c>).

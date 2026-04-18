@@ -18,16 +18,16 @@ public class when_token_is_expired : Specification
             "test-audience",
             expires: DateTime.UtcNow.AddMinutes(-10));
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig
+            Invite = new C.Invite
             {
                 PublicKeyPem = publicKeyPem,
                 Issuer = "test-issuer",
                 Audience = "test-audience",
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         _validator = new InviteTokenValidator(optionsMonitor);

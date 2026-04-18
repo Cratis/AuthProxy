@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
 
@@ -20,12 +20,12 @@ public static class OidcProviderScheme
         providerName.ToLowerInvariant().Replace(" ", "-", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Builds the <see cref="OidcProviderInfo"/> for a given <see cref="OidcProviderConfig"/>,
+    /// Builds the <see cref="OidcProviderInfo"/> for a given <see cref="C.OidcProvider"/>,
     /// computing the login URL based on the scheme name.
     /// </summary>
     /// <param name="provider">The provider configuration.</param>
     /// <returns>A populated <see cref="OidcProviderInfo"/> instance.</returns>
-    public static OidcProviderInfo ToProviderInfo(OidcProviderConfig provider)
+    public static OidcProviderInfo ToProviderInfo(C.OidcProvider provider)
     {
         var scheme = FromName(provider.Name);
         var loginUrl = $"{WellKnownPaths.LoginPrefix}/{scheme}";
@@ -33,12 +33,12 @@ public static class OidcProviderScheme
     }
 
     /// <summary>
-    /// Builds the <see cref="OidcProviderInfo"/> for a given <see cref="OAuthProviderConfig"/>,
+    /// Builds the <see cref="OidcProviderInfo"/> for a given <see cref="C.OAuthProvider"/>,
     /// computing the login URL based on the scheme name.
     /// </summary>
     /// <param name="provider">The provider configuration.</param>
     /// <returns>A populated <see cref="OidcProviderInfo"/> instance.</returns>
-    public static OidcProviderInfo ToProviderInfo(OAuthProviderConfig provider)
+    public static OidcProviderInfo ToProviderInfo(C.OAuthProvider provider)
     {
         var scheme = FromName(provider.Name);
         var loginUrl = $"{WellKnownPaths.LoginPrefix}/{scheme}";

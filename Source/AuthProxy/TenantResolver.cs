@@ -14,11 +14,11 @@ namespace Cratis.AuthProxy;
 /// until one succeeds, then matching the resulting source identifier against the
 /// tenant map.
 /// </summary>
-/// <param name="config">The options monitor providing the current ingress configuration.</param>
+/// <param name="config">The options monitor providing the current auth proxy configuration.</param>
 /// <param name="strategies">The collection of available source identifier resolution strategies.</param>
 /// <param name="logger">The logger.</param>
 public class TenantResolver(
-    IOptionsMonitor<C.IngressConfig> config,
+    IOptionsMonitor<C.AuthProxy> config,
     IEnumerable<T.ISourceIdentifierStrategy> strategies,
     ILogger<TenantResolver> logger) : ITenantResolver
 {
@@ -119,7 +119,7 @@ public class TenantResolver(
           Type strategyType,
           string sourceIdentifier,
           out Guid tenantId,
-          C.IngressConfig config)
+          C.AuthProxy config)
     {
         tenantId = Guid.Empty;
 

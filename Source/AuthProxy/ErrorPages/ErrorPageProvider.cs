@@ -1,8 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ErrorPages;
 
@@ -12,14 +12,14 @@ namespace Cratis.AuthProxy.ErrorPages;
 /// <remarks>
 /// Page resolution order:
 /// <list type="number">
-///   <item>The directory configured in <see cref="IngressConfig.PagesPath"/> (when set and the directory exists).</item>
+///   <item>The directory configured in <see cref="Cratis.AuthProxy.Configuration.AuthProxy.PagesPath"/> (when set and the directory exists).</item>
 ///   <item>A <c>Pages</c> directory co-located with the application's content root.</item>
 /// </list>
 /// If neither location contains the requested page, a minimal inline HTML fallback is written.
 /// </remarks>
 /// <param name="environment">The web host environment, used to locate the application content root.</param>
-/// <param name="config">The ingress configuration monitor.</param>
-public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<IngressConfig> config) : IErrorPageProvider
+/// <param name="config">The auth proxy configuration monitor.</param>
+public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config) : IErrorPageProvider
 {
     /// <inheritdoc/>
     public async Task WriteErrorPageAsync(HttpContext context, string pageName, int statusCode)

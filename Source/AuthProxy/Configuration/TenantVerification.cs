@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Configuration;
 /// <summary>
 /// Represents the configuration for verifying that a resolved tenant exists in the system.
 /// </summary>
-public class TenantVerificationConfig
+public class TenantVerification
 {
     /// <summary>
     /// Gets or sets the URL template used to verify tenant existence.

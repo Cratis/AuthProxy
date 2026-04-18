@@ -1,11 +1,11 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Configuration;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
 
@@ -15,11 +15,11 @@ namespace Cratis.AuthProxy;
 ///   <item>Strip inbound identity headers so clients cannot spoof them.</item>
 ///   <item>Resolve the tenant from the request and store it in <see cref="HttpContext.Items"/>.</item>
 ///   <item>Verify the resolved tenant exists (when verification is configured).</item>
-///   <item>Call <c>/.cratis/me</c> on configured microservices and write the identity cookie.</item>
+///   <item>Call <c>/.cratis/me</c> on configured services and write the identity cookie.</item>
 /// </list>
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
-/// <param name="config">The ingress configuration monitor.</param>
+/// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="tenantResolver">The tenant resolver.</param>
 /// <param name="tenantVerifier">The tenant existence verifier.</param>
 /// <param name="identityDetailsResolver">The identity details resolver.</param>
@@ -27,7 +27,7 @@ namespace Cratis.AuthProxy;
 /// <param name="logger">The logger.</param>
 public class TenancyMiddleware(
     RequestDelegate next,
-    IOptionsMonitor<IngressConfig> config,
+    IOptionsMonitor<C.AuthProxy> config,
     ITenantResolver tenantResolver,
     ITenantVerifier tenantVerifier,
     IIdentityDetailsResolver identityDetailsResolver,

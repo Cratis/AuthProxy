@@ -25,19 +25,19 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
                 return true;
             });
 
-        var config = new IngressConfig
+        var config = new C.AuthProxy
         {
-            Invite = new InviteConfig
+            Invite = new C.Invite
             {
                 ExchangeUrl = "http://studio/internal/invites/exchange",
                 TenantClaim = TenantClaimType,
-                Lobby = new MicroserviceConfig
+                Lobby = new C.Service
                 {
-                    Frontend = new MicroserviceEndpointConfig { BaseUrl = LobbyUrl }
+                    Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
                 }
             }
         };
-        var optionsMonitor = Substitute.For<IOptionsMonitor<IngressConfig>>();
+        var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
@@ -74,10 +74,10 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
     [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldNotContain(LobbyUrl);
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 
-    static IOptionsMonitor<AuthenticationConfig> CreateEmptyAuthConfig()
+    static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {
-        var monitor = Substitute.For<IOptionsMonitor<AuthenticationConfig>>();
-        monitor.CurrentValue.Returns(new AuthenticationConfig());
+        var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        monitor.CurrentValue.Returns(new C.Authentication());
         return monitor;
     }
 }

@@ -4,22 +4,22 @@
 namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
-/// Represents the configuration for a single microservice that the ingress can route to.
+/// Represents the configuration for a single service that the auth proxy can route to.
 /// </summary>
-public class MicroserviceConfig
+public class Service
 {
     /// <summary>
-    /// Gets or sets the backend (API) endpoint for this microservice.
+    /// Gets or sets the backend (API) endpoint for this service.
     /// </summary>
-    public MicroserviceEndpointConfig? Backend { get; set; }
+    public ServiceEndpoint? Backend { get; set; }
 
     /// <summary>
-    /// Gets or sets the frontend (SPA / static assets) endpoint for this microservice.
+    /// Gets or sets the frontend (SPA / static assets) endpoint for this service.
     /// </summary>
-    public MicroserviceEndpointConfig? Frontend { get; set; }
+    public ServiceEndpoint? Frontend { get; set; }
 
     /// <summary>
-    /// Gets or sets whether to call the <c>/.cratis/me</c> identity endpoint on this microservice
+    /// Gets or sets whether to call the <c>/.cratis/me</c> identity endpoint on this service
     /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
     public bool? ResolveIdentityDetails { get; set; }
