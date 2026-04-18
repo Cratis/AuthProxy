@@ -11,7 +11,7 @@ public class Authentication
     /// <summary>
     /// The configuration section key for the authentication settings.
     /// </summary>
-    public const string SectionKey = "Cratis:AuthProxy:Authentication";
+    public const string SectionKey = $"{AuthProxy.SectionKey}:Authentication";
 
     /// <summary>
     /// Gets or sets the list of OIDC providers available for login.
