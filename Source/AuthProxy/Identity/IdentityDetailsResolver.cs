@@ -37,7 +37,7 @@ public class IdentityDetailsResolver(
     };
 
     /// <inheritdoc/>
-    public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, Guid tenantId)
+    public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
     {
         var hasPendingInviteToken = context.Request.Cookies.ContainsKey(Cookies.InviteToken);
 
@@ -144,7 +144,7 @@ public class IdentityDetailsResolver(
         string serviceName,
         string baseUrl,
         ClientPrincipal principal,
-        Guid tenantId,
+        string tenantId,
         HttpResponse response)
     {
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
@@ -153,7 +153,7 @@ public class IdentityDetailsResolver(
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.SetMicrosoftIdentityHeaders(principal);
-        request.Headers.Add(Headers.TenantId, tenantId.ToString());
+        request.Headers.Add(Headers.TenantId, tenantId);
 
         HttpResponseMessage httpResponse;
         try

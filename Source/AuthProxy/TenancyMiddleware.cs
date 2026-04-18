@@ -38,6 +38,12 @@ public class TenancyMiddleware(
     public const string TenantIdItemKey = "Cratis.TenantId";
 
     /// <summary>
+    /// Key used to store an optional strategy-specific verification URL template in
+    /// <see cref="HttpContext.Items"/>.
+    /// </summary>
+    public const string TenantVerificationUrlTemplateItemKey = "Cratis.TenantVerificationUrlTemplate";
+
+    /// <summary>
     /// Executes the tenancy middleware for the given <paramref name="context"/>.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
@@ -84,7 +90,11 @@ public class TenancyMiddleware(
         }
 
         // 3. Verify the resolved tenant exists (when verification is configured).
-        if (tenantId != Guid.Empty && !await tenantVerifier.VerifyAsync(tenantId))
+        var verificationUrlTemplate = context.Items.TryGetValue(TenantVerificationUrlTemplateItemKey, out var verificationTemplate)
+            ? verificationTemplate as string
+            : null;
+
+        if (!string.IsNullOrWhiteSpace(tenantId) && !await tenantVerifier.VerifyAsync(tenantId, verificationUrlTemplate))
         {
             logger.TenantDoesNotExist(tenantId, SanitizePath(context.Request.Path));
             await errorPageProvider.WriteErrorPageAsync(
@@ -98,7 +108,7 @@ public class TenancyMiddleware(
 
         // 4. If the user is authenticated, resolve identity details (call /.cratis/me).
         var principal = context.BuildClientPrincipal();
-        if (principal is not null && tenantId != Guid.Empty)
+        if (principal is not null && !string.IsNullOrWhiteSpace(tenantId))
         {
             var result = await identityDetailsResolver.Resolve(context, principal, tenantId);
             if (!result.IsAuthorized)

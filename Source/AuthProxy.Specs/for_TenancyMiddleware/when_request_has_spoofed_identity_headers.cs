@@ -17,10 +17,10 @@ public class when_request_has_spoofed_identity_headers : Specification
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();
-        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>()).Returns(true);
+        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>()).Returns(true);
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
-        identityResolver.Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<Guid>()).Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
+        identityResolver.Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<string>()).Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
 
         _middleware = new TenancyMiddleware(
             _ => Task.CompletedTask,

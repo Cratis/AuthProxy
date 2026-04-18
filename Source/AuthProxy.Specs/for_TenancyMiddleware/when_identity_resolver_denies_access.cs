@@ -13,7 +13,7 @@ public class when_identity_resolver_denies_access : Specification
 
     void Establish()
     {
-        var tenantId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        const string tenantId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 
         var config = new C.AuthProxy();
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
@@ -21,7 +21,7 @@ public class when_identity_resolver_denies_access : Specification
 
         var tenantResolver = Substitute.For<ITenantResolver>();
         tenantResolver
-            .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>())
+            .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>())
             .Returns(call =>
             {
                 call[1] = tenantId;
@@ -30,11 +30,11 @@ public class when_identity_resolver_denies_access : Specification
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
         identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<Guid>())
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<string>())
             .Returns(Task.FromResult(IdentityProviderResult.Unauthorized));
 
         var tenantVerifier = Substitute.For<ITenantVerifier>();
-        tenantVerifier.VerifyAsync(Arg.Any<Guid>()).Returns(Task.FromResult(true));
+        tenantVerifier.VerifyAsync(Arg.Any<string>()).Returns(Task.FromResult(true));
 
         _middleware = new TenancyMiddleware(
             _ =>

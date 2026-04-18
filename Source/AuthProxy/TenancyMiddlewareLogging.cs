@@ -12,5 +12,5 @@ internal static partial class TenancyMiddlewareLogging
     internal static partial void CouldNotResolveTenant(this ILogger logger, string path);
 
     [LoggerMessage(LogLevel.Warning, "Resolved tenant '{TenantId}' does not exist for request {Path}. Returning tenant-not-found page.")]
-    internal static partial void TenantDoesNotExist(this ILogger logger, Guid tenantId, string path);
+    internal static partial void TenantDoesNotExist(this ILogger logger, string tenantId, string path);
 }

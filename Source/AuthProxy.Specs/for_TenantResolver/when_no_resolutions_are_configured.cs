@@ -8,7 +8,7 @@ public class when_no_resolutions_are_configured : Specification
     TenantResolver _resolver;
     DefaultHttpContext _context;
     bool _succeeded;
-    Guid _tenantId;
+    string _tenantId = string.Empty;
 
     void Establish()
     {
@@ -23,5 +23,5 @@ public class when_no_resolutions_are_configured : Specification
     void Because() => _succeeded = _resolver.TryResolve(_context, out _tenantId);
 
     [Fact] void should_succeed() => Assert.True(_succeeded);
-    [Fact] void should_return_empty_tenant_id() => Assert.Equal(Guid.Empty, _tenantId);
+    [Fact] void should_return_empty_tenant_id() => Assert.Equal(string.Empty, _tenantId);
 }

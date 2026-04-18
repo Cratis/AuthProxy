@@ -3,10 +3,8 @@
 
 namespace Cratis.AuthProxy.for_TenantResolver;
 
-public class when_specified_strategy_resolves_directly_to_tenant_id : Specification
+public class when_subhost_strategy_resolves_directly_to_tenant_id : Specification
 {
-    const string ExpectedTenantId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
-
     TenantResolver _resolver;
     DefaultHttpContext _context;
     bool _succeeded;
@@ -20,8 +18,8 @@ public class when_specified_strategy_resolves_directly_to_tenant_id : Specificat
             [
                 new C.TenantResolution
                 {
-                    Strategy = C.TenantSourceIdentifierResolverType.Specified,
-                    Options = new SpecifiedOptions { TenantId = ExpectedTenantId }
+                    Strategy = C.TenantSourceIdentifierResolverType.SubHost,
+                    Options = new SubHostOptions { ParentHost = "example.com" }
                 }
             ]
         };
@@ -30,12 +28,13 @@ public class when_specified_strategy_resolves_directly_to_tenant_id : Specificat
         optionsMonitor.CurrentValue.Returns(config);
 
         _context = new DefaultHttpContext();
+        _context.Request.Host = new HostString("acme.example.com");
 
-        _resolver = new TenantResolver(optionsMonitor, [new SpecifiedSourceIdentifierStrategy()], Substitute.For<ILogger<TenantResolver>>());
+        _resolver = new TenantResolver(optionsMonitor, [new SubHostSourceIdentifierStrategy()], Substitute.For<ILogger<TenantResolver>>());
     }
 
     void Because() => _succeeded = _resolver.TryResolve(_context, out _tenantId);
 
-    [Fact] void should_succeed() => Assert.True(_succeeded);
-    [Fact] void should_return_the_specified_tenant_id() => Assert.Equal(ExpectedTenantId, _tenantId);
+    [Fact] void should_succeed() => _succeeded.ShouldBeTrue();
+    [Fact] void should_return_the_subhost_as_tenant_id() => _tenantId.ShouldEqual("acme");
 }

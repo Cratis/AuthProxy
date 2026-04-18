@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.for_TenancyMiddleware;
 
 public class when_everything_succeeds : Specification
 {
-    static readonly Guid _tenantId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    const string TenantId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 
     TenancyMiddleware _middleware;
     DefaultHttpContext _context;
@@ -21,20 +21,20 @@ public class when_everything_succeeds : Specification
 
         var tenantResolver = Substitute.For<ITenantResolver>();
         tenantResolver
-            .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>())
+            .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>())
             .Returns(call =>
             {
-                call[1] = _tenantId;
+                call[1] = TenantId;
                 return true;
             });
 
         var identityResolver = Substitute.For<IIdentityDetailsResolver>();
         identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<Guid>())
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<string>())
             .Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
 
         var tenantVerifier = Substitute.For<ITenantVerifier>();
-        tenantVerifier.VerifyAsync(Arg.Any<Guid>()).Returns(Task.FromResult(true));
+        tenantVerifier.VerifyAsync(Arg.Any<string>()).Returns(Task.FromResult(true));
 
         _middleware = new TenancyMiddleware(
             _ =>
@@ -57,5 +57,5 @@ public class when_everything_succeeds : Specification
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_call_next() => Assert.True(_nextCalled);
-    [Fact] void should_store_tenant_id_in_context_items() => Assert.Equal(_tenantId, _context.Items[TenancyMiddleware.TenantIdItemKey]);
+    [Fact] void should_store_tenant_id_in_context_items() => Assert.Equal(TenantId, _context.Items[TenancyMiddleware.TenantIdItemKey]);
 }

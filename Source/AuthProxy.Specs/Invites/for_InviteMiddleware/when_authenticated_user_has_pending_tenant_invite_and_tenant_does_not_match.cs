@@ -9,8 +9,8 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
 {
     const string LobbyUrl = "http://lobby-service/";
     const string TenantClaimType = "tenant_id";
-    static readonly Guid _tokenTenantId = Guid.NewGuid();
-    static readonly Guid _resolvedTenantId = Guid.NewGuid();
+    const string TokenTenantId = "tenant-a";
+    const string ResolvedTenantId = "tenant-b";
 
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
@@ -22,7 +22,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
         tokenValidator.TryGetClaim(Arg.Any<string>(), TenantClaimType, out Arg.Any<string>())
             .Returns(x =>
             {
-                x[2] = _tokenTenantId.ToString();
+                x[2] = TokenTenantId;
                 return true;
             });
 
@@ -66,7 +66,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
-        _context.Items[TenancyMiddleware.TenantIdItemKey] = _resolvedTenantId;
+        _context.Items[TenancyMiddleware.TenantIdItemKey] = ResolvedTenantId;
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

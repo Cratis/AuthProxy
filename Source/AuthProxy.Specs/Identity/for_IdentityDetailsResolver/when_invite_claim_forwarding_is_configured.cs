@@ -82,7 +82,7 @@ public class when_invite_claim_forwarding_is_configured : Specification
                     new ClientPrincipalClaim { Type = "given_name", Value = "Alice" }
                 ]
             },
-            Guid.NewGuid());
+            Guid.NewGuid().ToString());
 
     [Fact] void should_preserve_user_id() => _handler.Principal?.UserId.ShouldEqual("identity-user-id");
 

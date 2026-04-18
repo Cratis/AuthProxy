@@ -23,5 +23,5 @@ public interface IIdentityDetailsResolver
     /// A <see cref="Task{TResult}"/> resolving to the merged <see cref="IdentityProviderResult"/>,
     /// or an unauthorized result when any microservice reports HTTP 403.
     /// </returns>
-    Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, Guid tenantId);
+    Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId);
 }

@@ -27,7 +27,7 @@ public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobb
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();
-        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>()).Returns(false);
+        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>()).Returns(false);
 
         _middleware = new TenancyMiddleware(
             _ =>

@@ -237,18 +237,19 @@ public class InviteMiddleware(
             return false;
         }
 
-        if (!Guid.TryParse(tokenTenantIdStr, out var tokenTenantId))
+        if (string.IsNullOrWhiteSpace(tokenTenantIdStr))
         {
             return false;
         }
 
         if (!context.Items.TryGetValue(TenancyMiddleware.TenantIdItemKey, out var resolvedTenantObj)
-            || resolvedTenantObj is not Guid resolvedTenantId)
+            || resolvedTenantObj is not string resolvedTenantId
+            || string.IsNullOrWhiteSpace(resolvedTenantId))
         {
             return false;
         }
 
-        return tokenTenantId != Guid.Empty && tokenTenantId == resolvedTenantId;
+        return string.Equals(tokenTenantIdStr, resolvedTenantId, StringComparison.OrdinalIgnoreCase);
     }
 
     string BuildLobbyRedirectUrlWithInvitationId(string lobbyUrl, string inviteToken)

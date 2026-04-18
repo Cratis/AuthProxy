@@ -23,7 +23,7 @@ public class when_verification_url_is_not_configured : Specification
             Substitute.For<ILogger<TenantVerifier>>());
     }
 
-    async Task Because() => _result = await _verifier.VerifyAsync(Guid.NewGuid());
+    async Task Because() => _result = await _verifier.VerifyAsync(Guid.NewGuid().ToString());
 
     [Fact] void should_be_verified() => _result.ShouldBeTrue();
     [Fact] void should_not_call_http_client() => _httpClientFactory.DidNotReceive().CreateClient(Arg.Any<string>());

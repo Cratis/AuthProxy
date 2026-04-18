@@ -43,7 +43,7 @@ public class AuthProxy
 
     /// <summary>
     /// Gets or sets the <see cref="Tenants"/>.
-    /// Tenants are keyed by tenant ID (GUID).
+    /// Tenants are keyed by tenant ID string.
     /// </summary>
     public Tenants Tenants { get; set; } = new();
 

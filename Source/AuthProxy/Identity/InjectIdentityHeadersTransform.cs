@@ -31,10 +31,10 @@ public class InjectIdentityHeadersTransform : RequestTransform
 
         // Forward the resolved Tenant-ID if it was set by the tenancy middleware.
         if (httpContext.Items.TryGetValue(TenancyMiddleware.TenantIdItemKey, out var tenantId)
-            && tenantId is Guid tid && tid != Guid.Empty)
+            && tenantId is string tid && !string.IsNullOrWhiteSpace(tid))
         {
             context.ProxyRequest.Headers.Remove(Headers.TenantId);
-            context.ProxyRequest.Headers.Add(Headers.TenantId, tid.ToString());
+            context.ProxyRequest.Headers.Add(Headers.TenantId, tid);
         }
 
         return ValueTask.CompletedTask;

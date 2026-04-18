@@ -23,9 +23,10 @@ public class TenantResolver(
     ILogger<TenantResolver> logger) : ITenantResolver
 {
     /// <inheritdoc/>
-    public bool TryResolve(HttpContext context, out Guid tenantId)
+    public bool TryResolve(HttpContext context, out string tenantId)
     {
-        tenantId = Guid.Empty;
+        tenantId = string.Empty;
+        context.Items.Remove(TenancyMiddleware.TenantVerificationUrlTemplateItemKey);
         var resolutions = config.CurrentValue.TenantResolutions;
 
         if (resolutions.Count == 0)
@@ -103,6 +104,25 @@ public class TenantResolver(
                     return true;
                 }
             }
+            else if (strategy is T.ISourceIdentifierStrategyTyped<T.SubHostOptions> subHostStrategy)
+            {
+                var subHostOptions = resolution.Options as T.SubHostOptions ?? new T.SubHostOptions();
+
+                if (!subHostStrategy.TryResolveSourceIdentifier(context, subHostOptions, out var sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
+                    if (!string.IsNullOrWhiteSpace(subHostOptions.VerificationUrlTemplate))
+                    {
+                        context.Items[TenancyMiddleware.TenantVerificationUrlTemplateItemKey] = subHostOptions.VerificationUrlTemplate;
+                    }
+
+                    return true;
+                }
+            }
             else if (strategy is T.ISourceIdentifierStrategyTyped<object>)
             {
                 var sourceIdentifier = context.Request.Host.Host;
@@ -125,17 +145,21 @@ public class TenantResolver(
     private static bool HandleResolvedSourceIdentifier(
           Type strategyType,
           string sourceIdentifier,
-          out Guid tenantId,
+          out string tenantId,
           C.AuthProxy config)
     {
-        tenantId = Guid.Empty;
+        tenantId = string.Empty;
 
-        // Specified and Default strategies return a fixed Guid directly.
-        if ((strategyType == Type.Specified || strategyType == Type.Default)
-                 && Guid.TryParse(sourceIdentifier, out var specifiedId))
+        // Specified, Default, and SubHost strategies return a fixed tenant ID directly.
+        if (strategyType == Type.Specified || strategyType == Type.Default || strategyType == Type.SubHost)
         {
-            tenantId = specifiedId;
-            return true;
+            if (!string.IsNullOrWhiteSpace(sourceIdentifier))
+            {
+                tenantId = sourceIdentifier;
+                return true;
+            }
+
+            return false;
         }
 
         // For all other strategies, look up the source identifier in the tenant map.
