@@ -1,6 +1,6 @@
 # Invites & Lobby
 
-Ingress includes a two-phase invite flow that lets you onboard new users via signed JWT invite
+AuthProxy includes a two-phase invite flow that lets you onboard new users via signed JWT invite
 tokens, and an optional **lobby** service to which users without a resolved tenant are
 redirected while they complete the onboarding process.
 
@@ -11,20 +11,20 @@ redirected while they complete the onboarding process.
 ### Phase 1 – Invite link
 
 1. A user receives a link in the form `https://your-authproxy/invite/<token>`.
-2. Ingress validates the token against the configured RSA public key.
+2. AuthProxy validates the token against the configured RSA public key.
 3. If the token is **valid**, it is stored in a short-lived HTTP-only cookie.
    - If **only one** identity provider is configured, the user is redirected directly to that provider's login.
-   - If **multiple** identity providers are configured, Ingress serves `invitation-select-provider.html`
+  - If **multiple** identity providers are configured, AuthProxy serves `invitation-select-provider.html`
      with a `.cratis-providers` cookie so the user can choose which provider to log in with.
-4. If the token has **expired** (valid signature but past its `exp` claim), Ingress serves
+4. If the token has **expired** (valid signature but past its `exp` claim), AuthProxy serves
    `invitation-expired.html` with HTTP 401.
-5. If the token is **invalid** (malformed, bad signature, or unparseable), Ingress serves
+5. If the token is **invalid** (malformed, bad signature, or unparseable), AuthProxy serves
    `invitation-invalid.html` with HTTP 401.
 
 ### Phase 2 – Post-login exchange
 
 1. After a successful OIDC login the user is redirected back.
-2. Ingress detects the invite cookie, calls the configured `ExchangeUrl` with the token and the
+2. AuthProxy detects the invite cookie, calls the configured `ExchangeUrl` with the token and the
    authenticated user's subject, then deletes the cookie.
 3. If the exchange succeeds and a **lobby** service is configured, the user is redirected to
    the lobby's frontend so they can enter the application with their newly assigned tenant.
@@ -32,12 +32,12 @@ redirected while they complete the onboarding process.
 ### Lobby – no-tenant redirect
 
 Tenancy is resolved **before** the invite system.  
-When Ingress cannot resolve a tenant for a request it checks whether a lobby is configured:
+When AuthProxy cannot resolve a tenant for a request it checks whether a lobby is configured:
 
 - **Lobby configured** – the user is redirected to the lobby's frontend URL, unless the request
   is already an invite path (`/invite/...`) or the user already holds a pending invite cookie (so
   that the Phase 2 exchange can complete).
-- **No lobby** – Ingress returns `401 Unauthorized` when `TenantResolutions` is non-empty,
+- **No lobby** – AuthProxy returns `401 Unauthorized` when `TenantResolutions` is non-empty,
   or proceeds without a tenant when no resolutions are configured.
 
 ---
@@ -50,21 +50,29 @@ All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
 {
   "Cratis": {
     "AuthProxy": {
-    "Invite": {
-      "PublicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
-      "Issuer": "https://studio.example.com",
-      "Audience": "authproxy",
-      "ExchangeUrl": "https://studio.example.com/internal/invites/exchange",
-      "Lobby": {
-        "Frontend": { "BaseUrl": "http://lobby-service:3000/" },
-        "Backend":  { "BaseUrl": "http://lobby-service:8080/" }
+      "Invite": {
+        "PublicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+        "Issuer": "https://studio.example.com",
+        "Audience": "authproxy",
+        "ExchangeUrl": "https://studio.example.com/internal/invites/exchange",
+        "TenantClaim": "tenant_id",
+        "AppendInvitationIdToQueryString": true,
+        "InvitationIdQueryStringKey": "invitationId",
+        "ClaimsToForward": [
+          { "FromClaimType": "organization_id", "ToClaimType": "organization" },
+          { "FromClaimType": "invited_by" }
+        ],
+        "Lobby": {
+          "Frontend": { "BaseUrl": "http://lobby-service:3000/" },
+          "Backend":  { "BaseUrl": "http://lobby-service:8080/" }
+        }
       }
     }
   }
 }
 ```
 
-### InviteConfig properties
+### Invite properties
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -72,11 +80,33 @@ All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
 | `Issuer` | `string` | Expected `iss` claim. Leave empty to skip issuer validation. |
 | `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
 | `ExchangeUrl` | `string` | Absolute URL of the invite-exchange endpoint, e.g. `https://studio.example.com/internal/invites/exchange`. |
-| `Lobby` | `ServiceConfig` | Optional lobby service. See below. |
+| `TenantClaim` | `string` | Claim in the invite token that contains tenant ID for tenant-issued invite detection. |
+| `AppendInvitationIdToQueryString` | `bool` | Appends `jti` from the invite token to the lobby redirect query string when enabled. |
+| `InvitationIdQueryStringKey` | `string` | Query string key used when appending invitation ID. |
+| `ClaimsToForward` | `InviteClaimForwarding[]` | Claim mappings forwarded from invite token into the principal sent to identity details providers. |
+| `Lobby` | `Service` | Optional lobby service. See below. |
+
+### Invite claim forwarding
+
+When `ClaimsToForward` is configured and a pending invite token cookie exists, AuthProxy reads the configured
+invite-token claims and adds them to the principal payload sent to each `/.cratis/me` identity details endpoint.
+
+- Existing identity-provider claims are preserved.
+- Mapped invite claims are appended if present.
+- If `ToClaimType` is empty, the original `FromClaimType` is used.
+
+This gives you a decoupled extension point for propagating invitation context into identity resolution.
+
+### InviteClaimForwarding properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `FromClaimType` | `string` | Claim type to read from the invite token payload. |
+| `ToClaimType` | `string` | Claim type to emit in the principal sent to identity details providers. Defaults to `FromClaimType` when empty. |
 
 ### Lobby service
 
-The `Lobby` property accepts a standard [`ServiceConfig`](microservices.md) object.
+The `Lobby` property accepts a standard [`Service`](services.md) object.
 Only the `Frontend.BaseUrl` is required for the lobby redirect; a `Backend` endpoint is optional
 and can be used if the lobby needs an API.
 
@@ -113,7 +143,7 @@ Recommended claims:
 
 ## Invitation error pages
 
-Ingress distinguishes between two token failure modes and serves a dedicated page for each:
+AuthProxy distinguishes between two token failure modes and serves a dedicated page for each:
 
 | Page file | Condition |
 |-----------|-----------|
