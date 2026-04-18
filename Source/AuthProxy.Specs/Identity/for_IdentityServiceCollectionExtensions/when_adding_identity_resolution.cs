@@ -36,7 +36,7 @@ public class when_adding_identity_resolution : Specification
     [Fact]
     void should_register_identity_principal_enrichers() =>
         _serviceProvider.GetRequiredService<IEnumerable<IIdentityDetailsPrincipalEnricher>>().ToList().Exists(_ =>
-            _ is InviteTokenInvitationIdPrincipalEnricher or InviteTokenClaimsPrincipalEnricher).ShouldBeTrue();
+            _ is InviteTokenClaimsPrincipalEnricher).ShouldBeTrue();
 
     [Fact] void should_register_http_client_factory() =>
         _serviceProvider.GetRequiredService<IHttpClientFactory>().ShouldNotBeNull();

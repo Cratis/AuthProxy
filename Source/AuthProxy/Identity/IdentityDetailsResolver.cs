@@ -111,7 +111,6 @@ public class IdentityDetailsResolver(
         var enrichers = principalEnrichers
             ??
             [
-                new InviteTokenInvitationIdPrincipalEnricher(inviteTokenValidator),
                 new InviteTokenClaimsPrincipalEnricher(inviteTokenValidator, config)
             ];
 

@@ -57,7 +57,6 @@ public class when_invite_claim_forwarding_is_configured : Specification
 
         var enrichers = new IIdentityDetailsPrincipalEnricher[]
         {
-            new InviteTokenInvitationIdPrincipalEnricher(tokenValidator),
             new InviteTokenClaimsPrincipalEnricher(tokenValidator, optionsMonitor)
         };
 
@@ -85,7 +84,7 @@ public class when_invite_claim_forwarding_is_configured : Specification
             },
             Guid.NewGuid());
 
-    [Fact] void should_replace_user_id_with_invitation_id() => _handler.Principal?.UserId.ShouldEqual("invite-jti");
+    [Fact] void should_preserve_user_id() => _handler.Principal?.UserId.ShouldEqual("identity-user-id");
 
     [Fact] void should_forward_mapped_invite_claim() =>
         _handler.Principal?.Claims.Any(_ => _.Type == "organization" && _.Value == "org-123").ShouldBeTrue();
