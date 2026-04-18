@@ -1,25 +1,25 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.AuthProxy.Tenancy.for_SpecifiedSourceIdentifierStrategy;
+namespace Cratis.AuthProxy.Tenancy.for_DefaultSourceIdentifierStrategy;
 
-public class when_configured_tenant_id_is_whitespace : Specification
+public class when_tenant_id_is_not_configured : Specification
 {
-    SpecifiedSourceIdentifierStrategy _strategy;
+    DefaultSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
-    SpecifiedOptions _options;
+    DefaultOptions _options;
     bool _succeeded;
     string _sourceIdentifier;
 
     void Establish()
     {
-        _strategy = new SpecifiedSourceIdentifierStrategy();
+        _strategy = new DefaultSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
-        _options = new SpecifiedOptions { TenantId = "   " };
+        _options = new DefaultOptions { TenantId = null };
     }
 
     void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 
     [Fact] void should_fail() => _succeeded.ShouldBeFalse();
-    [Fact] void should_return_empty_source_identifier() => _sourceIdentifier.ShouldEqual(string.Empty);
+    [Fact] void should_return_empty_string() => _sourceIdentifier.ShouldEqual(string.Empty);
 }

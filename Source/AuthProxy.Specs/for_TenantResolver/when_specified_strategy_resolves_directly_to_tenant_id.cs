@@ -21,7 +21,7 @@ public class when_specified_strategy_resolves_directly_to_tenant_id : Specificat
                 new C.TenantResolution
                 {
                     Strategy = C.TenantSourceIdentifierResolverType.Specified,
-                    Options = new JsonObject { ["tenantId"] = _expectedTenantId.ToString() }
+                    Options = new SpecifiedOptions { TenantId = _expectedTenantId.ToString() }
                 }
             ]
         };
@@ -31,7 +31,7 @@ public class when_specified_strategy_resolves_directly_to_tenant_id : Specificat
 
         _context = new DefaultHttpContext();
 
-        _resolver = new TenantResolver(optionsMonitor, [new SpecifiedSourceIdentifierStrategy(optionsMonitor)], Substitute.For<ILogger<TenantResolver>>());
+        _resolver = new TenantResolver(optionsMonitor, [new SpecifiedSourceIdentifierStrategy()], Substitute.For<ILogger<TenantResolver>>());
     }
 
     void Because() => _succeeded = _resolver.TryResolve(_context, out _tenantId);

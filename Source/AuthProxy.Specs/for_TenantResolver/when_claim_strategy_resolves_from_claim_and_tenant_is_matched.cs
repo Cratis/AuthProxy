@@ -25,7 +25,7 @@ public class when_claim_strategy_resolves_from_claim_and_tenant_is_matched : Spe
                 new C.TenantResolution
                 {
                     Strategy = C.TenantSourceIdentifierResolverType.Claim,
-                    Options = new JsonObject { ["claimType"] = "tenant_claim" }
+                    Options = new ClaimOptions { ClaimType = "tenant_claim" }
                 }
             ]
         };

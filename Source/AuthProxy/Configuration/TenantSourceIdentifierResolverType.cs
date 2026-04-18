@@ -22,4 +22,7 @@ public enum TenantSourceIdentifierResolverType
 
     /// <summary>Always resolve to a specific, pre-configured tenant ID (single-tenant deployments).</summary>
     Specified = 4,
+
+    /// <summary>Always resolve to the configured default tenant ID when no other strategy matches.</summary>
+    Default = 5,
 }

@@ -25,7 +25,7 @@ public class when_route_strategy_resolves_and_tenant_source_identifier_is_matche
                 new C.TenantResolution
                 {
                     Strategy = C.TenantSourceIdentifierResolverType.Route,
-                    Options = new JsonObject { ["pattern"] = "/(?<sourceIdentifier>[^/]+)/" }
+                    Options = new RouteOptions { Pattern = "/(?<sourceIdentifier>[^/]+)/" }
                 }
             ]
         };

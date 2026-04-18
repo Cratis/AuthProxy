@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Extensions.Options;
+
 namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
@@ -19,7 +21,9 @@ public static class TenancyServiceCollectionExtensions
         builder.Services.AddSingleton<ISourceIdentifierStrategy, ClaimSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, RouteSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, SpecifiedSourceIdentifierStrategy>();
+        builder.Services.AddSingleton<ISourceIdentifierStrategy, DefaultSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ITenantResolver, TenantResolver>();
+        builder.Services.AddSingleton<IPostConfigureOptions<Configuration.AuthProxy>, TenantResolutionOptionsConfigurer>();
 
         return builder;
     }

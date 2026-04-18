@@ -13,9 +13,7 @@ public class when_tenant_id_option_uses_different_casing : Specification
 
     void Establish()
     {
-        var configMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        configMonitor.CurrentValue.Returns(new C.AuthProxy());
-        _strategy = new SpecifiedSourceIdentifierStrategy(configMonitor);
+        _strategy = new SpecifiedSourceIdentifierStrategy();
         _context = new DefaultHttpContext();
         _options = new SpecifiedOptions { TenantId = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" };
     }
