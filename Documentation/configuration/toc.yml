@@ -4,8 +4,8 @@
   href: authentication.md
 - name: Tenancy
   href: tenancy.md
-- name: Microservices
-  href: microservices.md
+- name: Services
+  href: services.md
 - name: Invites & Lobby
   href: invites.md
 - name: Custom Invitation Provider-Selection Page

@@ -1,18 +1,19 @@
 # Tenancy
 
 Ingress resolves a **tenant ID** (GUID) from every incoming request and stores it in the request
-context. Downstream microservices receive the resolved tenant ID via the `X-Tenant-ID` header.
+context. Downstream services receive the resolved tenant ID via the `X-Tenant-ID` header.
 
 ---
 
 ## Tenant resolution strategies
 
 Resolution strategies are evaluated **in order** until one succeeds.
-Configure them under `Ingress:TenantResolutions`:
+Configure them under `Cratis:AuthProxy:TenantResolutions`:
 
 ```json
 {
-  "Ingress": {
+  "Cratis": {
+    "AuthProxy": {
     "TenantResolutions": [
       { "Strategy": "Host" },
       { "Strategy": "Claim", "Options": { "ClaimType": "tid" } }
@@ -25,7 +26,7 @@ Configure them under `Ingress:TenantResolutions`:
 
 | Strategy | Description |
 |----------|-------------|
-| `Host` | Extracts the hostname from the `Host` header and looks it up in `Ingress:Tenants`. |
+| `Host` | Extracts the hostname from the `Host` header and looks it up in `Cratis:AuthProxy:Tenants`. |
 | `Claim` | Reads a claim value from the authenticated user's `ClaimsPrincipal`. |
 | `Route` | Matches a regex pattern against the request path to extract a tenant identifier. |
 | `Specified` | Uses a fixed, statically configured tenant ID for all requests. |
@@ -60,7 +61,7 @@ If `ClaimType` is omitted, the strategy falls back to reading the `X-MS-CLIENT-P
 ```
 
 The named group `tenant` is used as the tenant identifier, which is then matched against
-`Ingress:Tenants`.
+`Cratis:AuthProxy:Tenants`.
 
 ---
 
@@ -80,11 +81,12 @@ The named group `tenant` is used as the tenant identifier, which is then matched
 ## Tenant registry
 
 Each strategy (except `Specified`) resolves a **source identifier** string that is matched
-against the `Ingress:Tenants` dictionary to obtain the final tenant GUID.
+against the `Cratis:AuthProxy:Tenants` dictionary to obtain the final tenant GUID.
 
 ```json
 {
-  "Ingress": {
+  "Cratis": {
+    "AuthProxy": {
     "Tenants": {
       "00000000-0000-0000-0000-000000000001": {
         "SourceIdentifiers": [ "myapp.example.com" ]
@@ -128,7 +130,8 @@ Ingress issues an HTTP GET to a configurable URL. The remote service must return
 
 ```json
 {
-  "Ingress": {
+  "Cratis": {
+    "AuthProxy": {
     "TenantVerification": {
       "UrlTemplate": "https://platform.example.com/api/tenants/{tenantId}"
     }

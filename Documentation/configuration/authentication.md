@@ -1,6 +1,6 @@
 # Authentication
 
-Ingress supports two authentication modes that can be active simultaneously:
+AuthProxy supports two authentication modes that can be active simultaneously:
 
 - **Interactive browser sessions** – OpenID Connect (OIDC) with a cookie.
 - **Machine-to-machine / API** – JWT Bearer tokens.
@@ -9,50 +9,58 @@ Ingress supports two authentication modes that can be active simultaneously:
 
 ## OIDC providers
 
-Configure one or more OpenID Connect providers under `Authentication:OidcProviders`.
+Configure one or more OpenID Connect providers under `Cratis:AuthProxy:Authentication:OidcProviders`.
 
-**Single provider** – the ingress challenges unauthenticated browser requests directly with that provider:
+**Single provider** – the auth proxy challenges unauthenticated browser requests directly with that provider:
 
 ```json
 {
-  "Authentication": {
-    "OidcProviders": [
-      {
-        "Name": "Microsoft",
-        "Type": "Microsoft",
-        "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
-        "ClientId": "<client-id>",
-        "ClientSecret": "<client-secret>"
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Microsoft",
+            "Type": "Microsoft",
+            "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>"
+          }
+        ]
       }
-    ]
+    }
   }
 }
 ```
 
-**Multiple providers** – the ingress redirects unauthenticated browser requests to a built-in
+**Multiple providers** – the auth proxy redirects unauthenticated browser requests to a built-in
 provider-selection page (`/.cratis/select-provider`) so the user can choose which provider to log in with:
 
 ```json
 {
-  "Authentication": {
-    "OidcProviders": [
-      {
-        "Name": "Microsoft",
-        "Type": "Microsoft",
-        "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
-        "ClientId": "<client-id>",
-        "ClientSecret": "<client-secret>",
-        "Scopes": []
-      },
-      {
-        "Name": "Google",
-        "Type": "Google",
-        "Authority": "https://accounts.google.com",
-        "ClientId": "<client-id>",
-        "ClientSecret": "<client-secret>",
-        "Scopes": []
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Microsoft",
+            "Type": "Microsoft",
+            "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>",
+            "Scopes": []
+          },
+          {
+            "Name": "Google",
+            "Type": "Google",
+            "Authority": "https://accounts.google.com",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>",
+            "Scopes": []
+          }
+        ]
       }
-    ]
+    }
   }
 }
 ```
@@ -80,10 +88,14 @@ For machine-to-machine calls, configure a JWT Bearer handler:
 
 ```json
 {
-  "Authentication": {
-    "JwtBearer": {
-      "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
-      "Audience": "<api-audience>"
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "JwtBearer": {
+          "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+          "Audience": "<api-audience>"
+        }
+      }
     }
   }
 }
