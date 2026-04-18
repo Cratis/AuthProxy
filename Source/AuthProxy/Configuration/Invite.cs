@@ -54,6 +54,13 @@ public class Invite
     public string InvitationIdQueryStringKey { get; set; } = "invitationId";
 
     /// <summary>
+    /// Gets or sets claim mappings to forward values from the invite token into
+    /// the principal sent to the identity details provider.
+    /// This allows invite claims and identity-provider claims to be combined in a configurable way.
+    /// </summary>
+    public IList<InviteClaimForwarding> ClaimsToForward { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the lobby service configuration.
     /// When set, requests from users without a resolved tenant are forwarded to this service's frontend,
     /// and users are redirected here after a successful invite exchange.
