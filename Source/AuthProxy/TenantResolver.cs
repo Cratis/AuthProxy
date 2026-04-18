@@ -45,10 +45,7 @@ public class TenantResolver(
             // Claim strategy
             if (strategy is T.ISourceIdentifierStrategyTyped<T.ClaimOptions> claimStrategy)
             {
-                var claimOptions = new T.ClaimOptions
-                {
-                    ClaimType = resolution.Options["claimType"]?.GetValue<string>()
-                };
+                var claimOptions = resolution.Options as T.ClaimOptions ?? new T.ClaimOptions();
 
                 if (!claimStrategy.TryResolveSourceIdentifier(context, claimOptions, out var sourceIdentifier))
                 {
@@ -64,10 +61,7 @@ public class TenantResolver(
             // Specified strategy
             else if (strategy is T.ISourceIdentifierStrategyTyped<T.SpecifiedOptions> specifiedStrategy)
             {
-                var specifiedOptions = new T.SpecifiedOptions
-                {
-                    TenantId = resolution.Options["tenantId"]?.GetValue<string>()
-                };
+                var specifiedOptions = resolution.Options as T.SpecifiedOptions ?? new T.SpecifiedOptions();
 
                 if (!specifiedStrategy.TryResolveSourceIdentifier(context, specifiedOptions, out var sourceIdentifier))
                 {
@@ -79,12 +73,25 @@ public class TenantResolver(
                     return true;
                 }
             }
+
+            // Default strategy
+            else if (strategy is T.ISourceIdentifierStrategyTyped<T.DefaultOptions> defaultStrategy)
+            {
+                var defaultOptions = resolution.Options as T.DefaultOptions ?? new T.DefaultOptions();
+
+                if (!defaultStrategy.TryResolveSourceIdentifier(context, defaultOptions, out var sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
+                    return true;
+                }
+            }
             else if (strategy is T.ISourceIdentifierStrategyTyped<T.RouteOptions> routeStrategy)
             {
-                var routeOptions = new T.RouteOptions
-                {
-                    Pattern = resolution.Options["pattern"]?.GetValue<string>()
-                };
+                var routeOptions = resolution.Options as T.RouteOptions ?? new T.RouteOptions();
 
                 if (!routeStrategy.TryResolveSourceIdentifier(context, routeOptions, out var sourceIdentifier))
                 {
@@ -123,8 +130,8 @@ public class TenantResolver(
     {
         tenantId = Guid.Empty;
 
-        // Specified strategy returns a fixed Guid directly.
-        if (strategyType == Type.Specified
+        // Specified and Default strategies return a fixed Guid directly.
+        if ((strategyType == Type.Specified || strategyType == Type.Default)
                  && Guid.TryParse(sourceIdentifier, out var specifiedId))
         {
             tenantId = specifiedId;
