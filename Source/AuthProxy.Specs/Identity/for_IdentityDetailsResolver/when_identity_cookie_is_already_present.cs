@@ -34,7 +34,7 @@ public class when_identity_cookie_is_already_present : Specification
         _context.Request.Headers.Cookie = $"{Cookies.Identity}=existing-value";
     }
 
-    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid());
+    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid().ToString());
 
     [Fact] void should_be_authorized() => Assert.True(_result.IsAuthorized);
     [Fact] void should_not_call_the_http_client() => _httpClientFactory.DidNotReceive().CreateClient(Arg.Any<string>());

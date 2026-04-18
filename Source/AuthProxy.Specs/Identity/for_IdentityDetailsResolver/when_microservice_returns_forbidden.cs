@@ -34,7 +34,7 @@ public class when_microservice_returns_forbidden : Specification
         _context = new DefaultHttpContext();
     }
 
-    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid());
+    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid().ToString());
 
     [Fact] void should_not_be_authorized() => Assert.False(_result.IsAuthorized);
     [Fact] void should_set_403_on_response() => Assert.Equal(StatusCodes.Status403Forbidden, _context.Response.StatusCode);

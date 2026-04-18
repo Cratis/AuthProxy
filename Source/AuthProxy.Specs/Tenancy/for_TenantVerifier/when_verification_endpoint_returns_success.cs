@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Tenancy.for_TenantVerifier;
 
 public class when_verification_endpoint_returns_success : Specification
 {
-    static readonly Guid _tenantId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    const string TenantId = "11111111-1111-1111-1111-111111111111";
 
     TenantVerifier _verifier;
     bool _result;
@@ -35,10 +35,10 @@ public class when_verification_endpoint_returns_success : Specification
             Substitute.For<ILogger<TenantVerifier>>());
     }
 
-    async Task Because() => _result = await _verifier.VerifyAsync(_tenantId);
+    async Task Because() => _result = await _verifier.VerifyAsync(TenantId);
 
     [Fact] void should_be_verified() => _result.ShouldBeTrue();
-    [Fact] void should_replace_tenant_id_in_url() => _calledUrl.ShouldContain(_tenantId.ToString());
+    [Fact] void should_replace_tenant_id_in_url() => _calledUrl.ShouldContain(TenantId);
 
     class RecordingHttpMessageHandler(Action<string> onRequest, HttpStatusCode statusCode) : HttpMessageHandler
     {

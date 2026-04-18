@@ -25,4 +25,7 @@ public enum TenantSourceIdentifierResolverType
 
     /// <summary>Always resolve to the configured default tenant ID when no other strategy matches.</summary>
     Default = 5,
+
+    /// <summary>Resolve the tenant ID from the request subhost by convention (for example, tenant.example.com -> tenant).</summary>
+    SubHost = 6,
 }

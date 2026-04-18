@@ -8,7 +8,7 @@ public class when_strategy_resolves_but_no_tenant_is_matched : Specification
     TenantResolver _resolver;
     DefaultHttpContext _context;
     bool _succeeded;
-    Guid _tenantId;
+    string _tenantId = string.Empty;
 
     void Establish()
     {
@@ -16,7 +16,7 @@ public class when_strategy_resolves_but_no_tenant_is_matched : Specification
         {
             Tenants = new C.Tenants
             {
-                [Guid.NewGuid()] = new C.Tenant { Name = "Acme", Domains = ["acme.example.com"] }
+                [Guid.NewGuid().ToString()] = new C.Tenant { Name = "Acme", Domains = ["acme.example.com"] }
             },
             TenantResolutions =
             [
@@ -36,5 +36,5 @@ public class when_strategy_resolves_but_no_tenant_is_matched : Specification
     void Because() => _succeeded = _resolver.TryResolve(_context, out _tenantId);
 
     [Fact] void should_not_succeed() => Assert.False(_succeeded);
-    [Fact] void should_return_empty_tenant_id() => Assert.Equal(Guid.Empty, _tenantId);
+    [Fact] void should_return_empty_tenant_id() => Assert.Equal(string.Empty, _tenantId);
 }

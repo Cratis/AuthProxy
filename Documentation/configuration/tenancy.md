@@ -1,23 +1,24 @@
 # Tenancy
 
-Ingress resolves a **tenant ID** (GUID) from every incoming request and stores it in the request
-context. Downstream services receive the resolved tenant ID via the `X-Tenant-ID` header.
+AuthProxy resolves a **tenant ID** string from each incoming request and stores it in the request context.
+Downstream services receive the resolved tenant ID via the `Tenant-ID` header.
 
 ---
 
 ## Tenant resolution strategies
 
-Resolution strategies are evaluated **in order** until one succeeds.
+Resolution strategies run **in order** until one strategy resolves a tenant.
 Configure them under `Cratis:AuthProxy:TenantResolutions`:
 
 ```json
 {
   "Cratis": {
     "AuthProxy": {
-    "TenantResolutions": [
-      { "Strategy": "Host" },
-      { "Strategy": "Claim", "Options": { "ClaimType": "tid" } }
-    ]
+      "TenantResolutions": [
+        { "Strategy": "Host" },
+        { "Strategy": "Claim", "Options": { "ClaimType": "tid" } }
+      ]
+    }
   }
 }
 ```
@@ -26,10 +27,12 @@ Configure them under `Cratis:AuthProxy:TenantResolutions`:
 
 | Strategy | Description |
 |----------|-------------|
-| `Host` | Extracts the hostname from the `Host` header and looks it up in `Cratis:AuthProxy:Tenants`. |
-| `Claim` | Reads a claim value from the authenticated user's `ClaimsPrincipal`. |
-| `Route` | Matches a regex pattern against the request path to extract a tenant identifier. |
-| `Specified` | Uses a fixed, statically configured tenant ID for all requests. |
+| `Host` | Uses the request host and matches it against configured tenant `Domains` / `SourceIdentifiers`. |
+| `Claim` | Reads a claim value from the authenticated user and matches it against configured tenant `SourceIdentifiers`. |
+| `Route` | Extracts a source identifier from the request path by regex and matches it against configured tenant `SourceIdentifiers`. |
+| `Specified` | Resolves directly to a fixed tenant ID string from configuration. |
+| `Default` | Resolves directly to a fallback tenant ID string from configuration. |
+| `SubHost` | Resolves directly from subhost convention, for example `acme.example.com` -> `acme`. |
 
 ---
 
@@ -44,8 +47,7 @@ Configure them under `Cratis:AuthProxy:TenantResolutions`:
 }
 ```
 
-If `ClaimType` is omitted, the strategy falls back to reading the `X-MS-CLIENT-PRINCIPAL` header
-(Azure App Service format).
+If `ClaimType` is omitted, AuthProxy falls back to reading `X-MS-CLIENT-PRINCIPAL`.
 
 ---
 
@@ -55,13 +57,12 @@ If `ClaimType` is omitted, the strategy falls back to reading the `X-MS-CLIENT-P
 {
   "Strategy": "Route",
   "Options": {
-    "Pattern": "^/tenant/(?<tenant>[^/]+)"
+    "Pattern": "^/tenant/(?<sourceIdentifier>[^/]+)"
   }
 }
 ```
 
-The named group `tenant` is used as the tenant identifier, which is then matched against
-`Cratis:AuthProxy:Tenants`.
+The regex must expose a named group called `sourceIdentifier`.
 
 ---
 
@@ -71,28 +72,65 @@ The named group `tenant` is used as the tenant identifier, which is then matched
 {
   "Strategy": "Specified",
   "Options": {
-    "TenantId": "00000000-0000-0000-0000-000000000001"
+    "TenantId": "acme"
   }
 }
 ```
 
 ---
 
+## Default strategy options
+
+```json
+{
+  "Strategy": "Default",
+  "Options": {
+    "TenantId": "lobby"
+  }
+}
+```
+
+---
+
+## SubHost strategy options
+
+```json
+{
+  "Strategy": "SubHost",
+  "Options": {
+    "ParentHost": "example.com",
+    "VerificationUrlTemplate": "https://platform.example.com/internal/tenants/{tenantId}"
+  }
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `ParentHost` | `string` | Parent host suffix used to extract the tenant ID from request host. |
+| `VerificationUrlTemplate` | `string` | Optional strategy-specific verification URL template. Overrides global `TenantVerification.UrlTemplate` for this strategy. |
+
+`SubHost` resolves directly to the subhost tenant ID and does not require a `Tenants` dictionary lookup.
+Use `VerificationUrlTemplate` to validate that the resolved tenant exists before forwarding requests.
+
+---
+
 ## Tenant registry
 
-Each strategy (except `Specified`) resolves a **source identifier** string that is matched
-against the `Cratis:AuthProxy:Tenants` dictionary to obtain the final tenant GUID.
+For `Host`, `Claim`, and `Route`, AuthProxy resolves a source identifier and then looks up the tenant ID in `Cratis:AuthProxy:Tenants`.
 
 ```json
 {
   "Cratis": {
     "AuthProxy": {
-    "Tenants": {
-      "00000000-0000-0000-0000-000000000001": {
-        "SourceIdentifiers": [ "myapp.example.com" ]
-      },
-      "00000000-0000-0000-0000-000000000002": {
-        "SourceIdentifiers": [ "otherapp.example.com" ]
+      "Tenants": {
+        "acme": {
+          "Domains": ["acme.example.com"],
+          "SourceIdentifiers": ["acme", "tenant-acme"]
+        },
+        "contoso": {
+          "Domains": ["contoso.example.com"],
+          "SourceIdentifiers": ["contoso", "tenant-contoso"]
+        }
       }
     }
   }
@@ -103,37 +141,27 @@ against the `Cratis:AuthProxy:Tenants` dictionary to obtain the final tenant GUI
 
 ## Lobby fallback
 
-When no tenant can be resolved and the [invite lobby](invites.md) is configured, the user is
-redirected to the lobby frontend instead of receiving a `401 Unauthorized` response.
-See [Invites & Lobby](invites.md) for details.
+When no tenant can be resolved and the [invite lobby](invites.md) is configured, AuthProxy redirects the user to the lobby frontend instead of returning `401 Unauthorized`.
 
-If no lobby is configured and `TenantResolutions` is non-empty, Ingress returns `401 Unauthorized`.
-When `TenantResolutions` is empty (not configured), the request proceeds without a tenant.
+If no lobby is configured and `TenantResolutions` is non-empty, AuthProxy returns `401 Unauthorized`.
+When `TenantResolutions` is empty, the request proceeds without a tenant.
 
 ---
 
 ## Tenant verification
 
-After a tenant has been resolved Ingress can verify that it actually **exists** in your platform
-before forwarding the request. This is an opt-in feature — when not configured all resolved
-tenants are accepted without a remote check.
+After tenant resolution, AuthProxy can verify that the tenant exists before forwarding the request.
+This is optional.
 
-### How it works
-
-Ingress issues an HTTP GET to a configurable URL. The remote service must return:
-
-- **200** – tenant exists, request proceeds.
-- **404** – tenant does not exist; Ingress serves `tenant-not-found.html` with HTTP 404.
-- Any other status or network error – Ingress treats the tenant as not found and serves the same page.
-
-### Configuration
+### Global verification configuration
 
 ```json
 {
   "Cratis": {
     "AuthProxy": {
-    "TenantVerification": {
-      "UrlTemplate": "https://platform.example.com/api/tenants/{tenantId}"
+      "TenantVerification": {
+        "UrlTemplate": "https://platform.example.com/api/tenants/{tenantId}"
+      }
     }
   }
 }
@@ -141,11 +169,17 @@ Ingress issues an HTTP GET to a configurable URL. The remote service must return
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `UrlTemplate` | `string` | URL to call for verification. Use `{tenantId}` as a placeholder for the resolved tenant GUID. |
+| `UrlTemplate` | `string` | URL template for tenant verification. Use `{tenantId}` placeholder. |
 
-The `{tenantId}` placeholder is replaced at runtime with the resolved tenant ID.
+### Response handling
+
+- `200`: tenant exists, request proceeds.
+- `404`: tenant does not exist; AuthProxy serves `tenant-not-found.html` with `404`.
+- Any other status or network error: treated as tenant verification failure, and `tenant-not-found.html` is served.
+
+If a strategy provides a strategy-specific verification URL template (for example `SubHost.Options.VerificationUrlTemplate`), that template is used instead of the global `TenantVerification.UrlTemplate`.
 
 ### Tenant not found page
 
-When verification fails, the `tenant-not-found.html` page is served.
-See [Error pages](error-pages.md) for how to override this page with your own custom version.
+When verification fails, AuthProxy serves `tenant-not-found.html`.
+See [Error pages](error-pages.md) to override this page.

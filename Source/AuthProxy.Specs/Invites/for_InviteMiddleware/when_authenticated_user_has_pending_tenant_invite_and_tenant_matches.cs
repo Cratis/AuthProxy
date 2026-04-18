@@ -9,7 +9,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
 {
     const string LobbyUrl = "http://lobby-service/";
     const string TenantClaimType = "tenant_id";
-    static readonly Guid _tenantId = Guid.NewGuid();
+    const string TenantId = "tenant-matched";
 
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
@@ -21,7 +21,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
         tokenValidator.TryGetClaim(Arg.Any<string>(), TenantClaimType, out Arg.Any<string>())
             .Returns(x =>
             {
-                x[2] = _tenantId.ToString();
+                x[2] = TenantId;
                 return true;
             });
 
@@ -65,7 +65,7 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
-        _context.Items[TenancyMiddleware.TenantIdItemKey] = _tenantId;
+        _context.Items[TenancyMiddleware.TenantIdItemKey] = TenantId;
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

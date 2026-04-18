@@ -14,7 +14,7 @@ internal static partial class TenantVerifierLogging
     /// <param name="logger">The logger to write to.</param>
     /// <param name="tenantId">The tenant identifier that was not found.</param>
     [LoggerMessage(LogLevel.Warning, "Tenant '{TenantId}' was not found by the verification service.")]
-    internal static partial void TenantNotFound(this ILogger<TenantVerifier> logger, Guid tenantId);
+    internal static partial void TenantNotFound(this ILogger<TenantVerifier> logger, string tenantId);
 
     /// <summary>
     /// Logs a non-success, non-404 HTTP status code returned by the tenant verification service.
@@ -23,7 +23,7 @@ internal static partial class TenantVerifierLogging
     /// <param name="tenantId">The tenant identifier being verified.</param>
     /// <param name="statusCode">The unexpected HTTP status code.</param>
     [LoggerMessage(LogLevel.Warning, "Tenant verification for '{TenantId}' returned unexpected status {StatusCode}.")]
-    internal static partial void TenantVerificationFailed(this ILogger<TenantVerifier> logger, Guid tenantId, int statusCode);
+    internal static partial void TenantVerificationFailed(this ILogger<TenantVerifier> logger, string tenantId, int statusCode);
 
     /// <summary>
     /// Logs an exception thrown while contacting the tenant verification service.
@@ -33,5 +33,5 @@ internal static partial class TenantVerifierLogging
     /// <param name="tenantId">The tenant identifier being verified.</param>
     /// <param name="url">The URL that was contacted.</param>
     [LoggerMessage(LogLevel.Error, "Error contacting tenant verification service for '{TenantId}' at '{Url}'.")]
-    internal static partial void TenantVerificationError(this ILogger<TenantVerifier> logger, Exception exception, Guid tenantId, string url);
+    internal static partial void TenantVerificationError(this ILogger<TenantVerifier> logger, Exception exception, string tenantId, string url);
 }

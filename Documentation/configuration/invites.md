@@ -80,7 +80,7 @@ All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
 | `Issuer` | `string` | Expected `iss` claim. Leave empty to skip issuer validation. |
 | `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
 | `ExchangeUrl` | `string` | Absolute URL of the invite-exchange endpoint, e.g. `https://studio.example.com/internal/invites/exchange`. |
-| `TenantClaim` | `string` | Claim in the invite token that contains tenant ID for tenant-issued invite detection. |
+| `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID string for tenant-issued invite detection. |
 | `AppendInvitationIdToQueryString` | `bool` | Appends `jti` from the invite token to the lobby redirect query string when enabled. |
 | `InvitationIdQueryStringKey` | `string` | Query string key used when appending invitation ID. |
 | `ClaimsToForward` | `InviteClaimForwarding[]` | Claim mappings forwarded from invite token into the principal sent to identity details providers. |

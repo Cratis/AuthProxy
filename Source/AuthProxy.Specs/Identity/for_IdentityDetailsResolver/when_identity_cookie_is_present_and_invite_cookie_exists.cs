@@ -44,7 +44,7 @@ public class when_identity_cookie_is_present_and_invite_cookie_exists : Specific
         _context.Request.Headers.Cookie = $"{Cookies.Identity}=existing-value; {Cookies.InviteToken}=invite-token";
     }
 
-    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid());
+    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid().ToString());
 
     [Fact] void should_be_authorized() => _result.IsAuthorized.ShouldBeTrue();
     [Fact] void should_call_the_http_client_to_refresh_details() => _httpClientFactory.Received(1).CreateClient(Arg.Any<string>());

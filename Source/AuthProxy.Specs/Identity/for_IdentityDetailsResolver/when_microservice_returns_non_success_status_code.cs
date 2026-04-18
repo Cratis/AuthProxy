@@ -34,7 +34,7 @@ public class when_microservice_returns_non_success_status_code : Specification
         _context = new DefaultHttpContext();
     }
 
-    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid());
+    async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid().ToString());
 
     [Fact] void should_still_be_authorized() => _result.IsAuthorized.ShouldBeTrue();
     [Fact] void should_write_identity_cookie_to_response() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.Identity);

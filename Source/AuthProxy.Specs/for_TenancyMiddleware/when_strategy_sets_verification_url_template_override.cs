@@ -3,14 +3,11 @@
 
 namespace Cratis.AuthProxy.for_TenancyMiddleware;
 
-public class when_tenant_does_not_exist : Specification
+public class when_strategy_sets_verification_url_template_override : Specification
 {
-    const string TenantId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
-
     TenancyMiddleware _middleware;
     DefaultHttpContext _context;
-    IErrorPageProvider _errorPageProvider;
-    bool _nextCalled;
+    ITenantVerifier _tenantVerifier;
 
     void Establish()
     {
@@ -23,38 +20,30 @@ public class when_tenant_does_not_exist : Specification
             .TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>())
             .Returns(call =>
             {
-                call[1] = TenantId;
+                var context = (HttpContext)call[0];
+                context.Items[TenancyMiddleware.TenantVerificationUrlTemplateItemKey] = "https://tenant-registry.local/{tenantId}";
+                call[1] = "acme";
                 return true;
             });
 
-        var tenantVerifier = Substitute.For<ITenantVerifier>();
-        tenantVerifier.VerifyAsync(TenantId).Returns(Task.FromResult(false));
-
-        _errorPageProvider = Substitute.For<IErrorPageProvider>();
+        _tenantVerifier = Substitute.For<ITenantVerifier>();
+        _tenantVerifier.VerifyAsync(Arg.Any<string>(), Arg.Any<string?>()).Returns(Task.FromResult(true));
 
         _middleware = new TenancyMiddleware(
-            _ =>
-            {
-                _nextCalled = true;
-                return Task.CompletedTask;
-            },
+            _ => Task.CompletedTask,
             optionsMonitor,
             tenantResolver,
-            tenantVerifier,
+            _tenantVerifier,
             Substitute.For<IIdentityDetailsResolver>(),
-            _errorPageProvider,
+            Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();
     }
 
-    async Task Because() => await _middleware.InvokeAsync(_context);
+    Task Because() => _middleware.InvokeAsync(_context);
 
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
     [Fact]
-    void should_serve_tenant_not_found_page() =>
-        _errorPageProvider.Received(1).WriteErrorPageAsync(
-            _context,
-            WellKnownPageNames.TenantNotFound,
-            StatusCodes.Status404NotFound);
+    void should_forward_strategy_override_to_verifier() =>
+        _tenantVerifier.Received(1).VerifyAsync("acme", "https://tenant-registry.local/{tenantId}");
 }

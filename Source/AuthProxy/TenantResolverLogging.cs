@@ -8,10 +8,10 @@ namespace Cratis.AuthProxy;
 internal static partial class TenantResolverLogging
 {
     [LoggerMessage(LogLevel.Debug, "Tenant resolved via Specified strategy to {TenantId}")]
-    internal static partial void TenantResolvedViaSpecifiedStrategy(this ILogger logger, Guid tenantId);
+    internal static partial void TenantResolvedViaSpecifiedStrategy(this ILogger logger, string tenantId);
 
     [LoggerMessage(LogLevel.Debug, "Tenant resolved via {Strategy} strategy using source identifier '{SourceIdentifier}' to {TenantId}")]
-    internal static partial void TenantResolved(this ILogger logger, C.TenantSourceIdentifierResolverType strategy, string sourceIdentifier, Guid tenantId);
+    internal static partial void TenantResolved(this ILogger logger, C.TenantSourceIdentifierResolverType strategy, string sourceIdentifier, string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "Source identifier '{SourceIdentifier}' resolved by {Strategy} strategy but matched no configured tenant")]
     internal static partial void SourceIdentifierMatchedNoTenant(this ILogger logger, string sourceIdentifier, C.TenantSourceIdentifierResolverType strategy);

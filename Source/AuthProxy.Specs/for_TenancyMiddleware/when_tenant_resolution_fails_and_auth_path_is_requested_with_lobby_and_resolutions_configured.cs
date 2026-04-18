@@ -31,7 +31,7 @@ public class when_tenant_resolution_fails_and_auth_path_is_requested_with_lobby_
         optionsMonitor.CurrentValue.Returns(config);
 
         var tenantResolver = Substitute.For<ITenantResolver>();
-        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<Guid>()).Returns(false);
+        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>()).Returns(false);
 
         _middleware = new TenancyMiddleware(
             _ =>

@@ -15,9 +15,13 @@ public interface ITenantVerifier
     /// as not found (HTTP 404) or cannot be reached.
     /// </summary>
     /// <param name="tenantId">The tenant identifier to verify.</param>
+    /// <param name="urlTemplateOverride">
+    /// Optional strategy-specific URL template to use instead of the global
+    /// <see cref="Configuration.TenantVerification.UrlTemplate"/>.
+    /// </param>
     /// <returns>
     /// A <see cref="Task{TResult}"/> that resolves to <see langword="true"/> if the tenant exists;
     /// otherwise <see langword="false"/>.
     /// </returns>
-    Task<bool> VerifyAsync(Guid tenantId);
+    Task<bool> VerifyAsync(string tenantId, string? urlTemplateOverride = null);
 }

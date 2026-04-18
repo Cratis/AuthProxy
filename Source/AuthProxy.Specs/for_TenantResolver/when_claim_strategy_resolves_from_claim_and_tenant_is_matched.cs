@@ -5,12 +5,12 @@ namespace Cratis.AuthProxy.for_TenantResolver;
 
 public class when_claim_strategy_resolves_from_claim_and_tenant_is_matched : Specification
 {
-    static readonly Guid _expectedTenantId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    const string ExpectedTenantId = "55555555-5555-5555-5555-555555555555";
 
     TenantResolver _resolver;
     DefaultHttpContext _context;
     bool _succeeded;
-    Guid _tenantId;
+    string _tenantId = string.Empty;
 
     void Establish()
     {
@@ -18,7 +18,7 @@ public class when_claim_strategy_resolves_from_claim_and_tenant_is_matched : Spe
         {
             Tenants = new C.Tenants
             {
-                [_expectedTenantId] = new C.Tenant { Name = "Acme", SourceIdentifiers = ["tenant-from-claim"] }
+                [ExpectedTenantId] = new C.Tenant { Name = "Acme", SourceIdentifiers = ["tenant-from-claim"] }
             },
             TenantResolutions =
             [
@@ -49,5 +49,5 @@ public class when_claim_strategy_resolves_from_claim_and_tenant_is_matched : Spe
     void Because() => _succeeded = _resolver.TryResolve(_context, out _tenantId);
 
     [Fact] void should_succeed() => _succeeded.ShouldBeTrue();
-    [Fact] void should_return_the_matched_tenant_id() => _tenantId.ShouldEqual(_expectedTenantId);
+    [Fact] void should_return_the_matched_tenant_id() => _tenantId.ShouldEqual(ExpectedTenantId);
 }

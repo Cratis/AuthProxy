@@ -31,7 +31,7 @@ public class when_verification_call_throws : Specification
             Substitute.For<ILogger<TenantVerifier>>());
     }
 
-    async Task Because() => _result = await _verifier.VerifyAsync(Guid.NewGuid());
+    async Task Because() => _result = await _verifier.VerifyAsync(Guid.NewGuid().ToString());
 
     [Fact] void should_not_be_verified() => _result.ShouldBeFalse();
 

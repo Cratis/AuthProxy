@@ -23,15 +23,18 @@ public class TenantVerifier(
     ILogger<TenantVerifier> logger) : ITenantVerifier
 {
     /// <inheritdoc/>
-    public async Task<bool> VerifyAsync(Guid tenantId)
+    public async Task<bool> VerifyAsync(string tenantId, string? urlTemplateOverride = null)
     {
-        var urlTemplate = config.CurrentValue.TenantVerification?.UrlTemplate;
+        var urlTemplate = string.IsNullOrWhiteSpace(urlTemplateOverride)
+            ? config.CurrentValue.TenantVerification?.UrlTemplate
+            : urlTemplateOverride;
+
         if (string.IsNullOrWhiteSpace(urlTemplate))
         {
             return true;
         }
 
-        var url = urlTemplate.Replace("{tenantId}", tenantId.ToString());
+        var url = urlTemplate.Replace("{tenantId}", tenantId, StringComparison.Ordinal);
         using var client = httpClientFactory.CreateClient();
 
         try
