@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
@@ -79,19 +80,10 @@ public static class IngressExtensions
     static void UsePagesStaticFiles(WebApplication app)
     {
         var config = app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>();
-        var configured = config.CurrentValue.PagesPath;
-        var pagesDirectory = !string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured)
-            ? configured
-            : Path.Combine(app.Environment.ContentRootPath, "Pages");
-
-        if (!Directory.Exists(pagesDirectory))
-        {
-            return;
-        }
 
         app.UseStaticFiles(new StaticFileOptions
         {
-            FileProvider = new PhysicalFileProvider(pagesDirectory),
+            FileProvider = new PagesFileProvider(app.Environment, config),
             RequestPath = WellKnownPaths.Pages,
         });
     }
@@ -165,5 +157,81 @@ public static class IngressExtensions
             await context.Response.SendFileAsync(indexHtmlPath);
         })
         .AllowAnonymous();
+    }
+
+    sealed class PagesFileProvider(IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config) : IFileProvider
+    {
+        public IDirectoryContents GetDirectoryContents(string subpath) => NotFoundDirectoryContents.Singleton;
+
+        public IFileInfo GetFileInfo(string subpath)
+        {
+            var relativePath = subpath.TrimStart('/');
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                return new NotFoundFileInfo(subpath);
+            }
+
+            foreach (var directory in GetCandidateDirectories())
+            {
+                var directoryFullPath = Path.GetFullPath(directory);
+                var candidateFullPath = Path.GetFullPath(Path.Combine(directoryFullPath, relativePath));
+                var startsWithDirectory = candidateFullPath.StartsWith($"{directoryFullPath}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(candidateFullPath, directoryFullPath, StringComparison.OrdinalIgnoreCase);
+
+                if (!startsWithDirectory || !File.Exists(candidateFullPath))
+                {
+                    continue;
+                }
+
+                return new PhysicalPathFileInfo(candidateFullPath);
+            }
+
+            return new NotFoundFileInfo(subpath);
+        }
+
+        public IChangeToken Watch(string filter) => NullChangeToken.Singleton;
+
+        IEnumerable<string> GetCandidateDirectories()
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var configuredPath = config.CurrentValue.PagesPath;
+            if (!string.IsNullOrWhiteSpace(configuredPath))
+            {
+                var resolvedConfiguredPath = Path.IsPathRooted(configuredPath)
+                    ? configuredPath
+                    : Path.Combine(environment.ContentRootPath, configuredPath);
+
+                if (Directory.Exists(resolvedConfiguredPath) && seen.Add(resolvedConfiguredPath))
+                {
+                    yield return resolvedConfiguredPath;
+                }
+            }
+
+            var defaultPagesPath = Path.Combine(environment.ContentRootPath, "Pages");
+            if (Directory.Exists(defaultPagesPath) && seen.Add(defaultPagesPath))
+            {
+                yield return defaultPagesPath;
+            }
+        }
+
+        sealed class PhysicalPathFileInfo(string fullPath) : IFileInfo
+        {
+            readonly FileInfo _fileInfo = new(fullPath);
+
+            public bool Exists => _fileInfo.Exists;
+
+            public long Length => _fileInfo.Length;
+
+            public string PhysicalPath => _fileInfo.FullName;
+
+            public string Name => _fileInfo.Name;
+
+            public DateTimeOffset LastModified => new(_fileInfo.LastWriteTimeUtc, TimeSpan.Zero);
+
+            public bool IsDirectory => false;
+
+            public Stream CreateReadStream() => _fileInfo.OpenRead();
+        }
     }
 }
