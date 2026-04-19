@@ -3,7 +3,6 @@
 
 using System.Net;
 using Cratis.Arc.Identity;
-using Cratis.AuthProxy.Invites;
 
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver;
 
@@ -29,9 +28,8 @@ public class when_multiple_microservices_return_details : Specification
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, /*lang=json,strict*/ "{\"propA\":\"valueA\",\"propB\":\"valueB\"}")));
-        var inviteTokenValidator = Substitute.For<IInviteTokenValidator>();
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, inviteTokenValidator, Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<ILogger<IdentityDetailsResolver>>());
         _context = new DefaultHttpContext();
     }
 

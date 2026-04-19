@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Arc.Identity;
-
 namespace Cratis.AuthProxy.for_TenancyMiddleware;
 
 public class when_everything_succeeds : Specification
@@ -28,11 +26,6 @@ public class when_everything_succeeds : Specification
                 return true;
             });
 
-        var identityResolver = Substitute.For<IIdentityDetailsResolver>();
-        identityResolver
-            .Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<string>())
-            .Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
-
         var tenantVerifier = Substitute.For<ITenantVerifier>();
         tenantVerifier.VerifyAsync(Arg.Any<string>()).Returns(Task.FromResult(true));
 
@@ -45,7 +38,6 @@ public class when_everything_succeeds : Specification
             optionsMonitor,
             tenantResolver,
             tenantVerifier,
-            identityResolver,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
