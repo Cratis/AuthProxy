@@ -1,9 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.AuthProxy.for_TenancyMiddleware;
+namespace Cratis.AuthProxy.for_TenancyMiddleware.when_tenant_resolution_fails;
 
-public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobby_configured : Specification
+public class and_lobby_is_configured : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
 
@@ -15,6 +15,10 @@ public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobb
     {
         var config = new C.AuthProxy
         {
+            TenantResolutions =
+            [
+                new C.TenantResolution { Strategy = C.TenantSourceIdentifierResolverType.Host }
+            ],
             Invite = new C.Invite
             {
                 Lobby = new C.Service
@@ -38,17 +42,15 @@ public class when_tenant_resolution_fails_and_invite_cookie_is_present_with_lobb
             optionsMonitor,
             tenantResolver,
             Substitute.For<ITenantVerifier>(),
-            Substitute.For<IIdentityDetailsResolver>(),
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/some-page";
-        _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-token";
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(string.Empty);
+    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
+    [Fact] void should_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(LobbyUrl);
 }

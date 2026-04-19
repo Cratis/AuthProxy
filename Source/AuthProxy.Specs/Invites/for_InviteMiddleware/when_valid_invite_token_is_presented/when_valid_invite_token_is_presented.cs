@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_valid_invite_token_is_presented;
 
 public class when_valid_invite_token_is_presented : Specification
 {

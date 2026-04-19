@@ -3,9 +3,9 @@
 
 using System.Net;
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_tenant_invite;
 
-public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_not_match : Specification
+public class and_tenant_does_not_match : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
     const string TenantClaimType = "tenant_id";
@@ -71,8 +71,8 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_does_n
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(LobbyUrl);
+    [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
+    [Fact] void should_set_lobby_redirect_url_in_context_items() => _context.Items[InviteMiddleware.LobbyRedirectUrlItemKey].ShouldEqual(LobbyUrl);
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()

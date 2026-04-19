@@ -1,12 +1,10 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.AuthProxy.for_TenancyMiddleware;
+namespace Cratis.AuthProxy.for_TenancyMiddleware.when_tenant_resolution_fails;
 
-public class when_tenant_resolution_fails_and_invite_path_is_requested_with_lobby_configured : Specification
+public class and_resolutions_are_configured : Specification
 {
-    const string LobbyUrl = "http://lobby-service/";
-
     TenancyMiddleware _middleware;
     DefaultHttpContext _context;
     bool _nextCalled;
@@ -15,13 +13,10 @@ public class when_tenant_resolution_fails_and_invite_path_is_requested_with_lobb
     {
         var config = new C.AuthProxy
         {
-            Invite = new C.Invite
-            {
-                Lobby = new C.Service
-                {
-                    Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
-                }
-            }
+            TenantResolutions =
+            [
+                new C.TenantResolution { Strategy = C.TenantSourceIdentifierResolverType.Host }
+            ]
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
@@ -38,16 +33,14 @@ public class when_tenant_resolution_fails_and_invite_path_is_requested_with_lobb
             optionsMonitor,
             tenantResolver,
             Substitute.For<ITenantVerifier>(),
-            Substitute.For<IIdentityDetailsResolver>(),
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/invite/some-token";
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(string.Empty);
+    [Fact] void should_return_401() => Assert.Equal(StatusCodes.Status401Unauthorized, _context.Response.StatusCode);
+    [Fact] void should_not_call_next() => Assert.False(_nextCalled);
 }
