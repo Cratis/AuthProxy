@@ -10,7 +10,7 @@ public class and_request_is_made(AuthProxyFactory factory) : IClassFixture<AuthP
 
     public async Task InitializeAsync()
     {
-        using var client = factory.CreateTestClient();
+        using var client = factory.CreateTestClient(authenticated: true);
         _response = await client.GetAsync("/");
         _responseBody = await _response.Content.ReadAsStringAsync();
     }

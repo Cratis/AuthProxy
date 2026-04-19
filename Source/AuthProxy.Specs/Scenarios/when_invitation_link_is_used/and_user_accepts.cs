@@ -10,6 +10,7 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 /// Verifies that the exchange endpoint is called, identity details are resolved,
 /// the identity cookie is set, and the user is redirected to the lobby.
 /// </summary>
+/// <param name="factory">The shared application factory.</param>
 public class and_user_accepts(AuthProxyFactory factory) : IClassFixture<AuthProxyFactory>, IAsyncLifetime
 {
     HttpResponseMessage? _response;

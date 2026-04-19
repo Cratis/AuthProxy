@@ -41,7 +41,9 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((_, config) =>
+        builder
+            .UseEnvironment("Test")
+            .ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
