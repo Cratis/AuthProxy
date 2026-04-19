@@ -30,7 +30,8 @@ public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<
         var pagePath = ResolvePage(pageName);
         if (pagePath is not null)
         {
-            await context.Response.SendFileAsync(pagePath);
+            var html = await File.ReadAllTextAsync(pagePath);
+            await context.Response.WriteAsync(InjectBaseHref(html, WellKnownPaths.Pages + "/"));
             return;
         }
 
@@ -40,6 +41,20 @@ public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<
             "<head><meta charset=\"utf-8\"><title>Error " + statusCode + "</title></head>" +
             "<body><h1>Error " + statusCode + "</h1></body>" +
             "</html>");
+    }
+
+    static string InjectBaseHref(string html, string baseHref)
+    {
+        if (html.Contains("<base ", StringComparison.OrdinalIgnoreCase))
+        {
+            return html;
+        }
+
+        var tag = $"<base href=\"{baseHref}\">";
+        var headEnd = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+        return headEnd >= 0
+            ? html.Insert(headEnd, tag)
+            : tag + html;
     }
 
     string? ResolvePage(string pageName)
