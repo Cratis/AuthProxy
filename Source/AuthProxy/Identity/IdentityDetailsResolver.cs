@@ -1,11 +1,13 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
 using Cratis.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -19,19 +21,24 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="config">The auth proxy configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="principalEnrichers">Enrichers that augment the principal before it is sent to the identity endpoint.</param>
+/// <param name="memoryCache">The memory cache used to deduplicate concurrent identity resolutions.</param>
 /// <param name="logger">The logger.</param>
 public class IdentityDetailsResolver(
     IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
     IEnumerable<IIdentityDetailsPrincipalEnricher> principalEnrichers,
+    IMemoryCache memoryCache,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
+    static readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(30);
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         Converters = { new ConceptAsJsonConverterFactory() }
     };
+
+    readonly ConcurrentDictionary<string, SemaphoreSlim> _resolverLocks = new();
 
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
@@ -41,46 +48,69 @@ public class IdentityDetailsResolver(
             return BuildAuthorizedResult(principal, details: null);
         }
 
-        var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
+        var cacheKey = $"{tenantId}:{principal.UserId}";
 
-        var mergedDetails = new JsonObject();
-        var services = config.CurrentValue.Services;
-
-        foreach (var (name, service) in services)
+        if (memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
-            var shouldResolve = service.ResolveIdentityDetails
-                ?? (service.Backend is not null);
-
-            if (!shouldResolve || service.Backend is null)
-            {
-                continue;
-            }
-
-            logger.CallingIdentityEndpointWithPrincipal(name, enrichedPrincipal.UserId);
-
-            var result = await CallIdentityEndpoint(
-                name,
-                service.Backend.BaseUrl,
-                enrichedPrincipal,
-                tenantId,
-                context.Response);
-
-            if (result is null)
-            {
-                return IdentityProviderResult.Unauthorized;
-            }
-
-            foreach (var property in result)
-            {
-                mergedDetails[property.Key] = property.Value?.DeepClone();
-            }
+            WriteIdentityCookie(context, cached);
+            logger.IdentityDetailsCacheHit(principal.UserId);
+            return cached;
         }
 
-        var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
-        WriteIdentityCookie(context, identityResult);
-        logger.IdentityDetailsCookieWritten(principal.UserId);
+        var semaphore = _resolverLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+        await semaphore.WaitAsync();
+        try
+        {
+            // Double-check inside the lock — another request may have populated the cache while we waited.
+            if (memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
+            {
+                WriteIdentityCookie(context, cached);
+                logger.IdentityDetailsCacheHit(principal.UserId);
+                return cached;
+            }
 
-        return identityResult;
+            var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
+            var mergedDetails = new JsonObject();
+            var services = config.CurrentValue.Services;
+
+            foreach (var (name, service) in services)
+            {
+                var shouldResolve = service.ResolveIdentityDetails ?? (service.Backend is not null);
+                if (!shouldResolve || service.Backend is null)
+                {
+                    continue;
+                }
+
+                logger.CallingIdentityEndpointWithPrincipal(name, enrichedPrincipal.UserId);
+
+                var result = await CallIdentityEndpoint(
+                    name,
+                    service.Backend.BaseUrl,
+                    enrichedPrincipal,
+                    tenantId,
+                    context.Response);
+
+                if (result is null)
+                {
+                    return IdentityProviderResult.Unauthorized;
+                }
+
+                foreach (var property in result)
+                {
+                    mergedDetails[property.Key] = property.Value?.DeepClone();
+                }
+            }
+
+            var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
+            WriteIdentityCookie(context, identityResult);
+            logger.IdentityDetailsCookieWritten(principal.UserId);
+            memoryCache.Set(cacheKey, identityResult, _cacheTtl);
+            return identityResult;
+        }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 
     IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>

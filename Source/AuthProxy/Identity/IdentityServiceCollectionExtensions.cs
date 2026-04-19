@@ -16,6 +16,7 @@ public static class IdentityServiceCollectionExtensions
     public static WebApplicationBuilder AddIdentityResolution(this WebApplicationBuilder builder)
     {
         builder.Services.AddHttpClient();
+        builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<IIdentityDetailsPrincipalEnricher, InviteTokenClaimsPrincipalEnricher>();
         builder.Services.AddSingleton<IIdentityDetailsResolver, IdentityDetailsResolver>();
 

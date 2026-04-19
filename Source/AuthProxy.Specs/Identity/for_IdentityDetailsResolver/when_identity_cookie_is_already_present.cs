@@ -26,7 +26,7 @@ public class when_identity_cookie_is_already_present : Specification
 
         _httpClientFactory = Substitute.For<IHttpClientFactory>();
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, _httpClientFactory, [], Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, _httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Headers.Cookie = $"{Cookies.Identity}=existing-value";

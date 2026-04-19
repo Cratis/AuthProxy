@@ -34,9 +34,11 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
 
     public int ExchangeCallCount => _exchangeCallCount;
     public int IdentityCallCount => _identityCallCount;
+    public ClientPrincipal? CapturedIdentityPrincipal => _capturedIdentityPrincipal;
 
     int _exchangeCallCount;
     int _identityCallCount;
+    ClientPrincipal? _capturedIdentityPrincipal;
 
     /// <summary>Initializes a new instance of the <see cref="AuthProxyFactory"/> class.</summary>
     public AuthProxyFactory()
@@ -55,12 +57,18 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
             Directory.Delete(_pagesPath, recursive: true);
     }
 
+    /// <summary>
+    /// Override to supply additional in-memory configuration entries on top of the base configuration.
+    /// </summary>
+    /// <returns>Key/value pairs that are merged into the app configuration.</returns>
+    protected virtual IEnumerable<KeyValuePair<string, string?>> GetAdditionalConfiguration() => [];
+
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+            var entries = new Dictionary<string, string?>
             {
                 // Invite token validation
                 [$"{C.AuthProxy.SectionKey}:Invite:PublicKeyPem"] = InviteKeyPair.PublicKeyPem,
@@ -76,7 +84,9 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
 
                 // Static webroot and pages paths (use temp directories)
                 [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
-            });
+            };
+            config.AddInMemoryCollection(entries);
+            config.AddInMemoryCollection(GetAdditionalConfiguration());
         });
 
         builder.ConfigureTestServices(services =>
@@ -87,8 +97,10 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
 
             // Replace the HTTP client factory with one that intercepts all outbound calls.
             services.AddSingleton<IHttpClientFactory>(new TestHttpClientFactory(
-                url =>
+                request =>
                 {
+                    var url = request.RequestUri?.ToString() ?? string.Empty;
+
                     if (url.StartsWith(ExchangeUrl, StringComparison.OrdinalIgnoreCase))
                     {
                         Interlocked.Increment(ref _exchangeCallCount);
@@ -98,6 +110,11 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
                     if (url.StartsWith(IdentityBackendBaseUrl, StringComparison.OrdinalIgnoreCase))
                     {
                         Interlocked.Increment(ref _identityCallCount);
+                        if (request.Headers.TryGetValues(Headers.Principal, out var principalValues))
+                        {
+                            ClientPrincipal.TryFromBase64(principalValues.First(), out var captured);
+                            _capturedIdentityPrincipal = captured;
+                        }
                         return new HttpResponseMessage(HttpStatusCode.OK)
                         {
                             Content = new StringContent(/*lang=json,strict*/ "{\"displayName\":\"Test User\"}")
@@ -170,17 +187,17 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>Minimal IHttpClientFactory that routes all calls through a single handler.</summary>
-    /// <param name="handler">The request dispatch function.</param>
-    sealed class TestHttpClientFactory(Func<string, HttpResponseMessage> handler) : IHttpClientFactory
+    /// <param name="handler">The request dispatch function receiving the full outbound request.</param>
+    sealed class TestHttpClientFactory(Func<HttpRequestMessage, HttpResponseMessage> handler) : IHttpClientFactory
     {
         /// <inheritdoc/>
         public HttpClient CreateClient(string name) =>
             new(new DispatchingHandler(handler)) { Timeout = TimeSpan.FromSeconds(10) };
 
-        sealed class DispatchingHandler(Func<string, HttpResponseMessage> handler) : HttpMessageHandler
+        sealed class DispatchingHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-                Task.FromResult(handler(request.RequestUri?.ToString() ?? string.Empty));
+                Task.FromResult(handler(request));
         }
     }
 }

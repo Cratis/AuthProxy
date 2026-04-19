@@ -8,6 +8,9 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Debug, "Identity details resolved and stored in cookie for user {UserId}")]
     internal static partial void IdentityDetailsCookieWritten(this ILogger logger, string userId);
 
+    [LoggerMessage(LogLevel.Debug, "Identity details served from cache for user {UserId}")]
+    internal static partial void IdentityDetailsCacheHit(this ILogger logger, string userId);
+
     [LoggerMessage(LogLevel.Debug, "Calling identity endpoint {Url} for service '{Service}'")]
     internal static partial void CallingIdentityEndpoint(this ILogger logger, string url, string service);
 

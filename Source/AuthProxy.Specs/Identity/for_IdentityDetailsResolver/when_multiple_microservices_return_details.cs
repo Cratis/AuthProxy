@@ -29,7 +29,7 @@ public class when_multiple_microservices_return_details : Specification
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, /*lang=json,strict*/ "{\"propA\":\"valueA\",\"propB\":\"valueB\"}")));
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>());
         _context = new DefaultHttpContext();
     }
 

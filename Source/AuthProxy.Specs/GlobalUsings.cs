@@ -7,6 +7,7 @@ global using Cratis.AuthProxy.Identity;
 global using Cratis.AuthProxy.Tenancy;
 global using Cratis.Specifications;
 global using Microsoft.AspNetCore.Http;
+global using Microsoft.Extensions.Caching.Memory;
 global using Microsoft.Extensions.Logging;
 global using Microsoft.Extensions.Options;
 global using NSubstitute;
