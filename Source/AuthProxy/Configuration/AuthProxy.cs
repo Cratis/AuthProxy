@@ -34,7 +34,7 @@ public class AuthProxy
 
     /// <summary>
     /// Gets or sets the absolute path to a directory containing custom error pages.
-    /// Pages are looked up by their <see cref="ErrorPages.WellKnownPageNames"/> file name inside this directory.
+    /// Pages are looked up by their <see cref="WellKnownPageNames"/> file name inside this directory.
     /// When empty or unset the ingress uses the built-in <c>Pages</c> directory.
     /// Override this by mounting a custom pages directory into the container and pointing
     /// this setting at the mount path.
