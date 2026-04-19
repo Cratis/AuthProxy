@@ -68,6 +68,7 @@ public static class IngressExtensions
         app.UseStaticFiles();
         UsePagesStaticFiles(app);
         app.UseAuthentication();
+        app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<TenancyMiddleware>();
         app.UseMiddleware<InviteMiddleware>();

@@ -25,5 +25,3 @@ app.UseIngress();
 
 await app.RunAsync();
 
-public partial class Program;
-
