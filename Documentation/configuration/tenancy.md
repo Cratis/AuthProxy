@@ -106,11 +106,42 @@ The regex must expose a named group called `sourceIdentifier`.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `ParentHost` | `string` | Parent host suffix used to extract the tenant ID from request host. |
-| `VerificationUrlTemplate` | `string` | Optional strategy-specific verification URL template. Overrides global `TenantVerification.UrlTemplate` for this strategy. |
+| `ParentHost` | `string` | Parent host suffix used to extract the tenant ID from the request host. |
+| `VerificationUrlTemplate` | `string` | Optional strategy-specific verification URL template. Overrides the global `TenantVerification.UrlTemplate` for this strategy. |
 
-`SubHost` resolves directly to the subhost tenant ID and does not require a `Tenants` dictionary lookup.
-Use `VerificationUrlTemplate` to validate that the resolved tenant exists before forwarding requests.
+### How SubHost resolution works
+
+The strategy strips the configured `ParentHost` suffix from the incoming request host to derive the tenant ID.
+
+Given `ParentHost: "example.com"`:
+
+| Request host | Resolved tenant ID | Notes |
+|---|---|---|
+| `acme.example.com` | `acme` | Single-segment subhost — resolved successfully. |
+| `contoso.example.com` | `contoso` | Single-segment subhost — resolved successfully. |
+| `foo.bar.example.com` | — | Multi-segment subhost rejected — not resolved. |
+| `example.com` | — | No subhost present — not resolved. |
+| `other.com` | — | Host does not end with `.example.com` — not resolved. |
+
+The resolved subhost string becomes the tenant ID directly.
+**No `Tenants` dictionary lookup is performed** — unlike `Host`, `Claim`, and `Route` strategies, SubHost does not match a source identifier against a pre-configured list.
+This is intentional: SubHost is designed for environments where tenants are provisioned dynamically (for example SaaS platforms where each customer gets their own subdomain).
+
+Because there is no registry lookup to prove the tenant exists, you should configure `VerificationUrlTemplate` to have AuthProxy call your back-end to confirm the tenant is valid before forwarding the request:
+
+```json
+{
+  "Strategy": "SubHost",
+  "Options": {
+    "ParentHost": "example.com",
+    "VerificationUrlTemplate": "https://internal-api.example.com/tenants/{tenantId}"
+  }
+}
+```
+
+AuthProxy replaces `{tenantId}` with the resolved subhost value and expects a `200` response.
+Any other response causes the request to be rejected with `tenant-not-found.html`.
+See [Tenant verification](#tenant-verification) for full response handling details.
 
 ---
 
