@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.ReverseProxy;
 
 /// <summary>
 /// Builds and serves the YARP <see cref="IProxyConfig"/> dynamically from the
-/// <see cref="Cratis.AuthProxy.Configuration.AuthProxy.Services"/> configuration section.
+/// <see cref="C.AuthProxy.Services"/> configuration section.
 ///
 /// <para>
 /// Each microservice generates routes that are matched by either:

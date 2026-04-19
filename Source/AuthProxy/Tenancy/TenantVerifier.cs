@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Tenancy;
 /// Verifies tenant existence by issuing an HTTP GET to a configurable URL template.
 /// </summary>
 /// <remarks>
-/// When <see cref="Cratis.AuthProxy.Configuration.TenantVerification.UrlTemplate"/> is empty or not configured the
+/// When <see cref="C.TenantVerification.UrlTemplate"/> is empty or not configured the
 /// verifier returns <see langword="true"/> for all tenants (verification is disabled).
 /// </remarks>
 /// <param name="config">The auth proxy configuration monitor.</param>

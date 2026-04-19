@@ -12,7 +12,7 @@ namespace Cratis.AuthProxy.ErrorPages;
 /// <remarks>
 /// Page resolution order:
 /// <list type="number">
-///   <item>The directory configured in <see cref="Cratis.AuthProxy.Configuration.AuthProxy.PagesPath"/> (when set and the directory exists).</item>
+///   <item>The directory configured in <see cref="C.AuthProxy.PagesPath"/> (when set and the directory exists).</item>
 ///   <item>A <c>Pages</c> directory co-located with the application's content root.</item>
 /// </list>
 /// If neither location contains the requested page, a minimal inline HTML fallback is written.
