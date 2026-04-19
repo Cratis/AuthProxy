@@ -25,4 +25,4 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Tenancy](tenancy.md) | How the auth proxy resolves the current tenant from each request, and how to verify tenant existence. |
 | [Services](services.md) | Routing requests to backend and frontend services. |
 | [Invites & Lobby](invites.md) | Invite-based onboarding and the lobby service. |
-| [Error Pages](error-pages.md) | Custom HTML error pages and how to override them via a mounted volume. |
+| [Well-Known Pages](well-known-pages.md) | Built-in HTML pages (provider selection, errors, tenant not found) and how to override them via a mounted volume. |

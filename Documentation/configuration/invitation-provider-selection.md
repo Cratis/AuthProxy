@@ -1,15 +1,23 @@
-# Custom Invitation Provider-Selection Page
+# Provider Selection Pages
 
-When a valid invite link is followed and **two or more** identity providers are configured,
-Ingress serves `invitation-select-provider.html` so the user can choose which provider to
-sign in with.  The built-in page is functional but unstyled beyond a minimal card layout.
-This guide explains how to replace it with a fully branded custom page.
+When multiple identity providers are configured, Ingress serves a provider-selection page
+so the user can choose which provider to sign in with.  Two pages serve this role depending
+on the flow that triggered them:
+
+| Page | Triggered by |
+| ---- | ------------ |
+| `select-provider.html` | Direct navigation to a protected resource when not yet authenticated. |
+| `invitation-select-provider.html` | Following a valid invite link. |
+
+Both pages work identically — they receive provider data via the `.cratis-providers` cookie
+and can be overridden in the same way.  The built-in versions are functional but minimally
+styled.  This guide explains how to replace either or both with fully branded custom pages.
 
 ---
 
 ## How Ingress injects provider data
 
-Before serving the page, Ingress sets a short-lived, **non-HTTP-only** cookie named
+Before serving either page, Ingress sets a short-lived, **non-HTTP-only** cookie named
 `.cratis-providers`.  The value is a URL-encoded JSON array — one entry per configured
 identity provider:
 
@@ -34,10 +42,9 @@ identity provider:
 |-------|------|-------------|
 | `name` | `string` | Human-readable display name taken from `Authentication:OidcProviders[].Name`. |
 | `type` | `string` | Provider brand — `Microsoft`, `Google`, `GitHub`, `Apple`, or `Custom`. Use this to pick logos or apply brand-specific styling. |
-| `loginUrl` | `string` | Ingress-relative URL that initiates the OIDC/OAuth challenge for this provider. Navigating to this URL starts the login flow and, after a successful login, redirects the user back into the invite exchange. |
+| `loginUrl` | `string` | Ingress-relative URL that initiates the OIDC/OAuth challenge for this provider. Navigating to this URL starts the login flow and, after a successful login, redirects the user back to the original destination. |
 
-The cookie expires after 15 minutes (matching the invite-token cookie lifetime) and is
-deleted automatically by the browser after that time.
+The cookie expires after 15 minutes and is deleted automatically by the browser after that time.
 
 ---
 
@@ -76,17 +83,16 @@ A custom page only needs to:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Accept Your Invitation – Sign In</title>
+  <title>Sign In</title>
   <link rel="stylesheet" href="/_pages/brand.css" />
 </head>
 <body>
   <main id="content">
-    <h1>You have been invited</h1>
-    <p>Choose how you want to sign in:</p>
+    <h1>Choose how you want to sign in</h1>
     <ul id="providers"></ul>
     <p id="error" hidden>
       Unable to load sign-in options.
-      Please try opening your invitation link again or contact support.
+      Please try again or contact support.
     </p>
   </main>
 
@@ -126,13 +132,17 @@ A custom page only needs to:
 ```
 
 > **Note:** Assets placed in the same pages directory are served at the `/_pages/` URL prefix.
-> The `brand.css` reference above assumes `brand.css` lives alongside `invitation-select-provider.html`.
+> The `brand.css` reference above assumes `brand.css` lives alongside your custom page.
+
+The same HTML template works for both `select-provider.html` and `invitation-select-provider.html`.
+You can use identical files, or tailor each one — for example, showing "You have been invited" in
+the invitation variant and "Sign in to continue" in the direct-access variant.
 
 ---
 
-## Deploying the custom page
+## Deploying custom pages
 
-1. Create the HTML file named exactly `invitation-select-provider.html`.
+1. Create the HTML file(s) named exactly `select-provider.html` and/or `invitation-select-provider.html`.
 2. Place any CSS, images, or other assets in the same directory.
 3. Mount the directory into your container and point `Ingress:PagesPath` at the mount path:
 
@@ -147,8 +157,8 @@ services:
       Ingress__PagesPath: /mnt/pages
 ```
 
-Ingress resolves the page file by name — if `invitation-select-provider.html` exists in the
-configured `PagesPath` it is used; otherwise the built-in default is served.
+Ingress resolves each page file by name — if a file exists in the configured `PagesPath` it is
+used; otherwise the built-in default is served.
 
 ---
 
@@ -186,6 +196,35 @@ providers.forEach(function (provider) {
 
 ## Complete flow reference
 
+### Direct access flow (`select-provider.html`)
+
+```
+User navigates to protected resource
+        │
+        ▼
+Unauthenticated request detected
+        │
+        ├─ Single provider ──► redirect to /.cratis/login/<scheme>
+        │
+        └─ Multiple providers
+                │
+                ▼
+  Set .cratis-providers cookie
+  Serve select-provider.html
+                │
+                │ User clicks provider
+                ▼
+  GET /.cratis/login/<scheme>
+                │
+                ▼
+      OIDC/OAuth challenge
+                │
+                ▼
+      Redirect to original resource
+```
+
+### Invitation flow (`invitation-select-provider.html`)
+
 ```
 User clicks invite link
         │
@@ -197,16 +236,16 @@ GET /invite/<token>
         └─ Token valid
                 │
                 ├─ Single provider ──► redirect to /.cratis/login/<scheme>
-                │                              │
-                └─ Multiple providers          │
-                        │                      │
-                        ▼                      │
-          Set .cratis-providers cookie         │
-          Serve invitation-select-provider.html│
-                        │                      │
-                        │ User clicks provider  │
-                        ▼                      │
-          GET /.cratis/login/<scheme> ◄────────┘
+                │
+                └─ Multiple providers
+                        │
+                        ▼
+          Set .cratis-providers cookie
+          Serve invitation-select-provider.html
+                        │
+                        │ User clicks provider
+                        ▼
+          GET /.cratis/login/<scheme>
                         │
                         ▼
               OIDC/OAuth challenge
