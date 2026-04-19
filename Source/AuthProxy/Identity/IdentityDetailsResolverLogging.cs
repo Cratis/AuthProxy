@@ -11,8 +11,8 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Debug, "Calling identity endpoint {Url} for service '{Service}'")]
     internal static partial void CallingIdentityEndpoint(this ILogger logger, string url, string service);
 
-    [LoggerMessage(LogLevel.Debug, "Calling identity endpoint for service '{Service}' with UserId={UserId} (InviteToken present: {HasInviteToken})")]
-    internal static partial void CallingIdentityEndpointWithPrincipal(this ILogger logger, string service, string userId, bool hasInviteToken);
+    [LoggerMessage(LogLevel.Debug, "Calling identity endpoint for service '{Service}' with UserId={UserId}")]
+    internal static partial void CallingIdentityEndpointWithPrincipal(this ILogger logger, string service, string userId);
 
     [LoggerMessage(LogLevel.Error, "Error calling identity endpoint for service '{Service}'")]
     internal static partial void ErrorCallingIdentityEndpoint(this ILogger logger, Exception exception, string service);

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
@@ -70,6 +71,8 @@ public static class IngressExtensions
         app.UseAuthorization();
         app.UseMiddleware<TenancyMiddleware>();
         app.UseMiddleware<InviteMiddleware>();
+        app.UseMiddleware<IdentityMiddleware>();
+        app.UseMiddleware<InviteRedirectMiddleware>();
 
         app.MapIngressEndpoints();
         app.UseReverseProxy();
