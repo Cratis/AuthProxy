@@ -1,7 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Security.Claims;
 using Cratis.AuthProxy.Invites;
 
 namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
@@ -11,22 +10,19 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 /// Verifies that the exchange endpoint is called, identity details are resolved,
 /// the identity cookie is set, and the user is redirected to the lobby.
 /// </summary>
-public class and_user_accepts : IClassFixture<AuthProxyFactory>, IAsyncLifetime
+public class and_user_accepts(AuthProxyFactory factory) : IClassFixture<AuthProxyFactory>, IAsyncLifetime
 {
-    readonly AuthProxyFactory _factory;
-    HttpResponseMessage _response = null!;
-
-    public and_user_accepts(AuthProxyFactory factory) => _factory = factory;
+    HttpResponseMessage? _response;
 
     public async Task InitializeAsync()
     {
         // Valid invite token signed with the factory's known RSA key.
         var token = TokenFixture.CreateToken(
-            _factory.InviteKeyPair.PrivateKey,
+            factory.InviteKeyPair.PrivateKey,
             additionalClaims: [new Claim("jti", Guid.NewGuid().ToString())]);
 
         // Authenticated request with the pending invite cookie — triggers Phase 2.
-        using var client = _factory.CreateTestClient(authenticated: true, inviteTokenCookie: token);
+        using var client = factory.CreateTestClient(authenticated: true, inviteTokenCookie: token);
         _response = await client.GetAsync("/");
     }
 
@@ -42,18 +38,18 @@ public class and_user_accepts : IClassFixture<AuthProxyFactory>, IAsyncLifetime
 
     [Fact]
     public void should_call_the_exchange_endpoint() =>
-        Assert.True(_factory.ExchangeCallCount > 0, "Exchange endpoint was not called");
+        Assert.True(factory.ExchangeCallCount > 0, "Exchange endpoint was not called");
 
     [Fact]
     public void should_call_the_identity_details_provider() =>
-        Assert.True(_factory.IdentityCallCount > 0, "Identity details provider was not called");
+        Assert.True(factory.IdentityCallCount > 0, "Identity details provider was not called");
 
     [Fact]
     public void should_set_the_identity_cookie()
     {
         _response.Headers.TryGetValues("Set-Cookie", out var cookies);
         Assert.True(
-            cookies?.Any(c => c.StartsWith(Cookies.Identity, StringComparison.OrdinalIgnoreCase)) == true,
+            cookies?.Any(c => c.StartsWith(Cookies.Identity, StringComparison.OrdinalIgnoreCase)),
             $"Expected Set-Cookie header containing '{Cookies.Identity}'");
     }
 
@@ -62,7 +58,7 @@ public class and_user_accepts : IClassFixture<AuthProxyFactory>, IAsyncLifetime
     {
         _response.Headers.TryGetValues("Set-Cookie", out var cookies);
         Assert.True(
-            cookies?.Any(c => c.Contains(Cookies.InviteToken, StringComparison.OrdinalIgnoreCase)) == true,
+            cookies?.Any(c => c.Contains(Cookies.InviteToken, StringComparison.OrdinalIgnoreCase)),
             $"Expected Set-Cookie header containing '{Cookies.InviteToken}'");
     }
 }
