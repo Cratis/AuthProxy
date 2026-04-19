@@ -41,7 +41,6 @@ public class when_tenant_does_not_exist : Specification
             optionsMonitor,
             tenantResolver,
             tenantVerifier,
-            Substitute.For<IIdentityDetailsResolver>(),
             _errorPageProvider,
             Substitute.For<ILogger<TenancyMiddleware>>());
 

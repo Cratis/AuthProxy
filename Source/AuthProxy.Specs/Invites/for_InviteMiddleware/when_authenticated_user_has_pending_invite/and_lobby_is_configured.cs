@@ -3,13 +3,11 @@
 
 using System.Net;
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_invite;
 
-public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matches : Specification
+public class and_lobby_is_configured : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
-    const string TenantClaimType = "tenant_id";
-    const string TenantId = "tenant-matched";
 
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
@@ -18,19 +16,12 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
-        tokenValidator.TryGetClaim(Arg.Any<string>(), TenantClaimType, out Arg.Any<string>())
-            .Returns(x =>
-            {
-                x[2] = TenantId;
-                return true;
-            });
 
         var config = new C.AuthProxy
         {
             Invite = new C.Invite
             {
                 ExchangeUrl = "http://studio/internal/invites/exchange",
-                TenantClaim = TenantClaimType,
                 Lobby = new C.Service
                 {
                     Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
@@ -65,13 +56,12 @@ public class when_authenticated_user_has_pending_tenant_invite_and_tenant_matche
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
-        _context.Items[TenancyMiddleware.TenantIdItemKey] = TenantId;
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldNotContain(LobbyUrl);
+    [Fact] void should_set_lobby_redirect_url_in_context_items() => _context.Items[InviteMiddleware.LobbyRedirectUrlItemKey].ShouldEqual(LobbyUrl);
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()

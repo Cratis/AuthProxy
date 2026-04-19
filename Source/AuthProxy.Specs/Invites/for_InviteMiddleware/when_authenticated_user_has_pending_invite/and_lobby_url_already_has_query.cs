@@ -3,22 +3,40 @@
 
 using System.Net;
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_invite;
 
-public class when_authenticated_user_has_pending_invite : Specification
+public class and_lobby_url_already_has_query : Specification
 {
+    const string LobbyUrl = "http://lobby-service/?source=invite";
+    const string InvitationId = "7cf1cec4-3fdf-4dc1-9b0c-04d42d928f6e";
+
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
-    bool _nextCalled;
 
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
+        tokenValidator.TryGetClaim("pending-invite-token", "jti", out Arg.Any<string>())
+            .Returns(callInfo =>
+            {
+                callInfo[2] = InvitationId;
+                return true;
+            });
 
         var config = new C.AuthProxy
         {
-            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
+            Invite = new C.Invite
+            {
+                ExchangeUrl = "http://studio/internal/invites/exchange",
+                Lobby = new C.Service
+                {
+                    Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
+                },
+                AppendInvitationIdToQueryString = true,
+                InvitationIdQueryStringKey = "inviteId"
+            }
         };
+
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
@@ -27,11 +45,7 @@ public class when_authenticated_user_has_pending_invite : Specification
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
         _middleware = new InviteMiddleware(
-            _ =>
-            {
-                _nextCalled = true;
-                return Task.CompletedTask;
-            },
+            _ => Task.CompletedTask,
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
@@ -42,19 +56,17 @@ public class when_authenticated_user_has_pending_invite : Specification
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
 
-        // Simulate authenticated user.
-        var identity = new ClaimsIdentity(
-            [new Claim("sub", "user-123")], "aad");
+        var identity = new ClaimsIdentity([new Claim("sub", "user-123")], "aad");
         _context.User = new ClaimsPrincipal(identity);
 
-        // Simulate pending invite cookie.
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
+    [Fact]
+    void should_set_lobby_redirect_url_with_ampersand_separator() =>
+        _context.Items[InviteMiddleware.LobbyRedirectUrlItemKey].ShouldEqual($"{LobbyUrl}&inviteId={InvitationId}");
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {

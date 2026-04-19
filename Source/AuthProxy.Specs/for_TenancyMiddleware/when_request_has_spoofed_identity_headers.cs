@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.Arc.Identity;
-
 namespace Cratis.AuthProxy.for_TenancyMiddleware;
 
 public class when_request_has_spoofed_identity_headers : Specification
@@ -19,15 +17,11 @@ public class when_request_has_spoofed_identity_headers : Specification
         var tenantResolver = Substitute.For<ITenantResolver>();
         tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>()).Returns(true);
 
-        var identityResolver = Substitute.For<IIdentityDetailsResolver>();
-        identityResolver.Resolve(Arg.Any<HttpContext>(), Arg.Any<Identity.ClientPrincipal>(), Arg.Any<string>()).Returns(Task.FromResult(new IdentityProviderResult("user-id", "user-name", true, true, [], null!)));
-
         _middleware = new TenancyMiddleware(
             _ => Task.CompletedTask,
             optionsMonitor,
             tenantResolver,
             Substitute.For<ITenantVerifier>(),
-            identityResolver,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 

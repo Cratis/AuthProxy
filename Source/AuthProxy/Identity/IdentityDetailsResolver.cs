@@ -5,7 +5,6 @@ using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
-using Cratis.AuthProxy.Invites;
 using Cratis.Json;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -19,15 +18,13 @@ namespace Cratis.AuthProxy.Identity;
 /// </summary>
 /// <param name="config">The auth proxy configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
-/// <param name="inviteTokenValidator">The invite token validator.</param>
+/// <param name="principalEnrichers">Enrichers that augment the principal before it is sent to the identity endpoint.</param>
 /// <param name="logger">The logger.</param>
-/// <param name="principalEnrichers">Optional custom enrichers for the principal used during identity details resolution.</param>
 public class IdentityDetailsResolver(
     IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
-    IInviteTokenValidator inviteTokenValidator,
-    ILogger<IdentityDetailsResolver> logger,
-    IEnumerable<IIdentityDetailsPrincipalEnricher>? principalEnrichers = null) : IIdentityDetailsResolver
+    IEnumerable<IIdentityDetailsPrincipalEnricher> principalEnrichers,
+    ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {
@@ -39,15 +36,12 @@ public class IdentityDetailsResolver(
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
     {
-        var hasPendingInviteToken = context.Request.Cookies.ContainsKey(Cookies.InviteToken);
-
-        // Skip only when identity is already present and we are not in an invite flow.
-        if (context.Request.Cookies.ContainsKey(Cookies.Identity) && !hasPendingInviteToken)
+        if (context.Request.Cookies.ContainsKey(Cookies.Identity))
         {
             return BuildAuthorizedResult(principal, details: null);
         }
 
-        var principalForIdentityResolution = EnrichPrincipalForIdentityResolution(context, principal);
+        var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
 
         var mergedDetails = new JsonObject();
         var services = config.CurrentValue.Services;
@@ -62,22 +56,20 @@ public class IdentityDetailsResolver(
                 continue;
             }
 
-            logger.CallingIdentityEndpointWithPrincipal(name, principalForIdentityResolution.UserId, hasPendingInviteToken);
+            logger.CallingIdentityEndpointWithPrincipal(name, enrichedPrincipal.UserId);
 
             var result = await CallIdentityEndpoint(
                 name,
                 service.Backend.BaseUrl,
-                principalForIdentityResolution,
+                enrichedPrincipal,
                 tenantId,
                 context.Response);
 
             if (result is null)
             {
-                // 403 – stop processing.
                 return IdentityProviderResult.Unauthorized;
             }
 
-            // Merge top-level properties from this service into the combined result.
             foreach (var property in result)
             {
                 mergedDetails[property.Key] = property.Value?.DeepClone();
@@ -89,32 +81,6 @@ public class IdentityDetailsResolver(
         logger.IdentityDetailsCookieWritten(principal.UserId);
 
         return identityResult;
-    }
-
-    static ClientPrincipal EnrichPrincipalForIdentityResolution(
-        HttpContext context,
-        ClientPrincipal principal,
-        IEnumerable<IIdentityDetailsPrincipalEnricher> principalEnrichers)
-    {
-        var enriched = principal;
-
-        foreach (var enricher in principalEnrichers)
-        {
-            enriched = enricher.Enrich(context, enriched);
-        }
-
-        return enriched;
-    }
-
-    ClientPrincipal EnrichPrincipalForIdentityResolution(HttpContext context, ClientPrincipal principal)
-    {
-        var enrichers = principalEnrichers
-            ??
-            [
-                new InviteTokenClaimsPrincipalEnricher(inviteTokenValidator, config)
-            ];
-
-        return EnrichPrincipalForIdentityResolution(context, principal, enrichers);
     }
 
     IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>
@@ -198,4 +164,3 @@ public class IdentityDetailsResolver(
         }
     }
 }
-

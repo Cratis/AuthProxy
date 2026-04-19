@@ -1,13 +1,14 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+using System.Net;
 
-public class when_authenticated_user_has_pending_invite_and_exchange_url_is_missing : Specification
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_invite;
+
+public class and_exchange_returns_non_success_status : Specification
 {
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
-    IHttpClientFactory _httpClientFactory;
     bool _nextCalled;
 
     void Establish()
@@ -16,12 +17,21 @@ public class when_authenticated_user_has_pending_invite_and_exchange_url_is_miss
 
         var config = new C.AuthProxy
         {
-            Invite = new C.Invite()
+            Invite = new C.Invite
+            {
+                ExchangeUrl = "http://studio/internal/invites/exchange",
+                Lobby = new C.Service
+                {
+                    Frontend = new C.ServiceEndpoint { BaseUrl = "http://lobby-service/" }
+                }
+            }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
-        _httpClientFactory = Substitute.For<IHttpClientFactory>();
+        var httpClientFactory = Substitute.For<IHttpClientFactory>();
+        httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
+            new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.BadRequest)));
 
         _middleware = new InviteMiddleware(
             _ =>
@@ -32,7 +42,7 @@ public class when_authenticated_user_has_pending_invite_and_exchange_url_is_miss
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
-            _httpClientFactory,
+            httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
 
@@ -48,7 +58,7 @@ public class when_authenticated_user_has_pending_invite_and_exchange_url_is_miss
 
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
-    [Fact] void should_not_call_exchange_endpoint() => _httpClientFactory.DidNotReceive().CreateClient(Arg.Any<string>());
+    [Fact] void should_not_set_lobby_redirect_when_exchange_fails() => _context.Items.ContainsKey(InviteMiddleware.LobbyRedirectUrlItemKey).ShouldBeFalse();
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {

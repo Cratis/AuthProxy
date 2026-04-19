@@ -34,7 +34,6 @@ public class when_strategy_sets_verification_url_template_override : Specificati
             optionsMonitor,
             tenantResolver,
             _tenantVerifier,
-            Substitute.For<IIdentityDetailsResolver>(),
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<TenancyMiddleware>>());
 

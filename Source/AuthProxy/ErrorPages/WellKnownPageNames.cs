@@ -39,4 +39,11 @@ public static class WellKnownPageNames
     /// and renders a sign-in button for each available provider.
     /// </summary>
     public const string InvitationSelectProvider = "invitation-select-provider.html";
+
+    /// <summary>
+    /// The page served when an unauthenticated user reaches the proxy and multiple identity
+    /// providers are configured.  The page reads the <c>.cratis-providers</c> cookie injected
+    /// by the proxy and renders a sign-in button for each available provider.
+    /// </summary>
+    public const string SelectProvider = "select-provider.html";
 }

@@ -63,9 +63,8 @@ public class when_invite_claim_forwarding_is_configured : Specification
         _resolver = new IdentityDetailsResolver(
             optionsMonitor,
             httpClientFactory,
-            tokenValidator,
-            Substitute.For<ILogger<IdentityDetailsResolver>>(),
-            enrichers);
+            enrichers,
+            Substitute.For<ILogger<IdentityDetailsResolver>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=invite-token";

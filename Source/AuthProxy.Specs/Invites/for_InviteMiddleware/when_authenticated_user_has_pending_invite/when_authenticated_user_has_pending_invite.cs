@@ -1,9 +1,11 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+using System.Net;
 
-public class when_authenticated_user_has_pending_invite_and_exchange_call_throws : Specification
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_invite;
+
+public class when_authenticated_user_has_pending_invite : Specification
 {
     InviteMiddleware _middleware;
     DefaultHttpContext _context;
@@ -15,20 +17,14 @@ public class when_authenticated_user_has_pending_invite_and_exchange_call_throws
 
         var config = new C.AuthProxy
         {
-            Invite = new C.Invite
-            {
-                ExchangeUrl = "http://studio/internal/invites/exchange",
-                Lobby = new C.Service
-                {
-                    Frontend = new C.ServiceEndpoint { BaseUrl = "http://lobby-service/" }
-                }
-            }
+            Invite = new C.Invite { ExchangeUrl = "http://studio/internal/invites/exchange" }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
-        httpClientFactory.CreateClient(Arg.Any<string>()).Returns(new HttpClient(new ThrowingHttpMessageHandler()));
+        httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
+            new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK)));
 
         _middleware = new InviteMiddleware(
             _ =>
@@ -46,8 +42,12 @@ public class when_authenticated_user_has_pending_invite_and_exchange_call_throws
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
 
-        var identity = new ClaimsIdentity([new Claim("sub", "user-123")], "aad");
+        // Simulate authenticated user.
+        var identity = new ClaimsIdentity(
+            [new Claim("sub", "user-123")], "aad");
         _context.User = new ClaimsPrincipal(identity);
+
+        // Simulate pending invite cookie.
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
     }
 
@@ -55,18 +55,11 @@ public class when_authenticated_user_has_pending_invite_and_exchange_call_throws
 
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
-    [Fact] void should_not_redirect_to_lobby_when_exchange_fails() => _context.Response.Headers.Location.ToString().ShouldEqual(string.Empty);
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {
         var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
         monitor.CurrentValue.Returns(new C.Authentication());
         return monitor;
-    }
-
-    class ThrowingHttpMessageHandler : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            throw new HttpRequestException("Simulated exchange failure");
     }
 }

@@ -23,7 +23,11 @@ namespace Cratis.AuthProxy.Invites;
 ///   </item>
 ///   <item>
 ///     After a successful OIDC login – detects the pending invite cookie, calls the Studio
-///     exchange endpoint and then deletes the cookie before continuing the request pipeline.
+///     exchange endpoint, deletes the cookie, and signals any required lobby redirect via
+///     <see cref="LobbyRedirectUrlItemKey"/> in <see cref="HttpContext.Items"/> before
+///     continuing the pipeline. Identity resolution and the actual redirect are handled by
+///     <see cref="Identity.IdentityMiddleware"/> and <see cref="InviteRedirectMiddleware"/>
+///     respectively.
 ///   </item>
 /// </list>
 /// </summary>
@@ -46,6 +50,13 @@ public class InviteMiddleware(
     /// <summary>The route prefix that triggers invite handling.</summary>
     public const string InvitePathPrefix = WellKnownPaths.InvitePathPrefix;
 
+    /// <summary>
+    /// Key used to store the post-exchange lobby redirect URL in <see cref="HttpContext.Items"/>.
+    /// Set by Phase 2 when exchange succeeds and the invite is not tenant-issued.
+    /// Read by <see cref="InviteRedirectMiddleware"/> to perform the actual redirect.
+    /// </summary>
+    public const string LobbyRedirectUrlItemKey = "Cratis.InviteLobbyRedirectUrl";
+
     static readonly JsonSerializerOptions _providerSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -62,29 +73,14 @@ public class InviteMiddleware(
             && context.Request.Cookies.TryGetValue(Cookies.InviteToken, out var inviteToken))
         {
             var exchangeSucceeded = await ExchangeInvite(context, inviteToken);
-
-            // Always delete the invite cookie regardless of exchange outcome so
-            // the user is never stuck in a retry loop.
             context.Response.Cookies.Delete(Cookies.InviteToken);
 
-            // After a successful exchange redirect the user to the lobby so they
-            // can enter the application with their newly assigned tenant – unless
-            // the invite is a tenant-issued invite that matches the resolved tenant,
-            // in which case the user passes directly through to the service.
-            if (exchangeSucceeded)
+            if (exchangeSucceeded && !IsTenantIssuedInvite(inviteToken, context))
             {
-                if (IsTenantIssuedInvite(inviteToken, context))
-                {
-                    await next(context);
-                    return;
-                }
-
                 var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
                 if (!string.IsNullOrWhiteSpace(lobbyUrl))
                 {
-                    var redirectUrl = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
-                    context.Response.Redirect(redirectUrl);
-                    return;
+                    context.Items[LobbyRedirectUrlItemKey] = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
                 }
             }
 

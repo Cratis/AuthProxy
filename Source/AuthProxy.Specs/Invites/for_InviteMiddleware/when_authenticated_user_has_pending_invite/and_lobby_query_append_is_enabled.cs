@@ -3,9 +3,9 @@
 
 using System.Net;
 
-namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
+namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_invite;
 
-public class when_authenticated_user_has_pending_invite_and_lobby_query_append_is_enabled : Specification
+public class and_lobby_query_append_is_enabled : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
     const string InvitationId = "7cf1cec4-3fdf-4dc1-9b0c-04d42d928f6e";
@@ -65,8 +65,8 @@ public class when_authenticated_user_has_pending_invite_and_lobby_query_append_i
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact]
-    void should_redirect_to_lobby_with_configured_query_key() =>
-        _context.Response.Headers.Location.ToString().ShouldEqual($"{LobbyUrl}?inviteId={InvitationId}");
+    void should_set_lobby_redirect_url_with_configured_query_key() =>
+        _context.Items[InviteMiddleware.LobbyRedirectUrlItemKey].ShouldEqual($"{LobbyUrl}?inviteId={InvitationId}");
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()
     {

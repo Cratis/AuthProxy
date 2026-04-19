@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Cratis.Specifications.XUnit" />
     <PackageReference Include="coverlet.collector">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -25,5 +26,6 @@
   <ItemGroup>
     <ProjectReference Include="../AuthProxy/AuthProxy.csproj" />
   </ItemGroup>
+
 
 </Project>

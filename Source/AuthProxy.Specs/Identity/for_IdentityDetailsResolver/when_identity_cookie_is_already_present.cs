@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Arc.Identity;
-using Cratis.AuthProxy.Invites;
 
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver;
 
@@ -26,9 +25,8 @@ public class when_identity_cookie_is_already_present : Specification
         optionsMonitor.CurrentValue.Returns(config);
 
         _httpClientFactory = Substitute.For<IHttpClientFactory>();
-        var inviteTokenValidator = Substitute.For<IInviteTokenValidator>();
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, _httpClientFactory, inviteTokenValidator, Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, _httpClientFactory, [], Substitute.For<ILogger<IdentityDetailsResolver>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Headers.Cookie = $"{Cookies.Identity}=existing-value";

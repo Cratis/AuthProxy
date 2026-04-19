@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.ErrorPages;
-using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -15,14 +14,12 @@ namespace Cratis.AuthProxy;
 ///   <item>Strip inbound identity headers so clients cannot spoof them.</item>
 ///   <item>Resolve the tenant from the request and store it in <see cref="HttpContext.Items"/>.</item>
 ///   <item>Verify the resolved tenant exists (when verification is configured).</item>
-///   <item>Call <c>/.cratis/me</c> on configured services and write the identity cookie.</item>
 /// </list>
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="tenantResolver">The tenant resolver.</param>
 /// <param name="tenantVerifier">The tenant existence verifier.</param>
-/// <param name="identityDetailsResolver">The identity details resolver.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
 public class TenancyMiddleware(
@@ -30,7 +27,6 @@ public class TenancyMiddleware(
     IOptionsMonitor<C.AuthProxy> config,
     ITenantResolver tenantResolver,
     ITenantVerifier tenantVerifier,
-    IIdentityDetailsResolver identityDetailsResolver,
     IErrorPageProvider errorPageProvider,
     ILogger<TenancyMiddleware> logger)
 {
@@ -105,21 +101,6 @@ public class TenancyMiddleware(
         }
 
         context.Items[TenantIdItemKey] = tenantId;
-
-        // 4. If the user is authenticated, resolve identity details (call /.cratis/me).
-        var principal = context.BuildClientPrincipal();
-        if (principal is not null && !string.IsNullOrWhiteSpace(tenantId))
-        {
-            var result = await identityDetailsResolver.Resolve(context, principal, tenantId);
-            if (!result.IsAuthorized)
-            {
-                await errorPageProvider.WriteErrorPageAsync(
-                    context,
-                    WellKnownPageNames.Forbidden,
-                    StatusCodes.Status403Forbidden);
-                return;
-            }
-        }
 
         await next(context);
     }
