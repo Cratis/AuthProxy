@@ -51,10 +51,17 @@ public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<
         }
 
         var tag = $"<base href=\"{baseHref}\">";
-        var headEnd = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
-        return headEnd >= 0
-            ? html.Insert(headEnd, tag)
-            : tag + html;
+        var headStart = html.IndexOf("<head", StringComparison.OrdinalIgnoreCase);
+        if (headStart >= 0)
+        {
+            var headTagEnd = html.IndexOf('>', headStart);
+            if (headTagEnd >= 0)
+            {
+                return html.Insert(headTagEnd + 1, tag);
+            }
+        }
+
+        return tag + html;
     }
 
     string? ResolvePage(string pageName)
