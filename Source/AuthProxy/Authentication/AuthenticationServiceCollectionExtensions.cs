@@ -64,15 +64,9 @@ public static class AuthenticationServiceCollectionExtensions
                 .GetRequiredService<IOptionsMonitor<C.Authentication>>()
                 .CurrentValue;
 
-            var requestPath = ctx.Request.Path;
-            var isAuthBootstrapPath = requestPath.StartsWithSegments(WellKnownPaths.LoginPrefix)
-                || requestPath.StartsWithSegments(WellKnownPaths.LoginPage)
-                || requestPath.StartsWithSegments(WellKnownPaths.Providers)
-                || requestPath.StartsWithSegments("/signin-");
-
-            var returnUrl = isAuthBootstrapPath
+            var returnUrl = ctx.HttpContext.IsAuthenticationBootstrap()
                 ? "/"
-                : ctx.Request.Path + ctx.Request.QueryString;
+                : ctx.HttpContext.GetPathAndQuery();
 
             if (authConfig.TotalProviderCount > 1)
             {
