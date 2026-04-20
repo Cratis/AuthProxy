@@ -25,13 +25,23 @@ public class TenantResolver(
     /// <inheritdoc/>
     public bool TryResolve(HttpContext context, out string tenantId)
     {
-        tenantId = string.Empty;
+        var resolved = TryResolve(context, out TenantResolutionResult result);
+        tenantId = result.TenantId;
+        return resolved;
+    }
+
+    /// <inheritdoc/>
+    public bool TryResolve(HttpContext context, out TenantResolutionResult result)
+    {
+        var tenantId = string.Empty;
+        result = new TenantResolutionResult(string.Empty, Type.None);
         context.Items.Remove(TenancyMiddleware.TenantVerificationUrlTemplateItemKey);
         var resolutions = config.CurrentValue.TenantResolutions;
 
         if (resolutions.Count == 0)
         {
             // No resolution configured – treat as single-tenant with empty tenant ID.
+            result = new TenantResolutionResult(string.Empty, Type.None);
             return true;
         }
 
@@ -55,6 +65,7 @@ public class TenantResolver(
 
                 if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
                 {
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
                     return true;
                 }
             }
@@ -71,6 +82,7 @@ public class TenantResolver(
 
                 if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
                 {
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
                     return true;
                 }
             }
@@ -87,6 +99,7 @@ public class TenantResolver(
 
                 if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
                 {
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
                     return true;
                 }
             }
@@ -101,6 +114,7 @@ public class TenantResolver(
 
                 if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
                 {
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
                     return true;
                 }
             }
@@ -120,6 +134,7 @@ public class TenantResolver(
                         context.Items[TenancyMiddleware.TenantVerificationUrlTemplateItemKey] = subHostOptions.VerificationUrlTemplate;
                     }
 
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy, subHostOptions.ParentHost);
                     return true;
                 }
             }
@@ -133,6 +148,7 @@ public class TenantResolver(
 
                 if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
                 {
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
                     return true;
                 }
             }

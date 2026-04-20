@@ -36,4 +36,5 @@ public class when_registering_oidc_provider_options : Specification
     [Fact] void should_set_callback_path() => _options.CallbackPath.ToString().ShouldEqual("/signin-microsoft");
     [Fact] void should_include_standard_scopes() => _options.Scope.Contains("openid").ShouldBeTrue();
     [Fact] void should_include_custom_scopes() => _options.Scope.Contains("offline_access").ShouldBeTrue();
+    [Fact] void should_configure_ticket_received_event() => _options.Events.OnTicketReceived.ShouldNotBeNull();
 }

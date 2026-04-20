@@ -30,6 +30,7 @@ public class when_invalid_invite_token_is_presented : Specification
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             Substitute.For<IHttpClientFactory>(),
             _errorPageProvider,
             Substitute.For<ILogger<InviteMiddleware>>());

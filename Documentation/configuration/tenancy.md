@@ -127,6 +127,12 @@ The resolved subhost string becomes the tenant ID directly.
 **No `Tenants` dictionary lookup is performed** — unlike `Host`, `Claim`, and `Route` strategies, SubHost does not match a source identifier against a pre-configured list.
 This is intentional: SubHost is designed for environments where tenants are provisioned dynamically (for example SaaS platforms where each customer gets their own subdomain).
 
+### SubHost and authentication callbacks
+
+For interactive authentication flows, AuthProxy stores SubHost strategy metadata in protected authentication `state` when it issues the provider challenge. On callback, AuthProxy restores this metadata and redirects to the tenant subhost.
+
+This enables a shared callback endpoint (for example `auth.cratis.studio`) while returning the user to the original tenant host (for example `nova.cratis.studio`).
+
 Because there is no registry lookup to prove the tenant exists, you should configure `VerificationUrlTemplate` to have AuthProxy call your back-end to confirm the tenant is valid before forwarding the request:
 
 ```json

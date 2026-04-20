@@ -15,4 +15,12 @@ public interface ITenantResolver
     /// <param name="tenantId">The resolved tenant ID, or an empty string when unresolved.</param>
     /// <returns><see langword="true"/> if a tenant was resolved; otherwise <see langword="false"/>.</returns>
     bool TryResolve(HttpContext context, out string tenantId);
+
+    /// <summary>
+    /// Tries to resolve tenant metadata from the current request.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="result">The full tenant resolution result when a tenant was resolved.</param>
+    /// <returns><see langword="true"/> if a tenant was resolved; otherwise <see langword="false"/>.</returns>
+    bool TryResolve(HttpContext context, out TenantResolutionResult result);
 }

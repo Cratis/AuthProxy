@@ -53,16 +53,18 @@ public class TenancyMiddleware(
         context.Request.Headers.Remove(Headers.TenantId);
 
         // 2. Resolve tenant.
-        if (!tenantResolver.TryResolve(context, out var tenantId))
+        if (!tenantResolver.TryResolve(context, out string tenantId))
         {
             // If a lobby is configured, redirect users without a resolved tenant to the lobby
             // frontend – unless this is an invite path (handled by InviteMiddleware) or the
             // user already has a pending invite cookie (so the Phase 2 exchange can proceed).
             var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+            var shouldRedirectToLobby = config.CurrentValue.Invite?.RedirectToLobbyWhenTenantUnresolved == true;
             var isInvitePath = context.IsInvitation();
             var hasPendingInviteCookie = context.HasPendingInvitation();
             var isAuthPath = context.IsAuthenticationUI();
-            if (!string.IsNullOrWhiteSpace(lobbyUrl)
+            if (shouldRedirectToLobby
+                && !string.IsNullOrWhiteSpace(lobbyUrl)
                 && !isInvitePath
                 && !isAuthPath
                 && !hasPendingInviteCookie)

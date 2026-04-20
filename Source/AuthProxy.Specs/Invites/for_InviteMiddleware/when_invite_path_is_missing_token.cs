@@ -15,6 +15,7 @@ public class when_invite_path_is_missing_token : Specification
             Substitute.For<IInviteTokenValidator>(),
             CreateAuthProxyConfig(),
             CreateAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             Substitute.For<IHttpClientFactory>(),
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

@@ -17,10 +17,12 @@ namespace Cratis.AuthProxy.Authentication;
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="authConfig">The authentication configuration monitor.</param>
 /// <param name="errorPageProvider">The error page provider used to serve the selection page.</param>
+/// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
 public class SelectProviderMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.Authentication> authConfig,
-    IErrorPageProvider errorPageProvider)
+    IErrorPageProvider errorPageProvider,
+    ITenantResolver tenantResolver)
 {
     static readonly JsonSerializerOptions _serializerOptions = new()
     {
@@ -67,7 +69,7 @@ public class SelectProviderMiddleware(
         {
             var scheme = OidcProviderScheme.FromName(providers[0].Name);
             var returnUrl = context.GetPathAndQuery();
-            var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+            var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
             await context.ChallengeAsync(scheme, properties);
             return;
         }

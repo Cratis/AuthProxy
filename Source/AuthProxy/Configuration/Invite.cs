@@ -54,6 +54,13 @@ public class Invite
     public string InvitationIdQueryStringKey { get; set; } = "invitationId";
 
     /// <summary>
+    /// Gets or sets a value indicating whether unresolved-tenant requests should redirect to the lobby frontend.
+    /// Defaults to <see langword="false"/> so unresolved tenants stay in the current proxy and receive
+    /// the proxy's local response behavior.
+    /// </summary>
+    public bool RedirectToLobbyWhenTenantUnresolved { get; set; }
+
+    /// <summary>
     /// Gets or sets claim mappings to forward values from the invite token into
     /// the principal sent to the identity details provider.
     /// This allows invite claims and identity-provider claims to be combined in a configurable way.

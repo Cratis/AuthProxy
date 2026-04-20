@@ -3,7 +3,7 @@
 
 namespace Cratis.AuthProxy.for_TenancyMiddleware.when_tenant_resolution_fails;
 
-public class and_lobby_is_configured : Specification
+public class and_lobby_redirect_on_unresolved_tenant_is_enabled : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
 
@@ -21,6 +21,7 @@ public class and_lobby_is_configured : Specification
             ],
             Invite = new C.Invite
             {
+                RedirectToLobbyWhenTenantUnresolved = true,
                 Lobby = new C.Service
                 {
                     Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
@@ -52,6 +53,5 @@ public class and_lobby_is_configured : Specification
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(string.Empty);
-    [Fact] void should_return_401() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status401Unauthorized);
+    [Fact] void should_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldEqual(LobbyUrl);
 }
