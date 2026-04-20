@@ -19,6 +19,14 @@ on:
         default: 'No release notes'
         type: string
 
+  pull_request:
+    types: [closed]
+    branches:
+      - "**"
+    paths:
+      - "Source/**"
+
+
 permissions:
   contents: write
   packages: write
