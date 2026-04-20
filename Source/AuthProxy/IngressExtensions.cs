@@ -154,7 +154,8 @@ public static class IngressExtensions
         .AllowAnonymous();
 
         // Serves the bundled React login-selection SPA.
-        var indexHtmlPath = Path.Combine(app.Environment.WebRootPath, "index.html");
+        var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+        var indexHtmlPath = Path.Combine(webRootPath, "index.html");
         app.MapGet($"{WellKnownPaths.LoginPage}/{{**path}}", async context =>
         {
             context.Response.ContentType = "text/html";
