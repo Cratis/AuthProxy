@@ -37,6 +37,7 @@ public class when_authenticated_user_has_pending_invite_with_fallback_claims : S
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

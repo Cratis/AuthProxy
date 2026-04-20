@@ -21,7 +21,8 @@ public class when_no_providers_are_configured : Specification
                 return Task.CompletedTask;
             },
             authConfig,
-            Substitute.For<IErrorPageProvider>());
+            Substitute.For<IErrorPageProvider>(),
+            Substitute.For<ITenantResolver>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";

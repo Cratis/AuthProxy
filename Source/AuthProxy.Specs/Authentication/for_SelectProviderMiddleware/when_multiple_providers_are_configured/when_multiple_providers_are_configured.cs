@@ -34,7 +34,8 @@ public class when_multiple_providers_are_configured : Specification
                 return Task.CompletedTask;
             },
             authConfig,
-            _errorPageProvider);
+            _errorPageProvider,
+            Substitute.For<ITenantResolver>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";

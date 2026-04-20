@@ -54,6 +54,7 @@ public class and_tenant_does_not_match : Specification
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

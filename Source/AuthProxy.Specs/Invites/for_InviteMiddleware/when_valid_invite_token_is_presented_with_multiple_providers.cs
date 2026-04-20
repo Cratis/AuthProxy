@@ -44,6 +44,7 @@ public class when_valid_invite_token_is_presented_with_multiple_providers : Spec
             tokenValidator,
             optionsMonitor,
             authConfigMonitor,
+            Substitute.For<ITenantResolver>(),
             Substitute.For<IHttpClientFactory>(),
             _errorPageProvider,
             Substitute.For<ILogger<InviteMiddleware>>());

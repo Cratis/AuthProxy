@@ -31,6 +31,7 @@ public class when_valid_invite_token_is_presented : Specification
             tokenValidator,
             optionsMonitor,
             CreateSingleProviderAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             Substitute.For<IHttpClientFactory>(),
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

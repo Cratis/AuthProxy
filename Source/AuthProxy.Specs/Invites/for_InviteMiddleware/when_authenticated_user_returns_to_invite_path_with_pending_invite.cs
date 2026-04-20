@@ -38,6 +38,7 @@ public class when_authenticated_user_returns_to_invite_path_with_pending_invite 
             tokenValidator,
             optionsMonitor,
             authConfig,
+            Substitute.For<ITenantResolver>(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

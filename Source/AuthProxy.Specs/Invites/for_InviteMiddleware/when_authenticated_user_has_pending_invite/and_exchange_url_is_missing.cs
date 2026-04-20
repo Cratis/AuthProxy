@@ -32,6 +32,7 @@ public class and_exchange_url_is_missing : Specification
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             _httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

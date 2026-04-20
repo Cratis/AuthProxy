@@ -42,6 +42,7 @@ public class and_exchange_returns_non_success_status : Specification
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

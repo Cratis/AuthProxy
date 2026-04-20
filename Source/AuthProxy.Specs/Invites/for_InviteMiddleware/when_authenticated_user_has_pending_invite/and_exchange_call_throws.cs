@@ -39,6 +39,7 @@ public class and_exchange_call_throws : Specification
             tokenValidator,
             optionsMonitor,
             CreateEmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());

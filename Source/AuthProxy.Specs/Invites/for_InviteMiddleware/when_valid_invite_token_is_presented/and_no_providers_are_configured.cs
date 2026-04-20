@@ -35,6 +35,7 @@ public class and_no_providers_are_configured : Specification
             tokenValidator,
             optionsMonitor,
             authConfigMonitor,
+            Substitute.For<ITenantResolver>(),
             Substitute.For<IHttpClientFactory>(),
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ILogger<InviteMiddleware>>());
