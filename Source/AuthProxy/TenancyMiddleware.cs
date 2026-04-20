@@ -59,11 +59,9 @@ public class TenancyMiddleware(
             // frontend – unless this is an invite path (handled by InviteMiddleware) or the
             // user already has a pending invite cookie (so the Phase 2 exchange can proceed).
             var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
-            var isInvitePath = context.Request.Path.StartsWithSegments(WellKnownPaths.InvitePathPrefix);
-            var hasPendingInviteCookie = context.Request.Cookies.ContainsKey(Cookies.InviteToken);
-            var isAuthPath = context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPrefix)
-                || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage)
-                || context.Request.Path.StartsWithSegments(WellKnownPaths.Providers);
+            var isInvitePath = context.IsInvitation();
+            var hasPendingInviteCookie = context.HasPendingInvitation();
+            var isAuthPath = context.IsAuthenticationUI();
             if (!string.IsNullOrWhiteSpace(lobbyUrl)
                 && !isInvitePath
                 && !isAuthPath

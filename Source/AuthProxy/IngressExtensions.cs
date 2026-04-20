@@ -8,9 +8,8 @@ using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Primitives;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
@@ -65,8 +64,8 @@ public static class IngressExtensions
     public static WebApplication UseIngress(this WebApplication app)
     {
         app.UseForwardedHeaders();
+        app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
-        UsePagesStaticFiles(app);
         app.UseAuthentication();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseAuthorization();
@@ -81,25 +80,8 @@ public static class IngressExtensions
         return app;
     }
 
-    static void UsePagesStaticFiles(WebApplication app)
-    {
-        var config = app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>();
-
-        app.UseStaticFiles(new StaticFileOptions
-        {
-            FileProvider = new PagesFileProvider(app.Environment, config),
-            RequestPath = WellKnownPaths.Pages,
-        });
-    }
-
     static void MapIngressEndpoints(this WebApplication app)
     {
-        // All requests under /_pages are served as static files (anonymous by design).
-        // Any path not matched by the static file middleware is returned as 404 without
-        // requiring authentication, so the pages are never subject to auth challenges.
-        app.Map($"{WellKnownPaths.Pages}/{{**path}}", () => Results.NotFound())
-            .AllowAnonymous();
-
         // Returns a JSON array of all configured providers (OIDC + OAuth) used by the login page.
         app.MapGet(WellKnownPaths.Providers, (IOptionsMonitor<C.AuthProxy> config) =>
         {
@@ -164,79 +146,89 @@ public static class IngressExtensions
         .AllowAnonymous();
     }
 
-    sealed class PagesFileProvider(IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config) : IFileProvider
+    static void ConfigurePagesPipeline(IApplicationBuilder app, IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config)
     {
-        public IDirectoryContents GetDirectoryContents(string subpath) => NotFoundDirectoryContents.Singleton;
+        var pagesContentTypeProvider = new FileExtensionContentTypeProvider();
 
-        public IFileInfo GetFileInfo(string subpath)
+        app.Run(async context =>
         {
-            var relativePath = subpath.TrimStart('/');
+            if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            var relativePath = context.Request.Path.Value?.TrimStart('/');
             if (string.IsNullOrWhiteSpace(relativePath))
             {
-                return new NotFoundFileInfo(subpath);
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
             }
 
-            foreach (var directory in GetCandidateDirectories())
+            var assetPath = ResolvePageAssetPath(environment, config, relativePath);
+            if (assetPath is null)
             {
-                var directoryFullPath = Path.GetFullPath(directory);
-                var candidateFullPath = Path.GetFullPath(Path.Combine(directoryFullPath, relativePath));
-                var startsWithDirectory = candidateFullPath.StartsWith($"{directoryFullPath}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(candidateFullPath, directoryFullPath, StringComparison.OrdinalIgnoreCase);
-
-                if (!startsWithDirectory || !File.Exists(candidateFullPath))
-                {
-                    continue;
-                }
-
-                return new PhysicalPathFileInfo(candidateFullPath);
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
             }
 
-            return new NotFoundFileInfo(subpath);
-        }
+            if (!pagesContentTypeProvider.TryGetContentType(assetPath, out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
 
-        public IChangeToken Watch(string filter) => NullChangeToken.Singleton;
+            context.Response.ContentType = contentType;
 
-        IEnumerable<string> GetCandidateDirectories()
+            if (HttpMethods.IsHead(context.Request.Method))
+            {
+                var fileInfo = new FileInfo(assetPath);
+                context.Response.ContentLength = fileInfo.Length;
+                return;
+            }
+
+            await context.Response.SendFileAsync(assetPath);
+        });
+    }
+
+    static string? ResolvePageAssetPath(IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config, string relativePath)
+    {
+        foreach (var directory in GetCandidateDirectories(environment, config))
         {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var directoryFullPath = Path.GetFullPath(directory);
+            var candidateFullPath = Path.GetFullPath(Path.Combine(directoryFullPath, relativePath));
+            var isWithinDirectory = candidateFullPath.StartsWith($"{directoryFullPath}{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(candidateFullPath, directoryFullPath, StringComparison.OrdinalIgnoreCase);
 
-            var configuredPath = config.CurrentValue.PagesPath;
-            if (!string.IsNullOrWhiteSpace(configuredPath))
+            if (isWithinDirectory && File.Exists(candidateFullPath))
             {
-                var resolvedConfiguredPath = Path.IsPathRooted(configuredPath)
-                    ? configuredPath
-                    : Path.Combine(environment.ContentRootPath, configuredPath);
-
-                if (Directory.Exists(resolvedConfiguredPath) && seen.Add(resolvedConfiguredPath))
-                {
-                    yield return resolvedConfiguredPath;
-                }
-            }
-
-            var defaultPagesPath = Path.Combine(environment.ContentRootPath, "Pages");
-            if (Directory.Exists(defaultPagesPath) && seen.Add(defaultPagesPath))
-            {
-                yield return defaultPagesPath;
+                return candidateFullPath;
             }
         }
 
-        sealed class PhysicalPathFileInfo(string fullPath) : IFileInfo
+        return null;
+    }
+
+    static IEnumerable<string> GetCandidateDirectories(IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var configuredPath = config.CurrentValue.PagesPath;
+        if (!string.IsNullOrWhiteSpace(configuredPath))
         {
-            readonly FileInfo _fileInfo = new(fullPath);
+            var resolvedConfiguredPath = Path.IsPathRooted(configuredPath)
+                ? configuredPath
+                : Path.Combine(environment.ContentRootPath, configuredPath);
 
-            public bool Exists => _fileInfo.Exists;
+            if (Directory.Exists(resolvedConfiguredPath) && seen.Add(resolvedConfiguredPath))
+            {
+                yield return resolvedConfiguredPath;
+            }
+        }
 
-            public long Length => _fileInfo.Length;
-
-            public string PhysicalPath => _fileInfo.FullName;
-
-            public string Name => _fileInfo.Name;
-
-            public DateTimeOffset LastModified => new(_fileInfo.LastWriteTimeUtc, TimeSpan.Zero);
-
-            public bool IsDirectory => false;
-
-            public Stream CreateReadStream() => _fileInfo.OpenRead();
+        var defaultPagesPath = Path.Combine(environment.ContentRootPath, "Pages");
+        if (Directory.Exists(defaultPagesPath) && seen.Add(defaultPagesPath))
+        {
+            yield return defaultPagesPath;
         }
     }
 }

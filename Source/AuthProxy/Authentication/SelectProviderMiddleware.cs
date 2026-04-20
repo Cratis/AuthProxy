@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.ErrorPages;
-using Cratis.AuthProxy.Invites;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -33,11 +32,9 @@ public class SelectProviderMiddleware(
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.User.Identity?.IsAuthenticated == true
-            || context.Request.Path.StartsWithSegments(InviteMiddleware.InvitePathPrefix)
-            || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPrefix)
-            || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage)
-            || context.Request.Path.StartsWithSegments(WellKnownPaths.Providers)
-            || context.Request.Cookies.ContainsKey(Cookies.InviteToken))
+            || context.IsInvitation()
+            || context.IsAuthenticationUI()
+            || context.HasPendingInvitation())
         {
             await next(context);
             return;
@@ -69,7 +66,7 @@ public class SelectProviderMiddleware(
         if (providers.Count == 1)
         {
             var scheme = OidcProviderScheme.FromName(providers[0].Name);
-            var returnUrl = $"{context.Request.Path}{context.Request.QueryString}";
+            var returnUrl = context.GetPathAndQuery();
             var properties = new AuthenticationProperties { RedirectUri = returnUrl };
             await context.ChallengeAsync(scheme, properties);
             return;

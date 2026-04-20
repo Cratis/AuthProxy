@@ -70,7 +70,7 @@ public class InviteMiddleware(
         // Run this first so authenticated callbacks that return to /invite/{token}
         // do not get re-challenged and end up in a redirect loop.
         if (context.User.Identity?.IsAuthenticated == true
-            && context.Request.Cookies.TryGetValue(Cookies.InviteToken, out var inviteToken))
+            && context.TryGetPendingInvitationToken(out var inviteToken))
         {
             var exchangeSucceeded = await ExchangeInvite(context, inviteToken);
             context.Response.Cookies.Delete(Cookies.InviteToken);
@@ -89,9 +89,8 @@ public class InviteMiddleware(
         }
 
         // ── Phase 1: incoming invite URL ──────────────────────────────────────
-        if (context.Request.Path.StartsWithSegments(InvitePathPrefix, out var remaining))
+        if (context.TryGetInvitationToken(out var token))
         {
-            var token = remaining.Value?.TrimStart('/');
             if (string.IsNullOrEmpty(token))
             {
                 context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -150,7 +149,7 @@ public class InviteMiddleware(
             if (providers.Count == 1)
             {
                 var scheme = OidcProviderScheme.FromName(providers[0].Name);
-                var returnUrl = $"{context.Request.Path}{context.Request.QueryString}";
+                var returnUrl = context.GetPathAndQuery();
                 var properties = new AuthenticationProperties { RedirectUri = returnUrl };
                 await context.ChallengeAsync(scheme, properties);
                 return;
