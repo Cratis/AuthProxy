@@ -3,6 +3,7 @@
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
@@ -35,6 +36,7 @@ namespace Cratis.AuthProxy.Invites;
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="authConfig">The authentication configuration monitor, used to determine how many providers are available.</param>
+/// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
 /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
@@ -43,6 +45,7 @@ public class InviteMiddleware(
     IInviteTokenValidator tokenValidator,
     IOptionsMonitor<C.AuthProxy> config,
     IOptionsMonitor<C.Authentication> authConfig,
+    ITenantResolver tenantResolver,
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
     ILogger<InviteMiddleware> logger)
@@ -150,7 +153,7 @@ public class InviteMiddleware(
             {
                 var scheme = OidcProviderScheme.FromName(providers[0].Name);
                 var returnUrl = context.GetPathAndQuery();
-                var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+                var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
                 await context.ChallengeAsync(scheme, properties);
                 return;
             }

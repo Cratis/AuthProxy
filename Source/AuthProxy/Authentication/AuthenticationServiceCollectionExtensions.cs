@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -126,6 +127,24 @@ public static class AuthenticationServiceCollectionExtensions
                 options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
                 options.NonceCookie.SameSite = SameSiteMode.Lax;
                 options.NonceCookie.SecurePolicy = CookieSecurePolicy.None;
+
+                options.Events = new OpenIdConnectEvents
+                {
+                    OnTicketReceived = context =>
+                    {
+                        if (context.Properties is not null
+                            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
+                                context.HttpContext,
+                                context.Properties,
+                                context.ReturnUri,
+                                out var redirectUri))
+                        {
+                            context.ReturnUri = redirectUri;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
             });
         }
     }
@@ -176,6 +195,20 @@ public static class AuthenticationServiceCollectionExtensions
                         using var user = JsonDocument.Parse(
                             await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
                         ctx.RunClaimActions(user.RootElement);
+                    },
+                    OnTicketReceived = context =>
+                    {
+                        if (context.Properties is not null
+                            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
+                                context.HttpContext,
+                                context.Properties,
+                                context.ReturnUri,
+                                out var redirectUri))
+                        {
+                            context.ReturnUri = redirectUri;
+                        }
+
+                        return Task.CompletedTask;
                     }
                 };
             });

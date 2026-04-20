@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
@@ -98,7 +99,7 @@ public static class IngressExtensions
             .AllowAnonymous();
 
         // Initiates the challenge for the requested provider scheme.
-        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig) =>
+        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
         {
             var config = authConfig.CurrentValue;
             var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
@@ -112,12 +113,12 @@ public static class IngressExtensions
             }
 
             var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
-            var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+            var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
             await context.ChallengeAsync(scheme, properties);
         })
         .AllowAnonymous();
 
-        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig) =>
+        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
         {
             var config = authConfig.CurrentValue;
             var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
@@ -130,7 +131,7 @@ public static class IngressExtensions
             }
 
             var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
-            var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+            var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
             await context.ChallengeAsync(scheme, properties);
         })
         .AllowAnonymous();
