@@ -18,6 +18,7 @@ condition is detected:
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
 | `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
+| `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
 
 ---
 
@@ -90,6 +91,15 @@ can render a sign-in button for each available provider without an additional HT
 The built-in page reads the cookie with JavaScript and renders one sign-in button per provider.
 You can override it with a custom branded version by placing your own `invitation-select-provider.html`
 in the configured pages directory.
+
+### `invitation-subject-already-exists.html`
+
+Served during Phase 2 (post-login invite exchange) when the exchange endpoint returns HTTP 409 Conflict,
+indicating that the authenticated user's subject is already associated with an existing account.
+The user should sign in with their existing account rather than completing the invitation again.
+
+If you prefer to redirect users to a custom URL instead of serving this page, configure
+`Invite.SubjectAlreadyExistsUrl` (see [Invites & Lobby](invites.md#invite-properties)).
 
 ---
 

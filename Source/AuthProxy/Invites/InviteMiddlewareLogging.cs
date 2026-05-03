@@ -19,4 +19,7 @@ internal static partial class InviteMiddlewareLogging
 
     [LoggerMessage(LogLevel.Information, "Invite exchanged successfully for subject {Subject}")]
     internal static partial void InviteExchangedSuccessfully(this ILogger logger, string subject);
+
+    [LoggerMessage(LogLevel.Warning, "Invite exchange rejected because subject {Subject} is already associated with an existing user")]
+    internal static partial void InviteSubjectAlreadyExists(this ILogger logger, string subject);
 }
