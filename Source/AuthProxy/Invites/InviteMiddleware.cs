@@ -75,10 +75,28 @@ public class InviteMiddleware(
         if (context.User.Identity?.IsAuthenticated == true
             && context.TryGetPendingInvitationToken(out var inviteToken))
         {
-            var exchangeSucceeded = await ExchangeInvite(context, inviteToken);
+            var exchangeResult = await ExchangeInvite(context, inviteToken);
             context.Response.Cookies.Delete(Cookies.InviteToken);
 
-            if (exchangeSucceeded && !IsTenantIssuedInvite(inviteToken, context))
+            if (exchangeResult == InviteExchangeResult.DuplicateSubject)
+            {
+                var subjectAlreadyExistsUrl = config.CurrentValue.Invite?.SubjectAlreadyExistsUrl;
+                if (!string.IsNullOrWhiteSpace(subjectAlreadyExistsUrl))
+                {
+                    context.Response.Redirect(subjectAlreadyExistsUrl);
+                }
+                else
+                {
+                    await errorPageProvider.WriteErrorPageAsync(
+                        context,
+                        WellKnownPageNames.InvitationSubjectAlreadyExists,
+                        StatusCodes.Status409Conflict);
+                }
+
+                return;
+            }
+
+            if (exchangeResult == InviteExchangeResult.Success && !IsTenantIssuedInvite(inviteToken, context))
             {
                 var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
                 if (!string.IsNullOrWhiteSpace(lobbyUrl))
@@ -175,13 +193,13 @@ public class InviteMiddleware(
         config.OidcProviders.Select(OidcProviderScheme.ToProviderInfo)
             .Concat(config.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo));
 
-    async Task<bool> ExchangeInvite(HttpContext context, string inviteToken)
+    async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken)
     {
         var exchangeUrl = config.CurrentValue.Invite?.ExchangeUrl;
         if (string.IsNullOrWhiteSpace(exchangeUrl))
         {
             logger.InviteExchangeUrlNotConfigured();
-            return false;
+            return InviteExchangeResult.Failed;
         }
 
         var subject = context.User.FindFirst("sub")?.Value
@@ -209,17 +227,23 @@ public class InviteMiddleware(
         catch (Exception ex)
         {
             logger.FailedToCallInviteExchangeEndpoint(ex, exchangeUrl);
-            return false;
+            return InviteExchangeResult.Failed;
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            logger.InviteSubjectAlreadyExists(subject);
+            return InviteExchangeResult.DuplicateSubject;
         }
 
         if (!response.IsSuccessStatusCode)
         {
             logger.InviteExchangeEndpointFailed((int)response.StatusCode, subject);
-            return false;
+            return InviteExchangeResult.Failed;
         }
 
         logger.InviteExchangedSuccessfully(subject);
-        return true;
+        return InviteExchangeResult.Success;
     }
 
     bool IsTenantIssuedInvite(string inviteToken, HttpContext context)

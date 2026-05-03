@@ -26,7 +26,10 @@ redirected while they complete the onboarding process.
 1. After a successful OIDC login the user is redirected back.
 2. AuthProxy detects the invite cookie, calls the configured `ExchangeUrl` with the token and the
    authenticated user's subject, then deletes the cookie.
-3. If the exchange succeeds and a **lobby** service is configured, the user is redirected to
+3. If the exchange endpoint returns **HTTP 409 Conflict** (subject already registered), AuthProxy
+   redirects to `SubjectAlreadyExistsUrl` (if configured) or serves the built-in
+   `invitation-subject-already-exists.html` page.
+4. If the exchange succeeds and a **lobby** service is configured, the user is redirected to
    the lobby's frontend so they can enter the application with their newly assigned tenant.
 
 ### Lobby – no-tenant redirect
@@ -56,6 +59,7 @@ All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
         "Audience": "authproxy",
         "ExchangeUrl": "https://studio.example.com/internal/invites/exchange",
         "TenantClaim": "tenant_id",
+        "SubjectAlreadyExistsUrl": "https://app.example.com/errors/account-already-exists",
         "AppendInvitationIdToQueryString": true,
         "InvitationIdQueryStringKey": "invitationId",
         "ClaimsToForward": [
@@ -81,6 +85,7 @@ All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
 | `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
 | `ExchangeUrl` | `string` | Absolute URL of the invite-exchange endpoint, e.g. `https://studio.example.com/internal/invites/exchange`. |
 | `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID string for tenant-issued invite detection. |
+| `SubjectAlreadyExistsUrl` | `string` | URL to redirect to when the exchange endpoint returns HTTP 409 (subject already registered). Leave empty to serve the built-in `invitation-subject-already-exists.html` page. |
 | `AppendInvitationIdToQueryString` | `bool` | Appends `jti` from the invite token to the lobby redirect query string when enabled. |
 | `InvitationIdQueryStringKey` | `string` | Query string key used when appending invitation ID. |
 | `ClaimsToForward` | `InviteClaimForwarding[]` | Claim mappings forwarded from invite token into the principal sent to identity details providers. |
@@ -150,8 +155,16 @@ AuthProxy distinguishes between two token failure modes and serves a dedicated p
 | `invitation-expired.html` | The token had a valid signature but has passed its `exp` claim. |
 | `invitation-invalid.html` | The token is malformed, carries an invalid signature, or cannot be parsed. |
 | `invitation-select-provider.html` | The token is valid and multiple identity providers are configured. |
+| `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account (exchange returned HTTP 409). |
 
-All error pages are served with HTTP 401 except `invitation-select-provider.html` which uses HTTP 200.
+All error pages are served with the following HTTP status codes:
+
+| Page | HTTP status |
+|------|-------------|
+| `invitation-expired.html` | 401 |
+| `invitation-invalid.html` | 401 |
+| `invitation-select-provider.html` | 200 |
+| `invitation-subject-already-exists.html` | 409 |
 These pages use full descriptive names rather than numeric error codes because they represent
 application-level conditions, not generic HTTP errors.
 

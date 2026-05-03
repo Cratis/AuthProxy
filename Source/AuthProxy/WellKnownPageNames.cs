@@ -34,6 +34,12 @@ public static class WellKnownPageNames
     public const string InvitationInvalid = "invitation-invalid.html";
 
     /// <summary>
+    /// The page returned when an authenticated user attempts to accept an invitation but the subject
+    /// is already associated with an existing user.
+    /// </summary>
+    public const string InvitationSubjectAlreadyExists = "invitation-subject-already-exists.html";
+
+    /// <summary>
     /// The page served when a valid invitation token is presented and multiple identity providers
     /// are configured.  The page reads the <c>.cratis-providers</c> cookie injected by the proxy
     /// and renders a sign-in button for each available provider.

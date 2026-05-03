@@ -20,6 +20,7 @@ condition is detected:
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
 | `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
+| `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
 
 ---
 
@@ -99,6 +100,11 @@ passed its `exp` claim. The user should request a fresh invitation.
 
 Served when the token on an `/invite/<token>` link is malformed, carries an invalid signature,
 or cannot be parsed at all. This typically indicates a truncated or otherwise corrupted link.
+
+### `invitation-subject-already-exists.html`
+
+Served during Phase 2 (post-login invite exchange) when the exchange endpoint returns HTTP 409 Conflict,
+indicating that the authenticated user's subject is already associated with an existing account.
 
 ---
 

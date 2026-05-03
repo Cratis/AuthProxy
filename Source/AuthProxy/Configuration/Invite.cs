@@ -32,6 +32,15 @@ public class Invite
     public string ExchangeUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the URL to redirect to when the authenticated user's subject is already
+    /// associated with an existing user during the invite exchange (Phase 2).
+    /// When set, the user is redirected to this URL instead of the built-in
+    /// <c>invitation-subject-already-exists.html</c> page.
+    /// Leave empty to serve the built-in well-known error page.
+    /// </summary>
+    public string SubjectAlreadyExistsUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the claim name in the invite token that holds the tenant ID.
     /// When set, a tenant-issued invite is recognized when this claim's value matches
     /// the resolved tenant. If they match the invite bypasses the lobby redirect and
