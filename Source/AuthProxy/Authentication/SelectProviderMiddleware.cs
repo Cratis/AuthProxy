@@ -12,14 +12,20 @@ namespace Cratis.AuthProxy.Authentication;
 /// Middleware that intercepts unauthenticated requests and either serves a provider-selection
 /// page (when multiple identity providers are configured) or initiates a direct OIDC challenge
 /// (when exactly one provider is configured).
+/// When the proxy is in lobby mode (<see cref="C.Invite.RedirectToLobbyWhenTenantUnresolved"/> is
+/// enabled and a lobby URL is configured), unauthenticated requests without an invite token or
+/// pending invite cookie are immediately answered with the <c>invitation-required.html</c> page
+/// instead of being redirected to a login provider.
 /// Skips invite paths, authentication paths, and requests with a pending invite cookie.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
+/// <param name="proxyConfig">The auth proxy configuration monitor.</param>
 /// <param name="authConfig">The authentication configuration monitor.</param>
 /// <param name="errorPageProvider">The error page provider used to serve the selection page.</param>
 /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
 public class SelectProviderMiddleware(
     RequestDelegate next,
+    IOptionsMonitor<C.AuthProxy> proxyConfig,
     IOptionsMonitor<C.Authentication> authConfig,
     IErrorPageProvider errorPageProvider,
     ITenantResolver tenantResolver)
@@ -39,6 +45,17 @@ public class SelectProviderMiddleware(
             || context.HasPendingInvitation())
         {
             await next(context);
+            return;
+        }
+
+        var inviteConfig = proxyConfig.CurrentValue.Invite;
+        if (inviteConfig?.RedirectToLobbyWhenTenantUnresolved == true
+            && !string.IsNullOrWhiteSpace(inviteConfig.Lobby?.Frontend?.BaseUrl))
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.InvitationRequired,
+                StatusCodes.Status401Unauthorized);
             return;
         }
 

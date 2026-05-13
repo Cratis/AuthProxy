@@ -3,39 +3,43 @@
 
 using Microsoft.AspNetCore.Authentication;
 
-namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware;
+namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_lobby_mode_is_configured;
 
-public class when_single_provider_is_configured : Specification
+public class and_lobby_url_is_not_configured : Specification
 {
     SelectProviderMiddleware _middleware;
     DefaultHttpContext _context;
-    bool _nextCalled;
     string _challengedScheme = string.Empty;
+    IErrorPageProvider _errorPageProvider;
 
     void Establish()
     {
         var proxyConfig = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        proxyConfig.CurrentValue.Returns(new C.AuthProxy());
+        proxyConfig.CurrentValue.Returns(new C.AuthProxy
+        {
+            Invite = new C.Invite
+            {
+                RedirectToLobbyWhenTenantUnresolved = true
+            }
+        });
 
         var authConfig = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authConfig.CurrentValue.Returns(new C.Authentication
         {
-            OidcProviders = [new C.OidcProvider { Name = "my-provider", Authority = "https://auth.example.com", ClientId = "id" }]
+            OidcProviders = [new C.OidcProvider { Name = "provider1", Authority = "https://auth.example.com", ClientId = "id" }]
         });
 
+        _errorPageProvider = Substitute.For<IErrorPageProvider>();
+
         _middleware = new SelectProviderMiddleware(
-            _ =>
-            {
-                _nextCalled = true;
-                return Task.CompletedTask;
-            },
+            _ => Task.CompletedTask,
             proxyConfig,
             authConfig,
-            Substitute.For<IErrorPageProvider>(),
+            _errorPageProvider,
             Substitute.For<ITenantResolver>());
 
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/protected";
+        _context.Request.Path = "/";
         _context.Response.Body = new System.IO.MemoryStream();
 
         var authService = Substitute.For<IAuthenticationService>();
@@ -50,6 +54,10 @@ public class when_single_provider_is_configured : Specification
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_challenge_with_provider_scheme() => _challengedScheme.ShouldEqual(OidcProviderScheme.FromName("my-provider"));
+    [Fact] void should_not_serve_invitation_required_page() =>
+        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(
+            Arg.Any<HttpContext>(),
+            WellKnownPageNames.InvitationRequired,
+            Arg.Any<int>());
+    [Fact] void should_challenge_with_provider_scheme() => _challengedScheme.ShouldEqual(OidcProviderScheme.FromName("provider1"));
 }

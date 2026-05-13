@@ -11,6 +11,9 @@ public class when_user_is_authenticated : Specification
 
     void Establish()
     {
+        var proxyConfig = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        proxyConfig.CurrentValue.Returns(new C.AuthProxy());
+
         var authConfig = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authConfig.CurrentValue.Returns(new C.Authentication
         {
@@ -23,6 +26,7 @@ public class when_user_is_authenticated : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
+            proxyConfig,
             authConfig,
             Substitute.For<IErrorPageProvider>(),
             Substitute.For<ITenantResolver>());

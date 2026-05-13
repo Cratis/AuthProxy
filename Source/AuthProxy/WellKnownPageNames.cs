@@ -52,4 +52,10 @@ public static class WellKnownPageNames
     /// by the proxy and renders a sign-in button for each available provider.
     /// </summary>
     public const string SelectProvider = "select-provider.html";
+
+    /// <summary>
+    /// The page served when an unauthenticated user reaches a lobby-mode proxy without a
+    /// valid invitation token or pending invite cookie.
+    /// </summary>
+    public const string InvitationRequired = "invitation-required.html";
 }
