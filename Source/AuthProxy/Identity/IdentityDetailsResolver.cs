@@ -43,14 +43,20 @@ public class IdentityDetailsResolver(
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
     {
-        if (context.Request.Cookies.ContainsKey(Cookies.Identity))
+        // When a pending invite is in-flight the cookie and memory caches must be bypassed so that
+        // the enriched principal (which carries the invite claims jti/invite_type) is always sent to
+        // the identity endpoint. A stale .cratis-identity cookie from a previous session would
+        // otherwise shadow the invite claims and cause the Lobby to return the wrong flow type.
+        var hasPendingInvite = context.HasPendingInvitation();
+
+        if (!hasPendingInvite && context.Request.Cookies.ContainsKey(Cookies.Identity))
         {
             return BuildAuthorizedResult(principal, details: null);
         }
 
         var cacheKey = $"{tenantId}:{principal.UserId}";
 
-        if (memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
+        if (!hasPendingInvite && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
             WriteIdentityCookie(context, cached);
             logger.IdentityDetailsCacheHit(principal.UserId);
@@ -62,7 +68,7 @@ public class IdentityDetailsResolver(
         try
         {
             // Double-check inside the lock — another request may have populated the cache while we waited.
-            if (memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
+            if (!hasPendingInvite && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
             {
                 WriteIdentityCookie(context, cached);
                 logger.IdentityDetailsCacheHit(principal.UserId);
