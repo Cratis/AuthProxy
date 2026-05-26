@@ -33,6 +33,7 @@ Configure them under `Cratis:AuthProxy:TenantResolutions`:
 | `Specified` | Resolves directly to a fixed tenant ID string from configuration. |
 | `Default` | Resolves directly to a fallback tenant ID string from configuration. |
 | `SubHost` | Resolves directly from subhost convention, for example `acme.example.com` -> `acme`. |
+| `Selection` | Resolves from the selected-tenant cookie set by the tenant-selection page flow. |
 
 ---
 
@@ -148,6 +149,28 @@ Because there is no registry lookup to prove the tenant exists, you should confi
 AuthProxy replaces `{tenantId}` with the resolved subhost value and expects a `200` response.
 Any other response causes the request to be rejected with `tenant-not-found.html`.
 See [Tenant verification](#tenant-verification) for full response handling details.
+
+---
+
+## Selection strategy options
+
+```json
+{
+  "Strategy": "Selection",
+  "Options": {
+    "TenantsEndpoint": "https://platform.example.com/api/tenants/selectable"
+  }
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `TenantsEndpoint` | `string` | Absolute URL for the endpoint that returns selectable tenants for the current authenticated user. Expected response shape is an array of `{ "id": "...", "name": "..." }` objects. |
+
+When this strategy is configured and no `.cratis-tenant` cookie exists yet, AuthProxy calls
+`TenantsEndpoint`, sets the `.cratis-tenants` cookie, and serves `select-tenant.html`.
+The page links back to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`, and AuthProxy validates
+the selected tenant against the endpoint response before writing the `.cratis-tenant` cookie.
 
 ---
 

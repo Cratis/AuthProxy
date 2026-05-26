@@ -28,4 +28,7 @@ public enum TenantSourceIdentifierResolverType
 
     /// <summary>Resolve the tenant ID from the request subhost by convention (for example, tenant.example.com -> tenant).</summary>
     SubHost = 6,
+
+    /// <summary>Resolve the tenant ID from the selected-tenant cookie set via the tenant-selection page.</summary>
+    Selection = 7,
 }

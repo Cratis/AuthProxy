@@ -4,6 +4,8 @@
   href: authentication.md
 - name: Tenancy
   href: tenancy.md
+- name: Tenant Selection Page
+  href: tenant-selection.md
 - name: Services
   href: services.md
 - name: Invites & Lobby

@@ -54,6 +54,12 @@ public static class WellKnownPageNames
     public const string SelectProvider = "select-provider.html";
 
     /// <summary>
+    /// The page served when tenant selection is enabled and the authenticated user has no selected tenant.
+    /// The page reads the <c>.cratis-tenants</c> cookie injected by the proxy and renders a selectable list.
+    /// </summary>
+    public const string SelectTenant = "select-tenant.html";
+
+    /// <summary>
     /// The page served when an unauthenticated user reaches a lobby-mode proxy without a
     /// valid invitation token or pending invite cookie.
     /// </summary>

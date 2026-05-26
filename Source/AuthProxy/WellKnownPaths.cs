@@ -32,6 +32,11 @@ public static class WellKnownPaths
     public const string LoginPage = "/.cratis/select-provider";
 
     /// <summary>
+    /// The well-known path used by the tenant-selection page to submit the chosen tenant.
+    /// </summary>
+    public const string SelectTenant = "/.cratis/select-tenant";
+
+    /// <summary>
     /// The well-known path prefix that triggers invite-token handling.
     /// Append the token to complete the URL (e.g. <c>/invite/&lt;token&gt;</c>).
     /// </summary>
@@ -43,4 +48,3 @@ public static class WellKnownPaths
     /// </summary>
     public const string Pages = "/_pages";
 }
-

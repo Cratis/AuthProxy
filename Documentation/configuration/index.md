@@ -23,6 +23,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 |-------|-------------|
 | [Authentication](authentication.md) | OIDC providers and JWT Bearer configuration. |
 | [Tenancy](tenancy.md) | How the auth proxy resolves the current tenant from each request, and how to verify tenant existence. |
+| [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
 | [Services](services.md) | Routing requests to backend and frontend services. |
 | [Invites & Lobby](invites.md) | Invite-based onboarding and the lobby service. |
 | [Well-Known Pages](well-known-pages.md) | Built-in HTML pages (provider selection, errors, tenant not found) and how to override them via a mounted volume. |

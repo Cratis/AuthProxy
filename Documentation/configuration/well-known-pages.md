@@ -17,6 +17,7 @@ condition is detected:
 | `403.html` | The identity resolver denied access. | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
 | `select-provider.html` | A protected resource was requested and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
+| `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
 | `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |

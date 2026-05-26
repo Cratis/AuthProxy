@@ -36,6 +36,7 @@ public class TenantResolutionOptionsConfigurer(IConfiguration configuration) : I
                 C.TenantSourceIdentifierResolverType.Specified => optionsSection.Get<SpecifiedOptions>() ?? new SpecifiedOptions(),
                 C.TenantSourceIdentifierResolverType.Default => optionsSection.Get<DefaultOptions>() ?? new DefaultOptions(),
                 C.TenantSourceIdentifierResolverType.SubHost => optionsSection.Get<SubHostOptions>() ?? new SubHostOptions(),
+                C.TenantSourceIdentifierResolverType.Selection => optionsSection.Get<SelectionOptions>() ?? new SelectionOptions(),
                 _ => null
             };
         }

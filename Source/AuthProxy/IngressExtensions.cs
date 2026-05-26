@@ -70,6 +70,7 @@ public static class IngressExtensions
         app.UseAuthentication();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseAuthorization();
+        app.UseMiddleware<TenantSelectionMiddleware>();
         app.UseMiddleware<TenancyMiddleware>();
         app.UseMiddleware<InviteMiddleware>();
         app.UseMiddleware<IdentityMiddleware>();

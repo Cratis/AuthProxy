@@ -15,6 +15,7 @@ condition is detected:
 | `404.html` | The requested resource was not found. | 404 |
 | `403.html` | The identity resolver denied access. | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
+| `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
 | `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
@@ -154,3 +155,17 @@ providers.forEach(function(provider) {
 `tenant-not-found.html` is served when tenant verification is enabled and the platform reports
 that the resolved tenant ID does not exist. See [Tenant verification](tenancy.md#tenant-verification)
 for how to configure the verification endpoint.
+
+---
+
+## Tenant selection page
+
+`select-tenant.html` is served when the `Selection` tenant-resolution strategy is configured and no
+`.cratis-tenant` cookie is present for the authenticated user.
+
+See [Tenant Selection Page](tenant-selection.md) for:
+
+- `TenantsEndpoint` configuration
+- `.cratis-tenants` cookie schema (`id`, `name`)
+- `/.cratis/select-tenant` selection callback behavior
+- full custom-page example
