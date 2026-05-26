@@ -107,8 +107,15 @@ public class TenantSelectionMiddleware(
         context.Response.Cookies.Delete(Cookies.Tenants);
 
         var requestedReturnUrl = context.Request.Query["returnUrl"].FirstOrDefault();
-        var returnUrl = IsSafeRelativeUrl(requestedReturnUrl) ? requestedReturnUrl! : "/";
-        context.Response.Redirect(returnUrl);
+        if (!IsSafeRelativeUrl(requestedReturnUrl))
+        {
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            context.Response.Headers.Location = "/";
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status302Found;
+        context.Response.Headers.Location = requestedReturnUrl;
     }
 
     bool IsSafeRelativeUrl(string? url) =>
