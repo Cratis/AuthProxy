@@ -11,11 +11,12 @@ The page receives tenant data through a cookie, not by calling your tenant endpo
 
 1. Authenticated request arrives without a `.cratis-tenant` cookie.
 2. AuthProxy calls the configured `Selection.Options.TenantsEndpoint`.
-3. AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) and serves `select-tenant.html`.
-4. User clicks a tenant option.
-5. Browser navigates to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`.
-6. AuthProxy validates the selected `tenantId` against `TenantsEndpoint` and sets `.cratis-tenant`.
-7. AuthProxy redirects back to `returnUrl`.
+3. If exactly one tenant is returned, AuthProxy sets `.cratis-tenant` immediately and redirects to the original URL (no selection page shown).
+4. If more than one tenant is returned, AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) and serves `select-tenant.html`.
+5. User clicks a tenant option.
+6. Browser navigates to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`.
+7. AuthProxy validates the selected `tenantId` against `TenantsEndpoint` and sets `.cratis-tenant`.
+8. AuthProxy redirects back to `returnUrl`.
 
 ---
 

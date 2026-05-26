@@ -66,6 +66,20 @@ public class TenantSelectionMiddleware(
             return;
         }
 
+        if (tenantOptions.Count == 1)
+        {
+            context.Response.Cookies.Append(Cookies.Tenant, tenantOptions[0].Id, new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                Secure = context.Request.IsHttps,
+            });
+            context.Response.Cookies.Delete(Cookies.Tenants);
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            context.Response.Headers.Location = context.GetPathAndQuery();
+            return;
+        }
+
         var tenantsJson = JsonSerializer.Serialize(tenantOptions, _serializerOptions);
         context.Response.Cookies.Append(Cookies.Tenants, tenantsJson, new CookieOptions
         {
