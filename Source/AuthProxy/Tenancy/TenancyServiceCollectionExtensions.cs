@@ -23,6 +23,7 @@ public static class TenancyServiceCollectionExtensions
         builder.Services.AddSingleton<ISourceIdentifierStrategy, SpecifiedSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, DefaultSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, SubHostSourceIdentifierStrategy>();
+        builder.Services.AddSingleton<ISourceIdentifierStrategy, SelectionSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ITenantResolver, TenantResolver>();
         builder.Services.AddSingleton<IPostConfigureOptions<Configuration.AuthProxy>, TenantResolutionOptionsConfigurer>();
 

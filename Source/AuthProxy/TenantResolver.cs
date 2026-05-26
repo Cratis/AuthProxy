@@ -103,6 +103,21 @@ public class TenantResolver(
                     return true;
                 }
             }
+            else if (strategy is T.ISourceIdentifierStrategyTyped<T.SelectionOptions> selectionStrategy)
+            {
+                var selectionOptions = resolution.Options as T.SelectionOptions ?? new T.SelectionOptions();
+
+                if (!selectionStrategy.TryResolveSourceIdentifier(context, selectionOptions, out var sourceIdentifier))
+                {
+                    continue;
+                }
+
+                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
+                {
+                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
+                    return true;
+                }
+            }
             else if (strategy is T.ISourceIdentifierStrategyTyped<T.RouteOptions> routeStrategy)
             {
                 var routeOptions = resolution.Options as T.RouteOptions ?? new T.RouteOptions();
@@ -167,7 +182,7 @@ public class TenantResolver(
         tenantId = string.Empty;
 
         // Specified, Default, and SubHost strategies return a fixed tenant ID directly.
-        if (strategyType == Type.Specified || strategyType == Type.Default || strategyType == Type.SubHost)
+        if (strategyType == Type.Specified || strategyType == Type.Default || strategyType == Type.SubHost || strategyType == Type.Selection)
         {
             if (!string.IsNullOrWhiteSpace(sourceIdentifier))
             {
