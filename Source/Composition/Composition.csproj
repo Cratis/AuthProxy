@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../AuthProxy/AuthProxy.csproj" />
+    <ProjectReference Include="../Aspire/Aspire.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../TestApp/TestApp.csproj" />
   </ItemGroup>
 
