@@ -61,6 +61,18 @@ authproxy
 Both methods accept an optional `endpointName` parameter (defaults to `"http"`) that selects
 which endpoint from the target resource to forward to.
 
+### Identity details resolution
+
+For each service with a backend, AuthProxy calls `GET {baseUrl}/.cratis/me` after authentication
+to enrich the identity cookie.  This behaviour is on by default.  To disable it for a specific
+service, pass `resolveIdentityDetails: false` to `WithBackend`:
+
+```csharp
+authproxy
+    .WithBackend("reporting", reportingApi, resolveIdentityDetails: false)
+    .WithFrontend("reporting", reportingWeb);
+```
+
 See [Services](../configuration/services.md) for the underlying configuration model.
 
 ---
@@ -141,10 +153,15 @@ See [Tenancy](../configuration/tenancy.md) for detailed strategy documentation.
 
 ### Tenant verification
 
-After resolution, AuthProxy can confirm the tenant exists by calling your back-end:
+After resolution, AuthProxy can confirm the tenant exists by calling your back-end.  You can
+pass a raw URL template or reference an Aspire service resource directly:
 
 ```csharp
+// Raw URL template
 authproxy.WithTenantVerification("https://platform.example.com/api/tenants/{tenantId}");
+
+// Aspire resource reference — endpoint is resolved automatically
+authproxy.WithTenantVerification(platformApi, "/api/tenants/{tenantId}");
 ```
 
 AuthProxy issues a `GET` to the resolved URL. A `200` response lets the request proceed; `404` or
@@ -155,12 +172,15 @@ any error serves the `tenant-not-found.html` page.
 ## Tenant selection
 
 When users can be members of more than one tenant, the `Selection` strategy presents a
-tenant-selection page after login.  Pass the URL of the endpoint that returns the tenant list
-for the authenticated user:
+tenant-selection page after login.  You can pass a raw URL or reference an Aspire service resource:
 
 ```csharp
+// Raw URL
 authproxy.WithSelectionTenantResolution(
     tenantsEndpoint: "https://platform.example.com/api/tenants/selectable");
+
+// Aspire resource reference — endpoint is resolved automatically
+authproxy.WithSelectionTenantResolution(platformApi, "/api/tenants/selectable");
 ```
 
 AuthProxy calls the endpoint after login and, if more than one tenant is returned, serves the
@@ -178,9 +198,11 @@ custom selection page and the full flow.
 
 ### Core invite configuration
 
-Configure the invite system with the RSA public key and exchange endpoint:
+Configure the invite system with the RSA public key and exchange endpoint.  You can pass a raw URL
+or reference an Aspire service resource for the exchange endpoint:
 
 ```csharp
+// Raw URL
 authproxy.WithInvite(
     publicKeyPem: File.ReadAllText("invite-public-key.pem"),
     exchangeUrl: "https://studio.example.com/internal/invites/exchange",
@@ -188,6 +210,14 @@ authproxy.WithInvite(
     audience: "authproxy",
     tenantClaim: "tenant_id",
     subjectAlreadyExistsUrl: "https://app.example.com/errors/account-already-exists");
+
+// Aspire resource reference — exchange endpoint URL is resolved automatically
+authproxy.WithInvite(
+    publicKeyPem: File.ReadAllText("invite-public-key.pem"),
+    exchangeServiceResource: studioApi,
+    exchangeRoute: "/internal/invites/exchange",
+    issuer: "https://studio.example.com",
+    tenantClaim: "tenant_id");
 ```
 
 | Parameter | Required | Description |

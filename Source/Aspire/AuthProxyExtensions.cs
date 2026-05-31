@@ -38,18 +38,34 @@ public static class AuthProxyExtensions
     /// </param>
     /// <param name="serviceResource">The Aspire resource that exposes the backend.</param>
     /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <param name="resolveIdentityDetails">
+    /// Whether AuthProxy should call <c>GET {baseUrl}/.cratis/me</c> on this backend to enrich
+    /// the identity cookie after authentication.  Defaults to <see langword="null"/> (AuthProxy uses
+    /// its own default — <see langword="true"/> when a backend URL is present).
+    /// Set to <see langword="false"/> explicitly to opt this service out of identity enrichment.
+    /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithBackend<T>(
         this IResourceBuilder<T> builder,
         string serviceName,
         IResourceBuilder<IResourceWithEndpoints> serviceResource,
-        string endpointName = "http")
+        string endpointName = "http",
+        bool? resolveIdentityDetails = null)
         where T : IResourceWithEnvironment
     {
         var endpoint = serviceResource.GetEndpoint(endpointName);
-        return builder.WithEnvironment(context =>
+        builder.WithEnvironment(context =>
             context.EnvironmentVariables[$"{ConfigPrefix}__Services__{serviceName}__Backend__BaseUrl"] =
                 ReferenceExpression.Create($"{endpoint}/"));
+
+        if (resolveIdentityDetails.HasValue)
+        {
+            builder.WithEnvironment(
+                $"{ConfigPrefix}__Services__{serviceName}__ResolveIdentityDetails",
+                resolveIdentityDetails.Value.ToString());
+        }
+
+        return builder;
     }
 
     /// <summary>
@@ -333,6 +349,39 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Adds a cookie-selection-based tenant resolution strategy to AuthProxy, deriving the tenants
+    /// endpoint URL from the specified Aspire service resource.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceResource">The Aspire resource that hosts the selectable-tenants endpoint.</param>
+    /// <param name="route">
+    /// The route on the service that returns the selectable tenant list,
+    /// e.g. <c>"/api/tenants/selectable"</c>.
+    /// </param>
+    /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithSelectionTenantResolution<T>(
+        this IResourceBuilder<T> builder,
+        IResourceBuilder<IResourceWithEndpoints> serviceResource,
+        string route,
+        string endpointName = "http")
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        var idx = annotation.TenantResolutionCount++;
+        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
+        var endpoint = serviceResource.GetEndpoint(endpointName);
+
+        builder.WithEnvironment($"{prefix}__Strategy", "Selection");
+        builder.WithEnvironment(context =>
+            context.EnvironmentVariables[$"{prefix}__Options__TenantsEndpoint"] =
+                ReferenceExpression.Create($"{endpoint}{route}"));
+
+        return builder;
+    }
+
+    /// <summary>
     /// Configures AuthProxy to verify that a resolved tenant actually exists by calling an external HTTP endpoint.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
@@ -349,6 +398,32 @@ public static class AuthProxyExtensions
         string urlTemplate)
         where T : IResourceWithEnvironment =>
         builder.WithEnvironment($"{ConfigPrefix}__TenantVerification__UrlTemplate", urlTemplate);
+
+    /// <summary>
+    /// Configures AuthProxy to verify that a resolved tenant actually exists by calling an endpoint
+    /// on the specified Aspire service resource.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceResource">The Aspire resource that hosts the tenant-verification endpoint.</param>
+    /// <param name="routeTemplate">
+    /// The route on the service, including the <c>{tenantId}</c> placeholder,
+    /// e.g. <c>"/api/tenants/{tenantId}"</c>.
+    /// </param>
+    /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithTenantVerification<T>(
+        this IResourceBuilder<T> builder,
+        IResourceBuilder<IResourceWithEndpoints> serviceResource,
+        string routeTemplate,
+        string endpointName = "http")
+        where T : IResourceWithEnvironment
+    {
+        var endpoint = serviceResource.GetEndpoint(endpointName);
+        return builder.WithEnvironment(context =>
+            context.EnvironmentVariables[$"{ConfigPrefix}__TenantVerification__UrlTemplate"] =
+                ReferenceExpression.Create($"{endpoint}{routeTemplate}"));
+    }
 
     /// <summary>
     /// Configures the AuthProxy invite system with the core invite settings.
@@ -390,6 +465,76 @@ public static class AuthProxyExtensions
         builder
             .WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem)
             .WithEnvironment($"{prefix}__ExchangeUrl", exchangeUrl);
+
+        if (!string.IsNullOrEmpty(issuer))
+        {
+            builder.WithEnvironment($"{prefix}__Issuer", issuer);
+        }
+
+        if (!string.IsNullOrEmpty(audience))
+        {
+            builder.WithEnvironment($"{prefix}__Audience", audience);
+        }
+
+        if (!string.IsNullOrEmpty(tenantClaim))
+        {
+            builder.WithEnvironment($"{prefix}__TenantClaim", tenantClaim);
+        }
+
+        if (!string.IsNullOrEmpty(subjectAlreadyExistsUrl))
+        {
+            builder.WithEnvironment($"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
+        }
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Configures the AuthProxy invite system, deriving the exchange endpoint URL from the specified Aspire service resource.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="publicKeyPem">PEM-encoded RSA public key used to verify invite token signatures.</param>
+    /// <param name="exchangeServiceResource">The Aspire resource that hosts the invite-exchange endpoint.</param>
+    /// <param name="exchangeRoute">
+    /// The route on the exchange service, e.g. <c>"/internal/invites/exchange"</c>.
+    /// </param>
+    /// <param name="exchangeEndpointName">The endpoint name to use for the exchange service.  Defaults to <c>"http"</c>.</param>
+    /// <param name="issuer">
+    /// Expected <c>iss</c> claim value. Leave <see langword="null"/> to skip issuer validation.
+    /// </param>
+    /// <param name="audience">
+    /// Expected <c>aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
+    /// </param>
+    /// <param name="tenantClaim">
+    /// Claim in the invite token that carries the tenant ID string (used for tenant-issued invite detection).
+    /// Leave <see langword="null"/> to use the AuthProxy default.
+    /// </param>
+    /// <param name="subjectAlreadyExistsUrl">
+    /// URL to redirect to when the exchange endpoint returns HTTP 409 (subject already registered).
+    /// Leave <see langword="null"/> to serve the built-in <c>invitation-subject-already-exists.html</c> page.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithInvite<T>(
+        this IResourceBuilder<T> builder,
+        string publicKeyPem,
+        IResourceBuilder<IResourceWithEndpoints> exchangeServiceResource,
+        string exchangeRoute,
+        string exchangeEndpointName = "http",
+        string? issuer = null,
+        string? audience = null,
+        string? tenantClaim = null,
+        string? subjectAlreadyExistsUrl = null)
+        where T : IResourceWithEnvironment
+    {
+        const string prefix = $"{ConfigPrefix}__Invite";
+
+        var endpoint = exchangeServiceResource.GetEndpoint(exchangeEndpointName);
+        builder
+            .WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem)
+            .WithEnvironment(context =>
+                context.EnvironmentVariables[$"{prefix}__ExchangeUrl"] =
+                    ReferenceExpression.Create($"{endpoint}{exchangeRoute}"));
 
         if (!string.IsNullOrEmpty(issuer))
         {
