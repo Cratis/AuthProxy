@@ -17,4 +17,7 @@ sealed class AuthProxyConfigAnnotation : IResourceAnnotation
 
     /// <summary>Gets or sets the number of tenant resolution strategies that have been registered.</summary>
     public int TenantResolutionCount { get; set; }
+
+    /// <summary>Gets or sets the number of invite claim-forwarding entries that have been registered.</summary>
+    public int InviteClaimForwardingCount { get; set; }
 }

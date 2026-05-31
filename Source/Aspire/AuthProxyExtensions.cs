@@ -308,10 +308,29 @@ public static class AuthProxyExtensions
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
+    /// <param name="tenantsEndpoint">
+    /// Absolute URL of the endpoint that returns selectable tenants for the current authenticated user.
+    /// Expected response shape is an array of <c>{ "id": "...", "name": "..." }</c> objects.
+    /// When <see langword="null"/> the endpoint is omitted and must be supplied via other configuration.
+    /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
-    public static IResourceBuilder<T> WithSelectionTenantResolution<T>(this IResourceBuilder<T> builder)
-        where T : IResourceWithEnvironment =>
-        AddTenantResolution(builder, "Selection");
+    public static IResourceBuilder<T> WithSelectionTenantResolution<T>(
+        this IResourceBuilder<T> builder,
+        string? tenantsEndpoint = null)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        var idx = annotation.TenantResolutionCount++;
+        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
+
+        builder.WithEnvironment($"{prefix}__Strategy", "Selection");
+        if (!string.IsNullOrEmpty(tenantsEndpoint))
+        {
+            builder.WithEnvironment($"{prefix}__Options__TenantsEndpoint", tenantsEndpoint);
+        }
+
+        return builder;
+    }
 
     /// <summary>
     /// Configures AuthProxy to verify that a resolved tenant actually exists by calling an external HTTP endpoint.
@@ -330,6 +349,147 @@ public static class AuthProxyExtensions
         string urlTemplate)
         where T : IResourceWithEnvironment =>
         builder.WithEnvironment($"{ConfigPrefix}__TenantVerification__UrlTemplate", urlTemplate);
+
+    /// <summary>
+    /// Configures the AuthProxy invite system with the core invite settings.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="publicKeyPem">PEM-encoded RSA public key used to verify invite token signatures.</param>
+    /// <param name="exchangeUrl">
+    /// Absolute URL of the invite-exchange endpoint called after a successful login with a pending invite token,
+    /// e.g. <c>https://studio.example.com/internal/invites/exchange</c>.
+    /// </param>
+    /// <param name="issuer">
+    /// Expected <c>iss</c> claim value. Leave <see langword="null"/> to skip issuer validation.
+    /// </param>
+    /// <param name="audience">
+    /// Expected <c>aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
+    /// </param>
+    /// <param name="tenantClaim">
+    /// Claim in the invite token that carries the tenant ID string (used for tenant-issued invite detection).
+    /// Leave <see langword="null"/> to use the AuthProxy default.
+    /// </param>
+    /// <param name="subjectAlreadyExistsUrl">
+    /// URL to redirect to when the exchange endpoint returns HTTP 409 (subject already registered).
+    /// Leave <see langword="null"/> to serve the built-in <c>invitation-subject-already-exists.html</c> page.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithInvite<T>(
+        this IResourceBuilder<T> builder,
+        string publicKeyPem,
+        string exchangeUrl,
+        string? issuer = null,
+        string? audience = null,
+        string? tenantClaim = null,
+        string? subjectAlreadyExistsUrl = null)
+        where T : IResourceWithEnvironment
+    {
+        const string prefix = $"{ConfigPrefix}__Invite";
+
+        builder
+            .WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem)
+            .WithEnvironment($"{prefix}__ExchangeUrl", exchangeUrl);
+
+        if (!string.IsNullOrEmpty(issuer))
+        {
+            builder.WithEnvironment($"{prefix}__Issuer", issuer);
+        }
+
+        if (!string.IsNullOrEmpty(audience))
+        {
+            builder.WithEnvironment($"{prefix}__Audience", audience);
+        }
+
+        if (!string.IsNullOrEmpty(tenantClaim))
+        {
+            builder.WithEnvironment($"{prefix}__TenantClaim", tenantClaim);
+        }
+
+        if (!string.IsNullOrEmpty(subjectAlreadyExistsUrl))
+        {
+            builder.WithEnvironment($"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
+        }
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Adds a claim-forwarding entry to the AuthProxy invite system.
+    /// When a pending invite cookie exists, AuthProxy reads the specified claim from the invite token
+    /// and forwards it as part of the principal sent to each <c>/.cratis/me</c> identity details endpoint.
+    /// Call this method once per claim to forward; multiple calls accumulate entries.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="fromClaimType">Claim type to read from the invite token payload.</param>
+    /// <param name="toClaimType">
+    /// Claim type to emit in the forwarded principal.
+    /// When <see langword="null"/> the original <paramref name="fromClaimType"/> is used.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithInviteClaimForwarding<T>(
+        this IResourceBuilder<T> builder,
+        string fromClaimType,
+        string? toClaimType = null)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        var idx = annotation.InviteClaimForwardingCount++;
+        var prefix = $"{ConfigPrefix}__Invite__ClaimsToForward__{idx}";
+
+        builder.WithEnvironment($"{prefix}__FromClaimType", fromClaimType);
+        if (!string.IsNullOrEmpty(toClaimType))
+        {
+            builder.WithEnvironment($"{prefix}__ToClaimType", toClaimType);
+        }
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Configures the AuthProxy lobby frontend endpoint.
+    /// The lobby is the service users without a resolved tenant are redirected to
+    /// while they complete the onboarding / invite-exchange process.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceResource">The Aspire resource that exposes the lobby frontend.</param>
+    /// <param name="endpointName">The endpoint name to use. Defaults to <c>"http"</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithLobbyFrontend<T>(
+        this IResourceBuilder<T> builder,
+        IResourceBuilder<IResourceWithEndpoints> serviceResource,
+        string endpointName = "http")
+        where T : IResourceWithEnvironment
+    {
+        var endpoint = serviceResource.GetEndpoint(endpointName);
+        return builder.WithEnvironment(context =>
+            context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Frontend__BaseUrl"] =
+                ReferenceExpression.Create($"{endpoint}/"));
+    }
+
+    /// <summary>
+    /// Configures the AuthProxy lobby backend (API) endpoint.
+    /// The backend is optional — add it only when the lobby service exposes an API that
+    /// AuthProxy should be able to call or proxy.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceResource">The Aspire resource that exposes the lobby backend.</param>
+    /// <param name="endpointName">The endpoint name to use. Defaults to <c>"http"</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithLobbyBackend<T>(
+        this IResourceBuilder<T> builder,
+        IResourceBuilder<IResourceWithEndpoints> serviceResource,
+        string endpointName = "http")
+        where T : IResourceWithEnvironment
+    {
+        var endpoint = serviceResource.GetEndpoint(endpointName);
+        return builder.WithEnvironment(context =>
+            context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Backend__BaseUrl"] =
+                ReferenceExpression.Create($"{endpoint}/"));
+    }
 
     static IResourceBuilder<T> AddTenantResolution<T>(IResourceBuilder<T> builder, string strategy)
         where T : IResourceWithEnvironment

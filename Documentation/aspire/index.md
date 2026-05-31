@@ -149,3 +149,82 @@ authproxy.WithTenantVerification("https://platform.example.com/api/tenants/{tena
 
 AuthProxy issues a `GET` to the resolved URL. A `200` response lets the request proceed; `404` or
 any error serves the `tenant-not-found.html` page.
+
+---
+
+## Tenant selection
+
+When users can be members of more than one tenant, the `Selection` strategy presents a
+tenant-selection page after login.  Pass the URL of the endpoint that returns the tenant list
+for the authenticated user:
+
+```csharp
+authproxy.WithSelectionTenantResolution(
+    tenantsEndpoint: "https://platform.example.com/api/tenants/selectable");
+```
+
+AuthProxy calls the endpoint after login and, if more than one tenant is returned, serves the
+built-in `select-tenant.html` page.  If only one tenant is returned the selection page is
+skipped and the user is redirected immediately.
+
+The endpoint must return a JSON array of `{ "id": "...", "name": "..." }` objects.
+
+See [Tenant Selection Page](../configuration/tenant-selection.md) for details on building a
+custom selection page and the full flow.
+
+---
+
+## Invites and lobby
+
+### Core invite configuration
+
+Configure the invite system with the RSA public key and exchange endpoint:
+
+```csharp
+authproxy.WithInvite(
+    publicKeyPem: File.ReadAllText("invite-public-key.pem"),
+    exchangeUrl: "https://studio.example.com/internal/invites/exchange",
+    issuer: "https://studio.example.com",
+    audience: "authproxy",
+    tenantClaim: "tenant_id",
+    subjectAlreadyExistsUrl: "https://app.example.com/errors/account-already-exists");
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `publicKeyPem` | ✓ | PEM-encoded RSA public key to verify invite token signatures. |
+| `exchangeUrl` | ✓ | Endpoint called after login to exchange the invite token. |
+| `issuer` | – | Expected `iss` claim. Omit to skip issuer validation. |
+| `audience` | – | Expected `aud` claim. Omit to skip audience validation. |
+| `tenantClaim` | – | Claim that carries the tenant ID for tenant-issued invite detection. |
+| `subjectAlreadyExistsUrl` | – | Redirect URL when the exchange endpoint returns HTTP 409. Omit to serve the built-in page. |
+
+### Claim forwarding
+
+To propagate invite-token claims into the principal sent to `/.cratis/me` endpoints, call
+`WithInviteClaimForwarding` once per claim:
+
+```csharp
+authproxy
+    .WithInviteClaimForwarding("organization_id", toClaimType: "organization")
+    .WithInviteClaimForwarding("invited_by");
+```
+
+When `toClaimType` is omitted the original claim type is preserved.
+
+### Lobby
+
+The lobby is the service users are redirected to when no tenant can be resolved — typically
+an onboarding application.  At minimum, configure the lobby frontend:
+
+```csharp
+authproxy
+    .WithLobbyFrontend(lobbyResource)
+    .WithLobbyBackend(lobbyApiResource);   // optional
+```
+
+`WithLobbyFrontend` and `WithLobbyBackend` both accept an optional `endpointName` parameter
+(defaults to `"http"`).
+
+See [Invites & Lobby](../configuration/invites.md) for the full invite flow walkthrough.
+
