@@ -6,6 +6,20 @@
     <RootNamespace>Cratis.AuthProxy.Aspire</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+
+    <!-- NuGet package metadata -->
+    <PackageId>Cratis.AuthProxy.Aspire</PackageId>
+    <Title>Cratis AuthProxy — Aspire Hosting</Title>
+    <Description>Aspire hosting integration for Cratis AuthProxy. Provides fluent extension methods to add and configure AuthProxy (authentication, tenancy, backend/frontend routing) in a .NET Aspire AppHost — either as a container resource or layered on an existing ProjectResource.</Description>
+    <Authors>Cratis</Authors>
+    <Copyright>Copyright Cratis</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/cratis/authproxy</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cratis/authproxy</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageTags>aspire;authproxy;authentication;oidc;tenancy;cratis</PackageTags>
+    <IsPackable>true</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>

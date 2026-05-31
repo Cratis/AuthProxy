@@ -2,3 +2,5 @@
   href: index.md
 - name: Configuration
   href: configuration/toc.yml
+- name: Aspire Hosting
+  href: aspire/toc.yml
