@@ -270,4 +270,4 @@ authproxy.WithLobbyRegistration("https://lobby.example.com/register");
 This sets `Cratis:AuthProxy:Invite:Lobby:Registration:BaseUrl`. Users who visit `/register`
 authenticate through AuthProxy and are then redirected to that registration URL.
 
-See [Invites, Registration & Lobby](../configuration/invites.md) for the full onboarding flow walkthrough.
+See [Lobby](../configuration/lobby/index.md) for the onboarding flow walkthroughs.

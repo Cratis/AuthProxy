@@ -1,0 +1,8 @@
+- name: Lobby
+  href: index.md
+- name: Invitation for Creating Organization
+  href: invitation-for-creating-organization.md
+- name: Invitation to Organization
+  href: invitation-to-organization.md
+- name: Registration
+  href: registration.md
