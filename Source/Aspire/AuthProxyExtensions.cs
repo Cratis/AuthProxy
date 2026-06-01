@@ -636,6 +636,42 @@ public static class AuthProxyExtensions
                 ReferenceExpression.Create($"{endpoint}/"));
     }
 
+    /// <summary>
+    /// Configures the AuthProxy lobby registration URL directly.
+    /// This is the URL users are redirected to after completing the AuthProxy registration bootstrap flow.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="registrationUrl">Absolute URL for the lobby registration flow.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithLobbyRegistration<T>(
+        this IResourceBuilder<T> builder,
+        string registrationUrl)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl", registrationUrl);
+
+    /// <summary>
+    /// Configures the AuthProxy lobby registration URL from the specified Aspire service resource.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceResource">The Aspire resource that exposes the lobby registration endpoint.</param>
+    /// <param name="route">The route on the lobby service that starts registration, e.g. <c>"/register"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use. Defaults to <c>"http"</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    public static IResourceBuilder<T> WithLobbyRegistration<T>(
+        this IResourceBuilder<T> builder,
+        IResourceBuilder<IResourceWithEndpoints> serviceResource,
+        string route,
+        string endpointName = "http")
+        where T : IResourceWithEnvironment
+    {
+        var endpoint = serviceResource.GetEndpoint(endpointName);
+        return builder.WithEnvironment(context =>
+            context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl"] =
+                ReferenceExpression.Create($"{endpoint}{route}"));
+    }
+
     static IResourceBuilder<T> AddTenantResolution<T>(IResourceBuilder<T> builder, string strategy)
         where T : IResourceWithEnvironment
     {

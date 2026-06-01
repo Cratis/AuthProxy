@@ -34,8 +34,10 @@ public class TenantSelectionMiddleware(
     {
         if (context.User.Identity?.IsAuthenticated != true
             || context.IsInvitation()
+            || context.IsRegistration()
             || context.IsAuthenticationBootstrap()
-            || context.HasPendingInvitation())
+            || context.HasPendingInvitation()
+            || context.HasPendingRegistration())
         {
             await next(context);
             return;

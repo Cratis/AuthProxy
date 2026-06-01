@@ -79,7 +79,7 @@ public class Invite
     /// <summary>
     /// Gets or sets the lobby service configuration.
     /// When set, requests from users without a resolved tenant are forwarded to this service's frontend,
-    /// and users are redirected here after a successful invite exchange.
+    /// invite exchanges return here, and registrations can redirect to its configured registration endpoint.
     /// </summary>
     public Service? Lobby { get; set; }
 }

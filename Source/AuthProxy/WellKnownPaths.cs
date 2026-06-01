@@ -43,6 +43,11 @@ public static class WellKnownPaths
     public const string InvitePathPrefix = "/invite";
 
     /// <summary>
+    /// The well-known path that triggers the registration flow.
+    /// </summary>
+    public const string Registration = "/register";
+
+    /// <summary>
     /// The request path prefix under which custom pages (error pages, login UI, etc.) are served as static files.
     /// All requests under this prefix are always allowed anonymously.
     /// </summary>

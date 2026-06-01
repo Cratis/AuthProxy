@@ -1,8 +1,8 @@
-# Invites & Lobby
+# Invites, Registration & Lobby
 
 AuthProxy includes a two-phase invite flow that lets you onboard new users via signed JWT invite
-tokens, and an optional **lobby** service to which users without a resolved tenant are
-redirected while they complete the onboarding process.
+tokens, a registration bootstrap flow, and an optional **lobby** service to which users without a
+resolved tenant are redirected while they complete onboarding.
 
 ---
 
@@ -31,6 +31,16 @@ redirected while they complete the onboarding process.
    `invitation-subject-already-exists.html` page.
 4. If the exchange succeeds and a **lobby** service is configured, the user is redirected to
    the lobby's frontend so they can enter the application with their newly assigned tenant.
+
+### Registration flow
+
+1. A user visits `https://your-authproxy/register`.
+2. AuthProxy stores a short-lived registration cookie and starts authentication:
+   - If **only one** identity provider is configured, AuthProxy challenges it directly.
+   - If **multiple** identity providers are configured, AuthProxy redirects to the standard
+     provider-selection page.
+3. After a successful login AuthProxy deletes the registration cookie and, when
+   `Invite.Lobby.Registration.BaseUrl` is configured, redirects the user to that URL.
 
 ### Lobby – no-tenant redirect
 
@@ -68,7 +78,8 @@ All invite and lobby settings live under `Cratis:AuthProxy:Invite`:
         ],
         "Lobby": {
           "Frontend": { "BaseUrl": "http://lobby-service:3000/" },
-          "Backend":  { "BaseUrl": "http://lobby-service:8080/" }
+          "Backend":  { "BaseUrl": "http://lobby-service:8080/" },
+          "Registration": { "BaseUrl": "http://lobby-service:3000/register" }
         }
       }
     }
@@ -119,6 +130,7 @@ and can be used if the lobby needs an API.
 |----------|------|-------------|
 | `Frontend.BaseUrl` | `string` | URL to which users without a tenant (or after invite exchange) are redirected. |
 | `Backend.BaseUrl` | `string` | Optional backend API URL for the lobby service. |
+| `Registration.BaseUrl` | `string` | Optional URL to which authenticated users are redirected after `GET /register` completes. |
 
 ---
 
@@ -143,6 +155,7 @@ Recommended claims:
 | Path | Description |
 |------|-------------|
 | `/invite/<token>` | Phase 1 – validates the token and starts the OIDC flow. |
+| `/register` | Starts the registration bootstrap flow and redirects to `Lobby.Registration.BaseUrl` after login. |
 
 ---
 

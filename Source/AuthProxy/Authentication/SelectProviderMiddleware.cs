@@ -41,6 +41,7 @@ public class SelectProviderMiddleware(
     {
         if (context.User.Identity?.IsAuthenticated == true
             || context.IsInvitation()
+            || context.IsRegistration()
             || context.IsAuthenticationUI()
             || context.HasPendingInvitation())
         {

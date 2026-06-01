@@ -61,13 +61,17 @@ public class TenancyMiddleware(
             var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
             var shouldRedirectToLobby = config.CurrentValue.Invite?.RedirectToLobbyWhenTenantUnresolved == true;
             var isInvitePath = context.IsInvitation();
+            var isRegistrationPath = context.IsRegistration();
             var hasPendingInviteCookie = context.HasPendingInvitation();
+            var hasPendingRegistrationCookie = context.HasPendingRegistration();
             var isAuthPath = context.IsAuthenticationUI();
             if (shouldRedirectToLobby
                 && !string.IsNullOrWhiteSpace(lobbyUrl)
                 && !isInvitePath
+                && !isRegistrationPath
                 && !isAuthPath
-                && !hasPendingInviteCookie)
+                && !hasPendingInviteCookie
+                && !hasPendingRegistrationCookie)
             {
                 logger.RedirectingToLobby(context.Request.Path);
                 context.Response.Redirect(lobbyUrl);
@@ -77,7 +81,9 @@ public class TenancyMiddleware(
             if (config.CurrentValue.TenantResolutions.Count > 0
                 && !isAuthPath
                 && !isInvitePath
-                && !hasPendingInviteCookie)
+                && !isRegistrationPath
+                && !hasPendingInviteCookie
+                && !hasPendingRegistrationCookie)
             {
                 logger.CouldNotResolveTenant(context.Request.Path);
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;

@@ -194,7 +194,7 @@ custom selection page and the full flow.
 
 ---
 
-## Invites and lobby
+## Invites, registration and lobby
 
 ### Core invite configuration
 
@@ -256,5 +256,18 @@ authproxy
 `WithLobbyFrontend` and `WithLobbyBackend` both accept an optional `endpointName` parameter
 (defaults to `"http"`).
 
-See [Invites & Lobby](../configuration/invites.md) for the full invite flow walkthrough.
+### Registration
 
+To send users through the AuthProxy registration bootstrap flow, configure a lobby registration URL:
+
+```csharp
+authproxy.WithLobbyRegistration(lobbyResource, "/register");
+
+// or use a raw URL
+authproxy.WithLobbyRegistration("https://lobby.example.com/register");
+```
+
+This sets `Cratis:AuthProxy:Invite:Lobby:Registration:BaseUrl`. Users who visit `/register`
+authenticate through AuthProxy and are then redirected to that registration URL.
+
+See [Invites, Registration & Lobby](../configuration/invites.md) for the full onboarding flow walkthrough.
