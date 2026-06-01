@@ -25,11 +25,25 @@ public static class HttpContextExtensions
     public static bool HasPendingInvitation(this HttpContext context) => context.Request.Cookies.ContainsKey(Cookies.InviteToken);
 
     /// <summary>
+    /// Determines whether the request has a pending registration cookie.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if a pending registration cookie exists; otherwise <see langword="false"/>.</returns>
+    public static bool HasPendingRegistration(this HttpContext context) => context.Request.Cookies.ContainsKey(Cookies.Registration);
+
+    /// <summary>
     /// Determines whether the request targets an invitation URL.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if the request is an invitation URL; otherwise <see langword="false"/>.</returns>
     public static bool IsInvitation(this HttpContext context) => context.Request.Path.StartsWithSegments(WellKnownPaths.InvitePathPrefix);
+
+    /// <summary>
+    /// Determines whether the request targets the registration URL.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if the request is a registration URL; otherwise <see langword="false"/>.</returns>
+    public static bool IsRegistration(this HttpContext context) => context.Request.Path.StartsWithSegments(WellKnownPaths.Registration);
 
     /// <summary>
     /// Determines whether the request targets one of the login endpoints.

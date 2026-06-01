@@ -201,7 +201,7 @@ For `Host`, `Claim`, and `Route`, AuthProxy resolves a source identifier and the
 
 ## Lobby fallback
 
-When no tenant can be resolved and the [invite lobby](invites.md) is configured, AuthProxy redirects the user to the lobby frontend instead of returning `401 Unauthorized`.
+When no tenant can be resolved and the [lobby](lobby/index.md) is configured, AuthProxy redirects the user to the lobby frontend instead of returning `401 Unauthorized`.
 
 If no lobby is configured and `TenantResolutions` is non-empty, AuthProxy returns `401 Unauthorized`.
 When `TenantResolutions` is empty, the request proceeds without a tenant.

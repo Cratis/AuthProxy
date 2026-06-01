@@ -19,6 +19,11 @@ public static class Cookies
     public const string InviteToken = ".cratis-invite";
 
     /// <summary>
+    /// Short-lived HTTP-only cookie used to carry an in-flight registration across the OIDC redirect.
+    /// </summary>
+    public const string Registration = ".cratis-registration";
+
+    /// <summary>
     /// Short-lived cookie injected by the proxy when serving the invitation provider-selection page.
     /// Contains a JSON array of <c>OidcProviderInfo</c> objects so the page can render
     /// per-provider sign-in links without a separate HTTP round-trip.

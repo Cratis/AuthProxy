@@ -8,8 +8,8 @@
   href: tenant-selection.md
 - name: Services
   href: services.md
-- name: Invites & Lobby
-  href: invites.md
+- name: Lobby
+  href: lobby/toc.yml
 - name: Custom Invitation Provider-Selection Page
   href: invitation-provider-selection.md
 - name: Error Pages

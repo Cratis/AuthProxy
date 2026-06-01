@@ -100,7 +100,7 @@ indicating that the authenticated user's subject is already associated with an e
 The user should sign in with their existing account rather than completing the invitation again.
 
 If you prefer to redirect users to a custom URL instead of serving this page, configure
-`Invite.SubjectAlreadyExistsUrl` (see [Invites & Lobby](invites.md#invite-properties)).
+`Invite.SubjectAlreadyExistsUrl` (see [Invitation for Creating Organization](lobby/invitation-for-creating-organization.md#configuration)).
 
 ---
 

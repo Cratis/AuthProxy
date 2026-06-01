@@ -19,6 +19,13 @@ public class Service
     public ServiceEndpoint? Frontend { get; set; }
 
     /// <summary>
+    /// Gets or sets the registration endpoint for this service.
+    /// This is currently used by the lobby configuration to identify where new users should be sent
+    /// after the AuthProxy registration flow completes.
+    /// </summary>
+    public ServiceEndpoint? Registration { get; set; }
+
+    /// <summary>
     /// Gets or sets whether to call the <c>/.cratis/me</c> identity endpoint on this service
     /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
