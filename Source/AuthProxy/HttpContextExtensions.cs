@@ -62,11 +62,18 @@ public static class HttpContextExtensions
     public static bool IsProviders(this HttpContext context) => context.Request.Path.StartsWithSegments(WellKnownPaths.Providers);
 
     /// <summary>
+    /// Determines whether the request targets the well-known client-credentials token endpoint.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if the request targets the token endpoint; otherwise <see langword="false"/>.</returns>
+    public static bool IsToken(this HttpContext context) => context.Request.Path.StartsWithSegments(WellKnownPaths.Token);
+
+    /// <summary>
     /// Determines whether the request targets the AuthProxy authentication user interface.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if the request is part of the authentication UI; otherwise <see langword="false"/>.</returns>
-    public static bool IsAuthenticationUI(this HttpContext context) => context.IsLogin() || context.IsProviders();
+    public static bool IsAuthenticationUI(this HttpContext context) => context.IsLogin() || context.IsProviders() || context.IsToken();
 
     /// <summary>
     /// Determines whether the request targets any authentication bootstrap endpoint.

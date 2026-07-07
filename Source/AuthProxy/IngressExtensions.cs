@@ -101,6 +101,38 @@ public static class IngressExtensions
         app.MapMethods(WellKnownPaths.Providers, [HttpMethods.Head], () => Results.Ok())
             .AllowAnonymous();
 
+        app.MapPost(WellKnownPaths.Token, async (HttpContext context, ClientCredentialsGrantService grantService) =>
+        {
+            var form = await context.Request.ReadFormAsync(context.RequestAborted);
+            var result = await grantService.GrantAsync(
+                form["grant_type"].FirstOrDefault(),
+                form["service"].FirstOrDefault(),
+                form["client_id"].FirstOrDefault(),
+                form["client_secret"].FirstOrDefault(),
+                context.RequestAborted);
+
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.Pragma = "no-cache";
+
+            return result.Succeeded
+                ? Results.Json(
+                    new
+                    {
+                        access_token = result.AccessToken,
+                        token_type = result.TokenType,
+                        expires_in = result.ExpiresIn,
+                    },
+                    statusCode: result.StatusCode)
+                : Results.Json(
+                    new
+                    {
+                        error = result.Error,
+                        error_description = result.ErrorDescription,
+                    },
+                    statusCode: result.StatusCode);
+        })
+        .AllowAnonymous();
+
         // Initiates the challenge for the requested provider scheme.
         app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
         {

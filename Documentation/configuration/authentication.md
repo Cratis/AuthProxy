@@ -1,9 +1,10 @@
 # Authentication
 
-AuthProxy supports two authentication modes that can be active simultaneously:
+AuthProxy supports three authentication modes that can be active simultaneously:
 
 - **Interactive browser sessions** – OpenID Connect (OIDC) with a cookie.
-- **Machine-to-machine / API** – JWT Bearer tokens.
+- **Machine-to-machine / API** – JWT Bearer tokens from an external identity provider.
+- **Back-channel client credentials** – service-owned client credentials verified by the target service itself.
 
 ---
 
@@ -122,3 +123,44 @@ For machine-to-machine calls, configure a JWT Bearer handler:
 }
 ```
 
+---
+
+## Back-channel client credentials
+
+AuthProxy can also issue bearer tokens itself after a proxied service verifies the supplied
+client credentials over a private back channel.
+
+1. The client sends `POST /.cratis/token`
+2. The request body uses standard OAuth form fields:
+   - `grant_type=client_credentials`
+   - `service=<service-key>` (optional when only one service has client credentials configured)
+   - `client_id=<client-id>`
+   - `client_secret=<client-secret>`
+3. AuthProxy calls the configured downstream verification endpoint with a JSON payload:
+
+```json
+{
+  "service": "portal",
+  "routePrefix": "/api",
+  "clientId": "orders-api",
+  "clientSecret": "<client-secret>"
+}
+```
+
+4. Any `2xx` response mints a bearer token scoped to that service and route prefix
+5. Any `4xx` response rejects the credentials
+6. Any `5xx` response is treated as a downstream verification failure
+
+Successful responses from `/.cratis/token` look like this:
+
+```json
+{
+  "access_token": "<authproxy-issued-token>",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+The issued bearer token can then be used on the configured route prefix (for example `/api/**`).
+AuthProxy validates that the token is used against the same configured service and route before
+forwarding the request.
