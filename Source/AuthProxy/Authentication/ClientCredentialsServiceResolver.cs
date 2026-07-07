@@ -10,9 +10,17 @@ namespace Cratis.AuthProxy.Authentication;
 /// Resolves which configured service should handle a client-credentials request.
 /// </summary>
 /// <param name="config">Provides the current AuthProxy configuration.</param>
+/// <param name="logger">The logger.</param>
 public class ClientCredentialsServiceResolver(
-    IOptionsMonitor<C.AuthProxy> config)
+    IOptionsMonitor<C.AuthProxy> config,
+    ILogger<ClientCredentialsServiceResolver> logger)
 {
+    /// <summary>
+    /// The OAuth error description returned to callers when a service cannot be resolved by name.
+    /// Deliberately generic so unauthenticated callers cannot enumerate configured service names.
+    /// </summary>
+    const string UnresolvedServiceErrorDescription = "The requested service is not available for client credentials.";
+
     /// <summary>
     /// Tries to resolve the target service for a token request.
     /// </summary>
@@ -28,8 +36,9 @@ public class ClientCredentialsServiceResolver(
         var configuredServices = GetConfiguredServices().ToArray();
         if (configuredServices.Length == 0)
         {
+            logger.NoServicesConfiguredForClientCredentials();
             service = default!;
-            errorDescription = "No services are configured for client credentials.";
+            errorDescription = UnresolvedServiceErrorDescription;
             return false;
         }
 
@@ -43,8 +52,9 @@ public class ClientCredentialsServiceResolver(
                 return true;
             }
 
+            logger.RequestedServiceNotConfiguredForClientCredentials(serviceName);
             service = default!;
-            errorDescription = $"The service '{serviceName}' is not configured for client credentials.";
+            errorDescription = UnresolvedServiceErrorDescription;
             return false;
         }
 
