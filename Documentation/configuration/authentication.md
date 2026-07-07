@@ -164,3 +164,24 @@ Successful responses from `/.cratis/token` look like this:
 The issued bearer token can then be used on the configured route prefix (for example `/api/**`).
 AuthProxy validates that the token is used against the same configured service and route before
 forwarding the request.
+
+### Data Protection keys and horizontal scaling
+
+Both the authentication cookie and AuthProxy-issued client-credentials bearer tokens are encrypted
+using ASP.NET Core Data Protection. By default, keys are not shared across instances. Running more
+than one AuthProxy replica, or needing sessions and client-credentials tokens to survive a restart,
+requires mounting a persistent, shared volume and pointing `Cratis:AuthProxy:DataProtectionKeysPath`
+at it:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "DataProtectionKeysPath": "/mnt/dataprotection-keys"
+    }
+  }
+}
+```
+
+Without this, a client-credentials token minted by one replica will fail to validate on another,
+and all outstanding tokens and sessions are invalidated on every restart.

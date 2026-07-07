@@ -13,7 +13,8 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
       "Tenants": { ... },
       "Services": { ... },
       "Invite": { ... },
-      "PagesPath": ""
+      "PagesPath": "",
+      "DataProtectionKeysPath": ""
     }
   }
 }

@@ -9,6 +9,7 @@ using Cratis.AuthProxy.Registrations;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
@@ -52,6 +53,13 @@ public static class IngressExtensions
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
         builder.Services.AddSingleton<IErrorPageProvider, ErrorPageProvider>();
+
+        var dataProtectionBuilder = builder.Services.AddDataProtection().SetApplicationName("Cratis.AuthProxy");
+        var dataProtectionKeysPath = builder.Configuration[$"{C.AuthProxy.SectionKey}:DataProtectionKeysPath"];
+        if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
+        {
+            dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+        }
 
         return builder;
     }
