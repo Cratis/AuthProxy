@@ -32,4 +32,11 @@ public static class ClientCredentialsDefaults
     /// The claim type that stores the route prefix the token is scoped to.
     /// </summary>
     public const string RoutePrefixClaimType = "cratis/route-prefix";
+
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key under which the composite scheme selector stashes an
+    /// already-validated <see cref="ClientCredentialsTokenPayload"/>, so the bearer authentication handler
+    /// does not have to unprotect the same token a second time.
+    /// </summary>
+    internal const string ValidatedTokenPayloadItemKey = "Cratis.AuthProxy.ClientCredentials.ValidatedPayload";
 }

@@ -32,7 +32,7 @@ public class ClientCredentialsBearerAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        if (!tokenProtector.TryValidate(token, out var payload))
+        if (!TryGetValidatedPayload(token, out var payload))
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
@@ -78,5 +78,25 @@ public class ClientCredentialsBearerAuthenticationHandler(
 
         token = authorization["Bearer ".Length..].Trim();
         return !string.IsNullOrWhiteSpace(token);
+    }
+
+    /// <summary>
+    /// Gets the token payload validated earlier by the composite scheme selector, when present,
+    /// to avoid unprotecting the same token twice. Falls back to validating it directly so the
+    /// handler also works when invoked without going through the composite scheme (e.g. in specs).
+    /// </summary>
+    /// <param name="token">The bearer token to validate.</param>
+    /// <param name="payload">The resolved token payload.</param>
+    /// <returns><see langword="true"/> if a payload was found or validated; otherwise <see langword="false"/>.</returns>
+    bool TryGetValidatedPayload(string token, out ClientCredentialsTokenPayload payload)
+    {
+        if (Context.Items.TryGetValue(ClientCredentialsDefaults.ValidatedTokenPayloadItemKey, out var cached)
+            && cached is ClientCredentialsTokenPayload cachedPayload)
+        {
+            payload = cachedPayload;
+            return true;
+        }
+
+        return tokenProtector.TryValidate(token, out payload);
     }
 }

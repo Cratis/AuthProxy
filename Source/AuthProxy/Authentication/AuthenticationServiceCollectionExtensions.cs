@@ -55,6 +55,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<ClientCredentialsVerifier>();
         builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
         builder.Services.AddSingleton<ClientCredentialsGrantService>();
+        builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
         {
@@ -76,8 +77,9 @@ public static class AuthenticationServiceCollectionExtensions
         {
             var token = authorization["Bearer ".Length..].Trim();
             var tokenProtector = context.RequestServices.GetRequiredService<ClientCredentialsTokenProtector>();
-            if (tokenProtector.TryValidate(token, out _))
+            if (tokenProtector.TryValidate(token, out var payload))
             {
+                context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = payload;
                 return ClientCredentialsDefaults.AuthenticationScheme;
             }
 
