@@ -26,6 +26,11 @@ public static class WellKnownPaths
     public const string LoginPrefix = "/.cratis/login";
 
     /// <summary>
+    /// The well-known token endpoint for the back-channel client-credentials flow.
+    /// </summary>
+    public const string Token = "/.cratis/token";
+
+    /// <summary>
     /// The well-known path for the login selection page served by the Web project.
     /// Unauthenticated users are redirected here when multiple providers are configured.
     /// </summary>

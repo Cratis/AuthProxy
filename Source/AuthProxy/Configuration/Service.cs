@@ -30,4 +30,10 @@ public class Service
     /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
     public bool? ResolveIdentityDetails { get; set; }
+
+    /// <summary>
+    /// Gets or sets the back-channel client-credentials configuration for this service.
+    /// When configured, AuthProxy can verify client credentials against the service and mint scoped bearer tokens.
+    /// </summary>
+    public ServiceClientCredentials? ClientCredentials { get; set; }
 }

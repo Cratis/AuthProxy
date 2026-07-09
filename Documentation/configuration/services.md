@@ -11,12 +11,16 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 
 ```json
 {
-  "Cratis": { {
+  "Cratis": {
     "Services": {
       "portal": {
         "Backend": { "BaseUrl": "http://portal-api:8080/" },
         "Frontend": { "BaseUrl": "http://portal-web:3000/" },
-        "ResolveIdentityDetails": true
+        "ResolveIdentityDetails": true,
+        "ClientCredentials": {
+          "RoutePrefix": "/api",
+          "VerificationPath": "/.cratis/client-credentials/verify"
+        }
       },
       "catalog": {
         "Backend": { "BaseUrl": "http://catalog-api:8080/" }
@@ -33,12 +37,20 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `Backend` | `ServiceEndpointConfig` | `null` | API backend endpoint. |
 | `Frontend` | `ServiceEndpointConfig` | `null` | SPA / static-asset frontend endpoint. |
 | `ResolveIdentityDetails` | `bool?` | `true` when Backend is set | Whether to call `/.cratis/me` on this service to enrich the identity cookie. |
+| `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
 
 ### ServiceEndpointConfig properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `BaseUrl` | `string` | Base URL of the endpoint (e.g. `http://my-service:8080/`). |
+
+### ServiceClientCredentialsConfig properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `RoutePrefix` | `string` | Route prefix that AuthProxy-issued bearer tokens are allowed to access (for example `/api`). |
+| `VerificationPath` | `string` | Internal verification endpoint. Relative values are resolved against `Backend.BaseUrl`; absolute values are used as-is. |
 
 ---
 
@@ -72,3 +84,17 @@ For each service with a `Backend` endpoint (and `ResolveIdentityDetails` not exp
 The response is stored in a short-lived HTTP-only cookie (`.cratis-identity`) and injected as
 the `X-MS-CLIENT-PRINCIPAL` header on every proxied request so that backend services can read
 identity details without re-calling the identity endpoint themselves.
+
+---
+
+## Client credentials
+
+When `ClientCredentials` is configured for a service, AuthProxy exposes `POST /.cratis/token`.
+That endpoint forwards the supplied client credentials to the service's verification endpoint and,
+on success, issues a bearer token scoped to the configured `RoutePrefix`.
+
+This creates a one-to-one relationship between:
+
+- the proxied service
+- the route prefix the token may access
+- the downstream endpoint that verifies the client credentials

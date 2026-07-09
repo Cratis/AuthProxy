@@ -42,6 +42,16 @@ public class AuthProxy
     public string PagesPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the absolute path to a directory used to persist ASP.NET Core Data Protection keys.
+    /// These keys encrypt the authentication cookie and AuthProxy-issued client-credentials bearer tokens.
+    /// When empty or unset, the default per-machine key ring is used, which is neither guaranteed to
+    /// survive a restart nor shared across replicas. Any deployment running more than one AuthProxy
+    /// instance, or that needs sessions and client-credentials tokens to survive a restart, should
+    /// mount a persistent, shared volume and point this setting at it.
+    /// </summary>
+    public string DataProtectionKeysPath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the <see cref="Tenants"/>.
     /// Tenants are keyed by tenant ID string.
     /// </summary>

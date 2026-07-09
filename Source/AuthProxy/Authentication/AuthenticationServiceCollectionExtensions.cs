@@ -25,9 +25,24 @@ public static class AuthenticationServiceCollectionExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddIngressAuthentication(this WebApplicationBuilder builder)
     {
+        var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
+        var hasJwtBearer = jwtSection.Exists();
+
         var authBuilder = builder.Services
-            .AddAuthentication(options => options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookieOptions);
+            .AddAuthentication(options =>
+            {
+                options.DefaultScheme = ClientCredentialsDefaults.CompositeAuthenticationScheme;
+                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            })
+            .AddPolicyScheme(
+                ClientCredentialsDefaults.CompositeAuthenticationScheme,
+                ClientCredentialsDefaults.CompositeAuthenticationScheme,
+                options => options.ForwardDefaultSelector = context => ResolveAuthenticationScheme(context, hasJwtBearer))
+            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookieOptions)
+            .AddScheme<AuthenticationSchemeOptions, ClientCredentialsBearerAuthenticationHandler>(
+                ClientCredentialsDefaults.AuthenticationScheme,
+                _ => { });
 
         var authConfig = builder.Configuration
             .GetSection(C.Authentication.SectionKey)
@@ -36,7 +51,12 @@ public static class AuthenticationServiceCollectionExtensions
         RegisterOidcProviders(authBuilder, authConfig.OidcProviders);
         RegisterOAuthProviders(authBuilder, authConfig.OAuthProviders);
 
-        var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
+        builder.Services.AddSingleton<ClientCredentialsServiceResolver>();
+        builder.Services.AddSingleton<ClientCredentialsVerifier>();
+        builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
+        builder.Services.AddSingleton<ClientCredentialsGrantService>();
+        builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
+
         if (jwtSection.Exists())
         {
             authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, jwtSection.Bind);
@@ -48,6 +68,28 @@ public static class AuthenticationServiceCollectionExtensions
                 .Build());
 
         return builder;
+    }
+
+    static string ResolveAuthenticationScheme(HttpContext context, bool hasJwtBearer)
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+        if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            var token = authorization["Bearer ".Length..].Trim();
+            var tokenProtector = context.RequestServices.GetRequiredService<ClientCredentialsTokenProtector>();
+            if (tokenProtector.TryValidate(token, out var payload))
+            {
+                context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = payload;
+                return ClientCredentialsDefaults.AuthenticationScheme;
+            }
+
+            if (hasJwtBearer)
+            {
+                return JwtBearerDefaults.AuthenticationScheme;
+            }
+        }
+
+        return CookieAuthenticationDefaults.AuthenticationScheme;
     }
 
     static void ConfigureCookieOptions(CookieAuthenticationOptions options)
@@ -215,4 +257,3 @@ public static class AuthenticationServiceCollectionExtensions
         }
     }
 }
-
