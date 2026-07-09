@@ -24,6 +24,12 @@ public static class WellKnownPageNames
     public const string TenantNotFound = "tenant-not-found.html";
 
     /// <summary>
+    /// The page returned when an authenticated user is not associated with any organization,
+    /// so no tenant can be resolved for the request.
+    /// </summary>
+    public const string NoOrganization = "no-organization.html";
+
+    /// <summary>
     /// The page returned when an invitation token is presented that has passed its expiry time.
     /// </summary>
     public const string InvitationExpired = "invitation-expired.html";

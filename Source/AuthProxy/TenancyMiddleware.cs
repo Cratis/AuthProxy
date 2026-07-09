@@ -86,6 +86,20 @@ public class TenancyMiddleware(
                 && !hasPendingRegistrationCookie)
             {
                 logger.CouldNotResolveTenant(context.Request.Path);
+
+                // An authenticated user with no resolvable tenant is signed in but not associated
+                // with any organization. Serve a specific 403 page explaining this rather than a
+                // bare 401, which a frontend would otherwise treat as "not signed in" and loop back
+                // to the login flow.
+                if (context.User.Identity?.IsAuthenticated == true)
+                {
+                    await errorPageProvider.WriteErrorPageAsync(
+                        context,
+                        WellKnownPageNames.NoOrganization,
+                        StatusCodes.Status403Forbidden);
+                    return;
+                }
+
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
