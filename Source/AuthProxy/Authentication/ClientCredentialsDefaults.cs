@@ -19,9 +19,14 @@ public static class ClientCredentialsDefaults
     public const string AuthenticationScheme = "AuthProxyClientCredentials";
 
     /// <summary>
-    /// The OAuth 2.0 grant type supported by the token endpoint.
+    /// The OAuth 2.0 grant type used to request a token with client credentials.
     /// </summary>
     public const string GrantType = "client_credentials";
+
+    /// <summary>
+    /// The OAuth 2.0 grant type used to exchange a refresh token for a new access token.
+    /// </summary>
+    public const string RefreshGrantType = "refresh_token";
 
     /// <summary>
     /// The claim type that stores the target service key.
@@ -32,6 +37,13 @@ public static class ClientCredentialsDefaults
     /// The claim type that stores the route prefix the token is scoped to.
     /// </summary>
     public const string RoutePrefixClaimType = "cratis/route-prefix";
+
+    /// <summary>
+    /// The claim type that stores the tenant resolved from the downstream verification response.
+    /// Configure a <c>Claim</c> tenant resolution strategy with this claim type to have AuthProxy
+    /// resolve the tenant for client-credentials-authenticated requests.
+    /// </summary>
+    public const string TenantClaimType = "cratis/tenant";
 
     /// <summary>
     /// The <see cref="HttpContext.Items"/> key under which the composite scheme selector stashes an

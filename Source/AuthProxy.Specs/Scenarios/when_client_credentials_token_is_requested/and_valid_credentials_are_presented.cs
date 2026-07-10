@@ -36,6 +36,7 @@ public class and_valid_credentials_are_presented : Specification
     [Fact] void should_return_a_bearer_token() => _payload.RootElement.GetProperty("token_type").GetString().ShouldEqual("Bearer");
     [Fact] void should_return_an_access_token() => string.IsNullOrWhiteSpace(_payload.RootElement.GetProperty("access_token").GetString()).ShouldBeFalse();
     [Fact] void should_return_the_token_lifetime() => _payload.RootElement.GetProperty("expires_in").GetInt32().ShouldEqual(3600);
+    [Fact] void should_return_a_refresh_token() => string.IsNullOrWhiteSpace(_payload.RootElement.GetProperty("refresh_token").GetString()).ShouldBeFalse();
     [Fact] void should_forward_the_well_known_verification_payload()
     {
         _factory.CapturedVerificationRequest.ShouldNotBeNull();

@@ -13,43 +13,75 @@ public class ClientCredentialsTokenProtector(
     IDataProtectionProvider dataProtectionProvider)
 {
     static readonly TimeSpan _tokenLifetime = TimeSpan.FromHours(1);
+    static readonly TimeSpan _refreshTokenLifetime = TimeSpan.FromDays(30);
     static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
 
     readonly ITimeLimitedDataProtector _protector = dataProtectionProvider
         .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.v1")
         .ToTimeLimitedDataProtector();
 
+    readonly ITimeLimitedDataProtector _refreshProtector = dataProtectionProvider
+        .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.Refresh.v1")
+        .ToTimeLimitedDataProtector();
+
     /// <summary>
-    /// Gets the number of seconds a newly issued token remains valid.
+    /// Gets the number of seconds a newly issued access token remains valid.
     /// </summary>
     public int ExpiresInSeconds => (int)_tokenLifetime.TotalSeconds;
 
     /// <summary>
-    /// Creates a new bearer token for the supplied service and client identifier.
+    /// Gets the number of seconds a newly issued refresh token remains valid.
+    /// </summary>
+    public int RefreshExpiresInSeconds => (int)_refreshTokenLifetime.TotalSeconds;
+
+    /// <summary>
+    /// Creates a new access token for the supplied service and client identifier.
     /// </summary>
     /// <param name="service">The service the token is scoped to.</param>
     /// <param name="clientId">The verified client identifier.</param>
-    /// <returns>The protected bearer token value.</returns>
-    public string CreateToken(ConfiguredClientCredentialsService service, string clientId)
-    {
-        var payload = JsonSerializer.Serialize(
-            new ClientCredentialsTokenPayload(service.Name, service.RoutePrefix, clientId),
-            _serializerOptions);
-
-        return _protector.Protect(payload, _tokenLifetime);
-    }
+    /// <param name="tenant">The tenant resolved from the downstream verification response, when one was returned.</param>
+    /// <returns>The protected access token value.</returns>
+    public string CreateToken(ConfiguredClientCredentialsService service, string clientId, string? tenant = null) =>
+        _protector.Protect(Serialize(service, clientId, tenant), _tokenLifetime);
 
     /// <summary>
-    /// Tries to validate and unprotect a bearer token.
+    /// Creates a new refresh token for the supplied service and client identifier.
+    /// </summary>
+    /// <param name="service">The service the token is scoped to.</param>
+    /// <param name="clientId">The verified client identifier.</param>
+    /// <param name="tenant">The tenant resolved from the downstream verification response, when one was returned.</param>
+    /// <returns>The protected refresh token value.</returns>
+    public string CreateRefreshToken(ConfiguredClientCredentialsService service, string clientId, string? tenant = null) =>
+        _refreshProtector.Protect(Serialize(service, clientId, tenant), _refreshTokenLifetime);
+
+    /// <summary>
+    /// Tries to validate and unprotect an access token.
     /// </summary>
     /// <param name="token">The token to validate.</param>
     /// <param name="payload">The unprotected payload.</param>
     /// <returns><see langword="true"/> if the token is valid; otherwise <see langword="false"/>.</returns>
-    public bool TryValidate(string token, out ClientCredentialsTokenPayload payload)
+    public bool TryValidate(string token, out ClientCredentialsTokenPayload payload) =>
+        TryUnprotect(_protector, token, out payload);
+
+    /// <summary>
+    /// Tries to validate and unprotect a refresh token.
+    /// </summary>
+    /// <param name="token">The token to validate.</param>
+    /// <param name="payload">The unprotected payload.</param>
+    /// <returns><see langword="true"/> if the token is valid; otherwise <see langword="false"/>.</returns>
+    public bool TryValidateRefreshToken(string token, out ClientCredentialsTokenPayload payload) =>
+        TryUnprotect(_refreshProtector, token, out payload);
+
+    static string Serialize(ConfiguredClientCredentialsService service, string clientId, string? tenant) =>
+        JsonSerializer.Serialize(
+            new ClientCredentialsTokenPayload(service.Name, service.RoutePrefix, clientId, tenant),
+            _serializerOptions);
+
+    static bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload)
     {
         try
         {
-            var protectedPayload = _protector.Unprotect(token);
+            var protectedPayload = protector.Unprotect(token);
             var deserialized = JsonSerializer.Deserialize<ClientCredentialsTokenPayload>(protectedPayload, _serializerOptions);
             if (deserialized is null)
             {

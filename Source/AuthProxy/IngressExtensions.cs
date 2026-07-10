@@ -117,6 +117,7 @@ public static class IngressExtensions
                 form["service"].FirstOrDefault(),
                 form["client_id"].FirstOrDefault(),
                 form["client_secret"].FirstOrDefault(),
+                form["refresh_token"].FirstOrDefault(),
                 context.RequestAborted);
 
             context.Response.Headers.CacheControl = "no-store";
@@ -129,6 +130,7 @@ public static class IngressExtensions
                         access_token = result.AccessToken,
                         token_type = result.TokenType,
                         expires_in = result.ExpiresIn,
+                        refresh_token = result.RefreshToken,
                     },
                     statusCode: result.StatusCode)
                 : Results.Json(

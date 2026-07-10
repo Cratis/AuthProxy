@@ -50,6 +50,10 @@ Configure them under `Cratis:AuthProxy:TenantResolutions`:
 
 If `ClaimType` is omitted, AuthProxy falls back to reading `X-MS-CLIENT-PRINCIPAL`.
 
+This is also how you resolve a tenant carried on an AuthProxy-issued client-credentials bearer token —
+point `ClaimType` at `cratis/tenant`. See
+[Resolving a tenant from the verification response](authentication.md#resolving-a-tenant-from-the-verification-response).
+
 ---
 
 ## Route strategy options

@@ -59,6 +59,11 @@ public class ClientCredentialsBearerAuthenticationHandler(
             new("amr", ClientCredentialsDefaults.GrantType),
         };
 
+        if (!string.IsNullOrWhiteSpace(payload.Tenant))
+        {
+            claims.Add(new(ClientCredentialsDefaults.TenantClaimType, payload.Tenant));
+        }
+
         var identity = new ClaimsIdentity(claims, Scheme.Name);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Scheme.Name);

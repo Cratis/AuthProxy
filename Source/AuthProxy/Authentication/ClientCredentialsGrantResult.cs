@@ -33,6 +33,11 @@ public record ClientCredentialsGrantResult
     public int ExpiresIn { get; init; }
 
     /// <summary>
+    /// Gets the issued refresh token, when the request succeeded.
+    /// </summary>
+    public string RefreshToken { get; init; } = string.Empty;
+
+    /// <summary>
     /// Gets the OAuth error code, when the request failed.
     /// </summary>
     public string Error { get; init; } = string.Empty;
@@ -51,13 +56,15 @@ public record ClientCredentialsGrantResult
     /// Creates a successful token result.
     /// </summary>
     /// <param name="accessToken">The issued access token.</param>
-    /// <param name="expiresIn">The token lifetime in seconds.</param>
+    /// <param name="expiresIn">The access token lifetime in seconds.</param>
+    /// <param name="refreshToken">The issued refresh token.</param>
     /// <returns>A successful token result.</returns>
-    public static ClientCredentialsGrantResult Success(string accessToken, int expiresIn) => new()
+    public static ClientCredentialsGrantResult Success(string accessToken, int expiresIn, string refreshToken) => new()
     {
         StatusCode = StatusCodes.Status200OK,
         AccessToken = accessToken,
         ExpiresIn = expiresIn,
+        RefreshToken = refreshToken,
     };
 
     /// <summary>

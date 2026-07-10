@@ -91,10 +91,16 @@ identity details without re-calling the identity endpoint themselves.
 
 When `ClientCredentials` is configured for a service, AuthProxy exposes `POST /.cratis/token`.
 That endpoint forwards the supplied client credentials to the service's verification endpoint and,
-on success, issues a bearer token scoped to the configured `RoutePrefix`.
+on success, issues a bearer token scoped to the configured `RoutePrefix`, along with a refresh token
+that can later be exchanged for a new access token without resupplying the client credentials.
 
 This creates a one-to-one relationship between:
 
 - the proxied service
 - the route prefix the token may access
 - the downstream endpoint that verifies the client credentials
+
+The verification endpoint's response can optionally include a `tenant` property, which AuthProxy then
+carries on the issued tokens and can resolve into the `Tenant-ID` header on proxied requests.
+See [Back-channel client credentials](authentication.md#back-channel-client-credentials) for the full
+token, tenant-resolution, and refresh-token flow.
