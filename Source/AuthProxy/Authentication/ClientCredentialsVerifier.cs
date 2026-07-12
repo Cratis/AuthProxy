@@ -11,6 +11,8 @@ namespace Cratis.AuthProxy.Authentication;
 public class ClientCredentialsVerifier(
     IHttpClientFactory httpClientFactory)
 {
+    static readonly JsonSerializerOptions _responseSerializerOptions = new(JsonSerializerDefaults.Web);
+
     /// <summary>
     /// Verifies the supplied client credentials against the configured downstream service.
     /// </summary>
@@ -41,7 +43,8 @@ public class ClientCredentialsVerifier(
 
             if (response.IsSuccessStatusCode)
             {
-                return new(ClientCredentialsVerificationStatus.Succeeded, response.StatusCode);
+                var tenant = await TryReadTenantAsync(response, cancellationToken);
+                return new(ClientCredentialsVerificationStatus.Succeeded, response.StatusCode, tenant);
             }
 
             return (int)response.StatusCode >= 500
@@ -51,6 +54,24 @@ public class ClientCredentialsVerifier(
         catch (HttpRequestException)
         {
             return new(ClientCredentialsVerificationStatus.Failed, HttpStatusCode.BadGateway);
+        }
+    }
+
+    static async Task<string?> TryReadTenantAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(response.Content.Headers.ContentType?.MediaType, "application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<ClientCredentialsVerificationResponseBody>(_responseSerializerOptions, cancellationToken);
+            return string.IsNullOrWhiteSpace(body?.Tenant) ? null : body.Tenant;
+        }
+        catch (JsonException)
+        {
+            return null;
         }
     }
 }

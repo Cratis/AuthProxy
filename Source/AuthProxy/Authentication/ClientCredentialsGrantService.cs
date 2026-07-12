@@ -15,29 +15,37 @@ public class ClientCredentialsGrantService(
     ClientCredentialsTokenProtector tokenProtector)
 {
     /// <summary>
-    /// Processes a client-credentials token request.
+    /// Processes a client-credentials or refresh-token request.
     /// </summary>
     /// <param name="grantType">The requested OAuth grant type.</param>
     /// <param name="serviceName">The requested service name.</param>
     /// <param name="clientId">The provided client identifier.</param>
     /// <param name="clientSecret">The provided client secret.</param>
+    /// <param name="refreshToken">The provided refresh token, for the <c>refresh_token</c> grant.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The token issuance result.</returns>
-    public async Task<ClientCredentialsGrantResult> GrantAsync(
+    public Task<ClientCredentialsGrantResult> GrantAsync(
         string? grantType,
+        string? serviceName,
+        string? clientId,
+        string? clientSecret,
+        string? refreshToken,
+        CancellationToken cancellationToken) => grantType switch
+        {
+            ClientCredentialsDefaults.GrantType => GrantFromClientCredentialsAsync(serviceName, clientId, clientSecret, cancellationToken),
+            ClientCredentialsDefaults.RefreshGrantType => Task.FromResult(GrantFromRefreshToken(refreshToken)),
+            _ => Task.FromResult(ClientCredentialsGrantResult.CreateError(
+                StatusCodes.Status400BadRequest,
+                "unsupported_grant_type",
+                "Only the client_credentials and refresh_token grant types are supported.")),
+        };
+
+    async Task<ClientCredentialsGrantResult> GrantFromClientCredentialsAsync(
         string? serviceName,
         string? clientId,
         string? clientSecret,
         CancellationToken cancellationToken)
     {
-        if (!string.Equals(grantType, ClientCredentialsDefaults.GrantType, StringComparison.Ordinal))
-        {
-            return ClientCredentialsGrantResult.CreateError(
-                StatusCodes.Status400BadRequest,
-                "unsupported_grant_type",
-                "Only the client_credentials grant type is supported.");
-        }
-
         if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
         {
             return ClientCredentialsGrantResult.CreateError(
@@ -71,8 +79,41 @@ public class ClientCredentialsGrantService(
                 "The target service could not verify the supplied client credentials.");
         }
 
-        return ClientCredentialsGrantResult.Success(
-            tokenProtector.CreateToken(service, clientId),
-            tokenProtector.ExpiresInSeconds);
+        return IssueTokens(service, clientId, verificationResult.Tenant);
     }
+
+    ClientCredentialsGrantResult GrantFromRefreshToken(string? refreshToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return ClientCredentialsGrantResult.CreateError(
+                StatusCodes.Status400BadRequest,
+                "invalid_request",
+                "The refresh_token field is required.");
+        }
+
+        if (!tokenProtector.TryValidateRefreshToken(refreshToken, out var payload))
+        {
+            return ClientCredentialsGrantResult.CreateError(
+                StatusCodes.Status401Unauthorized,
+                "invalid_grant",
+                "The refresh token is invalid or has expired.");
+        }
+
+        if (!serviceResolver.TryResolveForTokenRequest(payload.Service, out var service, out var errorDescription))
+        {
+            return ClientCredentialsGrantResult.CreateError(
+                StatusCodes.Status400BadRequest,
+                "invalid_grant",
+                errorDescription);
+        }
+
+        return IssueTokens(service, payload.ClientId, payload.Tenant);
+    }
+
+    ClientCredentialsGrantResult IssueTokens(ConfiguredClientCredentialsService service, string clientId, string? tenant) =>
+        ClientCredentialsGrantResult.Success(
+            tokenProtector.CreateToken(service, clientId, tenant),
+            tokenProtector.ExpiresInSeconds,
+            tokenProtector.CreateRefreshToken(service, clientId, tenant));
 }

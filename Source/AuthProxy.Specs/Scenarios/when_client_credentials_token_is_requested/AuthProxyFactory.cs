@@ -23,6 +23,8 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
 
     protected virtual HttpStatusCode VerificationStatusCode => HttpStatusCode.NoContent;
 
+    protected virtual object? VerificationResponseBody => null;
+
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -52,7 +54,13 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
                     CapturedVerificationRequest = await request.Content.ReadFromJsonAsync<ClientCredentialsVerificationRequest>();
                 }
 
-                return new HttpResponseMessage(VerificationStatusCode);
+                var response = new HttpResponseMessage(VerificationStatusCode);
+                if (VerificationResponseBody is not null)
+                {
+                    response.Content = JsonContent.Create(VerificationResponseBody);
+                }
+
+                return response;
             }));
         });
     }

@@ -9,7 +9,9 @@ namespace Cratis.AuthProxy.Authentication;
 /// <param name="Service">The service the token is scoped to.</param>
 /// <param name="RoutePrefix">The route prefix the token is scoped to.</param>
 /// <param name="ClientId">The verified client identifier.</param>
+/// <param name="Tenant">The tenant resolved from the downstream verification response, when one was returned.</param>
 public record ClientCredentialsTokenPayload(
     string Service,
     string RoutePrefix,
-    string ClientId);
+    string ClientId,
+    string? Tenant = null);

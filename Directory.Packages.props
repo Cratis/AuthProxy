@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis.Arc.Core" Version="20.52.0" />
+    <PackageVersion Include="Cratis.Arc.Core" Version="20.54.2" />
     <!-- Microsoft -->
     <PackageVersion Include="Aspire.Hosting" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.NodeJs" Version="9.5.2" />
@@ -22,7 +22,7 @@
     <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
     <PackageVersion Include="Meziantou.Analyzer" Version="3.0.122" />
     <!-- Specifications -->
-    <PackageVersion Include="Cratis.Specifications.XUnit" Version="3.0.5" />
+    <PackageVersion Include="Cratis.Specifications.XUnit" Version="4.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />

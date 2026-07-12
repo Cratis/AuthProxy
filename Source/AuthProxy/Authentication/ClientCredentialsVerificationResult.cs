@@ -10,6 +10,8 @@ namespace Cratis.AuthProxy.Authentication;
 /// </summary>
 /// <param name="Status">The high-level verification status.</param>
 /// <param name="StatusCode">The downstream HTTP status code.</param>
+/// <param name="Tenant">The tenant the verified client belongs to, when the target service resolved one.</param>
 public record ClientCredentialsVerificationResult(
     ClientCredentialsVerificationStatus Status,
-    HttpStatusCode StatusCode);
+    HttpStatusCode StatusCode,
+    string? Tenant = null);
