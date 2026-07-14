@@ -81,6 +81,7 @@ jobs:
           path: ./Source/AuthProxy/wwwroot
           retention-days: 1
           include-hidden-files: true
+          if-no-files-found: error
 
   dotnet-publish:
     if: needs.release.outputs.publish == 'true'
