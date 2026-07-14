@@ -8,10 +8,16 @@ user can continue directly into the application instead of being sent to the lob
 
 1. The user opens `https://your-authproxy/invite/<token>`.
 2. AuthProxy validates the token and starts authentication in the same way as any other invite.
-3. After login, AuthProxy exchanges the invite at `Invite.ExchangeUrl`.
-4. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
+3. After login, AuthProxy **re-validates the token** (signature, issuer, audience, and lifetime) before
+   forwarding it, so AuthProxy is the authoritative validator across both phases.
+4. AuthProxy binds the invite to its recipient: if the token carries the `Invite.EmailClaim` claim, the
+   account's provider-verified email must match it, otherwise the exchange is refused and the
+   `invitation-email-mismatch.html` page is served.
+5. AuthProxy exchanges the invite at `Invite.ExchangeUrl`, forwarding the authenticated account's
+   verified email so the backend can apply its own defense-in-depth check.
+6. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
    for the request.
-5. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
+7. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
 
 If the tenant IDs do not match, or AuthProxy cannot resolve a tenant for the request, the invite is
 treated like lobby onboarding and falls back to the configured lobby behavior.
@@ -25,6 +31,7 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
       "Invite": {
         "ExchangeUrl": "https://studio.example.com/internal/invites/exchange",
         "TenantClaim": "tenant_id",
+        "EmailClaim": "email",
         "Lobby": {
           "Frontend": { "BaseUrl": "http://lobby-service:3000/" }
         }
@@ -38,6 +45,7 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
 |----------|------|-------------|
 | `ExchangeUrl` | `string` | Absolute URL of the invite exchange endpoint. |
 | `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID. |
+| `EmailClaim` | `string` | Claim in the invite token that contains the email the invitation was issued for. Defaults to `email`. When the token carries it, the authenticated account's verified email must match. Set to an empty string to disable email-binding enforcement (the verified email is still forwarded to the exchange endpoint). |
 | `Lobby.Frontend.BaseUrl` | `string` | Fallback redirect if the invite cannot continue directly into the organization. |
 
 ## Requirements

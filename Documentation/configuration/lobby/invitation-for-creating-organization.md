@@ -12,8 +12,11 @@ frontend to finish onboarding.
    - With one configured identity provider, AuthProxy challenges that provider immediately.
    - With multiple providers, AuthProxy serves `invitation-select-provider.html` so the user can
      choose how to sign in.
-4. After a successful login, AuthProxy calls `Invite.ExchangeUrl` with the invite token and the
-   authenticated user's subject.
+4. After a successful login, AuthProxy re-validates the token, then calls `Invite.ExchangeUrl` with the
+   invite token and the authenticated user's subject and verified email.
+   - The token is re-validated (signature, issuer, audience, lifetime) before it is forwarded.
+   - If the token was issued for a specific email (`Invite.EmailClaim`), the account's verified email
+     must match, otherwise `invitation-email-mismatch.html` is served.
 5. If the exchange succeeds, AuthProxy redirects the user to `Invite.Lobby.Frontend.BaseUrl`.
 
 This flow is the right fit when the invited user is not entering an already-resolved tenant.
