@@ -22,7 +22,7 @@ condition is detected:
 | `invitation-invalid.html` | The JWT token on an invite link is malformed or has an invalid signature. Served in either phase — when the link is followed (Phase 1) and when the token is re-validated at the exchange (Phase 2). | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
-| `invitation-email-mismatch.html` | The account signed in with has a verified email that does not match the email the invitation was issued for (Phase 2). | 403 |
+| `invitation-email-mismatch.html` | Gateway email binding is enabled (`Invite.EmailClaim`) and the account signed in with has a verified email that does not match the email the invitation was issued for (Phase 2). | 403 |
 
 ---
 
@@ -113,11 +113,12 @@ indicating that the authenticated user's subject is already associated with an e
 
 ### `invitation-email-mismatch.html`
 
-Served during Phase 2 (post-login invite exchange) when the invite token was issued for a specific
-email address (the `Invite.EmailClaim` claim) and the account the user signed in with does not own
-that verified email. This binds an invitation to its intended recipient so it cannot be redeemed with
-a different account. See [Invitation to Organization](lobby/invitation-to-organization.md) for how to
-configure the email claim.
+Served during Phase 2 (post-login invite exchange) when gateway email binding is enabled — the
+`Invite.EmailClaim` claim is configured — the invite token was issued for a specific email address, and
+the account the user signed in with does not own that verified email. This binds an invitation to its
+intended recipient so it cannot be redeemed with a different account. Email binding is off by default;
+see [Invitation to Organization](lobby/invitation-to-organization.md) for how to configure the email
+claim.
 
 ---
 

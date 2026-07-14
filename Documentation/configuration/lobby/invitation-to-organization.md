@@ -10,11 +10,11 @@ user can continue directly into the application instead of being sent to the lob
 2. AuthProxy validates the token and starts authentication in the same way as any other invite.
 3. After login, AuthProxy **re-validates the token** (signature, issuer, audience, and lifetime) before
    forwarding it, so AuthProxy is the authoritative validator across both phases.
-4. AuthProxy binds the invite to its recipient: if the token carries the `Invite.EmailClaim` claim, the
-   account's provider-verified email must match it, otherwise the exchange is refused and the
-   `invitation-email-mismatch.html` page is served.
-5. AuthProxy exchanges the invite at `Invite.ExchangeUrl`, forwarding the authenticated account's
-   verified email so the backend can apply its own defense-in-depth check.
+4. If `Invite.EmailClaim` is configured (opt-in) and the token carries that claim, AuthProxy binds the
+   invite to its recipient: the account's provider-verified email must match it, otherwise the exchange
+   is refused and the `invitation-email-mismatch.html` page is served.
+5. AuthProxy exchanges the invite at `Invite.ExchangeUrl`, always forwarding the authenticated account's
+   verified email so the backend can apply its own binding check — whether or not gateway enforcement is on.
 6. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
    for the request.
 7. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
@@ -45,7 +45,7 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
 |----------|------|-------------|
 | `ExchangeUrl` | `string` | Absolute URL of the invite exchange endpoint. |
 | `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID. |
-| `EmailClaim` | `string` | Claim in the invite token that contains the email the invitation was issued for. Defaults to `email`. When the token carries it, the authenticated account's verified email must match. Set to an empty string to disable email-binding enforcement (the verified email is still forwarded to the exchange endpoint). |
+| `EmailClaim` | `string` | Claim in the invite token that contains the email the invitation was issued for. **Empty by default, which leaves gateway email-binding enforcement off.** Set it (for example to `email`) to require the authenticated account's verified email to match the invited email at the exchange. The verified email is forwarded to the exchange endpoint regardless of this setting. |
 | `Lobby.Frontend.BaseUrl` | `string` | Fallback redirect if the invite cannot continue directly into the organization. |
 
 ## Requirements

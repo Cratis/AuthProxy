@@ -15,8 +15,9 @@ frontend to finish onboarding.
 4. After a successful login, AuthProxy re-validates the token, then calls `Invite.ExchangeUrl` with the
    invite token and the authenticated user's subject and verified email.
    - The token is re-validated (signature, issuer, audience, lifetime) before it is forwarded.
-   - If the token was issued for a specific email (`Invite.EmailClaim`), the account's verified email
-     must match, otherwise `invitation-email-mismatch.html` is served.
+   - If gateway email binding is enabled (`Invite.EmailClaim` is set) and the token was issued for a
+     specific email, the account's verified email must match, otherwise `invitation-email-mismatch.html`
+     is served.
 5. If the exchange succeeds, AuthProxy redirects the user to `Invite.Lobby.Frontend.BaseUrl`.
 
 This flow is the right fit when the invited user is not entering an already-resolved tenant.
