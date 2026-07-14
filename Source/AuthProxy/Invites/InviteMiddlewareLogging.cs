@@ -8,6 +8,12 @@ internal static partial class InviteMiddlewareLogging
     [LoggerMessage(LogLevel.Warning, "Invite token validation failed for path {Path}")]
     internal static partial void InviteTokenValidationFailed(this ILogger logger, string path);
 
+    [LoggerMessage(LogLevel.Warning, "Invite token failed re-validation at the Phase-2 exchange forward for path {Path} - not forwarding to the exchange endpoint")]
+    internal static partial void InviteExchangeTokenValidationFailed(this ILogger logger, string path);
+
+    [LoggerMessage(LogLevel.Warning, "Invite exchange rejected because the authenticated account's verified email does not match the invited email for subject {Subject}")]
+    internal static partial void InviteEmailMismatch(this ILogger logger, string subject);
+
     [LoggerMessage(LogLevel.Warning, "Invite exchange URL is not configured - skipping invite exchange")]
     internal static partial void InviteExchangeUrlNotConfigured(this ILogger logger);
 

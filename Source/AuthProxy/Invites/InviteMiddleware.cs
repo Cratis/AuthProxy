@@ -75,8 +75,40 @@ public class InviteMiddleware(
         if (context.User.Identity?.IsAuthenticated == true
             && context.TryGetPendingInvitationToken(out var inviteToken))
         {
+            // Re-validate the invite token before forwarding it (Phase 2). The token arrives from the
+            // HTTP-only .cratis-invite cookie, but HTTP-only only blocks browser JS - an authenticated
+            // caller can still set the cookie to a self-crafted token. AuthProxy must therefore be the
+            // authoritative invite-token validator across BOTH phases, re-checking the RSA signature,
+            // issuer, audience and lifetime here before handing the token to the exchange endpoint.
+            var validationResult = tokenValidator.ValidateDetailed(inviteToken);
+            if (validationResult != InviteTokenValidationResult.Valid)
+            {
+                logger.InviteExchangeTokenValidationFailed(context.Request.Path);
+                context.Response.Cookies.Delete(Cookies.InviteToken);
+
+                var invalidPageName = validationResult == InviteTokenValidationResult.Expired
+                    ? WellKnownPageNames.InvitationExpired
+                    : WellKnownPageNames.InvitationInvalid;
+
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    invalidPageName,
+                    StatusCodes.Status401Unauthorized);
+                return;
+            }
+
             var exchangeResult = await ExchangeInvite(context, inviteToken);
             context.Response.Cookies.Delete(Cookies.InviteToken);
+
+            if (exchangeResult == InviteExchangeResult.EmailMismatch)
+            {
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    WellKnownPageNames.InvitationEmailMismatch,
+                    StatusCodes.Status403Forbidden);
+
+                return;
+            }
 
             if (exchangeResult == InviteExchangeResult.DuplicateSubject)
             {
@@ -193,6 +225,26 @@ public class InviteMiddleware(
         config.OidcProviders.Select(OidcProviderScheme.ToProviderInfo)
             .Concat(config.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo));
 
+    /// <summary>
+    /// Resolves the authenticating account's email and its provider-supplied verification status.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="emailVerified">
+    /// The value of the provider's <c>email_verified</c> claim when present; otherwise <see langword="null"/>.
+    /// </param>
+    /// <returns>The authenticated email, or an empty string when none is available.</returns>
+    static string ResolveAuthenticatedEmail(HttpContext context, out bool? emailVerified)
+    {
+        emailVerified = bool.TryParse(context.User.FindFirst("email_verified")?.Value, out var verified)
+            ? verified
+            : null;
+
+        return context.User.FindFirst("email")?.Value
+            ?? context.User.FindFirst(ClaimTypes.Email)?.Value
+            ?? context.User.FindFirst("preferred_username")?.Value
+            ?? string.Empty;
+    }
+
     async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken)
     {
         var exchangeUrl = config.CurrentValue.Invite?.ExchangeUrl;
@@ -214,10 +266,24 @@ public class InviteMiddleware(
             ?? context.User.Identity?.AuthenticationType
             ?? string.Empty;
 
+        var email = ResolveAuthenticatedEmail(context, out var emailVerified);
+
+        // An invitation is otherwise a pure bearer link - anyone with the URL could sign in with their
+        // own account and be provisioned as the invited user. Bind the invite to its intended recipient
+        // by requiring the authenticating account's verified email to match the invited email.
+        if (!IsInvitedEmailBound(inviteToken, email, emailVerified))
+        {
+            logger.InviteEmailMismatch(subject);
+            return InviteExchangeResult.EmailMismatch;
+        }
+
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, exchangeUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", inviteToken);
-        request.Content = JsonContent.Create(new { subject, identityProvider });
+
+        // Forward the provider-verified email (and its verification status) so the backend can perform
+        // its own defense-in-depth check of invited-email vs. authenticated-email at accept time.
+        request.Content = JsonContent.Create(new { subject, identityProvider, email, emailVerified });
 
         HttpResponseMessage response;
         try
@@ -244,6 +310,39 @@ public class InviteMiddleware(
 
         logger.InviteExchangedSuccessfully(subject);
         return InviteExchangeResult.Success;
+    }
+
+    /// <summary>
+    /// Determines whether the invite may be exchanged for the given authenticated account, enforcing that
+    /// the invited email (when the token carries one) matches the account's verified email.
+    /// </summary>
+    /// <param name="inviteToken">The validated invite token.</param>
+    /// <param name="authenticatedEmail">The authenticating account's email.</param>
+    /// <param name="emailVerified">The provider-supplied verification status of <paramref name="authenticatedEmail"/>.</param>
+    /// <returns>
+    /// <see langword="true"/> when the invite is not bound to a specific email, or the authenticated
+    /// verified email matches the invited email; otherwise <see langword="false"/>.
+    /// </returns>
+    bool IsInvitedEmailBound(string inviteToken, string authenticatedEmail, bool? emailVerified)
+    {
+        var emailClaim = config.CurrentValue.Invite?.EmailClaim;
+        if (string.IsNullOrWhiteSpace(emailClaim)
+            || !tokenValidator.TryGetClaim(inviteToken, emailClaim, out var invitedEmail)
+            || string.IsNullOrWhiteSpace(invitedEmail))
+        {
+            // The invite does not target a specific email - there is nothing to bind against.
+            return true;
+        }
+
+        // The invite is bound to a specific email, so the account must own that email and the provider
+        // must not have flagged it as unverified.
+        if (emailVerified == false)
+        {
+            return false;
+        }
+
+        return !string.IsNullOrWhiteSpace(authenticatedEmail)
+            && string.Equals(invitedEmail, authenticatedEmail, StringComparison.OrdinalIgnoreCase);
     }
 
     bool IsTenantIssuedInvite(string inviteToken, HttpContext context)
