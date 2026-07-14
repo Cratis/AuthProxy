@@ -9,7 +9,7 @@ export default defineConfig({
         tailwindcss(),
     ],
     build: {
-        outDir: '../Ingress/wwwroot',
+        outDir: '../AuthProxy/wwwroot',
         emptyOutDir: true,
     },
     server: {
