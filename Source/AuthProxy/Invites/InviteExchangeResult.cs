@@ -16,4 +16,10 @@ enum InviteExchangeResult
 
     /// <summary>The exchange failed for any other reason.</summary>
     Failed = 2,
+
+    /// <summary>
+    /// The exchange was not attempted because the authenticating account's verified email did not match
+    /// the email the invitation was issued for.
+    /// </summary>
+    EmailMismatch = 3,
 }

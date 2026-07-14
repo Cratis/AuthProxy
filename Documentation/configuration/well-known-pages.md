@@ -18,10 +18,11 @@ condition is detected:
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
 | `select-provider.html` | A protected resource was requested and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
-| `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
-| `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
+| `invitation-expired.html` | The JWT token on an invite link has passed its expiry time. Served in either phase — when the link is followed (Phase 1) and when the token is re-validated at the exchange (Phase 2). | 401 |
+| `invitation-invalid.html` | The JWT token on an invite link is malformed or has an invalid signature. Served in either phase — when the link is followed (Phase 1) and when the token is re-validated at the exchange (Phase 2). | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
+| `invitation-email-mismatch.html` | The account signed in with has a verified email that does not match the email the invitation was issued for (Phase 2). | 403 |
 
 ---
 
@@ -94,18 +95,29 @@ they represent application-level conditions, not generic HTTP errors.
 
 ### `invitation-expired.html`
 
-Served when a user follows an `/invite/<token>` link whose JWT has a valid signature but has
-passed its `exp` claim. The user should request a fresh invitation.
+Served when an invite token has a valid signature but has passed its `exp` claim. AuthProxy validates
+the token both when the `/invite/<token>` link is followed (Phase 1) and again at the post-login
+exchange (Phase 2), so this page is served whenever an expired token is detected in either phase.
+The user should request a fresh invitation.
 
 ### `invitation-invalid.html`
 
-Served when the token on an `/invite/<token>` link is malformed, carries an invalid signature,
-or cannot be parsed at all. This typically indicates a truncated or otherwise corrupted link.
+Served when an invite token is malformed, carries an invalid signature, or cannot be parsed at all.
+Because AuthProxy re-validates the token at the Phase-2 exchange — not only when the link is first
+followed — this page is also served if a tampered or forged token is presented at the exchange.
 
 ### `invitation-subject-already-exists.html`
 
 Served during Phase 2 (post-login invite exchange) when the exchange endpoint returns HTTP 409 Conflict,
 indicating that the authenticated user's subject is already associated with an existing account.
+
+### `invitation-email-mismatch.html`
+
+Served during Phase 2 (post-login invite exchange) when the invite token was issued for a specific
+email address (the `Invite.EmailClaim` claim) and the account the user signed in with does not own
+that verified email. This binds an invitation to its intended recipient so it cannot be redeemed with
+a different account. See [Invitation to Organization](lobby/invitation-to-organization.md) for how to
+configure the email claim.
 
 ---
 
