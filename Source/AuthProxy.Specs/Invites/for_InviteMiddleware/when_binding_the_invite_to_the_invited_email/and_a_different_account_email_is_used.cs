@@ -5,6 +5,8 @@ namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_binding_the_invite_
 
 public class and_a_different_account_email_is_used : given.an_invite_exchange
 {
+    protected override string InviteEmailClaim => "email";
+
     void Establish()
     {
         // The account that logged in is not the one the invitation was issued for.

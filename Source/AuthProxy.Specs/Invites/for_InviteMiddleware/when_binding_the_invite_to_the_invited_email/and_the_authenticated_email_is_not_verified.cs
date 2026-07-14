@@ -7,6 +7,8 @@ public class and_the_authenticated_email_is_not_verified : given.an_invite_excha
 {
     const string InvitedEmail = "invited@example.com";
 
+    protected override string InviteEmailClaim => "email";
+
     void Establish()
     {
         // The email matches, but the provider explicitly reports it as unverified.

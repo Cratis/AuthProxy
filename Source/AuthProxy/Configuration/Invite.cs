@@ -51,13 +51,14 @@ public class Invite
 
     /// <summary>
     /// Gets or sets the claim name in the invite token that holds the email address the
-    /// invitation was issued for. Defaults to <c>email</c>.
-    /// When the (validated) invite token carries this claim, the authenticating account's
-    /// verified email must match it at the Phase-2 exchange or the invite is rejected, binding
-    /// the invitation to its intended recipient. Leave empty to disable email-binding enforcement
-    /// (the authenticated email is still forwarded to the exchange endpoint for app-level checks).
+    /// invitation was issued for. Empty by default, which leaves email-binding enforcement off.
+    /// When set (for example to <c>email</c>) and the validated invite token carries that claim,
+    /// the authenticating account's verified email must match it at the Phase-2 exchange or the
+    /// invite is rejected, binding the invitation to its intended recipient.
+    /// Regardless of this setting, the authenticated account's verified email is always forwarded
+    /// to the exchange endpoint so the backend can enforce the binding itself.
     /// </summary>
-    public string EmailClaim { get; set; } = "email";
+    public string EmailClaim { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets a value indicating whether the invitation ID from the invite token (<c>jti</c>)

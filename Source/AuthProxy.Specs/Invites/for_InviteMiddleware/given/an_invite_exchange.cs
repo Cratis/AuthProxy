@@ -25,6 +25,12 @@ public class an_invite_exchange : Specification
     protected bool _exchangeCalled;
     protected string _exchangeRequestBody = string.Empty;
 
+    /// <summary>
+    /// Gets the invite-token claim that carries the invited email. Empty by default (enforcement off);
+    /// enforcement specs override this to opt in, matching the production opt-in default.
+    /// </summary>
+    protected virtual string InviteEmailClaim => string.Empty;
+
     void Establish()
     {
         var (privateKey, publicKeyPem) = TokenFixture.GenerateKeyPair();
@@ -38,6 +44,7 @@ public class an_invite_exchange : Specification
                 Issuer = Issuer,
                 Audience = Audience,
                 ExchangeUrl = ExchangeUrl,
+                EmailClaim = InviteEmailClaim,
             }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();

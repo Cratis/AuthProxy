@@ -3,15 +3,14 @@
 
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_binding_the_invite_to_the_invited_email;
 
-public class and_the_invite_targets_no_email : given.an_invite_exchange
+public class and_the_email_claim_is_not_configured : given.an_invite_exchange
 {
-    protected override string InviteEmailClaim => "email";
-
     void Establish()
     {
-        // With enforcement configured, an invite that carries no email claim still has nothing to bind against.
-        GivenAuthenticatedUserWith(new Claim("email", "anyone@example.com"), new Claim("email_verified", "true"));
-        GivenPendingInviteCookie(CreateSignedToken());
+        // Enforcement is opt-in: with EmailClaim unset (the default), a mismatched account is NOT rejected
+        // at the gateway - the invite still forwards and the backend decides. This preserves existing behavior.
+        GivenAuthenticatedUserWith(new Claim("email", "attacker@example.com"), new Claim("email_verified", "true"));
+        GivenPendingInviteCookie(CreateSignedToken(claims: [new Claim("email", "invited@example.com")]));
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
