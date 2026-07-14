@@ -7,6 +7,8 @@ public class and_verified_email_matches : given.an_invite_exchange
 {
     const string InvitedEmail = "invited@example.com";
 
+    protected override string InviteEmailClaim => "email";
+
     void Establish()
     {
         GivenAuthenticatedUserWith(new Claim("email", InvitedEmail), new Claim("email_verified", "true"));
