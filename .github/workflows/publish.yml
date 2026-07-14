@@ -2,8 +2,6 @@ name: Publish
 
 env:
   DOTNET_VERSION: "10.0.x"
-  DOTNET_CACHE: "dotnet-cache-${{ github.sha }}"
-  FRONTEND_CACHE: "frontend-cache-${{ github.sha }}"
   NUGET_OUTPUT: ./Artifacts/NuGet
 
 on:
@@ -61,11 +59,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
-        with:
-          path: ./Source/AuthProxy/wwwroot
-          key: ${{ env.FRONTEND_CACHE }}
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -79,6 +72,16 @@ jobs:
         working-directory: ./Source/Web
         run: npm run build
 
+      # Hand the built frontend to the dotnet-publish job. Artifacts (unlike the Actions
+      # cache) are writable on pull_request-triggered runs, which this workflow is.
+      - name: Upload frontend output
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-wwwroot
+          path: ./Source/AuthProxy/wwwroot
+          retention-days: 1
+          include-hidden-files: true
+
   dotnet-publish:
     if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
@@ -88,24 +91,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - name: Download frontend output
+        uses: actions/download-artifact@v4
         with:
+          name: frontend-wwwroot
           path: ./Source/AuthProxy/wwwroot
-          key: ${{ env.FRONTEND_CACHE }}
-          fail-on-cache-miss: true
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - uses: actions/cache@v3
-        with:
-          path: ./Source/AuthProxy/out
-          key: ${{ env.DOTNET_CACHE }}
-
       - name: Publish
         run: dotnet publish Source/AuthProxy/AuthProxy.csproj -c Release -o Source/AuthProxy/out -p:Version=${{ needs.release.outputs.version }}
+
+      # Hand the published binaries to the publish-docker job.
+      - name: Upload published output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-out
+          path: ./Source/AuthProxy/out
+          retention-days: 1
+          include-hidden-files: true
 
   publish-docker:
     if: needs.release.outputs.publish == 'true'
@@ -116,11 +123,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: actions/cache@v3
+      - name: Download published output
+        uses: actions/download-artifact@v4
         with:
+          name: dotnet-out
           path: ./Source/AuthProxy/out
-          key: ${{ env.DOTNET_CACHE }}
-          fail-on-cache-miss: true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
