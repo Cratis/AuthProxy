@@ -20,6 +20,13 @@ namespace Cratis.AuthProxy.Authentication;
 public static class AuthenticationServiceCollectionExtensions
 {
     /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key recording which provider scheme established the
+    /// session. It is persisted into the authentication cookie on sign-in so a later RP-initiated logout can
+    /// resolve the correct identity provider's end-session endpoint.
+    /// </summary>
+    public const string AuthenticationSchemeStateKey = "Cratis.AuthProxy.AuthenticationScheme";
+
+    /// <summary>
     /// Registers cookie authentication, all configured OIDC providers, all configured OAuth providers,
     /// and (optionally) JWT Bearer for machine-to-machine flows.
     /// </summary>
@@ -57,6 +64,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<ClientCredentialsVerifier>();
         builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
         builder.Services.AddSingleton<ClientCredentialsGrantService>();
+        builder.Services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
         builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
@@ -237,8 +245,9 @@ public static class AuthenticationServiceCollectionExtensions
     /// Shared provider-callback handler. In the session-preserving link flow it captures the freshly
     /// authenticated subject and posts it to the application <em>without</em> signing the new identity in,
     /// so the user's primary session is preserved; otherwise it is a genuine sign-in — a logged-out user has
-    /// completed an identity-provider login and a fresh session is about to be established — so it notifies
-    /// the application of the sign-in and applies the tenant post-authentication redirect resolution used by
+    /// completed an identity-provider login and a fresh session is about to be established — so it records the
+    /// authenticating provider scheme for later RP-initiated logout, notifies the application of the sign-in,
+    /// and applies the tenant post-authentication redirect resolution used by
     /// the normal login flow.
     /// </summary>
     /// <param name="context">The ticket-received context.</param>
@@ -264,9 +273,12 @@ public static class AuthenticationServiceCollectionExtensions
             return;
         }
 
-        // A non-link ticket means a real sign-in is completing. Notifying the application here — rather than on
-        // every proxied request — is what scopes the sign-in event to the actual logged-out to signed-in
-        // transition. It never throws, so a notification failure can never break the sign-in.
+        // A non-link ticket means a real sign-in is completing. Record which provider established this session so
+        // a later RP-initiated logout can target the correct identity provider's end-session endpoint (persisted
+        // into the auth cookie by the RemoteAuthenticationHandler that signs the ticket in), and notify the
+        // application of the sign-in — scoped here to the logged-out to signed-in transition rather than every
+        // proxied request. The notification never throws, so a notification failure can never break the sign-in.
+        context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal);
 

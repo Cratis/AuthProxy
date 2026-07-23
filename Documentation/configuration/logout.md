@@ -12,19 +12,57 @@ the authentication challenge stages, so it never bounces the user to a login pro
 
 ---
 
+## Full-chain logout
+
+A plain cookie logout leaves the user signed in at the identity provider, so the next visit silently
+re-authenticates. To avoid that, AuthProxy performs a **full-chain logout**: it ends the session both
+locally *and* at the identity provider using OIDC [RP-initiated logout](https://openid.net/specs/openid-connect-rpinitiated-1_0.html).
+
+When the session was established through an **OIDC provider**, a logout request:
+
+1. Reads the stored `id_token` and the provider the session was established with from the authentication
+   cookie, and clears the local session (see [What it clears](#what-it-clears)).
+2. Redirects (`302 Found`) the browser to that provider's **end-session endpoint** (discovered from the
+   provider's OpenID configuration) with:
+   - `id_token_hint` — the stored `id_token`, so the provider knows which session to end.
+   - `post_logout_redirect_uri` — AuthProxy's own callback, `/.cratis/logout/callback`.
+
+   The validated final `redirect` target is carried across the round-trip in a short-lived, HTTP-only
+   cookie (`.cratis-logout`) rather than in the URL.
+3. The identity provider ends its own session and redirects back to `/.cratis/logout/callback`.
+4. The callback clears every AuthProxy cookie again (idempotent) and redirects (`302 Found`) to the
+   validated final `redirect` target.
+
+> **Register the callback with each OIDC provider.** `post_logout_redirect_uri` must be allow-listed at
+> the provider, so register `https://<your-proxy-host>/.cratis/logout/callback` as a permitted
+> post-logout redirect URI for every OIDC application.
+
+### OAuth 2.0 providers (e.g. GitHub)
+
+OAuth 2.0 providers have no standard OIDC end-session endpoint and cannot be force-logged-out via a
+redirect. When the session was established through an OAuth provider — or when there is no active OIDC
+session, or the provider's discovery document advertises no end-session endpoint — AuthProxy falls back to
+a **local-only logout**: it clears its own cookies and redirects straight to the validated `redirect`
+target. The user's session at the OAuth provider is left untouched, so a later visit may still
+re-authenticate silently without asking for credentials. This is a limitation of the OAuth providers, not
+of AuthProxy.
+
+---
+
 ## What it clears
 
-A logout request:
+Both the local logout and the post-logout callback:
 
-1. Signs the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2`), including any chunked variants.
-2. Deletes every AuthProxy session cookie:
+1. Sign the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2`), including any chunked variants.
+2. Delete every AuthProxy session cookie:
    - `.cratis-identity`
    - `.cratis-tenant`
    - `.cratis-tenants`
    - `.cratis-invite`
    - `.cratis-registration`
    - `.cratis-providers`
-3. Redirects (`302 Found`) to the validated `redirect` target.
+
+The `.cratis-logout` carry cookie is deleted by the callback once the final target has been read from it.
 
 ---
 
@@ -38,8 +76,9 @@ for example:
 ```
 
 Because the target is absolute, it cannot be validated with the relative-URL check used elsewhere.
-Instead it is matched against an **allow-list of origins** so the endpoint can never be turned into an
-open redirect. A target is allowed when its origin (scheme + host + port) matches any of:
+Instead it is matched against an **allow-list of origins** so neither the endpoint nor its callback can be
+turned into an open redirect. The target is validated on both legs of the round-trip. A target is allowed
+when its origin (scheme + host + port) matches any of:
 
 - The proxy's **own public origin** as seen by the browser (derived from the request, honoring
   `X-Forwarded-Proto`). This covers redirecting back to the site the user is already on.
@@ -94,5 +133,6 @@ A "Log out" control in the application simply navigates the browser to the endpo
 <a href="/.cratis/logout?redirect=https://cratis.studio">Log out</a>
 ```
 
-After the redirect the user lands on the target unauthenticated; requesting a protected resource then
-triggers the normal login flow.
+For an OIDC session the browser is taken through the provider's end-session endpoint and back via the
+callback; for an OAuth session it lands on the target directly. Either way the user ends up on the target
+unauthenticated at AuthProxy, and requesting a protected resource then triggers the normal login flow.

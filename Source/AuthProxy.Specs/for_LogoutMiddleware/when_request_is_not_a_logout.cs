@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.for_LogoutMiddleware;
@@ -23,7 +24,9 @@ public class when_request_is_not_a_logout : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            config);
+            config,
+            Substitute.For<IEndSessionEndpointResolver>(),
+            Substitute.For<ILogger<LogoutMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";

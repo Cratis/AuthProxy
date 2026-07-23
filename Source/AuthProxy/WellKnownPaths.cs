@@ -42,10 +42,20 @@ public static class WellKnownPaths
     public const string SelectTenant = "/.cratis/select-tenant";
 
     /// <summary>
-    /// The well-known path that logs the current user out by clearing all session cookies
-    /// and redirecting to the URL supplied in the <c>redirect</c> query-string parameter.
+    /// The well-known path that logs the current user out. It initiates a full-chain logout: when the
+    /// session was established through an OIDC provider it redirects the browser to that provider's
+    /// end-session endpoint (RP-initiated logout), otherwise it clears the local session directly. The
+    /// final destination is supplied in the <c>redirect</c> query-string parameter.
     /// </summary>
     public const string Logout = "/.cratis/logout";
+
+    /// <summary>
+    /// The well-known path the identity provider redirects back to after an RP-initiated logout completes.
+    /// It clears every AuthProxy-generated cookie and redirects to the validated final <c>redirect</c>
+    /// target that was carried across the round-trip. Must be a segment under <see cref="Logout"/> so the
+    /// logout middleware can distinguish it from the initiation request.
+    /// </summary>
+    public const string LogoutCallback = "/.cratis/logout/callback";
 
     /// <summary>
     /// The well-known path prefix for initiating a session-preserving link flow for a specific provider.
