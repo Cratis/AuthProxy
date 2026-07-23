@@ -19,6 +19,13 @@ namespace Cratis.AuthProxy.Authentication;
 public static class AuthenticationServiceCollectionExtensions
 {
     /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key recording which provider scheme established the
+    /// session. It is persisted into the authentication cookie on sign-in so a later RP-initiated logout can
+    /// resolve the correct identity provider's end-session endpoint.
+    /// </summary>
+    public const string AuthenticationSchemeStateKey = "Cratis.AuthProxy.AuthenticationScheme";
+
+    /// <summary>
     /// Registers cookie authentication, all configured OIDC providers, all configured OAuth providers,
     /// and (optionally) JWT Bearer for machine-to-machine flows.
     /// </summary>
@@ -56,6 +63,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<ClientCredentialsVerifier>();
         builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
         builder.Services.AddSingleton<ClientCredentialsGrantService>();
+        builder.Services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
         builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
@@ -235,8 +243,9 @@ public static class AuthenticationServiceCollectionExtensions
     /// <summary>
     /// Shared provider-callback handler. In the session-preserving link flow it captures the freshly
     /// authenticated subject and posts it to the application <em>without</em> signing the new identity in,
-    /// so the user's primary session is preserved; otherwise it applies the tenant post-authentication
-    /// redirect resolution used by the normal login flow.
+    /// so the user's primary session is preserved; otherwise it records the authenticating provider scheme
+    /// for later RP-initiated logout and applies the tenant post-authentication redirect resolution used by
+    /// the normal login flow.
     /// </summary>
     /// <param name="context">The ticket-received context.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
@@ -255,6 +264,12 @@ public static class AuthenticationServiceCollectionExtensions
             context.HandleResponse();
             return;
         }
+
+        // A non-link ticket means a real sign-in is completing. Record which provider established this session
+        // so a later RP-initiated logout can target the correct identity provider's end-session endpoint.
+        // These properties are persisted into the authentication cookie by the RemoteAuthenticationHandler that
+        // signs the ticket in.
+        context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
 
         if (context.Properties is not null
             && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
