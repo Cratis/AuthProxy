@@ -6,6 +6,8 @@
   href: tenancy.md
 - name: Tenant Selection Page
   href: tenant-selection.md
+- name: Logout
+  href: logout.md
 - name: Services
   href: services.md
 - name: Lobby
