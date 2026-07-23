@@ -25,6 +25,11 @@ public class AuthProxy
     public Invite? Invite { get; set; }
 
     /// <summary>
+    /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
+    /// </summary>
+    public Logout Logout { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the tenant verification configuration.
     /// When set, the ingress calls the configured service to confirm that a resolved
     /// tenant exists before forwarding the request.

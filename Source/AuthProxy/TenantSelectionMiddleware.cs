@@ -82,13 +82,15 @@ public class TenantSelectionMiddleware(
             return;
         }
 
+        // Written as a session cookie so that, once a multi-tenant user has selected a tenant, the
+        // tenant list remains available to the application's toolbar switcher for the rest of the
+        // browser session. It is intentionally not deleted on selection.
         var tenantsJson = JsonSerializer.Serialize(tenantOptions, _serializerOptions);
         context.Response.Cookies.Append(Cookies.Tenants, tenantsJson, new CookieOptions
         {
             HttpOnly = false,
             SameSite = SameSiteMode.Lax,
             Secure = context.Request.IsHttps,
-            MaxAge = TimeSpan.FromMinutes(15),
         });
 
         await errorPageProvider.WriteErrorPageAsync(
@@ -120,8 +122,8 @@ public class TenantSelectionMiddleware(
             Secure = context.Request.IsHttps,
         });
 
-        context.Response.Cookies.Delete(Cookies.Tenants);
-
+        // The tenant list is intentionally retained (not deleted) so a multi-tenant user keeps the
+        // ability to switch tenants from the application's toolbar after making a selection.
         var requestedReturnUrl = context.Request.Query["returnUrl"].FirstOrDefault();
         if (!IsSafeRelativeUrl(requestedReturnUrl))
         {

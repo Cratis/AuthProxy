@@ -11,12 +11,34 @@ The page receives tenant data through a cookie, not by calling your tenant endpo
 
 1. Authenticated request arrives without a `.cratis-tenant` cookie.
 2. AuthProxy calls the configured `Selection.Options.TenantsEndpoint`.
-3. If exactly one tenant is returned, AuthProxy sets `.cratis-tenant` immediately and redirects to the original URL (no selection page shown).
-4. If more than one tenant is returned, AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) and serves `select-tenant.html`.
+3. If exactly one tenant is returned, AuthProxy sets `.cratis-tenant` immediately, removes any `.cratis-tenants` cookie, and redirects to the original URL (no selection page shown).
+4. If more than one tenant is returned, AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) as a session cookie and serves `select-tenant.html`.
 5. User clicks a tenant option.
 6. Browser navigates to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`.
 7. AuthProxy validates the selected `tenantId` against `TenantsEndpoint` and sets `.cratis-tenant`.
-8. AuthProxy redirects back to `returnUrl`.
+8. AuthProxy redirects back to `returnUrl`. The `.cratis-tenants` cookie is **retained** so the application can offer an in-app tenant switcher.
+
+---
+
+## Switching tenants after selection
+
+For a user with **more than one** tenant, `.cratis-tenants` is written as a **session cookie** and is
+**not** deleted when a tenant is selected. It therefore remains available for the rest of the browser
+session, which lets the application's toolbar decide whether to show a "switch tenant" control (show it
+only when the cookie lists more than one tenant).
+
+To switch, the toolbar navigates to the same selection endpoint used by the selection page:
+
+```
+/.cratis/select-tenant?tenantId=<id>&returnUrl=<current path>
+```
+
+Every switch re-validates the requested `tenantId` against `TenantsEndpoint`, so a stale cookie can
+never grant access to a tenant the user is no longer a member of — an unknown `tenantId` is rejected
+with `400 Bad Request`.
+
+A user with exactly **one** tenant never receives `.cratis-tenants` (it is removed when the single
+tenant is auto-selected), so no switcher is shown for single-tenant users.
 
 ---
 

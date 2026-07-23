@@ -42,6 +42,12 @@ public static class WellKnownPaths
     public const string SelectTenant = "/.cratis/select-tenant";
 
     /// <summary>
+    /// The well-known path that logs the current user out by clearing all session cookies
+    /// and redirecting to the URL supplied in the <c>redirect</c> query-string parameter.
+    /// </summary>
+    public const string Logout = "/.cratis/logout";
+
+    /// <summary>
     /// The well-known path prefix that triggers invite-token handling.
     /// Append the token to complete the URL (e.g. <c>/invite/&lt;token&gt;</c>).
     /// </summary>

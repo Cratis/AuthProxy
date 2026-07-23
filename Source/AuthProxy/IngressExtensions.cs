@@ -77,6 +77,7 @@ public static class IngressExtensions
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
         app.UseAuthentication();
+        app.UseMiddleware<LogoutMiddleware>();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<TenantSelectionMiddleware>();
