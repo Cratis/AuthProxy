@@ -3,6 +3,7 @@
 
 using System.Net.Http.Headers;
 using Cratis.AuthProxy.Links;
+using Cratis.AuthProxy.SignIns;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -235,11 +236,18 @@ public static class AuthenticationServiceCollectionExtensions
     /// <summary>
     /// Shared provider-callback handler. In the session-preserving link flow it captures the freshly
     /// authenticated subject and posts it to the application <em>without</em> signing the new identity in,
-    /// so the user's primary session is preserved; otherwise it applies the tenant post-authentication
-    /// redirect resolution used by the normal login flow.
+    /// so the user's primary session is preserved; otherwise it is a genuine sign-in — a logged-out user has
+    /// completed an identity-provider login and a fresh session is about to be established — so it notifies
+    /// the application of the sign-in and applies the tenant post-authentication redirect resolution used by
+    /// the normal login flow.
     /// </summary>
     /// <param name="context">The ticket-received context.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// This handler only runs when a provider callback delivers a fresh ticket — that is, on the exact
+    /// logged-out to signed-in transition. A request that reuses an existing session cookie never reaches it,
+    /// so a sign-in is notified once per real sign-in and never on ordinary proxied traffic.
+    /// </remarks>
     static async Task HandleTicketReceived(TicketReceivedContext context)
     {
         if (context.Properties is not null
@@ -255,6 +263,12 @@ public static class AuthenticationServiceCollectionExtensions
             context.HandleResponse();
             return;
         }
+
+        // A non-link ticket means a real sign-in is completing. Notifying the application here — rather than on
+        // every proxied request — is what scopes the sign-in event to the actual logged-out to signed-in
+        // transition. It never throws, so a notification failure can never break the sign-in.
+        var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
+        await notifier.Notify(context.HttpContext, context.Principal);
 
         if (context.Properties is not null
             && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(

@@ -31,6 +31,13 @@ public class AuthProxy
     public Link? Link { get; set; }
 
     /// <summary>
+    /// Gets or sets the sign-in notification configuration.
+    /// Set this section to have AuthProxy post a notification to the application whenever a user
+    /// completes an interactive sign-in.
+    /// </summary>
+    public SignIn? SignIn { get; set; }
+
+    /// <summary>
     /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
     /// </summary>
     public Logout Logout { get; set; } = new();
