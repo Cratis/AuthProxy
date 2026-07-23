@@ -43,4 +43,11 @@ public static class Cookies
     /// Cookie that stores the selected tenant identifier for subsequent requests.
     /// </summary>
     public const string Tenant = ".cratis-tenant";
+
+    /// <summary>
+    /// Short-lived HTTP-only cookie used to carry the validated final post-logout redirect target across
+    /// the RP-initiated logout round-trip to the identity provider's end-session endpoint and back to the
+    /// logout callback (<see cref="WellKnownPaths.LogoutCallback"/>).
+    /// </summary>
+    public const string LogoutRedirect = ".cratis-logout";
 }

@@ -6,33 +6,26 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.for_LogoutMiddleware;
 
-public class when_logging_out_redirecting_to_a_configured_frontend : Specification
+public class when_completing_logout_with_a_disallowed_carried_target : Specification
 {
     LogoutMiddleware _middleware;
     DefaultHttpContext _context;
 
     void Establish()
     {
-        var authProxyConfig = new C.AuthProxy
-        {
-            Services = new Dictionary<string, C.Service>
-            {
-                ["app"] = new C.Service
-                {
-                    Frontend = new C.ServiceEndpoint { BaseUrl = "https://app.example.com/" }
-                }
-            }
-        };
         var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        config.CurrentValue.Returns(authProxyConfig);
+        config.CurrentValue.Returns(new C.AuthProxy());
 
         _middleware = new LogoutMiddleware(_ => Task.CompletedTask, config, Substitute.For<IEndSessionEndpointResolver>(), Substitute.For<ILogger<LogoutMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Scheme = "https";
-        _context.Request.Host = new HostString("internal-proxy");
-        _context.Request.Path = WellKnownPaths.Logout;
-        _context.Request.QueryString = QueryString.Create("redirect", "https://app.example.com/goodbye");
+        _context.Request.Host = new HostString("cratis.studio");
+        _context.Request.Path = WellKnownPaths.LogoutCallback;
+
+        // Defense in depth: even though the logout cookie is proxy-set and HTTP-only, the callback re-validates
+        // the carried target against the allow-list so a forged or stale value can never open-redirect.
+        _context.Request.Headers.Cookie = $"{Cookies.LogoutRedirect}=https://evil.example.com/steal";
         _context.Response.Body = new MemoryStream();
 
         var serviceProvider = Substitute.For<IServiceProvider>();
@@ -42,6 +35,7 @@ public class when_logging_out_redirecting_to_a_configured_frontend : Specificati
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_redirect_to_the_configured_frontend() => _context.Response.Headers.Location.ToString().ShouldEqual("https://app.example.com/goodbye");
     [Fact] void should_respond_with_found() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status302Found);
+    [Fact] void should_fall_back_to_the_application_root() => _context.Response.Headers.Location.ToString().ShouldEqual("/");
+    [Fact] void should_clear_the_logout_redirect_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.LogoutRedirect}=;");
 }

@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.for_LogoutMiddleware;
@@ -15,7 +16,7 @@ public class when_logging_out_without_a_redirect : Specification
         var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         config.CurrentValue.Returns(new C.AuthProxy());
 
-        _middleware = new LogoutMiddleware(_ => Task.CompletedTask, config);
+        _middleware = new LogoutMiddleware(_ => Task.CompletedTask, config, Substitute.For<IEndSessionEndpointResolver>(), Substitute.For<ILogger<LogoutMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Scheme = "https";
