@@ -48,6 +48,14 @@ public static class WellKnownPaths
     public const string Logout = "/.cratis/logout";
 
     /// <summary>
+    /// The well-known path prefix for initiating a session-preserving link flow for a specific provider.
+    /// Append the scheme name to complete the URL (e.g. <c>/.cratis/link/github</c>).
+    /// Unlike <see cref="LoginPrefix"/>, the link flow authenticates a second provider identity for the
+    /// already signed-in user <em>without</em> replacing the primary authentication cookie/session.
+    /// </summary>
+    public const string Link = "/.cratis/link";
+
+    /// <summary>
     /// The well-known path prefix that triggers invite-token handling.
     /// Append the token to complete the URL (e.g. <c>/invite/&lt;token&gt;</c>).
     /// </summary>

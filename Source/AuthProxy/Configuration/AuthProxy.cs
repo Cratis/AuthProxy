@@ -25,6 +25,12 @@ public class AuthProxy
     public Invite? Invite { get; set; }
 
     /// <summary>
+    /// Gets or sets the credential-linking configuration.
+    /// Set this section to enable the session-preserving <c>/.cratis/link/{scheme}</c> flow.
+    /// </summary>
+    public Link? Link { get; set; }
+
+    /// <summary>
     /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
     /// </summary>
     public Logout Logout { get; set; } = new();
