@@ -108,6 +108,15 @@ public class LogoutMiddleware(
         {
             yield return lobbyOrigin;
         }
+
+        // Any explicitly configured post-logout redirect origins (e.g. a separate marketing site).
+        foreach (var configured in authProxyConfig.Logout.AllowedRedirectOrigins)
+        {
+            if (TryGetOrigin(configured, out var configuredOrigin))
+            {
+                yield return configuredOrigin;
+            }
+        }
     }
 
     static bool TryGetOrigin(string? url, out string origin)

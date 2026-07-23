@@ -45,10 +45,44 @@ open redirect. A target is allowed when its origin (scheme + host + port) matche
   `X-Forwarded-Proto`). This covers redirecting back to the site the user is already on.
 - Any configured **service frontend** (`Cratis:AuthProxy:Services:<name>:Frontend:BaseUrl`).
 - The configured **lobby frontend** (`Cratis:AuthProxy:Invite:Lobby:Frontend:BaseUrl`).
+- Any origin listed in **`Cratis:AuthProxy:Logout:AllowedRedirectOrigins`** (see below).
 
 Same-site **relative** URLs (a single leading `/`, but not `//`) are always allowed.
 
 If `redirect` is missing, empty, or fails validation, AuthProxy falls back to the application root (`/`).
+
+---
+
+## Allowing additional post-logout origins
+
+The implicit origins above cover redirecting back to the app itself, but a deployment often wants to send
+the user somewhere else after logout — for example a separate marketing or landing site that is neither
+the proxy's own origin nor a configured frontend. List those origins under
+`Cratis:AuthProxy:Logout:AllowedRedirectOrigins`. Each entry is an absolute origin (scheme + host,
+optionally a port) with no path; malformed or non-HTTP(S) entries are ignored.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Logout": {
+        "AllowedRedirectOrigins": [
+          "https://cratis.studio"
+        ]
+      }
+    }
+  }
+}
+```
+
+Equivalent environment variables (one indexed key per entry):
+
+```
+Cratis__AuthProxy__Logout__AllowedRedirectOrigins__0=https://cratis.studio
+```
+
+With the example above, `GET /.cratis/logout?redirect=https://cratis.studio` is permitted even when the
+app itself is served from a different host such as `https://app.cratis.studio`.
 
 ---
 
