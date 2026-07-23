@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using Cratis.AuthProxy.Links;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -172,20 +173,7 @@ public static class AuthenticationServiceCollectionExtensions
 
                 options.Events = new OpenIdConnectEvents
                 {
-                    OnTicketReceived = context =>
-                    {
-                        if (context.Properties is not null
-                            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
-                                context.HttpContext,
-                                context.Properties,
-                                context.ReturnUri,
-                                out var redirectUri))
-                        {
-                            context.ReturnUri = redirectUri;
-                        }
-
-                        return Task.CompletedTask;
-                    }
+                    OnTicketReceived = HandleTicketReceived
                 };
             });
         }
@@ -238,22 +226,44 @@ public static class AuthenticationServiceCollectionExtensions
                             await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
                         ctx.RunClaimActions(user.RootElement);
                     },
-                    OnTicketReceived = context =>
-                    {
-                        if (context.Properties is not null
-                            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
-                                context.HttpContext,
-                                context.Properties,
-                                context.ReturnUri,
-                                out var redirectUri))
-                        {
-                            context.ReturnUri = redirectUri;
-                        }
-
-                        return Task.CompletedTask;
-                    }
+                    OnTicketReceived = HandleTicketReceived
                 };
             });
+        }
+    }
+
+    /// <summary>
+    /// Shared provider-callback handler. In the session-preserving link flow it captures the freshly
+    /// authenticated subject and posts it to the application <em>without</em> signing the new identity in,
+    /// so the user's primary session is preserved; otherwise it applies the tenant post-authentication
+    /// redirect resolution used by the normal login flow.
+    /// </summary>
+    /// <param name="context">The ticket-received context.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    static async Task HandleTicketReceived(TicketReceivedContext context)
+    {
+        if (context.Properties is not null
+            && context.Properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode)
+            && linkMode == "true")
+        {
+            var exchanger = context.HttpContext.RequestServices.GetRequiredService<ILinkSubjectExchanger>();
+            await exchanger.Exchange(context.Principal, context.Properties);
+
+            // Short-circuit before the RemoteAuthenticationHandler signs the ticket into the cookie scheme:
+            // the linked identity must never replace the primary session. Hand the browser back to the app.
+            context.Response.Redirect(context.Properties.RedirectUri ?? "/");
+            context.HandleResponse();
+            return;
+        }
+
+        if (context.Properties is not null
+            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
+                context.HttpContext,
+                context.Properties,
+                context.ReturnUri,
+                out var redirectUri))
+        {
+            context.ReturnUri = redirectUri;
         }
     }
 }

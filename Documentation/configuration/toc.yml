@@ -8,6 +8,8 @@
   href: tenant-selection.md
 - name: Logout
   href: logout.md
+- name: Credential Linking
+  href: link.md
 - name: Services
   href: services.md
 - name: Lobby

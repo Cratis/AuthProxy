@@ -5,6 +5,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
+using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Registrations;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
@@ -79,6 +80,7 @@ public static class IngressExtensions
         app.UseAuthentication();
         app.UseMiddleware<LogoutMiddleware>();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
+        app.UseMiddleware<LinkMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<TenantSelectionMiddleware>();
         app.UseMiddleware<TenancyMiddleware>();
