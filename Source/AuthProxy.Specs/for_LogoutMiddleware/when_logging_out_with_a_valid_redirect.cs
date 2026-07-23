@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -24,7 +25,9 @@ public class when_logging_out_with_a_valid_redirect : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            config);
+            config,
+            Substitute.For<IEndSessionEndpointResolver>(),
+            Substitute.For<ILogger<LogoutMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Scheme = "https";
