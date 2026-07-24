@@ -180,6 +180,12 @@ public static class AuthenticationServiceCollectionExtensions
                 options.NonceCookie.SameSite = SameSiteMode.Lax;
                 options.NonceCookie.SecurePolicy = CookieSecurePolicy.None;
 
+                // Keep the transient handshake cookies at the root path (they otherwise default to the
+                // callback path) so the browser sends them on the logout request and they can be cleared
+                // there instead of accumulating from abandoned sign-in attempts.
+                options.CorrelationCookie.Path = "/";
+                options.NonceCookie.Path = "/";
+
                 options.Events = new OpenIdConnectEvents
                 {
                     OnTicketReceived = HandleTicketReceived
@@ -208,6 +214,11 @@ public static class AuthenticationServiceCollectionExtensions
                 // Support local HTTP development callback flows.
                 options.CorrelationCookie.SameSite = SameSiteMode.Lax;
                 options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
+
+                // Keep the transient correlation cookie at the root path (it otherwise defaults to the
+                // callback path) so the browser sends it on the logout request and it can be cleared there
+                // instead of accumulating from abandoned sign-in attempts.
+                options.CorrelationCookie.Path = "/";
 
                 foreach (var scope in capturedProvider.Scopes)
                 {
