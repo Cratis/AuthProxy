@@ -140,6 +140,26 @@ public class LogoutMiddleware(
         context.Response.Cookies.Delete(Cookies.InviteToken);
         context.Response.Cookies.Delete(Cookies.Registration);
         context.Response.Cookies.Delete(Cookies.Providers);
+        ClearTransientAuthenticationCookies(context);
+    }
+
+    /// <summary>
+    /// Deletes the correlation and nonce cookies the OAuth/OIDC middleware leaves behind when a sign-in
+    /// handshake is abandoned. They carry random per-attempt names, so they are matched by their well-known
+    /// prefixes rather than by an exact name; the provider registration keeps them at the root path so the
+    /// browser still sends them on the logout request and they can be enumerated and cleared here.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> whose response the delete cookies are written to.</param>
+    static void ClearTransientAuthenticationCookies(HttpContext context)
+    {
+        var transientCookies = context.Request.Cookies.Keys
+            .Where(name => name.StartsWith(Cookies.CorrelationPrefix, StringComparison.Ordinal)
+                || name.StartsWith(Cookies.NoncePrefix, StringComparison.Ordinal));
+
+        foreach (var cookie in transientCookies)
+        {
+            context.Response.Cookies.Delete(cookie, new CookieOptions { Path = "/" });
+        }
     }
 
     static void SetLogoutRedirectCookie(HttpContext context, string target)
