@@ -17,6 +17,9 @@ public static class TenancyServiceCollectionExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddTenancy(this WebApplicationBuilder builder)
     {
+        // The tenant selection middleware uses the memory cache to bound how often a selected tenant
+        // is re-validated against the tenant endpoint.
+        builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, HostSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, ClaimSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, RouteSourceIdentifierStrategy>();
