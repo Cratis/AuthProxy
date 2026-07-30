@@ -19,6 +19,12 @@ public class AuthProxy
     public Authentication Authentication { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the browser-session hardening configuration: the bounded authentication session
+    /// lifetime and the identity/tenant re-validation intervals.
+    /// </summary>
+    public Session Session { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the invite system configuration.
     /// Set this section to enable invite-based onboarding.
     /// </summary>
