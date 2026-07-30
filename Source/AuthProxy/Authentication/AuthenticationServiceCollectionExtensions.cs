@@ -37,6 +37,10 @@ public static class AuthenticationServiceCollectionExtensions
         var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
         var hasJwtBearer = jwtSection.Exists();
 
+        var sessionConfig = builder.Configuration
+            .GetSection(C.Session.SectionKey)
+            .Get<C.Session>() ?? new();
+
         var authBuilder = builder.Services
             .AddAuthentication(options =>
             {
@@ -48,7 +52,7 @@ public static class AuthenticationServiceCollectionExtensions
                 ClientCredentialsDefaults.CompositeAuthenticationScheme,
                 ClientCredentialsDefaults.CompositeAuthenticationScheme,
                 options => options.ForwardDefaultSelector = context => ResolveAuthenticationScheme(context, hasJwtBearer))
-            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookieOptions)
+            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options => ConfigureCookieOptions(options, sessionConfig))
             .AddScheme<AuthenticationSchemeOptions, ClientCredentialsBearerAuthenticationHandler>(
                 ClientCredentialsDefaults.AuthenticationScheme,
                 _ => { });
@@ -102,12 +106,23 @@ public static class AuthenticationServiceCollectionExtensions
         return CookieAuthenticationDefaults.AuthenticationScheme;
     }
 
-    static void ConfigureCookieOptions(CookieAuthenticationOptions options)
+    static void ConfigureCookieOptions(CookieAuthenticationOptions options, C.Session session)
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.Name = ".Cratis.AuthProxy.Auth.v2";
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+
+        // Mark the cookie Secure whenever the request itself is HTTPS — the forwarded-headers middleware
+        // makes this reflect the original scheme behind a TLS-terminating ingress — while still supporting
+        // local HTTP development flows.
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // The cookie itself stays session-scoped (no persistent Expires) — closing the browser ends the
+        // session. The encrypted ticket additionally carries a bounded lifetime so even a browser session
+        // that never closes must re-authenticate with the identity provider periodically; with sliding
+        // expiration disabled (the default) that lifetime is absolute and activity cannot extend it.
+        options.ExpireTimeSpan = session.Lifetime > TimeSpan.Zero ? session.Lifetime : C.Session.DefaultLifetime;
+        options.SlidingExpiration = session.SlidingExpiration;
 
         // Redirect unauthenticated users to the provider selection page (multiple providers)
         // or directly to the single provider login endpoint.
@@ -174,11 +189,13 @@ public static class AuthenticationServiceCollectionExtensions
 
                 options.CallbackPath = $"/signin-{scheme}";
 
-                // Support local HTTP development callback flows.
+                // Lax + SameAsRequest keeps the handshake cookies flowing across the provider redirect,
+                // marks them Secure whenever the site runs on HTTPS, and still supports local HTTP
+                // development callback flows.
                 options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 options.NonceCookie.SameSite = SameSiteMode.Lax;
-                options.NonceCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
                 // Keep the transient handshake cookies at the root path (they otherwise default to the
                 // callback path) so the browser sends them on the logout request and they can be cleared
@@ -211,9 +228,11 @@ public static class AuthenticationServiceCollectionExtensions
                 options.CallbackPath = $"/signin-{scheme}";
                 options.SaveTokens = true;
 
-                // Support local HTTP development callback flows.
+                // Lax + SameAsRequest keeps the handshake cookie flowing across the provider redirect,
+                // marks it Secure whenever the site runs on HTTPS, and still supports local HTTP
+                // development callback flows.
                 options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
 
                 // Keep the transient correlation cookie at the root path (it otherwise defaults to the
                 // callback path) so the browser sends it on the logout request and it can be cleared there
