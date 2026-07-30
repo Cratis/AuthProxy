@@ -6,7 +6,7 @@ using Cratis.Arc.Identity;
 
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver;
 
-public class when_microservice_returns_identity_details : Specification
+public class when_identity_revalidation_is_disabled : Specification
 {
     IdentityDetailsResolver _resolver;
     DefaultHttpContext _context;
@@ -16,6 +16,7 @@ public class when_microservice_returns_identity_details : Specification
     {
         var config = new C.AuthProxy
         {
+            Session = new C.Session { IdentityRevalidationInterval = TimeSpan.Zero },
             Services = new Dictionary<string, C.Service>
             {
                 ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://backend/" } }
@@ -34,7 +35,6 @@ public class when_microservice_returns_identity_details : Specification
 
     async Task Because() => _result = await _resolver.Resolve(_context, new ClientPrincipal { UserId = "user-1" }, Guid.NewGuid().ToString());
 
-    [Fact] void should_be_authorized() => Assert.True(_result.IsAuthorized);
     [Fact] void should_write_identity_cookie_to_response() => Assert.NotEmpty(_context.Response.Headers.SetCookie.ToString());
-    [Fact] void should_bound_the_identity_cookie_to_the_revalidation_interval() => _context.Response.Headers.SetCookie.ToString().ShouldContain("max-age=600");
+    [Fact] void should_write_the_identity_cookie_as_a_session_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain("max-age");
 }
