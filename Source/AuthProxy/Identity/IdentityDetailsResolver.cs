@@ -133,12 +133,18 @@ public class IdentityDetailsResolver(
         var json = JsonSerializer.Serialize(result, _cookieSerializerOptions);
         var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
 
+        // The cookie is a pure cache of the resolved identity details. Bounding it to the configured
+        // re-validation interval makes the browser drop it periodically, which forces the details — and
+        // the authorization decision they represent — to be re-resolved against the services without
+        // paying a backend round-trip on every request. A non-positive interval keeps it a session cookie.
+        var revalidationInterval = config.CurrentValue.Session.IdentityRevalidationInterval;
+
         context.Response.Cookies.Append(Cookies.Identity, encoded, new CookieOptions
         {
             HttpOnly = false,   // Must be readable by the frontend JS.
             SameSite = SameSiteMode.Lax,
             Secure = context.Request.IsHttps,
-            Expires = null,     // Session cookie.
+            MaxAge = revalidationInterval > TimeSpan.Zero ? revalidationInterval : null,
         });
     }
 

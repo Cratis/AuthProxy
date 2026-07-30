@@ -39,7 +39,8 @@ public class when_switching_tenant_retains_the_tenant_list : Specification
             config,
             Substitute.For<ITenantResolver>(),
             httpClientFactory,
-            Substitute.For<IErrorPageProvider>());
+            Substitute.For<IErrorPageProvider>(),
+            new MemoryCache(new MemoryCacheOptions()));
 
         _context = new DefaultHttpContext();
         _context.Request.Path = WellKnownPaths.SelectTenant;

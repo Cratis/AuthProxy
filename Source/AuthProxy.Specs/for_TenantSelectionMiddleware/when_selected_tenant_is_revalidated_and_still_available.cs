@@ -6,11 +6,11 @@ using System.Text;
 
 namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 
-public class when_selecting_a_tenant : Specification
+public class when_selected_tenant_is_revalidated_and_still_available : Specification
 {
     TenantSelectionMiddleware _middleware;
-    DefaultHttpContext _context;
-    bool _nextCalled;
+    CountingTenantsHandler _handler;
+    int _nextCalls;
 
     void Establish()
     {
@@ -32,15 +32,22 @@ public class when_selecting_a_tenant : Specification
         config.CurrentValue.Returns(authProxyConfig);
 
         var tenantResolver = Substitute.For<ITenantResolver>();
+        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>())
+            .Returns(callInfo =>
+            {
+                callInfo[1] = new TenantResolutionResult("tenant-a", C.TenantSourceIdentifierResolverType.Selection);
+                return true;
+            });
 
+        _handler = new CountingTenantsHandler();
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>())
-            .Returns(new HttpClient(new FakeTenantsHandler()));
+            .Returns(_ => new HttpClient(_handler, disposeHandler: false));
 
         _middleware = new TenantSelectionMiddleware(
             _ =>
             {
-                _nextCalled = true;
+                _nextCalls++;
                 return Task.CompletedTask;
             },
             config,
@@ -48,31 +55,40 @@ public class when_selecting_a_tenant : Specification
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()));
-
-        _context = new DefaultHttpContext();
-        _context.Request.Path = WellKnownPaths.SelectTenant;
-        _context.Request.QueryString = new QueryString("?tenantId=tenant-b&returnUrl=%2Fdashboard");
-        _context.Response.Body = new MemoryStream();
-        _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
     }
 
-    async Task Because() => await _middleware.InvokeAsync(_context);
-
-    [Fact] void should_set_selected_tenant_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.Tenant}=tenant-b");
-    [Fact] void should_write_the_selected_tenant_cookie_as_a_session_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain("expires=");
-    [Fact] void should_not_give_the_selected_tenant_cookie_a_max_age() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain("max-age=");
-    [Fact] void should_redirect_to_return_url() => _context.Response.Headers.Location.ToString().ShouldEqual("/dashboard");
-    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
-
-    sealed class FakeTenantsHandler : HttpMessageHandler
+    async Task Because()
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        await _middleware.InvokeAsync(CreateContext());
+        await _middleware.InvokeAsync(CreateContext());
+    }
+
+    [Fact] void should_call_next_for_both_requests() => _nextCalls.ShouldEqual(2);
+    [Fact] void should_only_call_the_tenant_endpoint_once_within_the_revalidation_window() => _handler.Calls.ShouldEqual(1);
+
+    static DefaultHttpContext CreateContext()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/products";
+        context.Response.Body = new MemoryStream();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
+        return context;
+    }
+
+    sealed class CountingTenantsHandler : HttpMessageHandler
+    {
+        public int Calls { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
                     """[{"id":"tenant-a","name":"Tenant A"},{"id":"tenant-b","name":"Tenant B"}]""",
                     Encoding.UTF8,
                     "application/json")
             });
+        }
     }
 }

@@ -33,7 +33,7 @@ public class when_authenticated_user_has_no_resolved_tenant_and_only_one_tenant_
         config.CurrentValue.Returns(authProxyConfig);
 
         var tenantResolver = Substitute.For<ITenantResolver>();
-        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<string>()).Returns(false);
+        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>()).Returns(false);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>())
@@ -53,7 +53,8 @@ public class when_authenticated_user_has_no_resolved_tenant_and_only_one_tenant_
             config,
             tenantResolver,
             httpClientFactory,
-            _errorPageProvider);
+            _errorPageProvider,
+            new MemoryCache(new MemoryCacheOptions()));
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";
