@@ -104,6 +104,41 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 
 ---
 
+## Session lifetime and re-validation
+
+Interactive browser sessions are cookie-based, and every cookie AuthProxy issues for identity or tenant
+context is **session-scoped or short-lived** — closing the browser ends them. On top of that,
+`Cratis:AuthProxy:Session` bounds what a browser session that never closes may keep:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Session": {
+        "Lifetime": "12:00:00",
+        "SlidingExpiration": false,
+        "IdentityRevalidationInterval": "00:10:00",
+        "TenantRevalidationInterval": "00:10:00"
+      }
+    }
+  }
+}
+```
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `Lifetime` | `12:00:00` | Absolute lifetime of the authentication ticket. When it elapses the user must re-authenticate with the identity provider, even in a browser session that never closed. |
+| `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
+| `IdentityRevalidationInterval` | `00:10:00` | How long the `.cratis-identity` cookie is trusted before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative disables the bound. |
+| `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative disables re-validation. |
+
+The authentication cookie itself carries no persistent `Expires` — the browser drops it when the session
+ends — and is `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever the site is served over HTTPS.
+Re-validation is cached in memory per instance, so within an interval no extra backend calls are made;
+when the interval lapses, a single backend round-trip refreshes the cached identity or tenant context.
+
+---
+
 ## JWT Bearer (API)
 
 For machine-to-machine calls, configure a JWT Bearer handler:

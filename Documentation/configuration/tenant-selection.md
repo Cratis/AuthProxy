@@ -37,6 +37,22 @@ Every switch re-validates the requested `tenantId` against `TenantsEndpoint`, so
 never grant access to a tenant the user is no longer a member of — an unknown `tenantId` is rejected
 with `400 Bad Request`.
 
+---
+
+## Periodic re-validation of the selected tenant
+
+`.cratis-tenant` is a session cookie, but it is also **not trusted indefinitely within a session**:
+AuthProxy re-validates the selected tenant against `TenantsEndpoint` when the configured
+`Cratis:AuthProxy:Session:TenantRevalidationInterval` (default 10 minutes) has lapsed. A successful
+re-validation is cached in memory, so the endpoint is **not** called on every request.
+
+When the endpoint answers authoritatively that the tenant is no longer available to the user, the
+`.cratis-tenant` and `.cratis-tenants` cookies are deleted and the request is replayed without them —
+the user lands back in the regular selection flow (or the no-tenant handling when nothing remains).
+Revoked tenant access therefore takes effect within the interval, without waiting for the browser
+session to end. Transport failures fail open so a transient backend outage cannot lock users out;
+the next lapse of the window retries.
+
 A user with exactly **one** tenant never receives `.cratis-tenants` (it is removed when the single
 tenant is auto-selected), so no switcher is shown for single-tenant users.
 
