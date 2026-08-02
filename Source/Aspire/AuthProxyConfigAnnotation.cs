@@ -20,4 +20,10 @@ sealed class AuthProxyConfigAnnotation : IResourceAnnotation
 
     /// <summary>Gets or sets the number of invite claim-forwarding entries that have been registered.</summary>
     public int InviteClaimForwardingCount { get; set; }
+
+    /// <summary>
+    /// Gets the number of anonymous paths registered per service key, so that repeated calls append
+    /// rather than overwrite the indices an earlier call already wrote.
+    /// </summary>
+    public Dictionary<string, int> AnonymousPathCounts { get; } = new(StringComparer.Ordinal);
 }

@@ -16,7 +16,8 @@ namespace Cratis.AuthProxy.Authentication;
 /// enabled and a lobby URL is configured), unauthenticated requests without an invite token or
 /// pending invite cookie are immediately answered with the <c>invitation-required.html</c> page
 /// instead of being redirected to a login provider.
-/// Skips invite paths, authentication paths, and requests with a pending invite cookie.
+/// Skips invite paths, authentication paths, paths a service declares in
+/// <see cref="C.Service.AnonymousPaths"/>, and requests with a pending invite cookie.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="proxyConfig">The auth proxy configuration monitor.</param>
@@ -43,6 +44,7 @@ public class SelectProviderMiddleware(
             || context.IsInvitation()
             || context.IsRegistration()
             || context.IsAuthenticationUI()
+            || context.IsAnonymousPath(proxyConfig.CurrentValue)
             || context.HasPendingInvitation())
         {
             await next(context);

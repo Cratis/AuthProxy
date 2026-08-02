@@ -65,11 +65,18 @@ public class TenancyMiddleware(
             var hasPendingInviteCookie = context.HasPendingInvitation();
             var hasPendingRegistrationCookie = context.HasPendingRegistration();
             var isAuthPath = context.IsAuthenticationUI();
+
+            // A caller on a declared anonymous path has no session to resolve a tenant from, so treat it
+            // like the other tenant-less paths below. Without this, declaring a path anonymous would move
+            // the refusal from SelectProviderMiddleware to here instead of removing it.
+            var isAnonymousPath = context.IsAnonymousPath(config.CurrentValue);
+
             if (shouldRedirectToLobby
                 && !string.IsNullOrWhiteSpace(lobbyUrl)
                 && !isInvitePath
                 && !isRegistrationPath
                 && !isAuthPath
+                && !isAnonymousPath
                 && !hasPendingInviteCookie
                 && !hasPendingRegistrationCookie)
             {
@@ -82,6 +89,7 @@ public class TenancyMiddleware(
                 && !isAuthPath
                 && !isInvitePath
                 && !isRegistrationPath
+                && !isAnonymousPath
                 && !hasPendingInviteCookie
                 && !hasPendingRegistrationCookie)
             {

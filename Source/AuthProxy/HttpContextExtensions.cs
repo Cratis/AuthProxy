@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using C = Cratis.AuthProxy.Configuration;
+
 namespace Cratis.AuthProxy;
 
 /// <summary>
@@ -74,6 +76,15 @@ public static class HttpContextExtensions
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if the request is part of the authentication UI; otherwise <see langword="false"/>.</returns>
     public static bool IsAuthenticationUI(this HttpContext context) => context.IsLogin() || context.IsProviders() || context.IsToken();
+
+    /// <summary>
+    /// Determines whether the request targets a path a service declares as anonymous.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <param name="config">The auth proxy configuration declaring the anonymous paths.</param>
+    /// <returns><see langword="true"/> if the request targets an anonymous path; otherwise <see langword="false"/>.</returns>
+    public static bool IsAnonymousPath(this HttpContext context, C.AuthProxy config) =>
+        AnonymousPaths.Matches(context.Request.Path, config);
 
     /// <summary>
     /// Determines whether the request targets any authentication bootstrap endpoint.

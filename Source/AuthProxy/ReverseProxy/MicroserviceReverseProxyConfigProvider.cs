@@ -28,6 +28,16 @@ namespace Cratis.AuthProxy.ReverseProxy;
 public class MicroserviceReverseProxyConfigProvider(
     IOptionsMonitor<C.AuthProxy> config) : IProxyConfigProvider
 {
+    /// <summary>
+    /// The YARP well-known authorization policy name that disables authorization for a route.
+    /// </summary>
+    const string AnonymousAuthorizationPolicy = "anonymous";
+
+    /// <summary>
+    /// The path prefix served by a service's backend rather than its frontend.
+    /// </summary>
+    const string ApiPathPrefix = "/api";
+
     static readonly ClusterConfig _baseCluster = new()
     {
         HttpRequest = new() { ActivityTimeout = TimeSpan.FromMinutes(5) },
@@ -49,6 +59,8 @@ public class MicroserviceReverseProxyConfigProvider(
         foreach (var (name, ms) in services)
         {
             var key = name.ToLowerInvariant();
+
+            routes.AddRange(AnonymousRoutes(key, ms));
 
             if (ms.Backend is not null)
             {
@@ -93,6 +105,69 @@ public class MicroserviceReverseProxyConfigProvider(
         }
 
         return routes;
+    }
+
+    /// <summary>
+    /// Builds the routes for the paths a service declares in <see cref="C.Service.AnonymousPaths"/>.
+    /// </summary>
+    /// <param name="microserviceKey">The lower-cased service key.</param>
+    /// <param name="service">The service configuration.</param>
+    /// <returns>One route per declared anonymous path prefix.</returns>
+    /// <remarks>
+    /// These are the only routes not generated with <c>AuthorizationPolicy = "default"</c>. That default is
+    /// <c>RequireAuthenticatedUser()</c>, so without this a declared anonymous path would clear
+    /// <c>SelectProviderMiddleware</c> and then be refused by authorization instead — the same closed door,
+    /// one middleware later. None of the built-in skip-list paths (invite, registration, authentication UI,
+    /// <c>/_pages</c>) is ever proxied to a service, so this is the first case where an unauthenticated
+    /// request is meant to reach a backend, and the first that needs the policy relaxed.
+    /// <para>
+    /// The relaxation is scoped to exactly the declared prefixes and nothing else: with no
+    /// <c>AnonymousPaths</c> declared this yields no routes and the table is what it was before. Each
+    /// prefix is emitted as a catch-all so it covers the prefix itself and everything under it, which
+    /// matches the segment-prefix semantics the middlewares apply because
+    /// <see cref="AnonymousPaths.TryNormalize"/> only admits prefixes made of literal segments.
+    /// </para>
+    /// <para>
+    /// Order 0 puts these ahead of the header- and query-selected routes, which is what relaxes the policy
+    /// but also claims the prefix for the whole proxy: an anonymous caller cannot be expected to send a
+    /// service-selection header, so the declared path is necessarily what identifies the service. In a
+    /// multi-service deployment no other service can serve anything under a declared prefix.
+    /// </para>
+    /// </remarks>
+    static IEnumerable<RouteConfig> AnonymousRoutes(string microserviceKey, C.Service service)
+    {
+        var index = 0;
+
+        foreach (var path in AnonymousPaths.For(service))
+        {
+            // Mirror the authenticated split: /api goes to the backend, anything else to the frontend,
+            // falling back to whichever endpoint the service actually declares.
+            var prefersBackend = new PathString(path).StartsWithSegments(ApiPathPrefix);
+            var clusterId = (prefersBackend, service.Backend, service.Frontend) switch
+            {
+                (true, not null, _) => BackendClusterId(microserviceKey),
+                (false, _, not null) => FrontendClusterId(microserviceKey),
+                (_, not null, null) => BackendClusterId(microserviceKey),
+                (_, null, not null) => FrontendClusterId(microserviceKey),
+                _ => null,
+            };
+
+            if (clusterId is null)
+            {
+                continue;
+            }
+
+            yield return new RouteConfig
+            {
+                RouteId = $"{microserviceKey}-anonymous-{index}",
+                ClusterId = clusterId,
+                AuthorizationPolicy = AnonymousAuthorizationPolicy,
+                Match = new RouteMatch { Path = $"{path}/{{**catch-all}}" },
+                Order = 0,
+            };
+
+            index++;
+        }
     }
 
     static IEnumerable<RouteConfig> BackendRoutes(string microserviceKey, bool isSingle)
