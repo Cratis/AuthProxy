@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Net.Http.Headers;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
@@ -121,15 +122,8 @@ public static class HttpContextExtensions
                 || string.Equals(destination, "frame", StringComparison.OrdinalIgnoreCase);
         }
 
-        foreach (var accept in context.Request.Headers.Accept)
-        {
-            if (accept?.Contains(HtmlMediaType, StringComparison.OrdinalIgnoreCase) == true)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return MediaTypeHeaderValue.TryParseList(context.Request.Headers.Accept, out var accepted)
+            && accepted.Any(AcceptsHtml);
     }
 
     /// <summary>
@@ -180,4 +174,19 @@ public static class HttpContextExtensions
 
         return true;
     }
+
+    /// <summary>
+    /// Determines whether an <c>Accept</c> entry asks for HTML.
+    /// </summary>
+    /// <param name="mediaType">The parsed <c>Accept</c> entry.</param>
+    /// <returns><see langword="true"/> when the entry asks for HTML; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// Only an explicit <c>text/html</c> counts. The wildcards <c>*&#47;*</c> and <c>text/*</c> do not:
+    /// they are what a client sends when it will take whatever it is given, and reading them as a request
+    /// for a page is the misclassification that turns a refusal into a recorded success. A quality of zero
+    /// is the caller stating outright that HTML is unacceptable, so it is honored rather than matched.
+    /// </remarks>
+    static bool AcceptsHtml(MediaTypeHeaderValue mediaType) =>
+        string.Equals(mediaType.MediaType.Value, HtmlMediaType, StringComparison.OrdinalIgnoreCase)
+        && mediaType.Quality != 0;
 }

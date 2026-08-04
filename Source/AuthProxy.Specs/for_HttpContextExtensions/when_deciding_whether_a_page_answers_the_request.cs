@@ -59,6 +59,10 @@ public class when_deciding_whether_a_page_answers_the_request : Specification
     [Fact] void should_not_answer_a_contradictory_destination_with_a_page() => WithFetchDestinationAndAccept(new StringValues(["document", "empty"]), "text/html").IsDocumentNavigation().ShouldBeFalse();
     [Fact] void should_answer_an_explicit_html_accept_with_a_page() => WithAccept("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8").IsDocumentNavigation().ShouldBeTrue();
     [Fact] void should_not_answer_a_wildcard_accept_with_a_page() => WithAccept("*/*").IsDocumentNavigation().ShouldBeFalse();
+    [Fact] void should_not_answer_a_type_wildcard_accept_with_a_page() => WithAccept("text/*").IsDocumentNavigation().ShouldBeFalse();
     [Fact] void should_not_answer_a_json_accept_with_a_page() => WithAccept("application/json").IsDocumentNavigation().ShouldBeFalse();
+    [Fact] void should_not_answer_a_caller_refusing_html_with_a_page() => WithAccept("text/html;q=0, application/json").IsDocumentNavigation().ShouldBeFalse();
+    [Fact] void should_answer_a_weighted_html_accept_with_a_page() => WithAccept("application/json;q=0.9, text/html;q=0.8").IsDocumentNavigation().ShouldBeTrue();
+    [Fact] void should_not_answer_an_unparseable_accept_with_a_page() => WithAccept("=nonsense=").IsDocumentNavigation().ShouldBeFalse();
     [Fact] void should_not_answer_a_request_stating_nothing_with_a_page() => new DefaultHttpContext().IsDocumentNavigation().ShouldBeFalse();
 }
