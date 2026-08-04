@@ -146,7 +146,8 @@ actually declares.
   demanding a login before the application is ever reached.
 - A declared prefix is claimed for the whole proxy. An anonymous caller cannot send a `Service-ID`
   header, so the path itself identifies the service — in a multi-service deployment no other service can
-  serve anything under a declared prefix.
+  serve anything under a declared prefix. If two services declare the same prefix, the first one in
+  configuration order serves it; the path stays anonymous, which is what both asked for.
 - A declared path is reachable for *every* caller, not only signed-out ones. Provider selection, the
   unresolved-tenant refusal and the tenant-selection page are all skipped for it, so a user who happens to
   be signed in — without having chosen a tenant — still gets the application's response rather than a

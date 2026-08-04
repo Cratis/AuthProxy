@@ -56,11 +56,18 @@ public class MicroserviceReverseProxyConfigProvider(
         var services = config.Services;
         var isSingleMicroservice = services.Count == 1;
 
+        // A declared prefix is matched without any service-selection header or query parameter, so two
+        // services declaring the same prefix would emit two routes with an identical template and an
+        // identical order — which ASP.NET cannot choose between, and reports as AmbiguousMatchException on
+        // the declared path. Claiming each prefix for the first service that declares it keeps the path
+        // anonymous, which is what every declaring service asked for, and the table unambiguous.
+        var claimedAnonymousPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var (name, ms) in services)
         {
             var key = name.ToLowerInvariant();
 
-            routes.AddRange(AnonymousRoutes(key, ms));
+            routes.AddRange(AnonymousRoutes(key, ms, claimedAnonymousPaths));
 
             if (ms.Backend is not null)
             {
@@ -112,14 +119,18 @@ public class MicroserviceReverseProxyConfigProvider(
     /// </summary>
     /// <param name="microserviceKey">The lower-cased service key.</param>
     /// <param name="service">The service configuration.</param>
-    /// <returns>One route per declared anonymous path prefix.</returns>
+    /// <param name="claimedPaths">The prefixes already claimed by an earlier service; claimed here as they are emitted.</param>
+    /// <returns>One route per declared anonymous path prefix not already claimed.</returns>
     /// <remarks>
     /// These are the only routes not generated with <c>AuthorizationPolicy = "default"</c>. That default is
-    /// <c>RequireAuthenticatedUser()</c>, so without this a declared anonymous path would clear
-    /// <c>SelectProviderMiddleware</c> and then be refused by authorization instead — the same closed door,
-    /// one middleware later. None of the built-in skip-list paths (invite, registration, authentication UI,
-    /// <c>/_pages</c>) is ever proxied to a service, so this is the first case where an unauthenticated
-    /// request is meant to reach a backend, and the first that needs the policy relaxed.
+    /// <c>RequireAuthenticatedUser()</c>, so without this a declared anonymous path clears
+    /// <c>SelectProviderMiddleware</c> only to be stopped one step later — refused by authorization on the
+    /// catch-all route in a single-service deployment, or matching no route at all in a multi-service one,
+    /// where every other route is selected by a header or query parameter an anonymous caller has no reason
+    /// to send. The same closed door either way. None of the built-in skip-list paths (invite,
+    /// registration, authentication UI, <c>/_pages</c>) is ever proxied to a service, so this is the first
+    /// case where an unauthenticated request is meant to reach a backend, and the first that needs the
+    /// policy relaxed.
     /// <para>
     /// The relaxation is scoped to exactly the declared prefixes and nothing else: with no
     /// <c>AnonymousPaths</c> declared this yields no routes and the table is what it was before. Each
@@ -134,12 +145,17 @@ public class MicroserviceReverseProxyConfigProvider(
     /// multi-service deployment no other service can serve anything under a declared prefix.
     /// </para>
     /// </remarks>
-    static IEnumerable<RouteConfig> AnonymousRoutes(string microserviceKey, C.Service service)
+    static IEnumerable<RouteConfig> AnonymousRoutes(string microserviceKey, C.Service service, HashSet<string> claimedPaths)
     {
         var index = 0;
 
         foreach (var path in AnonymousPaths.For(service))
         {
+            if (!claimedPaths.Add(path))
+            {
+                continue;
+            }
+
             // Mirror the authenticated split: /api goes to the backend, anything else to the frontend,
             // falling back to whichever endpoint the service actually declares.
             var prefersBackend = new PathString(path).StartsWithSegments(ApiPathPrefix);
