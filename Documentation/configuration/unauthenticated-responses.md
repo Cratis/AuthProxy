@@ -65,6 +65,28 @@ when an authenticated user belongs to no organization.
 
 ---
 
+## Upgrading
+
+This changes the status code an existing deployment returns to non-browser callers, and one case is worth
+checking before rolling out: **an HTTP liveness or readiness probe pointed at AuthProxy**.
+
+A probe sends `Accept: */*` and no fetch metadata, so it is not a navigation. Pointed at `/` it used to
+get `200` (the selection page) or `302` (the provider redirect) — both of which a probe reads as healthy —
+and now gets `401`, which it reads as unhealthy. The pod then fails to become ready.
+
+That probe was never testing much: it asserted that the login chooser renders, not that anything behind
+the proxy works. Replace it with one of:
+
+- A path the application serves and the deployment declares in
+  [`AnonymousPaths`](services.md#anonymous-paths) — this actually exercises the proxy *and* the
+  application, which is what a readiness probe is for.
+- A TCP socket probe, if all you need is "the container is listening".
+
+Note that the bare `/` cannot be declared anonymous — it would match every request and turn the whole
+service anonymous, so it is rejected. Name a real path.
+
+---
+
 ## Consequences for clients
 
 - `!response.ok` is now a correct check against AuthProxy for any non-navigating caller. It was not
