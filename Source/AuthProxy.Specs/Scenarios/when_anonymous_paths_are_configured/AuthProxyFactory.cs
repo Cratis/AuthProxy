@@ -33,6 +33,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     {
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, "select-provider.html"), "<html><body><h1>Select Provider</h1></body></html>");
+        File.WriteAllText(Path.Combine(_pagesPath, "select-tenant.html"), "<html><body><h1>Select Tenant</h1></body></html>");
     }
 
     /// <inheritdoc/>

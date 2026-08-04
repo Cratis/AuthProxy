@@ -37,6 +37,10 @@ public class TenantSelectionMiddleware(
             || context.IsRegistration()
             || context.IsAuthenticationBootstrap()
 
+            // A path the deployment declares anonymous is served without regard to who is asking, so it
+            // stays reachable for a caller who happens to be signed in without having chosen a tenant.
+            // Without this, declaring a path anonymous only opens it to callers with no session at all.
+            || context.IsAnonymousPath(config.CurrentValue)
             || context.HasPendingInvitation()
             || context.HasPendingRegistration())
         {
