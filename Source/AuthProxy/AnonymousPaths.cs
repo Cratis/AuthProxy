@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
@@ -33,6 +34,12 @@ public static class AnonymousPaths
     static readonly SearchValues<char> _reservedCharacters = SearchValues.Create("{}?#*[]\\% \t\r\n");
 
     /// <summary>
+    /// The usable prefixes resolved for a configuration instance, so <see cref="Matches"/> does not re-parse
+    /// every declared entry on every request. Weak keys, so a superseded configuration is collectable.
+    /// </summary>
+    static readonly ConditionalWeakTable<C.AuthProxy, string[]> _resolvedPrefixes = [];
+
+    /// <summary>
     /// Gets the usable, de-duplicated anonymous path prefixes declared by a single service.
     /// </summary>
     /// <param name="service">The service to read.</param>
@@ -47,20 +54,27 @@ public static class AnonymousPaths
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <returns><see langword="true"/> when the path is anonymous; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// This runs on every request through three middlewares, so it walks the configuration directly and
-    /// short-circuits on the first match rather than materializing the declared set. With nothing declared
-    /// it returns without iterating anything, which is the case every deployment that never opts in is in.
+    /// This runs on every request through three middlewares, so the normalized prefixes are resolved once per
+    /// configuration rather than re-parsed per call: <see cref="TryNormalize"/> trims and scans every declared
+    /// entry, which was three passes over every entry on every request purely to arrive at the same strings.
+    /// <para>
+    /// Keyed on the configuration instance, so correctness does not depend on noticing a change.
+    /// <see cref="Microsoft.Extensions.Options.IOptionsMonitor{T}"/> hands out a new instance when
+    /// configuration reloads, which misses the cache and resolves again; the table holds its keys weakly, so a
+    /// superseded configuration is collectable. A cache that had to be invalidated explicitly could leave a
+    /// prefix anonymous after it was removed, which is the one failure mode worth engineering out here.
+    /// </para>
     /// </remarks>
     public static bool Matches(PathString path, C.AuthProxy config)
     {
-        foreach (var service in config.Services.Values)
+        var prefixes = _resolvedPrefixes.GetValue(config, Resolve);
+
+        // Nothing declared is the case every deployment that never opts in is in, so it costs a length check.
+        for (var i = 0; i < prefixes.Length; i++)
         {
-            foreach (var candidate in service.AnonymousPaths)
+            if (path.StartsWithSegments(prefixes[i]))
             {
-                if (TryNormalize(candidate, out var prefix) && path.StartsWithSegments(prefix))
-                {
-                    return true;
-                }
+                return true;
             }
         }
 
@@ -107,6 +121,11 @@ public static class AnonymousPaths
 
         return true;
     }
+
+    static string[] Resolve(C.AuthProxy config) =>
+        [.. config.Services.Values
+            .SelectMany(_ => Normalize(_.AnonymousPaths))
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
 
     static IEnumerable<string> Normalize(IEnumerable<string> candidates)
     {
