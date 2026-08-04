@@ -65,14 +65,11 @@ public class and_a_non_browser_caller_requests_a_page(AuthProxyFactory factory) 
     [Fact] public void should_refuse_a_fetch_from_a_frontend() => Assert.Equal(HttpStatusCode.Unauthorized, _fetch!.StatusCode);
     [Fact] public void should_refuse_a_webhook_asking_for_json() => Assert.Equal(HttpStatusCode.Unauthorized, _webhook!.StatusCode);
     [Fact] public void should_refuse_a_client_stating_nothing() => Assert.Equal(HttpStatusCode.Unauthorized, _bareClient!.StatusCode);
-
     [Fact] public void should_refuse_the_identity_bootstrap() => Assert.Equal(HttpStatusCode.Unauthorized, _identityBootstrap!.StatusCode);
     [Fact] public void should_not_answer_the_identity_bootstrap_with_a_page() => Assert.DoesNotContain("Select Provider", _identityBootstrapBody);
+    [Fact] public void should_not_set_the_providers_cookie_for_a_caller_that_gets_no_page() => Assert.False(HasProvidersCookie(_fetch!), "Expected no providers cookie when no selection page is served");
 
-    [Fact]
-    public void should_not_set_the_providers_cookie_for_a_caller_that_gets_no_page() =>
-        Assert.False(
-            _fetch!.Headers.TryGetValues("Set-Cookie", out var cookies)
-            && cookies.Any(_ => _.StartsWith(Cookies.Providers, StringComparison.OrdinalIgnoreCase)),
-            "Expected no providers cookie when no selection page is served");
+    static bool HasProvidersCookie(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("Set-Cookie", out var cookies)
+        && cookies.Any(_ => _.StartsWith(Cookies.Providers, StringComparison.OrdinalIgnoreCase));
 }

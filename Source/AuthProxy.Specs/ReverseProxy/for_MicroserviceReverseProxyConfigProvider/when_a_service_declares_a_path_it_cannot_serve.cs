@@ -49,9 +49,6 @@ public class when_a_service_declares_a_path_it_cannot_serve : Specification
 
     void Because() => _routes = _provider.GetConfig().Routes;
 
-    [Fact] void should_route_the_prefix_to_the_service_that_can_serve_it() =>
-        _routes.Single(_ => _.Match.Path == "/portal/{**catch-all}").ClusterId.ShouldEqual("serving-frontend-cluster");
-
-    [Fact] void should_generate_no_route_for_the_service_with_no_endpoint() =>
-        _routes.Any(_ => _.ClusterId?.StartsWith("endpointless", StringComparison.Ordinal) == true).ShouldBeFalse();
+    [Fact] void should_route_the_prefix_to_the_service_that_can_serve_it() => _routes.Single(_ => _.Match.Path == "/portal/{**catch-all}").ClusterId.ShouldEqual("serving-frontend-cluster");
+    [Fact] void should_generate_no_route_for_the_service_with_no_endpoint() => _routes.Any(_ => _.ClusterId?.StartsWith("endpointless", StringComparison.Ordinal) == true).ShouldBeFalse();
 }

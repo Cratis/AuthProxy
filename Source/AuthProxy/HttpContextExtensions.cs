@@ -113,6 +113,7 @@ public static class HttpContextExtensions
     public static bool IsDocumentNavigation(this HttpContext context)
     {
         var destination = context.Request.Headers[FetchDestinationHeader].ToString();
+
         if (!string.IsNullOrEmpty(destination))
         {
             return string.Equals(destination, "document", StringComparison.OrdinalIgnoreCase)

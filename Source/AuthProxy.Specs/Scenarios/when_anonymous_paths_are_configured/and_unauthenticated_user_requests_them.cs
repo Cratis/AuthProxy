@@ -76,7 +76,6 @@ public class and_unauthenticated_user_requests_them(AuthProxyFactory factory) : 
     [Fact] public void should_forward_below_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontendChild!.StatusCode);
     [Fact] public void should_forward_the_declared_backend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredBackend!.StatusCode);
     [Fact] public void should_forward_the_declared_path_in_a_different_casing() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontendInDifferentCasing!.StatusCode);
-
     [Fact] public void should_still_select_provider_for_an_undeclared_path() => Assert.Contains("Select Provider", _undeclaredBody);
     [Fact] public void should_still_select_provider_for_an_undeclared_sibling() => Assert.Contains("Select Provider", _undeclaredSiblingBody);
     [Fact] public void should_still_select_provider_for_a_longer_first_segment() => Assert.Contains("Select Provider", _undeclaredLongerFirstSegmentBody);

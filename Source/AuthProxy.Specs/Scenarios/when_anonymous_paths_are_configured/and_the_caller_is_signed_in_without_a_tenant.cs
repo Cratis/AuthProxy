@@ -44,6 +44,5 @@ public class and_the_caller_is_signed_in_without_a_tenant(TenantSelectionAuthPro
 
     [Fact] public void should_forward_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontend!.StatusCode);
     [Fact] public void should_forward_the_declared_backend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredBackend!.StatusCode);
-
     [Fact] public void should_still_select_a_tenant_for_an_undeclared_path() => Assert.Contains("Select Tenant", _undeclaredBody);
 }

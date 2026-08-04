@@ -31,13 +31,9 @@ public class and_unauthenticated_user_requests_page(AuthProxyFactory factory) : 
     [Fact] public void should_return_200() => Assert.Equal(System.Net.HttpStatusCode.OK, _response!.StatusCode);
     [Fact] public void should_return_html() => Assert.Equal("text/html; charset=utf-8", _response!.Content.Headers.ContentType?.ToString());
     [Fact] public void should_return_select_provider_page() => Assert.Contains("Select Provider", _responseBody);
+    [Fact] public void should_set_providers_cookie() => Assert.True(HasProvidersCookie(), $"Expected Set-Cookie header containing '{Cookies.Providers}'");
 
-    [Fact]
-    public void should_set_providers_cookie()
-    {
-        _response!.Headers.TryGetValues("Set-Cookie", out var cookies);
-        Assert.True(
-            cookies?.Any(c => c.StartsWith(Cookies.Providers, StringComparison.OrdinalIgnoreCase)),
-            $"Expected Set-Cookie header containing '{Cookies.Providers}'");
-    }
+    bool HasProvidersCookie() =>
+        _response!.Headers.TryGetValues("Set-Cookie", out var cookies)
+        && cookies.Any(_ => _.StartsWith(Cookies.Providers, StringComparison.OrdinalIgnoreCase));
 }

@@ -56,6 +56,15 @@ public class when_two_services_declare_the_same_anonymous_path : Specification
     void Because() => _routes = _provider.GetConfig().Routes;
 
     /// <summary>
+    /// Determines whether no two routes carrying the anonymous policy share a template and an order.
+    /// </summary>
+    /// <returns><see langword="true"/> when the router can choose between every generated route.</returns>
+    bool AnonymousRouteTemplatesAreUnique() =>
+        _routes.GroupBy(_ => new { Path = _.Match.Path?.ToUpperInvariant(), _.Order })
+            .Where(group => group.Any(_ => _.AuthorizationPolicy == "anonymous"))
+            .All(group => group.Count() == 1);
+
+    /// <summary>
     /// Finds the routes carrying a template, compared the way the router compares it.
     /// </summary>
     /// <param name="path">The route template to look for.</param>
@@ -68,18 +77,8 @@ public class when_two_services_declare_the_same_anonymous_path : Specification
     IEnumerable<RouteConfig> RoutesMatching(string path) =>
         _routes.Where(_ => string.Equals(_.Match.Path, path, StringComparison.OrdinalIgnoreCase));
 
-    [Fact] void should_generate_one_route_for_the_shared_prefix() =>
-        RoutesMatching("/portal/{**catch-all}").Count().ShouldEqual(1);
-
-    [Fact] void should_award_the_shared_prefix_to_the_first_declaring_service() =>
-        RoutesMatching("/portal/{**catch-all}").Single().ClusterId.ShouldEqual("first-frontend-cluster");
-
-    [Fact] void should_still_generate_the_prefix_only_the_second_service_declares() =>
-        RoutesMatching("/reports/{**catch-all}").Single().ClusterId.ShouldEqual("second-frontend-cluster");
-
-    [Fact] void should_not_generate_two_routes_with_the_same_template_and_order() =>
-        _routes.GroupBy(_ => new { Path = _.Match.Path?.ToUpperInvariant(), _.Order })
-            .Where(group => group.Any(_ => _.AuthorizationPolicy == "anonymous"))
-            .All(group => group.Count() == 1)
-            .ShouldBeTrue();
+    [Fact] void should_generate_one_route_for_the_shared_prefix() => RoutesMatching("/portal/{**catch-all}").Count().ShouldEqual(1);
+    [Fact] void should_award_the_shared_prefix_to_the_first_declaring_service() => RoutesMatching("/portal/{**catch-all}").Single().ClusterId.ShouldEqual("first-frontend-cluster");
+    [Fact] void should_still_generate_the_prefix_only_the_second_service_declares() => RoutesMatching("/reports/{**catch-all}").Single().ClusterId.ShouldEqual("second-frontend-cluster");
+    [Fact] void should_not_generate_two_routes_with_the_same_template_and_order() => AnonymousRouteTemplatesAreUnique().ShouldBeTrue();
 }

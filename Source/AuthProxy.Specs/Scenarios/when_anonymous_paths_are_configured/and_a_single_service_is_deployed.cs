@@ -43,7 +43,6 @@ public class and_a_single_service_is_deployed(SingleServiceAuthProxyFactory fact
     [Fact] public void should_forward_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontend!.StatusCode);
     [Fact] public void should_forward_below_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontendChild!.StatusCode);
     [Fact] public void should_forward_the_declared_backend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredBackend!.StatusCode);
-
     [Fact] public void should_not_forward_an_undeclared_path() => Assert.NotEqual(HttpStatusCode.BadGateway, _undeclared!.StatusCode);
     [Fact] public void should_still_select_provider_for_an_undeclared_path() => Assert.Contains("Select Provider", _undeclaredBody);
 }

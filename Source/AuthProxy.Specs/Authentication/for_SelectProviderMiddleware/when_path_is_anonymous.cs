@@ -86,12 +86,6 @@ public class when_path_is_anonymous : Specification
     [Fact] void should_forward_the_declared_path() => _nextCalledForAnonymousPath.ShouldBeTrue();
     [Fact] void should_not_forward_a_path_sharing_only_a_string_prefix() => _nextCalledForUndeclaredPath.ShouldBeFalse();
 
-    [Fact] void should_not_serve_the_selection_page_for_the_declared_path() =>
-        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(_anonymousContext, Arg.Any<string>(), Arg.Any<int>());
-
-    [Fact] void should_serve_the_selection_page_for_a_path_sharing_only_a_string_prefix() =>
-        _errorPageProvider.Received(1).WriteErrorPageAsync(
-            _undeclaredContext,
-            WellKnownPageNames.SelectProvider,
-            StatusCodes.Status200OK);
+    [Fact] void should_not_serve_the_selection_page_for_the_declared_path() => _errorPageProvider.DidNotReceive().WriteErrorPageAsync(_anonymousContext, Arg.Any<string>(), Arg.Any<int>());
+    [Fact] void should_serve_the_selection_page_for_a_path_sharing_only_a_string_prefix() => _errorPageProvider.Received(1).WriteErrorPageAsync(_undeclaredContext, WellKnownPageNames.SelectProvider, StatusCodes.Status200OK);
 }
