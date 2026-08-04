@@ -48,15 +48,19 @@ public class and_unauthenticated_user_requests_them(AuthProxyFactory factory) : 
         // so the middlewares have to agree — this is the request that would split them if they did not.
         _declaredFrontendInDifferentCasing = await client.GetAsync(AuthProxyFactory.AnonymousFrontendPath.ToUpperInvariant());
 
-        _undeclared = await client.GetAsync("/dashboard");
+        // The undeclared paths are requested as browser navigations, so what they get back is the selection
+        // page rather than the status a non-navigating caller is refused with — which keeps these
+        // assertions about the path list rather than about content negotiation.
+        _undeclared = await client.SendAsync(AuthProxyFactory.BrowserNavigation("/dashboard"));
         _undeclaredBody = await _undeclared.Content.ReadAsStringAsync();
 
         // A sibling under the same parent as the declared leaf: /api/portal/report is anonymous,
         // /api/portal/admin must not be.
-        _undeclaredSibling = await client.GetAsync("/api/portal/admin");
+        _undeclaredSibling = await client.SendAsync(AuthProxyFactory.BrowserNavigation("/api/portal/admin"));
         _undeclaredSiblingBody = await _undeclaredSibling.Content.ReadAsStringAsync();
 
-        _undeclaredLongerFirstSegment = await client.GetAsync($"{AuthProxyFactory.AnonymousFrontendPath}x/token");
+        _undeclaredLongerFirstSegment = await client.SendAsync(
+            AuthProxyFactory.BrowserNavigation($"{AuthProxyFactory.AnonymousFrontendPath}x/token"));
         _undeclaredLongerFirstSegmentBody = await _undeclaredLongerFirstSegment.Content.ReadAsStringAsync();
     }
 

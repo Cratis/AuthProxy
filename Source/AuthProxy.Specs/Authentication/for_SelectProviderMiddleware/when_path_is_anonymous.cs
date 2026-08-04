@@ -7,9 +7,10 @@ namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware;
 /// An unauthenticated request to a declared anonymous path must be forwarded, while a sibling path that
 /// was not declared must still be answered with the provider-selection page.
 /// <para>
-/// The selection page is served with <c>HTTP 200</c>, so a caller that is not a browser records success
-/// and never retries. Both facts are asserted from the same setup so that the skip cannot be mistaken for
-/// a middleware that simply forwards everything.
+/// Both facts are asserted from the same setup so that the skip cannot be mistaken for a middleware that
+/// simply forwards everything. The undeclared path is requested as a browser navigation, which is the only
+/// caller still answered with the page — see
+/// <see cref="when_the_caller_is_not_navigating.and_multiple_providers_are_configured"/> for the rest.
 /// </para>
 /// </summary>
 public class when_path_is_anonymous : Specification
@@ -51,6 +52,10 @@ public class when_path_is_anonymous : Specification
 
         _undeclaredContext = new DefaultHttpContext();
         _undeclaredContext.Request.Path = "/portalx";
+
+        // Navigated to in a browser, so the undeclared path is answered with the page rather than the
+        // status a non-navigating caller gets — which keeps this spec about the path list alone.
+        _undeclaredContext.Request.Headers["Sec-Fetch-Dest"] = "document";
 
         _middleware = new SelectProviderMiddleware(
             context =>

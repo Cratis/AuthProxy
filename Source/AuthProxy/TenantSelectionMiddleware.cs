@@ -36,6 +36,7 @@ public class TenantSelectionMiddleware(
             || context.IsInvitation()
             || context.IsRegistration()
             || context.IsAuthenticationBootstrap()
+
             || context.HasPendingInvitation()
             || context.HasPendingRegistration())
         {
@@ -79,6 +80,17 @@ public class TenantSelectionMiddleware(
             context.Response.Cookies.Delete(Cookies.Tenants);
             context.Response.StatusCode = StatusCodes.Status302Found;
             context.Response.Headers.Location = context.GetPathAndQuery();
+            return;
+        }
+
+        // The chooser is a page, and a page can only be delivered with a success status. To a caller that
+        // is not navigating that reads as the data it asked for, arriving intact — the same silent success
+        // the provider-selection page produces, reached here by an already-signed-in frontend. It is
+        // refused with 403 rather than 401 because the caller is authenticated: a 401 would send a
+        // frontend back through a login it has already completed.
+        if (!context.IsDocumentNavigation())
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 

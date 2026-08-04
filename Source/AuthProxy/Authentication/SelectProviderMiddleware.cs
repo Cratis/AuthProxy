@@ -18,6 +18,9 @@ namespace Cratis.AuthProxy.Authentication;
 /// instead of being redirected to a login provider.
 /// Skips invite paths, authentication paths, paths a service declares in
 /// <see cref="C.Service.AnonymousPaths"/>, and requests with a pending invite cookie.
+/// Both answers are only served to a browser navigating to a document; every other caller is refused
+/// with <c>401</c>, because a page or a login redirect reads as a delivered success to a client that
+/// checks the status code.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="proxyConfig">The auth proxy configuration monitor.</param>
@@ -67,6 +70,26 @@ public class SelectProviderMiddleware(
             .Concat(config.OAuthProviders.Select(OidcProviderScheme.ToProviderInfo))
             .ToList();
 
+        // With nothing configured to authenticate against there is nothing to refuse, so the request is
+        // forwarded exactly as before. Refusing here would turn a proxy that challenges nobody into one
+        // that refuses everybody.
+        if (providers.Count == 0)
+        {
+            await next(context);
+            return;
+        }
+
+        // Everything below answers a caller that cannot proceed: a selection page, or a redirect to an
+        // identity provider's login page. Both are answers to a person in a browser, and both read as a
+        // success to everything else — the page arrives as 200, and a client following the redirect ends
+        // up reading the provider's login page as 200 too. A caller that is not navigating gets the
+        // refusal as a status it can act on instead.
+        if (!context.IsDocumentNavigation())
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
         if (providers.Count > 1)
         {
             var providersJson = JsonSerializer.Serialize(providers, _serializerOptions);
@@ -85,15 +108,9 @@ public class SelectProviderMiddleware(
             return;
         }
 
-        if (providers.Count == 1)
-        {
-            var scheme = OidcProviderScheme.FromName(providers[0].Name);
-            var returnUrl = context.GetPathAndQuery();
-            var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
-            await context.ChallengeAsync(scheme, properties);
-            return;
-        }
-
-        await next(context);
+        var scheme = OidcProviderScheme.FromName(providers[0].Name);
+        var returnUrl = context.GetPathAndQuery();
+        var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
+        await context.ChallengeAsync(scheme, properties);
     }
 }

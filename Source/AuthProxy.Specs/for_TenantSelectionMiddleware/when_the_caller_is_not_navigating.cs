@@ -6,7 +6,18 @@ using System.Text;
 
 namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 
-public class when_authenticated_user_has_no_resolved_tenant_and_selection_strategy_is_configured : Specification
+/// <summary>
+/// The tenant-selection page is served at <c>200</c> exactly as the provider-selection page was, and it is
+/// the same defect: a caller that is not navigating to a document reads it as a delivered success.
+/// <para>
+/// This one is reached by a caller that <em>is</em> authenticated, so it is the shape an already-signed-in
+/// frontend hits — a <c>fetch()</c> for data that comes back as a tenant chooser with <c>response.ok</c>
+/// true. It gets <c>403</c> rather than <c>401</c>: the caller is authenticated, and answering <c>401</c>
+/// would tell a frontend to restart a login it has already completed, which is the loop
+/// <c>TenancyMiddleware</c> already avoids for the no-organization case.
+/// </para>
+/// </summary>
+public class when_the_caller_is_not_navigating : Specification
 {
     TenantSelectionMiddleware _middleware;
     DefaultHttpContext _context;
@@ -29,6 +40,7 @@ public class when_authenticated_user_has_no_resolved_tenant_and_selection_strate
                 }
             ]
         };
+
         var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         config.CurrentValue.Returns(authProxyConfig);
 
@@ -56,18 +68,17 @@ public class when_authenticated_user_has_no_resolved_tenant_and_selection_strate
             _errorPageProvider);
 
         _context = new DefaultHttpContext();
-        _context.Request.Path = "/products";
-
-        // A browser navigating to a page — the only caller the tenant chooser is an answer to.
-        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
+        _context.Request.Path = "/api/orders";
+        _context.Request.Headers["Sec-Fetch-Dest"] = "empty";
         _context.Response.Body = new MemoryStream();
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_set_tenants_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.Tenants);
-    [Fact] void should_serve_select_tenant_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.SelectTenant, StatusCodes.Status200OK);
+    [Fact] void should_refuse_the_request() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+    [Fact] void should_not_serve_the_tenant_selection_page() => _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
+    [Fact] void should_not_set_the_tenants_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain(Cookies.Tenants);
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
 
     sealed class FakeTenantsHandler : HttpMessageHandler

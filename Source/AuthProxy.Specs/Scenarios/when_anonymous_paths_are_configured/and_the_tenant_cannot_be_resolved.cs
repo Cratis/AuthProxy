@@ -32,7 +32,7 @@ public class and_the_tenant_cannot_be_resolved(UnresolvedTenantAuthProxyFactory 
         _declaredFrontendChild = await client.GetAsync($"{AuthProxyFactory.AnonymousFrontendPath}/some-token");
         _declaredBackend = await client.GetAsync(AuthProxyFactory.AnonymousBackendPath);
 
-        _undeclared = await client.GetAsync("/dashboard");
+        _undeclared = await client.SendAsync(AuthProxyFactory.BrowserNavigation("/dashboard"));
         _undeclaredBody = await _undeclared.Content.ReadAsStringAsync();
     }
 

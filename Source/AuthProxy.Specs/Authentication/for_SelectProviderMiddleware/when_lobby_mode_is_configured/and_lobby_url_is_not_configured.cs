@@ -40,6 +40,9 @@ public class and_lobby_url_is_not_configured : Specification
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
+
+        // A browser navigating to a page — the only caller redirected to a login provider.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
 
         var authService = Substitute.For<IAuthenticationService>();

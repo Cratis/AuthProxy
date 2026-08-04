@@ -43,6 +43,9 @@ public class when_multiple_providers_are_configured : Specification
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
+
+        // A browser navigating to a page — the only caller the selection page is an answer to.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
     }
 

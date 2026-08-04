@@ -50,6 +50,9 @@ public class lobby_mode_middleware : Specification
             Substitute.For<ITenantResolver>());
 
         _context = new DefaultHttpContext();
+
+        // A browser navigating to a page, which is what lobby mode is written for.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
     }
 }

@@ -94,6 +94,15 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     public HttpClient CreateTestClient() =>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
+    /// <summary>
+    /// Creates a request shaped like a browser navigating to a page, which is the only caller an HTML
+    /// selection page is served to.
+    /// </summary>
+    /// <param name="path">The path to request.</param>
+    /// <returns>A request carrying the fetch metadata a document navigation sends.</returns>
+    public static HttpRequestMessage BrowserNavigation(string path) =>
+        new(HttpMethod.Get, path) { Headers = { { "Sec-Fetch-Dest", "document" } } };
+
     /// <summary>Authentication handler that never authenticates (unauthenticated requests).</summary>
     /// <param name="options">The options monitor for authentication scheme options.</param>
     /// <param name="logger">The logger factory.</param>

@@ -44,6 +44,9 @@ public class and_redirect_to_lobby_flag_is_disabled : Specification
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
+
+        // A browser navigating to a page — the only caller redirected to a login provider.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
 
         var authService = Substitute.For<IAuthenticationService>();

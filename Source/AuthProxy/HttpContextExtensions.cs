@@ -11,6 +11,8 @@ namespace Cratis.AuthProxy;
 public static class HttpContextExtensions
 {
     const string SignInPathPrefix = "/signin-";
+    const string FetchDestinationHeader = "Sec-Fetch-Dest";
+    const string HtmlMediaType = "text/html";
 
     /// <summary>
     /// Gets the current request path and query string as a single relative URL.
@@ -85,6 +87,49 @@ public static class HttpContextExtensions
     /// <returns><see langword="true"/> if the request targets an anonymous path; otherwise <see langword="false"/>.</returns>
     public static bool IsAnonymousPath(this HttpContext context, C.AuthProxy config) =>
         AnonymousPaths.Matches(context.Request.Path, config);
+
+    /// <summary>
+    /// Determines whether the request is a browser navigating to a document, and therefore a request an
+    /// HTML page is an answer to.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if an HTML page answers the request; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// AuthProxy refuses unauthenticated callers by writing a page — provider selection, tenant selection —
+    /// and a page has to be delivered with a success status to render. That is the right answer to a person
+    /// in a browser and the wrong answer to everything else: a webhook or an integration reads the
+    /// <c>200</c> as delivered and never retries, and a frontend's <c>fetch()</c> passes the conventional
+    /// <c>response.ok</c> check and only fails later, on parsing. Callers that are not navigating are
+    /// refused with a status instead, so the refusal is visible where it is checked.
+    /// <para>
+    /// <see cref="FetchDestinationHeader"/> decides when it is present, because it is the only signal that
+    /// separates a document navigation from a scripted request issued by the very same browser —
+    /// <c>fetch()</c> sends <c>Accept: *&#47;*</c>, which reads as "HTML will do" and is exactly the
+    /// misclassification to avoid. Only when the header is absent — a client predating fetch metadata —
+    /// does <c>Accept</c> decide, and then nothing short of an explicit <c>text/html</c> counts, so a
+    /// caller that states nothing is treated as the API caller it almost always is.
+    /// </para>
+    /// </remarks>
+    public static bool IsDocumentNavigation(this HttpContext context)
+    {
+        var destination = context.Request.Headers[FetchDestinationHeader].ToString();
+        if (!string.IsNullOrEmpty(destination))
+        {
+            return string.Equals(destination, "document", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(destination, "iframe", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(destination, "frame", StringComparison.OrdinalIgnoreCase);
+        }
+
+        foreach (var accept in context.Request.Headers.Accept)
+        {
+            if (accept?.Contains(HtmlMediaType, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Determines whether the request targets any authentication bootstrap endpoint.

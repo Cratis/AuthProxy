@@ -82,9 +82,9 @@ Routes are matched case-insensitively.
 ## Anonymous paths
 
 By default every path behind AuthProxy requires a session. An unauthenticated request is answered by
-the provider-selection page — with **HTTP 200**, so a webhook or other non-browser caller records
-success and never retries — and anything that does reach the reverse proxy is refused by the default
-authorization policy.
+the provider-selection page if it is a browser navigation, or [refused with a status
+code](unauthenticated-responses.md) if it is not — and anything that does reach the reverse proxy is
+refused by the default authorization policy.
 
 `AnonymousPaths` declares the paths a service genuinely serves without a session: a magic-link landing
 page, a signed-token report, a public webhook receiver.
