@@ -300,8 +300,11 @@ public class TenantSelectionMiddleware(
 
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden || response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            // An authoritative answer: the user is not entitled to any tenant at all.
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            // An authoritative answer: the user is not entitled to any tenant at all. Reporting it as an
+            // empty-but-successful result forwards the request, and TenancyMiddleware — which finds no
+            // tenant to resolve for an authenticated user — answers it with the no-organization page at
+            // 403. Setting a status here would only be overwritten by that, and a 403 naming the actual
+            // reason is the better answer anyway.
             return new(Succeeded: true, []);
         }
 
