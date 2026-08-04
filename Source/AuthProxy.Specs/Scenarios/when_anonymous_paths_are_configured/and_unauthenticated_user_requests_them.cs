@@ -17,6 +17,12 @@ namespace Cratis.AuthProxy.Scenarios.when_anonymous_paths_are_configured;
 /// is what proves the prefixes do not over-match.
 /// </para>
 /// <para>
+/// The declared paths are requested without any fetch metadata or <c>Accept</c> header — the shape a
+/// webhook or a bare client sends, and the shape that is otherwise refused outright. Getting them
+/// forwarded is what pins the ordering: the declared-path skip has to be reached before the caller is
+/// ever classified, or declaring a path anonymous would open it to browsers only.
+/// </para>
+/// <para>
 /// This factory resolves a fixed tenant for every request, so <c>TenancyMiddleware</c>'s refusal branch is
 /// never entered here — that third enforcement point is covered by
 /// <see cref="and_the_tenant_cannot_be_resolved"/>.

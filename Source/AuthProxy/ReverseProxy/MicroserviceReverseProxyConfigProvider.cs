@@ -59,8 +59,8 @@ public class MicroserviceReverseProxyConfigProvider(
         // A declared prefix is matched without any service-selection header or query parameter, so two
         // services declaring the same prefix would emit two routes with an identical template and an
         // identical order — which ASP.NET cannot choose between, and reports as AmbiguousMatchException on
-        // the declared path. Claiming each prefix for the first service that declares it keeps the path
-        // anonymous, which is what every declaring service asked for, and the table unambiguous.
+        // the declared path. Claiming each prefix for the first service that can actually serve it keeps
+        // the path anonymous, which is what every declaring service asked for, and the table unambiguous.
         var claimedAnonymousPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (name, ms) in services)
@@ -151,7 +151,7 @@ public class MicroserviceReverseProxyConfigProvider(
 
         foreach (var path in AnonymousPaths.For(service))
         {
-            if (!claimedPaths.Add(path))
+            if (claimedPaths.Contains(path))
             {
                 continue;
             }
@@ -168,10 +168,17 @@ public class MicroserviceReverseProxyConfigProvider(
                 _ => null,
             };
 
+            // A service entry does not have to declare an endpoint — the lobby's registration service is
+            // configured that way — and one with nothing to forward to produces no route. Claiming only
+            // when a route is actually emitted keeps such an entry from taking the prefix away from a
+            // service that can serve it, which would leave the path matching no route at all while all
+            // three middlewares went on treating it as anonymous.
             if (clusterId is null)
             {
                 continue;
             }
+
+            claimedPaths.Add(path);
 
             yield return new RouteConfig
             {

@@ -15,25 +15,25 @@ public class when_nothing_is_declared : Specification
 {
     C.AuthProxy _emptyConfiguration;
     C.AuthProxy _configurationWithServices;
+    C.Service _service;
 
     void Establish()
     {
         _emptyConfiguration = new C.AuthProxy();
+        _service = new C.Service
+        {
+            Backend = new C.ServiceEndpoint { BaseUrl = "http://backend.test/" },
+            Frontend = new C.ServiceEndpoint { BaseUrl = "http://frontend.test/" },
+        };
+
         _configurationWithServices = new C.AuthProxy
         {
-            Services = new Dictionary<string, C.Service>
-            {
-                ["test"] = new()
-                {
-                    Backend = new C.ServiceEndpoint { BaseUrl = "http://backend.test/" },
-                    Frontend = new C.ServiceEndpoint { BaseUrl = "http://frontend.test/" },
-                },
-            },
+            Services = new Dictionary<string, C.Service> { ["test"] = _service },
         };
     }
 
-    [Fact] void should_resolve_no_paths_without_services() => AnonymousPaths.All(_emptyConfiguration).ShouldBeEmpty();
-    [Fact] void should_resolve_no_paths_with_services() => AnonymousPaths.All(_configurationWithServices).ShouldBeEmpty();
+    [Fact] void should_resolve_no_paths_for_a_service_declaring_none() => AnonymousPaths.For(_service).ShouldBeEmpty();
+    [Fact] void should_not_match_anything_without_services() => AnonymousPaths.Matches("/dashboard", _emptyConfiguration).ShouldBeFalse();
     [Fact] void should_not_match_the_root_path() => AnonymousPaths.Matches("/", _configurationWithServices).ShouldBeFalse();
     [Fact] void should_not_match_an_application_path() => AnonymousPaths.Matches("/dashboard", _configurationWithServices).ShouldBeFalse();
     [Fact] void should_not_match_an_api_path() => AnonymousPaths.Matches("/api/anything", _configurationWithServices).ShouldBeFalse();

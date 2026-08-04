@@ -142,6 +142,10 @@ actually declares.
 - No principal headers are injected for a caller with no session. A caller that *does* present a valid
   session is still authenticated normally and still gets its identity headers — the path is
   identity-*optional*, not identity-free.
+- A signed-in caller reaches a declared path **without a `Tenant-ID` header** when they have not chosen a
+  tenant, because tenant selection is skipped along with everything else. Handle a declared path as
+  tenant-optional: it already has to work for a caller with no identity at all, so identity without a
+  tenant is a strictly better-informed case of the same thing.
 - The application remains responsible for authorizing these paths. This only stops the proxy from
   demanding a login before the application is ever reached.
 - A declared prefix is claimed for the whole proxy. An anonymous caller cannot send a `Service-ID`

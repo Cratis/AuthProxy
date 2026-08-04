@@ -22,34 +22,37 @@ namespace Cratis.AuthProxy.for_AnonymousPaths;
 public class when_configuration_carries_unusable_entries : Specification
 {
     C.AuthProxy _configuration;
+    C.Service _service;
 
-    void Establish() => _configuration = new C.AuthProxy
+    void Establish()
     {
-        Services = new Dictionary<string, C.Service>
+        _service = new C.Service
         {
-            ["test"] = new()
-            {
-                AnonymousPaths =
-                [
-                    string.Empty,
-                    "   ",
-                    "/",
-                    "///",
-                    "no-leading-slash",
-                    "/double//segment",
-                    "/with space",
-                    "/route{parameter}",
-                    "/catch/{**all}",
-                    "/query?token=1",
-                    "/star*",
-                    "/percent%20encoded",
-                    "  /portal/  ",
-                ],
-            },
-        },
-    };
+            AnonymousPaths =
+            [
+                string.Empty,
+                "   ",
+                "/",
+                "///",
+                "no-leading-slash",
+                "/double//segment",
+                "/with space",
+                "/route{parameter}",
+                "/catch/{**all}",
+                "/query?token=1",
+                "/star*",
+                "/percent%20encoded",
+                "  /portal/  ",
+            ],
+        };
 
-    [Fact] void should_keep_only_the_usable_entry() => AnonymousPaths.All(_configuration).ShouldContainOnly("/portal");
+        _configuration = new C.AuthProxy
+        {
+            Services = new Dictionary<string, C.Service> { ["test"] = _service },
+        };
+    }
+
+    [Fact] void should_keep_only_the_usable_entry() => AnonymousPaths.For(_service).ShouldContainOnly("/portal");
     [Fact] void should_not_match_an_unrelated_path() => AnonymousPaths.Matches("/dashboard", _configuration).ShouldBeFalse();
     [Fact] void should_not_match_the_root_path() => AnonymousPaths.Matches("/", _configuration).ShouldBeFalse();
     [Fact] void should_not_match_an_arbitrary_first_segment() => AnonymousPaths.Matches("/anything", _configuration).ShouldBeFalse();

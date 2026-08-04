@@ -66,6 +66,17 @@ public class when_deciding_whether_a_page_answers_the_request : Specification
     [Fact] void should_not_answer_a_json_accept_with_a_page() =>
         WithAccept("application/json").IsDocumentNavigation().ShouldBeFalse();
 
+    [Fact] void should_not_answer_a_contradictory_destination_with_a_page()
+    {
+        // A request carrying the header twice is malformed — no browser sends it — so it decides nothing
+        // and the request is refused. Every rejection in this classification falls the same way: an
+        // unrecognized signal means "not navigating", never "serve the page anyway".
+        var context = new DefaultHttpContext();
+        context.Request.Headers["Sec-Fetch-Dest"] = new Microsoft.Extensions.Primitives.StringValues(["document", "empty"]);
+        context.Request.Headers.Accept = "text/html";
+        context.IsDocumentNavigation().ShouldBeFalse();
+    }
+
     [Fact] void should_not_answer_a_request_stating_nothing_with_a_page() =>
         new DefaultHttpContext().IsDocumentNavigation().ShouldBeFalse();
 }

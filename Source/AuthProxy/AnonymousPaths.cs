@@ -10,11 +10,12 @@ namespace Cratis.AuthProxy;
 /// Resolves the anonymous path prefixes declared in <see cref="C.Service.AnonymousPaths"/>.
 /// </summary>
 /// <remarks>
-/// Three components have to agree on what counts as an anonymous path — <c>SelectProviderMiddleware</c>
-/// (do not serve the provider-selection page), <c>TenancyMiddleware</c> (do not refuse a caller with no
-/// resolvable tenant), and the reverse-proxy route table (do not apply the authenticated-user
-/// authorization policy). If one disagreed the path would still be unreachable and the disagreement would
-/// be silent, so they all resolve through here.
+/// Four components have to agree on what counts as an anonymous path — <c>SelectProviderMiddleware</c>
+/// (do not serve the provider-selection page), <c>TenantSelectionMiddleware</c> (do not serve the
+/// tenant chooser to a signed-in caller who has not chosen one), <c>TenancyMiddleware</c> (do not refuse
+/// a caller with no resolvable tenant), and the reverse-proxy route table (do not apply the
+/// authenticated-user authorization policy). If one disagreed the path would still be unreachable and the
+/// disagreement would be silent, so they all resolve through here.
 /// <para>
 /// The middlewares match with <see cref="PathString.StartsWithSegments(PathString)"/> while the route
 /// table matches an ASP.NET route template built from the same prefix. Those two agree only for a prefix
@@ -32,16 +33,6 @@ public static class AnonymousPaths
     static readonly SearchValues<char> _reservedCharacters = SearchValues.Create("{}?#*[]\\% \t\r\n");
 
     /// <summary>
-    /// Gets the usable, de-duplicated anonymous path prefixes across every configured service.
-    /// </summary>
-    /// <param name="config">The auth proxy configuration to read.</param>
-    /// <returns>The declared anonymous path prefixes.</returns>
-    public static IEnumerable<string> All(C.AuthProxy config) =>
-        config.Services.Values
-            .SelectMany(For)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
     /// Gets the usable, de-duplicated anonymous path prefixes declared by a single service.
     /// </summary>
     /// <param name="service">The service to read.</param>
@@ -56,9 +47,9 @@ public static class AnonymousPaths
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <returns><see langword="true"/> when the path is anonymous; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// This runs on every request through two middlewares, so it walks the configuration directly and
-    /// short-circuits rather than materializing <see cref="All"/>. With nothing declared it returns
-    /// immediately without allocating.
+    /// This runs on every request through three middlewares, so it walks the configuration directly and
+    /// short-circuits on the first match rather than materializing the declared set. With nothing declared
+    /// it returns without iterating anything, which is the case every deployment that never opts in is in.
     /// </remarks>
     public static bool Matches(PathString path, C.AuthProxy config)
     {
