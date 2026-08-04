@@ -36,7 +36,8 @@ public class and_lobby_url_is_not_configured : Specification
             proxyConfig,
             authConfig,
             _errorPageProvider,
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";

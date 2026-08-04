@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -27,12 +28,14 @@ namespace Cratis.AuthProxy.Authentication;
 /// <param name="authConfig">The authentication configuration monitor.</param>
 /// <param name="errorPageProvider">The error page provider used to serve the selection page.</param>
 /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
+/// <param name="schemeProvider">The authentication scheme provider, used to name a challenge on a refusal.</param>
 public class SelectProviderMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> proxyConfig,
     IOptionsMonitor<C.Authentication> authConfig,
     IErrorPageProvider errorPageProvider,
-    ITenantResolver tenantResolver)
+    ITenantResolver tenantResolver,
+    IAuthenticationSchemeProvider schemeProvider)
 {
     static readonly JsonSerializerOptions _serializerOptions = new()
     {
@@ -86,7 +89,7 @@ public class SelectProviderMiddleware(
         // refusal as a status it can act on instead.
         if (!context.IsDocumentNavigation())
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await RefuseAsync(context);
             return;
         }
 
@@ -112,5 +115,31 @@ public class SelectProviderMiddleware(
         var returnUrl = context.GetPathAndQuery();
         var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
         await context.ChallengeAsync(scheme, properties);
+    }
+
+    /// <summary>
+    /// Refuses a caller that no page can answer, naming a credential it could come back with.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
+    /// <remarks>
+    /// A <c>401</c> is required to carry a <c>WWW-Authenticate</c> challenge, and the only credential this
+    /// proxy accepts on the wire is a bearer token — a JWT from the configured authority, or one AuthProxy
+    /// itself mints at <c>/.cratis/token</c> for a service with client credentials. The challenge is
+    /// therefore emitted exactly when one of those is configured; a deployment where neither is means there
+    /// is no token-based way in at all, and naming a scheme that cannot work would send a caller after
+    /// credentials no endpoint would accept.
+    /// </remarks>
+    async Task RefuseAsync(HttpContext context)
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+        var bearerIsAccepted = await schemeProvider.GetSchemeAsync(JwtBearerDefaults.AuthenticationScheme) is not null
+            || proxyConfig.CurrentValue.Services.Values.Any(_ => _.ClientCredentials is not null);
+
+        if (bearerIsAccepted)
+        {
+            context.Response.Headers.WWWAuthenticate = "Bearer";
+        }
     }
 }

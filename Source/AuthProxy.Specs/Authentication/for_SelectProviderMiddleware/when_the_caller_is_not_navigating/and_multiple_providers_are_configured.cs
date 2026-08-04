@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Authentication;
+
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_the_caller_is_not_navigating;
 
 /// <summary>
@@ -16,6 +18,12 @@ namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_the_
 /// <para>
 /// The providers cookie is withheld with the page: it exists so the selection page can render the
 /// choices, and there is no page here.
+/// </para>
+/// <para>
+/// No authority and no service minting tokens are configured here, so there is no credential to name and
+/// the refusal carries no challenge — sending one would point the caller at something nothing would
+/// accept. The cases where a challenge <em>is</em> real are
+/// <see cref="and_a_bearer_token_is_accepted"/> and <see cref="and_a_service_mints_its_own_tokens"/>.
 /// </para>
 /// </summary>
 public class and_multiple_providers_are_configured : Specification
@@ -54,7 +62,8 @@ public class and_multiple_providers_are_configured : Specification
             proxyConfig,
             authConfig,
             _errorPageProvider,
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/api/orders";
@@ -66,6 +75,7 @@ public class and_multiple_providers_are_configured : Specification
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_refuse_the_request() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status401Unauthorized);
+    [Fact] void should_not_name_a_challenge_that_cannot_work() => _context.Response.Headers.WWWAuthenticate.ToString().ShouldBeEmpty();
     [Fact] void should_not_serve_any_page() => _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
     [Fact] void should_not_set_the_providers_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain(Cookies.Providers);
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();

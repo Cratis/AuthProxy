@@ -42,7 +42,8 @@ public class and_a_single_provider_is_configured : Specification
             proxyConfig,
             authConfig,
             Substitute.For<IErrorPageProvider>(),
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/api/orders";

@@ -32,7 +32,8 @@ public class when_single_provider_is_configured : Specification
             proxyConfig,
             authConfig,
             Substitute.For<IErrorPageProvider>(),
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/protected";

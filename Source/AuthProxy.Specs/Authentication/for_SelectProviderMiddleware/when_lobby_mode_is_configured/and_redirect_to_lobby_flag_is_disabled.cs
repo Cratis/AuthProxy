@@ -40,7 +40,8 @@ public class and_redirect_to_lobby_flag_is_disabled : Specification
             proxyConfig,
             authConfig,
             _errorPageProvider,
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
