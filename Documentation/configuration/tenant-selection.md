@@ -11,12 +11,50 @@ The page receives tenant data through a cookie, not by calling your tenant endpo
 
 1. Authenticated request arrives without a `.cratis-tenant` cookie.
 2. AuthProxy calls the configured `Selection.Options.TenantsEndpoint`.
-3. If exactly one tenant is returned, AuthProxy sets `.cratis-tenant` immediately and redirects to the original URL (no selection page shown).
-4. If more than one tenant is returned, AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) and serves `select-tenant.html` — but only to a browser navigating to a page. Every other caller is refused with `403` instead, because a chooser page delivered as `200` reads as the data they asked for. See [Unauthenticated responses](unauthenticated-responses.md).
+3. If exactly one tenant is returned, AuthProxy sets `.cratis-tenant` immediately, removes any `.cratis-tenants` cookie, and redirects to the original URL (no selection page shown).
+4. If more than one tenant is returned, AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) as a session cookie and serves `select-tenant.html` — but only to a browser navigating to a page. Every other caller is refused with `403` instead, because a chooser page delivered as `200` reads as the data they asked for. See [Unauthenticated responses](unauthenticated-responses.md).
 5. User clicks a tenant option.
 6. Browser navigates to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`.
 7. AuthProxy validates the selected `tenantId` against `TenantsEndpoint` and sets `.cratis-tenant`.
-8. AuthProxy redirects back to `returnUrl`.
+8. AuthProxy redirects back to `returnUrl`. The `.cratis-tenants` cookie is **retained** so the application can offer an in-app tenant switcher.
+
+---
+
+## Switching tenants after selection
+
+For a user with **more than one** tenant, `.cratis-tenants` is written as a **session cookie** and is
+**not** deleted when a tenant is selected. It therefore remains available for the rest of the browser
+session, which lets the application's toolbar decide whether to show a "switch tenant" control (show it
+only when the cookie lists more than one tenant).
+
+To switch, the toolbar navigates to the same selection endpoint used by the selection page:
+
+```
+/.cratis/select-tenant?tenantId=<id>&returnUrl=<current path>
+```
+
+Every switch re-validates the requested `tenantId` against `TenantsEndpoint`, so a stale cookie can
+never grant access to a tenant the user is no longer a member of — an unknown `tenantId` is rejected
+with `400 Bad Request`.
+
+---
+
+## Periodic re-validation of the selected tenant
+
+`.cratis-tenant` is a session cookie, but it is also **not trusted indefinitely within a session**:
+AuthProxy re-validates the selected tenant against `TenantsEndpoint` when the configured
+`Cratis:AuthProxy:Session:TenantRevalidationInterval` (default 10 minutes) has lapsed. A successful
+re-validation is cached in memory, so the endpoint is **not** called on every request.
+
+When the endpoint answers authoritatively that the tenant is no longer available to the user, the
+`.cratis-tenant` and `.cratis-tenants` cookies are deleted and the request is replayed without them —
+the user lands back in the regular selection flow (or the no-tenant handling when nothing remains).
+Revoked tenant access therefore takes effect within the interval, without waiting for the browser
+session to end. Transport failures fail open so a transient backend outage cannot lock users out;
+the next lapse of the window retries.
+
+A user with exactly **one** tenant never receives `.cratis-tenants` (it is removed when the single
+tenant is auto-selected), so no switcher is shown for single-tenant users.
 
 ---
 

@@ -43,4 +43,25 @@ public static class Cookies
     /// Cookie that stores the selected tenant identifier for subsequent requests.
     /// </summary>
     public const string Tenant = ".cratis-tenant";
+
+    /// <summary>
+    /// Short-lived HTTP-only cookie used to carry the validated final post-logout redirect target across
+    /// the RP-initiated logout round-trip to the identity provider's end-session endpoint and back to the
+    /// logout callback (<see cref="WellKnownPaths.LogoutCallback"/>).
+    /// </summary>
+    public const string LogoutRedirect = ".cratis-logout";
+
+    /// <summary>
+    /// Name prefix of the transient correlation cookie the ASP.NET Core OAuth/OIDC middleware writes for
+    /// every sign-in handshake. Each carries a random per-attempt suffix, so an abandoned handshake leaves
+    /// one behind; they are cleared on logout by matching this prefix.
+    /// </summary>
+    public const string CorrelationPrefix = ".AspNetCore.Correlation.";
+
+    /// <summary>
+    /// Name prefix of the transient nonce cookie the ASP.NET Core OpenID Connect middleware writes for every
+    /// sign-in handshake. Like <see cref="CorrelationPrefix"/> it carries a random suffix and is cleared on
+    /// logout by matching this prefix.
+    /// </summary>
+    public const string NoncePrefix = ".AspNetCore.OpenIdConnect.Nonce.";
 }

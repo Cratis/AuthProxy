@@ -5,7 +5,9 @@ using Cratis.AuthProxy;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
+using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.ReverseProxy;
+using Cratis.AuthProxy.SignIns;
 using Cratis.AuthProxy.Tenancy;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +19,8 @@ builder.AddIngressAuthentication();
 builder.AddTenancy();
 builder.AddIdentityResolution();
 builder.AddInvites();
+builder.AddLinks();
+builder.AddSignIns();
 builder.SetupReverseProxy();
 
 var app = builder.Build();

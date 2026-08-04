@@ -8,6 +8,12 @@
   href: tenancy.md
 - name: Tenant Selection Page
   href: tenant-selection.md
+- name: Logout
+  href: logout.md
+- name: Credential Linking
+  href: link.md
+- name: Sign-in Notifications
+  href: sign-in.md
 - name: Services
   href: services.md
 - name: Lobby

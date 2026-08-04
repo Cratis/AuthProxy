@@ -19,10 +19,34 @@ public class AuthProxy
     public Authentication Authentication { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the browser-session hardening configuration: the bounded authentication session
+    /// lifetime and the identity/tenant re-validation intervals.
+    /// </summary>
+    public Session Session { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the invite system configuration.
     /// Set this section to enable invite-based onboarding.
     /// </summary>
     public Invite? Invite { get; set; }
+
+    /// <summary>
+    /// Gets or sets the credential-linking configuration.
+    /// Set this section to enable the session-preserving <c>/.cratis/link/{scheme}</c> flow.
+    /// </summary>
+    public Link? Link { get; set; }
+
+    /// <summary>
+    /// Gets or sets the sign-in notification configuration.
+    /// Set this section to have AuthProxy post a notification to the application whenever a user
+    /// completes an interactive sign-in.
+    /// </summary>
+    public SignIn? SignIn { get; set; }
+
+    /// <summary>
+    /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
+    /// </summary>
+    public Logout Logout { get; set; } = new();
 
     /// <summary>
     /// Gets or sets the tenant verification configuration.

@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using Cratis.AuthProxy.Links;
+using Cratis.AuthProxy.SignIns;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,6 +20,13 @@ namespace Cratis.AuthProxy.Authentication;
 public static class AuthenticationServiceCollectionExtensions
 {
     /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key recording which provider scheme established the
+    /// session. It is persisted into the authentication cookie on sign-in so a later RP-initiated logout can
+    /// resolve the correct identity provider's end-session endpoint.
+    /// </summary>
+    public const string AuthenticationSchemeStateKey = "Cratis.AuthProxy.AuthenticationScheme";
+
+    /// <summary>
     /// Registers cookie authentication, all configured OIDC providers, all configured OAuth providers,
     /// and (optionally) JWT Bearer for machine-to-machine flows.
     /// </summary>
@@ -27,6 +36,10 @@ public static class AuthenticationServiceCollectionExtensions
     {
         var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
         var hasJwtBearer = jwtSection.Exists();
+
+        var sessionConfig = builder.Configuration
+            .GetSection(C.Session.SectionKey)
+            .Get<C.Session>() ?? new();
 
         var authBuilder = builder.Services
             .AddAuthentication(options =>
@@ -39,7 +52,7 @@ public static class AuthenticationServiceCollectionExtensions
                 ClientCredentialsDefaults.CompositeAuthenticationScheme,
                 ClientCredentialsDefaults.CompositeAuthenticationScheme,
                 options => options.ForwardDefaultSelector = context => ResolveAuthenticationScheme(context, hasJwtBearer))
-            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookieOptions)
+            .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options => ConfigureCookieOptions(options, sessionConfig))
             .AddScheme<AuthenticationSchemeOptions, ClientCredentialsBearerAuthenticationHandler>(
                 ClientCredentialsDefaults.AuthenticationScheme,
                 _ => { });
@@ -55,6 +68,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<ClientCredentialsVerifier>();
         builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
         builder.Services.AddSingleton<ClientCredentialsGrantService>();
+        builder.Services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
         builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
@@ -92,12 +106,23 @@ public static class AuthenticationServiceCollectionExtensions
         return CookieAuthenticationDefaults.AuthenticationScheme;
     }
 
-    static void ConfigureCookieOptions(CookieAuthenticationOptions options)
+    static void ConfigureCookieOptions(CookieAuthenticationOptions options, C.Session session)
     {
         options.Cookie.HttpOnly = true;
         options.Cookie.Name = ".Cratis.AuthProxy.Auth.v2";
         options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+
+        // Mark the cookie Secure whenever the request itself is HTTPS — the forwarded-headers middleware
+        // makes this reflect the original scheme behind a TLS-terminating ingress — while still supporting
+        // local HTTP development flows.
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // The cookie itself stays session-scoped (no persistent Expires) — closing the browser ends the
+        // session. The encrypted ticket additionally carries a bounded lifetime so even a browser session
+        // that never closes must re-authenticate with the identity provider periodically; with sliding
+        // expiration disabled (the default) that lifetime is absolute and activity cannot extend it.
+        options.ExpireTimeSpan = session.Lifetime > TimeSpan.Zero ? session.Lifetime : C.Session.DefaultLifetime;
+        options.SlidingExpiration = session.SlidingExpiration;
 
         // Redirect unauthenticated users to the provider selection page (multiple providers)
         // or directly to the single provider login endpoint.
@@ -164,28 +189,23 @@ public static class AuthenticationServiceCollectionExtensions
 
                 options.CallbackPath = $"/signin-{scheme}";
 
-                // Support local HTTP development callback flows.
+                // Lax + SameAsRequest keeps the handshake cookies flowing across the provider redirect,
+                // marks them Secure whenever the site runs on HTTPS, and still supports local HTTP
+                // development callback flows.
                 options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 options.NonceCookie.SameSite = SameSiteMode.Lax;
-                options.NonceCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+                // Keep the transient handshake cookies at the root path (they otherwise default to the
+                // callback path) so the browser sends them on the logout request and they can be cleared
+                // there instead of accumulating from abandoned sign-in attempts.
+                options.CorrelationCookie.Path = "/";
+                options.NonceCookie.Path = "/";
 
                 options.Events = new OpenIdConnectEvents
                 {
-                    OnTicketReceived = context =>
-                    {
-                        if (context.Properties is not null
-                            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
-                                context.HttpContext,
-                                context.Properties,
-                                context.ReturnUri,
-                                out var redirectUri))
-                        {
-                            context.ReturnUri = redirectUri;
-                        }
-
-                        return Task.CompletedTask;
-                    }
+                    OnTicketReceived = HandleTicketReceived
                 };
             });
         }
@@ -208,9 +228,16 @@ public static class AuthenticationServiceCollectionExtensions
                 options.CallbackPath = $"/signin-{scheme}";
                 options.SaveTokens = true;
 
-                // Support local HTTP development callback flows.
+                // Lax + SameAsRequest keeps the handshake cookie flowing across the provider redirect,
+                // marks it Secure whenever the site runs on HTTPS, and still supports local HTTP
+                // development callback flows.
                 options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.None;
+                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+                // Keep the transient correlation cookie at the root path (it otherwise defaults to the
+                // callback path) so the browser sends it on the logout request and it can be cleared there
+                // instead of accumulating from abandoned sign-in attempts.
+                options.CorrelationCookie.Path = "/";
 
                 foreach (var scope in capturedProvider.Scopes)
                 {
@@ -238,22 +265,61 @@ public static class AuthenticationServiceCollectionExtensions
                             await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
                         ctx.RunClaimActions(user.RootElement);
                     },
-                    OnTicketReceived = context =>
-                    {
-                        if (context.Properties is not null
-                            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
-                                context.HttpContext,
-                                context.Properties,
-                                context.ReturnUri,
-                                out var redirectUri))
-                        {
-                            context.ReturnUri = redirectUri;
-                        }
-
-                        return Task.CompletedTask;
-                    }
+                    OnTicketReceived = HandleTicketReceived
                 };
             });
+        }
+    }
+
+    /// <summary>
+    /// Shared provider-callback handler. In the session-preserving link flow it captures the freshly
+    /// authenticated subject and posts it to the application <em>without</em> signing the new identity in,
+    /// so the user's primary session is preserved; otherwise it is a genuine sign-in — a logged-out user has
+    /// completed an identity-provider login and a fresh session is about to be established — so it records the
+    /// authenticating provider scheme for later RP-initiated logout, notifies the application of the sign-in,
+    /// and applies the tenant post-authentication redirect resolution used by
+    /// the normal login flow.
+    /// </summary>
+    /// <param name="context">The ticket-received context.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// This handler only runs when a provider callback delivers a fresh ticket — that is, on the exact
+    /// logged-out to signed-in transition. A request that reuses an existing session cookie never reaches it,
+    /// so a sign-in is notified once per real sign-in and never on ordinary proxied traffic.
+    /// </remarks>
+    static async Task HandleTicketReceived(TicketReceivedContext context)
+    {
+        if (context.Properties is not null
+            && context.Properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode)
+            && linkMode == "true")
+        {
+            var exchanger = context.HttpContext.RequestServices.GetRequiredService<ILinkSubjectExchanger>();
+            await exchanger.Exchange(context.Principal, context.Properties);
+
+            // Short-circuit before the RemoteAuthenticationHandler signs the ticket into the cookie scheme:
+            // the linked identity must never replace the primary session. Hand the browser back to the app.
+            context.Response.Redirect(context.Properties.RedirectUri ?? "/");
+            context.HandleResponse();
+            return;
+        }
+
+        // A non-link ticket means a real sign-in is completing. Record which provider established this session so
+        // a later RP-initiated logout can target the correct identity provider's end-session endpoint (persisted
+        // into the auth cookie by the RemoteAuthenticationHandler that signs the ticket in), and notify the
+        // application of the sign-in — scoped here to the logged-out to signed-in transition rather than every
+        // proxied request. The notification never throws, so a notification failure can never break the sign-in.
+        context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
+        var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
+        await notifier.Notify(context.HttpContext, context.Principal);
+
+        if (context.Properties is not null
+            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
+                context.HttpContext,
+                context.Properties,
+                context.ReturnUri,
+                out var redirectUri))
+        {
+            context.ReturnUri = redirectUri;
         }
     }
 }

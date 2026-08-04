@@ -75,7 +75,8 @@ public class when_path_is_anonymous : Specification
             config,
             tenantResolver,
             httpClientFactory,
-            _errorPageProvider);
+            _errorPageProvider,
+            new MemoryCache(new MemoryCacheOptions()));
 
         _context = new DefaultHttpContext();
         _context.Request.Path = AnonymousPath;
