@@ -28,7 +28,7 @@ public class when_multiple_services_are_configured : Specification
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(authProxy);
 
-        _provider = new MicroserviceReverseProxyConfigProvider(monitor);
+        _provider = new MicroserviceReverseProxyConfigProvider(monitor, Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 
     [Fact] void should_not_include_single_service_default_routes() =>

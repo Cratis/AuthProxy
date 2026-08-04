@@ -17,7 +17,8 @@ namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvid
 /// </para>
 /// <para>
 /// The first declaring service wins, in configuration order, so the path stays anonymous — which is what
-/// both services asked for — and the route table stays unambiguous.
+/// both services asked for — and the route table stays unambiguous. The losing declaration is logged as a
+/// warning naming both services, which is not asserted here because logging is deliberately not specced.
 /// </para>
 /// </summary>
 public class when_two_services_declare_the_same_anonymous_path : Specification
@@ -50,7 +51,7 @@ public class when_two_services_declare_the_same_anonymous_path : Specification
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(authProxy);
 
-        _provider = new MicroserviceReverseProxyConfigProvider(monitor);
+        _provider = new MicroserviceReverseProxyConfigProvider(monitor, Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 
     void Because() => _routes = _provider.GetConfig().Routes;

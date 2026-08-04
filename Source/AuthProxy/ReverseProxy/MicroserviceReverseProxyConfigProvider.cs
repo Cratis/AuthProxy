@@ -25,8 +25,10 @@ namespace Cratis.AuthProxy.ReverseProxy;
 /// </para>
 /// </summary>
 /// <param name="config">The options monitor providing the current auth proxy configuration.</param>
+/// <param name="logger">The logger.</param>
 public class MicroserviceReverseProxyConfigProvider(
-    IOptionsMonitor<C.AuthProxy> config) : IProxyConfigProvider
+    IOptionsMonitor<C.AuthProxy> config,
+    ILogger<MicroserviceReverseProxyConfigProvider> logger) : IProxyConfigProvider
 {
     /// <summary>
     /// The YARP well-known authorization policy name that disables authorization for a route.
@@ -44,13 +46,13 @@ public class MicroserviceReverseProxyConfigProvider(
     };
 
     readonly InMemoryConfigProvider _inner = new(
-        BuildRoutes(config.CurrentValue),
+        BuildRoutes(config.CurrentValue, logger),
         BuildClusters(config.CurrentValue));
 
     /// <inheritdoc/>
     public IProxyConfig GetConfig() => _inner.GetConfig();
 
-    static List<RouteConfig> BuildRoutes(C.AuthProxy config)
+    static List<RouteConfig> BuildRoutes(C.AuthProxy config, ILogger logger)
     {
         var routes = new List<RouteConfig>();
         var services = config.Services;
@@ -61,13 +63,13 @@ public class MicroserviceReverseProxyConfigProvider(
         // identical order — which ASP.NET cannot choose between, and reports as AmbiguousMatchException on
         // the declared path. Claiming each prefix for the first service that can actually serve it keeps
         // the path anonymous, which is what every declaring service asked for, and the table unambiguous.
-        var claimedAnonymousPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var claimedAnonymousPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (name, ms) in services)
         {
             var key = name.ToLowerInvariant();
 
-            routes.AddRange(AnonymousRoutes(key, ms, claimedAnonymousPaths));
+            routes.AddRange(AnonymousRoutes(key, ms, claimedAnonymousPaths, logger));
 
             if (ms.Backend is not null)
             {
@@ -119,7 +121,8 @@ public class MicroserviceReverseProxyConfigProvider(
     /// </summary>
     /// <param name="microserviceKey">The lower-cased service key.</param>
     /// <param name="service">The service configuration.</param>
-    /// <param name="claimedPaths">The prefixes already claimed by an earlier service; claimed here as they are emitted.</param>
+    /// <param name="claimedPaths">The prefixes already claimed, keyed by the service serving each; claimed here as they are emitted.</param>
+    /// <param name="logger">The logger, used to name a prefix an earlier service already claimed.</param>
     /// <returns>One route per declared anonymous path prefix not already claimed.</returns>
     /// <remarks>
     /// These are the only routes not generated with <c>AuthorizationPolicy = "default"</c>. That default is
@@ -145,14 +148,21 @@ public class MicroserviceReverseProxyConfigProvider(
     /// multi-service deployment no other service can serve anything under a declared prefix.
     /// </para>
     /// </remarks>
-    static IEnumerable<RouteConfig> AnonymousRoutes(string microserviceKey, C.Service service, HashSet<string> claimedPaths)
+    static IEnumerable<RouteConfig> AnonymousRoutes(
+        string microserviceKey,
+        C.Service service,
+        Dictionary<string, string> claimedPaths,
+        ILogger logger)
     {
         var index = 0;
 
         foreach (var path in AnonymousPaths.For(service))
         {
-            if (claimedPaths.Contains(path))
+            if (claimedPaths.TryGetValue(path, out var claimedBy))
             {
+                // Silently routing this service's traffic to another service's backend is the kind of
+                // thing an operator only discovers from the wrong response body, so it is named here.
+                logger.AnonymousPathAlreadyClaimed(path, claimedBy, microserviceKey);
                 continue;
             }
 
@@ -178,7 +188,7 @@ public class MicroserviceReverseProxyConfigProvider(
                 continue;
             }
 
-            claimedPaths.Add(path);
+            claimedPaths[path] = microserviceKey;
 
             yield return new RouteConfig
             {

@@ -48,7 +48,7 @@ public class when_declared_anonymous_paths_are_unusable : Specification
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(authProxy);
 
-        _provider = new MicroserviceReverseProxyConfigProvider(monitor);
+        _provider = new MicroserviceReverseProxyConfigProvider(monitor, Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 
     void Because() => _routes = _provider.GetConfig().Routes;
@@ -79,6 +79,6 @@ public class when_declared_anonymous_paths_are_unusable : Specification
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(authProxy);
 
-        return new MicroserviceReverseProxyConfigProvider(monitor).GetConfig().Routes.Select(_ => _.RouteId);
+        return new MicroserviceReverseProxyConfigProvider(monitor, Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>()).GetConfig().Routes.Select(_ => _.RouteId);
     }
 }

@@ -24,7 +24,7 @@ public class when_single_service_has_backend_and_frontend : Specification
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(authProxy);
 
-        _provider = new MicroserviceReverseProxyConfigProvider(monitor);
+        _provider = new MicroserviceReverseProxyConfigProvider(monitor, Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 
     [Fact] void should_include_backend_default_api_route() =>

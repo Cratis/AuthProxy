@@ -44,7 +44,7 @@ public class when_a_service_declares_a_path_it_cannot_serve : Specification
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(authProxy);
 
-        _provider = new MicroserviceReverseProxyConfigProvider(monitor);
+        _provider = new MicroserviceReverseProxyConfigProvider(monitor, Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 
     void Because() => _routes = _provider.GetConfig().Routes;
