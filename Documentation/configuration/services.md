@@ -89,6 +89,10 @@ refused by the default authorization policy.
 `AnonymousPaths` declares the paths a service genuinely serves without a session: a magic-link landing
 page, a signed-token report, a public webhook receiver.
 
+A declared path is reachable by anyone who knows the URL — AuthProxy stops demanding a login, it does not
+authenticate the caller. The application remains responsible for deciding whether to trust the request.
+For inbound webhooks specifically, see [Receiving webhooks](webhooks.md).
+
 ```json
 {
   "Cratis": {

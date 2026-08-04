@@ -16,6 +16,8 @@
   href: sign-in.md
 - name: Services
   href: services.md
+- name: Receiving Webhooks
+  href: webhooks.md
 - name: Lobby
   href: lobby/toc.yml
 - name: Custom Invitation Provider-Selection Page
