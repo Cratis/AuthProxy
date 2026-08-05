@@ -1,6 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Net.Http.Headers;
+using C = Cratis.AuthProxy.Configuration;
+
 namespace Cratis.AuthProxy;
 
 /// <summary>
@@ -9,6 +12,8 @@ namespace Cratis.AuthProxy;
 public static class HttpContextExtensions
 {
     const string SignInPathPrefix = "/signin-";
+    const string FetchDestinationHeader = "Sec-Fetch-Dest";
+    const string HtmlMediaType = "text/html";
 
     /// <summary>
     /// Gets the current request path and query string as a single relative URL.
@@ -76,6 +81,52 @@ public static class HttpContextExtensions
     public static bool IsAuthenticationUI(this HttpContext context) => context.IsLogin() || context.IsProviders() || context.IsToken();
 
     /// <summary>
+    /// Determines whether the request targets a path a service declares as anonymous.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <param name="config">The auth proxy configuration declaring the anonymous paths.</param>
+    /// <returns><see langword="true"/> if the request targets an anonymous path; otherwise <see langword="false"/>.</returns>
+    public static bool IsAnonymousPath(this HttpContext context, C.AuthProxy config) =>
+        AnonymousPaths.Matches(context.Request.Path, config);
+
+    /// <summary>
+    /// Determines whether the request is a browser navigating to a document, and therefore a request an
+    /// HTML page is an answer to.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if an HTML page answers the request; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// AuthProxy refuses unauthenticated callers by writing a page — provider selection, tenant selection —
+    /// and a page has to be delivered with a success status to render. That is the right answer to a person
+    /// in a browser and the wrong answer to everything else: a webhook or an integration reads the
+    /// <c>200</c> as delivered and never retries, and a frontend's <c>fetch()</c> passes the conventional
+    /// <c>response.ok</c> check and only fails later, on parsing. Callers that are not navigating are
+    /// refused with a status instead, so the refusal is visible where it is checked.
+    /// <para>
+    /// <see cref="FetchDestinationHeader"/> decides when it is present, because it is the only signal that
+    /// separates a document navigation from a scripted request issued by the very same browser —
+    /// <c>fetch()</c> sends <c>Accept: *&#47;*</c>, which reads as "HTML will do" and is exactly the
+    /// misclassification to avoid. Only when the header is absent — a client predating fetch metadata —
+    /// does <c>Accept</c> decide, and then nothing short of an explicit <c>text/html</c> counts, so a
+    /// caller that states nothing is treated as the API caller it almost always is.
+    /// </para>
+    /// </remarks>
+    public static bool IsDocumentNavigation(this HttpContext context)
+    {
+        var destination = context.Request.Headers[FetchDestinationHeader].ToString();
+
+        if (!string.IsNullOrEmpty(destination))
+        {
+            return string.Equals(destination, "document", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(destination, "iframe", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(destination, "frame", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return MediaTypeHeaderValue.TryParseList(context.Request.Headers.Accept, out var accepted)
+            && accepted.Any(AcceptsHtml);
+    }
+
+    /// <summary>
     /// Determines whether the request targets any authentication bootstrap endpoint.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
@@ -123,4 +174,19 @@ public static class HttpContextExtensions
 
         return true;
     }
+
+    /// <summary>
+    /// Determines whether an <c>Accept</c> entry asks for HTML.
+    /// </summary>
+    /// <param name="mediaType">The parsed <c>Accept</c> entry.</param>
+    /// <returns><see langword="true"/> when the entry asks for HTML; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// Only an explicit <c>text/html</c> counts. The wildcards <c>*&#47;*</c> and <c>text/*</c> do not:
+    /// they are what a client sends when it will take whatever it is given, and reading them as a request
+    /// for a page is the misclassification that turns a refusal into a recorded success. A quality of zero
+    /// is the caller stating outright that HTML is unacceptable, so it is honored rather than matched.
+    /// </remarks>
+    static bool AcceptsHtml(MediaTypeHeaderValue mediaType) =>
+        string.Equals(mediaType.MediaType.Value, HtmlMediaType, StringComparison.OrdinalIgnoreCase)
+        && mediaType.Quality != 0;
 }

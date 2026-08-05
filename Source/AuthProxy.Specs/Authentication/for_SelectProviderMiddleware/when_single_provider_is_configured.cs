@@ -32,10 +32,14 @@ public class when_single_provider_is_configured : Specification
             proxyConfig,
             authConfig,
             Substitute.For<IErrorPageProvider>(),
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/protected";
+
+        // A browser navigating to a page — the only caller redirected to a login provider.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
 
         var authService = Substitute.For<IAuthenticationService>();

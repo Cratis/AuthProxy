@@ -70,6 +70,10 @@ Each provider generates a dedicated login endpoint at `/.cratis/login/{scheme}`.
 The scheme name is derived from the provider `Name` by lowercasing and replacing spaces with hyphens
 (e.g. `"My Provider"` → `/.cratis/login/my-provider`).
 
+Both behaviors above — the direct challenge and the selection page — apply to **browser navigations**.
+A caller that is not navigating to a page is refused with `401` instead, so the rejection is visible to
+a client that checks the status code. See [Unauthenticated responses](unauthenticated-responses.md).
+
 ### Tenant-aware authentication state
 
 When authentication starts from a tenant-scoped request, AuthProxy stores tenant resolution metadata in the protected authentication `state` value:

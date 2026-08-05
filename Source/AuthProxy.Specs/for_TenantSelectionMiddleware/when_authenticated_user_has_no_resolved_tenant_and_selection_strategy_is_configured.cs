@@ -58,6 +58,9 @@ public class when_authenticated_user_has_no_resolved_tenant_and_selection_strate
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";
+
+        // A browser navigating to a page — the only caller the tenant chooser is an answer to.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new MemoryStream();
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
     }

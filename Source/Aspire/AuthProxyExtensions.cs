@@ -93,6 +93,58 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Declares the request paths on a named service that are served to unauthenticated callers.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">
+    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// </param>
+    /// <param name="paths">
+    /// The path prefixes to serve anonymously. Each must be a rooted path of literal segments
+    /// (e.g. <c>/portal</c>), and is matched case-insensitively on segment boundaries — <c>/portal</c>
+    /// covers <c>/portal</c> and <c>/portal/anything</c>, but not <c>/portalx</c>. Anything else is
+    /// discarded by AuthProxy, leaving that path authenticated.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Use this for paths an application genuinely serves without a session — a magic-link landing page, a
+    /// signed-token report, a public webhook receiver. Without it those paths are unreachable: an
+    /// unauthenticated caller is answered with the provider-selection page instead, at <c>HTTP 200</c>, so
+    /// a webhook or other non-browser caller records success and never retries.
+    /// <para>
+    /// Each entry is a prefix and covers everything under it, so name the specific leaf path whenever a
+    /// sibling under the same parent is not public. Requests still pass through AuthProxy, which keeps
+    /// stripping inbound identity headers, so this makes a path reachable — it does not make it trusted.
+    /// The application still authorizes it.
+    /// </para>
+    /// <para>
+    /// The declared prefix is claimed for the whole proxy: an anonymous caller cannot send a
+    /// service-selection header, so in a multi-service deployment no other service can serve anything
+    /// under a prefix declared here.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithAnonymousPaths<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        params string[] paths)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        annotation.AnonymousPathCounts.TryGetValue(serviceName, out var index);
+
+        foreach (var path in paths)
+        {
+            builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__AnonymousPaths__{index}", path);
+            index++;
+        }
+
+        annotation.AnonymousPathCounts[serviceName] = index;
+
+        return builder;
+    }
+
+    /// <summary>
     /// Adds an OIDC provider to the AuthProxy authentication configuration.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>

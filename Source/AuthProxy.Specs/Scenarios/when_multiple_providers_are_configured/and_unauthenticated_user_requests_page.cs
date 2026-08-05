@@ -4,9 +4,14 @@
 namespace Cratis.AuthProxy.Scenarios.when_multiple_providers_are_configured;
 
 /// <summary>
-/// End-to-end scenario: an unauthenticated user requests any page when multiple OIDC providers
+/// End-to-end scenario: an unauthenticated user navigates to any page when multiple OIDC providers
 /// are configured. Verifies that SelectProviderMiddleware intercepts the request, sets the
 /// providers cookie, and serves the select-provider page.
+/// <para>
+/// The request is shaped as a browser navigation because that is the caller a page answers; a caller that
+/// is not navigating is refused with a status instead, covered by
+/// <see cref="and_a_non_browser_caller_requests_a_page"/>.
+/// </para>
 /// </summary>
 /// <param name="factory">The shared application factory.</param>
 public class and_unauthenticated_user_requests_page(AuthProxyFactory factory) : IClassFixture<AuthProxyFactory>, IAsyncLifetime
@@ -17,7 +22,7 @@ public class and_unauthenticated_user_requests_page(AuthProxyFactory factory) : 
     public async Task InitializeAsync()
     {
         using var client = factory.CreateTestClient();
-        _response = await client.GetAsync("/");
+        _response = await client.SendAsync(AuthProxyFactory.BrowserNavigation("/"));
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
@@ -26,13 +31,9 @@ public class and_unauthenticated_user_requests_page(AuthProxyFactory factory) : 
     [Fact] public void should_return_200() => Assert.Equal(System.Net.HttpStatusCode.OK, _response!.StatusCode);
     [Fact] public void should_return_html() => Assert.Equal("text/html; charset=utf-8", _response!.Content.Headers.ContentType?.ToString());
     [Fact] public void should_return_select_provider_page() => Assert.Contains("Select Provider", _responseBody);
+    [Fact] public void should_set_providers_cookie() => Assert.True(HasProvidersCookie(), $"Expected Set-Cookie header containing '{Cookies.Providers}'");
 
-    [Fact]
-    public void should_set_providers_cookie()
-    {
-        _response!.Headers.TryGetValues("Set-Cookie", out var cookies);
-        Assert.True(
-            cookies?.Any(c => c.StartsWith(Cookies.Providers, StringComparison.OrdinalIgnoreCase)),
-            $"Expected Set-Cookie header containing '{Cookies.Providers}'");
-    }
+    bool HasProvidersCookie() =>
+        _response!.Headers.TryGetValues("Set-Cookie", out var cookies)
+        && cookies.Any(_ => _.StartsWith(Cookies.Providers, StringComparison.OrdinalIgnoreCase));
 }

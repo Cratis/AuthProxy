@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Authentication;
+
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware;
 
 public class when_user_is_authenticated : Specification
@@ -29,7 +31,8 @@ public class when_user_is_authenticated : Specification
             proxyConfig,
             authConfig,
             Substitute.For<IErrorPageProvider>(),
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";

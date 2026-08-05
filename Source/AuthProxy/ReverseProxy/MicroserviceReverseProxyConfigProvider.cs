@@ -25,30 +25,51 @@ namespace Cratis.AuthProxy.ReverseProxy;
 /// </para>
 /// </summary>
 /// <param name="config">The options monitor providing the current auth proxy configuration.</param>
+/// <param name="logger">The logger.</param>
 public class MicroserviceReverseProxyConfigProvider(
-    IOptionsMonitor<C.AuthProxy> config) : IProxyConfigProvider
+    IOptionsMonitor<C.AuthProxy> config,
+    ILogger<MicroserviceReverseProxyConfigProvider> logger) : IProxyConfigProvider
 {
+    /// <summary>
+    /// The YARP well-known authorization policy name that disables authorization for a route.
+    /// </summary>
+    const string AnonymousAuthorizationPolicy = "anonymous";
+
+    /// <summary>
+    /// The path prefix served by a service's backend rather than its frontend.
+    /// </summary>
+    const string ApiPathPrefix = "/api";
+
     static readonly ClusterConfig _baseCluster = new()
     {
         HttpRequest = new() { ActivityTimeout = TimeSpan.FromMinutes(5) },
     };
 
     readonly InMemoryConfigProvider _inner = new(
-        BuildRoutes(config.CurrentValue),
+        BuildRoutes(config.CurrentValue, logger),
         BuildClusters(config.CurrentValue));
 
     /// <inheritdoc/>
     public IProxyConfig GetConfig() => _inner.GetConfig();
 
-    static List<RouteConfig> BuildRoutes(C.AuthProxy config)
+    static List<RouteConfig> BuildRoutes(C.AuthProxy config, ILogger logger)
     {
         var routes = new List<RouteConfig>();
         var services = config.Services;
         var isSingleMicroservice = services.Count == 1;
 
+        // A declared prefix is matched without any service-selection header or query parameter, so two
+        // services declaring the same prefix would emit two routes with an identical template and an
+        // identical order — which ASP.NET cannot choose between, and reports as AmbiguousMatchException on
+        // the declared path. Claiming each prefix for the first service that can actually serve it keeps
+        // the path anonymous, which is what every declaring service asked for, and the table unambiguous.
+        var claimedAnonymousPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var (name, ms) in services)
         {
             var key = name.ToLowerInvariant();
+
+            routes.AddRange(AnonymousRoutes(key, ms, claimedAnonymousPaths, logger));
 
             if (ms.Backend is not null)
             {
@@ -93,6 +114,93 @@ public class MicroserviceReverseProxyConfigProvider(
         }
 
         return routes;
+    }
+
+    /// <summary>
+    /// Builds the routes for the paths a service declares in <see cref="C.Service.AnonymousPaths"/>.
+    /// </summary>
+    /// <param name="microserviceKey">The lower-cased service key.</param>
+    /// <param name="service">The service configuration.</param>
+    /// <param name="claimedPaths">The prefixes already claimed, keyed by the service serving each; claimed here as they are emitted.</param>
+    /// <param name="logger">The logger, used to name a prefix an earlier service already claimed.</param>
+    /// <returns>One route per declared anonymous path prefix not already claimed.</returns>
+    /// <remarks>
+    /// These are the only routes not generated with <c>AuthorizationPolicy = "default"</c>. That default is
+    /// <c>RequireAuthenticatedUser()</c>, so without this a declared anonymous path clears
+    /// <c>SelectProviderMiddleware</c> only to be stopped one step later — refused by authorization on the
+    /// catch-all route in a single-service deployment, or matching no route at all in a multi-service one,
+    /// where every other route is selected by a header or query parameter an anonymous caller has no reason
+    /// to send. The same closed door either way. None of the built-in skip-list paths (invite,
+    /// registration, authentication UI, <c>/_pages</c>) is ever proxied to a service, so this is the first
+    /// case where an unauthenticated request is meant to reach a backend, and the first that needs the
+    /// policy relaxed.
+    /// <para>
+    /// The relaxation is scoped to exactly the declared prefixes and nothing else: with no
+    /// <c>AnonymousPaths</c> declared this yields no routes and the table is what it was before. Each
+    /// prefix is emitted as a catch-all so it covers the prefix itself and everything under it, which
+    /// matches the segment-prefix semantics the middlewares apply because
+    /// <see cref="AnonymousPaths.TryNormalize"/> only admits prefixes made of literal segments.
+    /// </para>
+    /// <para>
+    /// Order 0 puts these ahead of the header- and query-selected routes, which is what relaxes the policy
+    /// but also claims the prefix for the whole proxy: an anonymous caller cannot be expected to send a
+    /// service-selection header, so the declared path is necessarily what identifies the service. In a
+    /// multi-service deployment no other service can serve anything under a declared prefix.
+    /// </para>
+    /// </remarks>
+    static IEnumerable<RouteConfig> AnonymousRoutes(
+        string microserviceKey,
+        C.Service service,
+        Dictionary<string, string> claimedPaths,
+        ILogger logger)
+    {
+        var index = 0;
+
+        foreach (var path in AnonymousPaths.For(service))
+        {
+            if (claimedPaths.TryGetValue(path, out var claimedBy))
+            {
+                // Silently routing this service's traffic to another service's backend is the kind of
+                // thing an operator only discovers from the wrong response body, so it is named here.
+                logger.AnonymousPathAlreadyClaimed(path, claimedBy, microserviceKey);
+                continue;
+            }
+
+            // Mirror the authenticated split: /api goes to the backend, anything else to the frontend,
+            // falling back to whichever endpoint the service actually declares.
+            var prefersBackend = new PathString(path).StartsWithSegments(ApiPathPrefix);
+            var clusterId = (prefersBackend, service.Backend, service.Frontend) switch
+            {
+                (true, not null, _) => BackendClusterId(microserviceKey),
+                (false, _, not null) => FrontendClusterId(microserviceKey),
+                (_, not null, null) => BackendClusterId(microserviceKey),
+                (_, null, not null) => FrontendClusterId(microserviceKey),
+                _ => null,
+            };
+
+            // A service entry does not have to declare an endpoint — the lobby's registration service is
+            // configured that way — and one with nothing to forward to produces no route. Claiming only
+            // when a route is actually emitted keeps such an entry from taking the prefix away from a
+            // service that can serve it, which would leave the path matching no route at all while all
+            // three middlewares went on treating it as anonymous.
+            if (clusterId is null)
+            {
+                continue;
+            }
+
+            claimedPaths[path] = microserviceKey;
+
+            yield return new RouteConfig
+            {
+                RouteId = $"{microserviceKey}-anonymous-{index}",
+                ClusterId = clusterId,
+                AuthorizationPolicy = AnonymousAuthorizationPolicy,
+                Match = new RouteMatch { Path = $"{path}/{{**catch-all}}" },
+                Order = 0,
+            };
+
+            index++;
+        }
     }
 
     static IEnumerable<RouteConfig> BackendRoutes(string microserviceKey, bool isSingle)

@@ -44,6 +44,11 @@ public class TenantSelectionMiddleware(
             || context.IsInvitation()
             || context.IsRegistration()
             || context.IsAuthenticationBootstrap()
+
+            // A path the deployment declares anonymous is served without regard to who is asking, so it
+            // stays reachable for a caller who happens to be signed in without having chosen a tenant.
+            // Without this, declaring a path anonymous only opens it to callers with no session at all.
+            || context.IsAnonymousPath(config.CurrentValue)
             || context.HasPendingInvitation()
             || context.HasPendingRegistration())
         {
@@ -100,6 +105,17 @@ public class TenantSelectionMiddleware(
             MarkTenantAsRevalidated(context, tenantOptions[0].Id);
             context.Response.StatusCode = StatusCodes.Status302Found;
             context.Response.Headers.Location = context.GetPathAndQuery();
+            return;
+        }
+
+        // The chooser is a page, and a page can only be delivered with a success status. To a caller that
+        // is not navigating that reads as the data it asked for, arriving intact — the same silent success
+        // the provider-selection page produces, reached here by an already-signed-in frontend. It is
+        // refused with 403 rather than 401 because the caller is authenticated: a 401 would send a
+        // frontend back through a login it has already completed.
+        if (!context.IsDocumentNavigation())
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 
@@ -284,8 +300,11 @@ public class TenantSelectionMiddleware(
 
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden || response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            // An authoritative answer: the user is not entitled to any tenant at all.
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            // An authoritative answer: the user is not entitled to any tenant at all. Reporting it as an
+            // empty-but-successful result forwards the request, and TenancyMiddleware — which finds no
+            // tenant to resolve for an authenticated user — answers it with the no-organization page at
+            // 403. Setting a status here would only be overwritten by that, and a 403 naming the actual
+            // reason is the better answer anyway.
             return new(Succeeded: true, []);
         }
 

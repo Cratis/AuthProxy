@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Authentication;
+
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_multiple_providers_are_configured;
 
 public class when_multiple_providers_are_configured : Specification
@@ -39,10 +41,14 @@ public class when_multiple_providers_are_configured : Specification
             proxyConfig,
             authConfig,
             _errorPageProvider,
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";
+
+        // A browser navigating to a page — the only caller the selection page is an answer to.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
     }
 

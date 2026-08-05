@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Authentication;
+
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_lobby_mode_is_configured.given;
 
 public class lobby_mode_middleware : Specification
@@ -47,9 +49,13 @@ public class lobby_mode_middleware : Specification
             proxyConfig,
             authConfig,
             _errorPageProvider,
-            Substitute.For<ITenantResolver>());
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
 
         _context = new DefaultHttpContext();
+
+        // A browser navigating to a page, which is what lobby mode is written for.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
         _context.Response.Body = new System.IO.MemoryStream();
     }
 }
