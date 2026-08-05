@@ -10,6 +10,7 @@ on:
       - "**"
     paths:
       - "Source/**"
+      - ".github/workflows/**"
 
 jobs:
   dotnet-build:
@@ -26,5 +27,27 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Build
+      # Debug and Release are not the same gate: the spec projects and several analyzer paths only compile
+      # under Debug, so a Release-only build can go green over code that does not compile for anyone
+      # working on it locally.
+      - name: Build (Debug)
+        run: dotnet build --configuration Debug
+
+      - name: Build (Release)
         run: dotnet build --configuration Release
+
+      - name: Test
+        run: >
+          dotnet test
+          --configuration Debug
+          --no-build
+          --logger "trx;LogFileName=specs.trx"
+          --results-directory TestResults
+
+      - name: Upload spec results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec-results
+          path: TestResults
+          retention-days: 14
