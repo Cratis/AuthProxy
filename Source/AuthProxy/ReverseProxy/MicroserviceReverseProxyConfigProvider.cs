@@ -23,12 +23,12 @@ namespace Cratis.AuthProxy.ReverseProxy;
 /// optional and a plain catch-all route is also registered so that the single
 /// microservice works without any special client configuration.
 /// </para>
+/// <para>
+/// The table is rebuilt whenever the configuration reloads, so it keeps agreeing with the middlewares that
+/// read the same configuration per request — see <see cref="Rebuild"/>.
+/// </para>
 /// </summary>
-/// <param name="config">The options monitor providing the current auth proxy configuration.</param>
-/// <param name="logger">The logger.</param>
-public class MicroserviceReverseProxyConfigProvider(
-    IOptionsMonitor<C.AuthProxy> config,
-    ILogger<MicroserviceReverseProxyConfigProvider> logger) : IProxyConfigProvider
+public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDisposable
 {
     /// <summary>
     /// The YARP well-known authorization policy name that disables authorization for a route.
@@ -45,12 +45,39 @@ public class MicroserviceReverseProxyConfigProvider(
         HttpRequest = new() { ActivityTimeout = TimeSpan.FromMinutes(5) },
     };
 
-    readonly InMemoryConfigProvider _inner = new(
-        BuildRoutes(config.CurrentValue, logger),
-        BuildClusters(config.CurrentValue));
+    readonly InMemoryConfigProvider _inner;
+    readonly ILogger<MicroserviceReverseProxyConfigProvider> _logger;
+    readonly Lock _rebuilding = new();
+    IDisposable? _configurationChanged;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MicroserviceReverseProxyConfigProvider"/> class.
+    /// </summary>
+    /// <param name="config">The options monitor providing the current auth proxy configuration.</param>
+    /// <param name="logger">The logger.</param>
+    public MicroserviceReverseProxyConfigProvider(
+        IOptionsMonitor<C.AuthProxy> config,
+        ILogger<MicroserviceReverseProxyConfigProvider> logger)
+    {
+        _logger = logger;
+        _inner = new InMemoryConfigProvider(
+            BuildRoutes(config.CurrentValue, logger),
+            BuildClusters(config.CurrentValue));
+        _configurationChanged = config.OnChange(Rebuild);
+    }
 
     /// <inheritdoc/>
     public IProxyConfig GetConfig() => _inner.GetConfig();
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        // Idempotent: this instance is registered both as itself and as IProxyConfigProvider, so the
+        // container can hand the same object to two disposal registrations.
+        _configurationChanged?.Dispose();
+        _configurationChanged = null;
+        GC.SuppressFinalize(this);
+    }
 
     static List<RouteConfig> BuildRoutes(C.AuthProxy config, ILogger logger)
     {
@@ -351,4 +378,40 @@ public class MicroserviceReverseProxyConfigProvider(
 
     static string BackendClusterId(string key) => $"{key}-backend-cluster";
     static string FrontendClusterId(string key) => $"{key}-frontend-cluster";
+
+    /// <summary>
+    /// Rebuilds the route table from a reloaded configuration.
+    /// </summary>
+    /// <param name="config">The reloaded configuration.</param>
+    /// <remarks>
+    /// The route table is one of the four components that have to agree on what counts as an anonymous path
+    /// (see <see cref="AnonymousPaths"/>). The other three are middlewares reading
+    /// <see cref="IOptionsMonitor{TOptions}.CurrentValue"/> per request, so they follow a reload immediately;
+    /// a table built once at startup would not. Withdrawing a declared prefix would leave it on a route still
+    /// carrying <see cref="AnonymousAuthorizationPolicy"/> until the process restarted, and declaring a new one
+    /// would leave it matching only the authenticated catch-all — agreement at the same startup rather than at
+    /// the same instant.
+    /// <para>
+    /// A file-backed configuration source commonly raises two change notifications for a single edit, so a
+    /// rebuild that arrives at the table already being served is skipped: handing YARP an identical
+    /// configuration makes it tear down and rebuild its route table for nothing.
+    /// </para>
+    /// </remarks>
+    void Rebuild(C.AuthProxy config)
+    {
+        var routes = BuildRoutes(config, _logger);
+        var clusters = BuildClusters(config);
+
+        lock (_rebuilding)
+        {
+            var current = _inner.GetConfig();
+
+            if (current.Routes.SequenceEqual(routes) && current.Clusters.SequenceEqual(clusters))
+            {
+                return;
+            }
+
+            _inner.Update(routes, clusters);
+        }
+    }
 }
