@@ -43,8 +43,6 @@ public class LinkMiddleware(
     /// </summary>
     public const string LinkTokenPropertyKey = "Cratis.AuthProxy.LinkToken";
 
-    const string ApplicationRoot = "/";
-
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
@@ -88,22 +86,15 @@ public class LinkMiddleware(
         await context.ChallengeAsync(scheme, properties);
     }
 
-    static string ResolveReturnUrl(string? returnUrl)
-    {
-        // The return URL is echoed back to the browser after the link completes, so it must be a same-site
-        // relative path (a single leading slash, not '//') — anything else falls back to the application
-        // root so the endpoint can never be used as an open redirect.
-        if (string.IsNullOrWhiteSpace(returnUrl))
-        {
-            return ApplicationRoot;
-        }
-
-        var isSafeRelative = Uri.TryCreate(returnUrl, UriKind.Relative, out _)
-            && returnUrl.StartsWith('/')
-            && !returnUrl.StartsWith("//", StringComparison.Ordinal);
-
-        return isSafeRelative ? returnUrl : ApplicationRoot;
-    }
+    /// <summary>
+    /// Resolves the return URL echoed back to the browser once the link completes.
+    /// </summary>
+    /// <param name="returnUrl">The caller-supplied return URL.</param>
+    /// <returns>The requested target when it is same-site relative; otherwise the application root.</returns>
+    /// <remarks>
+    /// See <see cref="RelativeRedirect"/> for why a single leading slash is not the whole test.
+    /// </remarks>
+    static string ResolveReturnUrl(string? returnUrl) => RelativeRedirect.Resolve(returnUrl);
 
     bool SchemeExists(string scheme)
     {

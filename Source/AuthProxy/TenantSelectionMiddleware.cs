@@ -251,10 +251,7 @@ public class TenantSelectionMiddleware(
         memoryCache.Set(RevalidationCacheKey(principal.UserId, tenantId), true, interval);
     }
 
-    bool IsSafeRelativeUrl(string? url) =>
-        !string.IsNullOrWhiteSpace(url)
-        && Uri.TryCreate(url, UriKind.Relative, out _)
-        && url.StartsWith('/');
+    bool IsSafeRelativeUrl(string? url) => RelativeRedirect.IsSameSiteRelative(url);
 
     bool TryGetSelectionOptions(C.AuthProxy authProxyConfig, out Tenancy.SelectionOptions selectionOptions)
     {
