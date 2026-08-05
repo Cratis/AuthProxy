@@ -1,9 +1,10 @@
 {
-  "name": "@cratis/ingress-web",
+  "name": "@cratis/authproxy-web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node ./link-eslint-typescript.cjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -28,7 +29,9 @@
     "globals": "^16.5.0",
     "tailwindcss": "^4.1.0",
     "typescript": "~7.0.2",
-    "typescript-eslint": "^8.48.0",
+    "typescript-eslint": "8.65.0",
+    "typescript-for-eslint": "npm:typescript@6.0.3",
     "vite": "^7.3.1"
-  }
+  },
+  "packageManager": "yarn@4.17.1"
 }

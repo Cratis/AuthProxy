@@ -25,3 +25,12 @@ Thumbs.db
 ## Ignore frontend build artifacts
 **/wwwroot/
 **/node_modules/
+
+## Yarn Berry - keep the vendored release/plugins, ignore everything else
+.pnp.*
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/sdks
+!**/.yarn/versions
