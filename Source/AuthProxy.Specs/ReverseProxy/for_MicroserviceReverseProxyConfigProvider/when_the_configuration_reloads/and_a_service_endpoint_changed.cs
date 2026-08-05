@@ -12,8 +12,8 @@ namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvid
 /// </summary>
 public class and_a_service_endpoint_changed : Specification
 {
-    ReloadableOptionsMonitor _monitor;
     MicroserviceReverseProxyConfigProvider _provider;
+    Action<C.AuthProxy, string?> _reload;
     IReadOnlyList<ClusterConfig> _clusters;
 
     static C.AuthProxy ConfigurationServing(string baseUrl) =>
@@ -27,15 +27,18 @@ public class and_a_service_endpoint_changed : Specification
 
     void Establish()
     {
-        _monitor = new ReloadableOptionsMonitor(ConfigurationServing("https://frontend.local/"));
+        var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        monitor.CurrentValue.Returns(ConfigurationServing("https://frontend.local/"));
+        monitor.OnChange(Arg.Do<Action<C.AuthProxy, string?>>(listener => _reload = listener));
+
         _provider = new MicroserviceReverseProxyConfigProvider(
-            _monitor,
+            monitor,
             Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 
     void Because()
     {
-        _monitor.Reload(ConfigurationServing("https://moved.local/"));
+        _reload(ConfigurationServing("https://moved.local/"), Options.DefaultName);
         _clusters = _provider.GetConfig().Clusters;
     }
 

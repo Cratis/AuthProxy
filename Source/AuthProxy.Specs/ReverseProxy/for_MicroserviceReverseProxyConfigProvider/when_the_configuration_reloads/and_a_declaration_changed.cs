@@ -22,7 +22,7 @@ public class and_a_declaration_changed : given.a_provider_over_a_reloadable_conf
 
     void Because()
     {
-        _monitor.Reload(ConfigurationDeclaring("/status"));
+        Reload(ConfigurationDeclaring("/status"));
         _routes = _provider.GetConfig().Routes;
     }
 

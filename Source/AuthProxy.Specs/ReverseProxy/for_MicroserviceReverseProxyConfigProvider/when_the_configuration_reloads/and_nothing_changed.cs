@@ -24,7 +24,7 @@ public class and_nothing_changed : given.a_provider_over_a_reloadable_configurat
     void Because()
     {
         _before = _provider.GetConfig();
-        _monitor.Reload(ConfigurationDeclaring("/portal"));
+        Reload(ConfigurationDeclaring("/portal"));
         _after = _provider.GetConfig();
     }
 
