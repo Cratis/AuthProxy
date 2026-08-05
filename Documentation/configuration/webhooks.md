@@ -79,3 +79,6 @@ Not an omission — a deliberate boundary:
 - **Treat the payload as untrusted until verified**, including any identifiers used to look up records.
 - **Re-read the declared paths when reviewing the deployment.** They are the surface reachable without a
   session, and they are the shortest list worth auditing.
+
+For the sibling case — a page or API a *person* reaches without an account, such as a magic-link landing
+page — see [Public application surfaces](public-surfaces.md).

@@ -16,6 +16,8 @@
   href: sign-in.md
 - name: Services
   href: services.md
+- name: Public Application Surfaces
+  href: public-surfaces.md
 - name: Receiving Webhooks
   href: webhooks.md
 - name: Lobby

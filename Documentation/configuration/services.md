@@ -91,7 +91,10 @@ page, a signed-token report, a public webhook receiver.
 
 A declared path is reachable by anyone who knows the URL — AuthProxy stops demanding a login, it does not
 authenticate the caller. The application remains responsible for deciding whether to trust the request.
-For inbound webhooks specifically, see [Receiving webhooks](webhooks.md).
+
+Two how-to guides cover the cases in detail: [Public application surfaces](public-surfaces.md) for a page
+or API a person reaches without an account, and [Receiving webhooks](webhooks.md) for a request from
+another system.
 
 ```json
 {
