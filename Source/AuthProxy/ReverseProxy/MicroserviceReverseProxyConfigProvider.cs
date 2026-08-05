@@ -249,7 +249,12 @@ public class MicroserviceReverseProxyConfigProvider(
             Order = 1,
         };
 
-        // Query-parameter–matched API route (adds the header for downstream)
+        // Query-parameter–matched API route (adds the header for downstream).
+        // Ordered behind the header-matched route rather than beside it: a caller that sends both a
+        // Service-ID header and a ?service= parameter satisfies both, and two candidates at the same order
+        // with the same template are an AmbiguousMatchException. Endpoint selection runs ahead of
+        // authentication, so that surfaces to an unauthenticated caller as a bare 500 — trivially
+        // reachable, and in Development a stack trace. A distinct order makes the header win instead.
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-backend-query-api",
@@ -269,7 +274,7 @@ public class MicroserviceReverseProxyConfigProvider(
                     }
                 ],
             },
-            Order = 1,
+            Order = 2,
         };
 
         // Plain /api catch-all when there is only one microservice.
@@ -311,7 +316,8 @@ public class MicroserviceReverseProxyConfigProvider(
             Order = 10,
         };
 
-        // Query-parameter–matched frontend route
+        // Query-parameter–matched frontend route, ordered behind the header-matched one for the same
+        // reason as the backend pair: satisfying both must select one route, not raise an ambiguity.
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-frontend-query",
@@ -331,7 +337,7 @@ public class MicroserviceReverseProxyConfigProvider(
                     }
                 ],
             },
-            Order = 10,
+            Order = 11,
         };
     }
 
