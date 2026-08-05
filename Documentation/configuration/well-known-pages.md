@@ -1,6 +1,6 @@
 # Well-Known Pages
 
-Ingress serves built-in HTML pages for a range of conditions — provider selection,
+AuthProxy serves built-in HTML pages for a range of conditions — provider selection,
 invitation errors, tenant errors, and generic HTTP errors.
 Every page can be **overridden** by mounting a directory of custom pages into the container.
 
@@ -8,7 +8,7 @@ Every page can be **overridden** by mounting a directory of custom pages into th
 
 ## Built-in pages
 
-The following pages are included with Ingress and are served automatically when the corresponding
+The following pages are included with AuthProxy and are served automatically when the corresponding
 condition is detected:
 
 | File name | Condition | HTTP status |
@@ -28,14 +28,16 @@ condition is detected:
 
 ## Overriding pages
 
-Mount a directory into the container and point `Ingress:PagesPath` at the mount path.
-Ingress looks up each page by its conventional file name inside that directory.
+Mount a directory into the container and point `Cratis:AuthProxy:PagesPath` at the mount path.
+AuthProxy looks up each page by its conventional file name inside that directory.
 Any page file that is present overrides the built-in default; missing files fall back to the built-in version.
 
 ```json
 {
-  "Ingress": {
-    "PagesPath": "/mnt/pages"
+  "Cratis": {
+    "AuthProxy": {
+      "PagesPath": "/mnt/pages"
+    }
   }
 }
 ```
@@ -43,19 +45,19 @@ Any page file that is present overrides the built-in default; missing files fall
 Equivalent environment variable:
 
 ```
-Ingress__PagesPath=/mnt/pages
+Cratis__AuthProxy__PagesPath=/mnt/pages
 ```
 
 ### Container mount example (Docker Compose)
 
 ```yaml
 services:
-  ingress:
-    image: cratis/ingress:latest
+  authproxy:
+    image: cratis/authproxy:latest
     volumes:
       - ./my-pages:/mnt/pages
     environment:
-      Ingress__PagesPath: /mnt/pages
+      Cratis__AuthProxy__PagesPath: /mnt/pages
 ```
 
 ### Page assets

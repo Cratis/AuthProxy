@@ -1,0 +1,75 @@
+---
+title: AuthProxy
+description: AuthProxy is a lightweight .NET gateway that sits in front of your services and handles the cross-cutting edges — authentication, multi-tenancy, identity enrichment, and invite-based onboarding — so your application code stays focused on the domain.
+---
+
+import { CardGrid, Aside } from '@astrojs/starlight/components';
+import SimpleCard from '@components/SimpleCard.astro';
+import TopicHero from '@components/TopicHero.astro';
+
+<TopicHero icon="seti:lock" eyebrow="The Cratis Stack" title="A gateway for the edges of your app">
+Every application eventually grows the same crop of edge concerns: who is this user, which tenant are they in, where does this request route, and how do you onboard someone who has been invited but doesn't have an account yet. **AuthProxy** is a small .NET gateway that owns those edges — so each of your services can assume the request is already authenticated, already scoped to a tenant, and already enriched with identity.
+</TopicHero>
+
+## The friction it removes
+
+Without a gateway, every service re-implements the same boilerplate: an OpenID Connect handshake, tenant resolution from the host or a claim, a call to fetch the user's profile, the invite-acceptance flow. It's repetitive, it drifts between services, and it's exactly the kind of code you don't want copy-pasted across a fleet.
+
+AuthProxy is a [reverse proxy](https://microsoft.github.io/reverse-proxy/) (built on YARP) that you put in front of your backend and frontend services. It authenticates the request, resolves the tenant, enriches the identity, and *then* forwards the request to your service — with the tenant and identity attached as headers. Your services trust the proxy and read those headers.
+
+```mermaid
+flowchart LR
+    User["Browser / client"] --> AP
+
+    subgraph AP["AuthProxy"]
+        direction TB
+        AUTH["Authenticate<br/>(OIDC / JWT Bearer)"]
+        TEN["Resolve tenant"]
+        ID["Enrich identity<br/>(/.cratis/me)"]
+        AUTH --> TEN --> ID
+    end
+
+    AP -->|"/api/** + Tenant-ID + identity"| BE["Backend service"]
+    AP -->|"/** "| FE["Frontend SPA"]
+```
+
+<Aside type="note" title="Standalone — not Cratis-only">
+AuthProxy is a plain ASP.NET Core service. It pairs naturally with [Arc](/arc/)'s identity model (it calls a `/.cratis/me` endpoint to enrich identity, which Arc exposes), but it sits in front of *any* backend and frontend you point it at.
+</Aside>
+
+## What it handles
+
+<CardGrid>
+  <SimpleCard title="Authentication" icon="seti:lock" link="/authproxy/configuration/authentication/">
+    OpenID Connect and OAuth 2.0 (single or multi-provider), plus JWT Bearer. Unauthenticated requests are challenged or sent to a provider-selection page.
+  </SimpleCard>
+  <SimpleCard title="Identity enrichment" icon="seti:json" link="/authproxy/configuration/services/#identity-enrichment">
+    Calls a <code>/.cratis/me</code> endpoint on your service and attaches the enriched identity to forwarded requests as a trusted header.
+  </SimpleCard>
+  <SimpleCard title="Multi-tenancy" icon="seti:db" link="/authproxy/configuration/tenancy/">
+    Resolve the current tenant per request — from the host, a subdomain, a claim, the route, or a fixed value — with optional remote verification.
+  </SimpleCard>
+  <SimpleCard title="Invites &amp; lobby" icon="open-book" link="/authproxy/configuration/lobby/">
+    Invite-based onboarding with signed JWT tokens, plus an optional lobby service for users not yet assigned to a tenant.
+  </SimpleCard>
+</CardGrid>
+
+## How the docs are organized
+
+There's no code to write — AuthProxy is configured entirely through the `Cratis:AuthProxy` section of `appsettings.json` and runs as a container in front of your services. Each page under [Configuration](/authproxy/configuration/) takes one edge concern and walks through how AuthProxy handles it and how you configure it.
+
+## Where to go next
+
+Start by putting the proxy in front of a service — the configuration reference covers the full `Cratis:AuthProxy` shape.
+
+<CardGrid>
+  <SimpleCard title="Configuration reference" icon="rocket" link="/authproxy/configuration/">
+    The complete `Cratis:AuthProxy` settings shape, service routing, and every topic below it.
+  </SimpleCard>
+  <SimpleCard title="Aspire hosting" icon="seti:config" link="/authproxy/aspire/">
+    Wire AuthProxy into a .NET Aspire AppHost alongside your other services.
+  </SimpleCard>
+  <SimpleCard title="Identity & access in Arc" icon="seti:lock" link="/arc/backend/core/authorization/">
+    How Arc models identity and authorization on commands and queries — the `/.cratis/me` endpoint AuthProxy enriches from.
+  </SimpleCard>
+</CardGrid>

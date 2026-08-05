@@ -64,13 +64,20 @@ jobs:
         with:
           node-version: 20.x
 
+      - uses: actions/cache@v4
+        with:
+          path: |
+            Source/Web/.yarn/cache
+            Source/Web/node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('Source/Web/yarn.lock') }}
+
       - name: Install dependencies
         working-directory: ./Source/Web
-        run: npm ci
+        run: yarn install
 
       - name: Build frontend
         working-directory: ./Source/Web
-        run: npm run build
+        run: yarn build
 
       # Hand the built frontend to the dotnet-publish job. Artifacts (unlike the Actions
       # cache) are writable on pull_request-triggered runs, which this workflow is.
