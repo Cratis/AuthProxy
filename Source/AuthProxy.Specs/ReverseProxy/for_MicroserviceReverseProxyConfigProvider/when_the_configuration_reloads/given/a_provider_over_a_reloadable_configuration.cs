@@ -4,13 +4,15 @@
 namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvider.when_the_configuration_reloads.given;
 
 /// <summary>
-/// A provider built over a configuration that can be replaced, declaring <c>/portal</c> anonymous to start
-/// with. A single service with only a frontend keeps the generated table small enough to read.
+/// A provider over a configuration declaring <c>/portal</c> anonymous, with the change listener it registers
+/// captured so a spec can call it the way a reload does. A single service with only a frontend keeps the
+/// generated table small enough to read.
 /// </summary>
 public class a_provider_over_a_reloadable_configuration : Specification
 {
     protected MicroserviceReverseProxyConfigProvider _provider;
-    protected ReloadableOptionsMonitor _monitor;
+
+    Action<C.AuthProxy, string?> _reload;
 
     protected static C.AuthProxy ConfigurationDeclaring(params string[] anonymousPaths) =>
         new()
@@ -25,11 +27,16 @@ public class a_provider_over_a_reloadable_configuration : Specification
             },
         };
 
+    protected void Reload(C.AuthProxy next) => _reload(next, Options.DefaultName);
+
     void Establish()
     {
-        _monitor = new ReloadableOptionsMonitor(ConfigurationDeclaring("/portal"));
+        var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        monitor.CurrentValue.Returns(ConfigurationDeclaring("/portal"));
+        monitor.OnChange(Arg.Do<Action<C.AuthProxy, string?>>(listener => _reload = listener));
+
         _provider = new MicroserviceReverseProxyConfigProvider(
-            _monitor,
+            monitor,
             Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>());
     }
 }
