@@ -133,13 +133,34 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 |----------|---------|-------------|
 | `Lifetime` | `12:00:00` | Absolute lifetime of the authentication ticket. When it elapses the user must re-authenticate with the identity provider, even in a browser session that never closed. |
 | `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
-| `IdentityRevalidationInterval` | `00:10:00` | How long the `.cratis-identity` cookie is trusted before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative disables the bound. |
+| `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative falls back to ten minutes. |
 | `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative disables re-validation. |
 
 The authentication cookie itself carries no persistent `Expires` — the browser drops it when the session
 ends — and is `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever the site is served over HTTPS.
 Re-validation is cached in memory per instance, so within an interval no extra backend calls are made;
 when the interval lapses, a single backend round-trip refreshes the cached identity or tenant context.
+
+### The two identity cookies
+
+The resolved identity is written to two cookies, and the split is a security boundary rather than an
+implementation detail:
+
+| Cookie | Readable by script | Contents | Role |
+|--------|--------------------|----------|------|
+| `.cratis-identity` | Yes | Base64 JSON identity details | Lets a frontend render the signed-in user without a round-trip. **Never** treated by AuthProxy as evidence of anything. |
+| `.cratis-identity-authorization` | No (`HttpOnly`) | A sealed, unforgeable record | Carries the authorization decision that is allowed to skip the `/.cratis/me` call on later requests. |
+
+Because `.cratis-identity` is deliberately script-readable, anything a client can write must not decide
+authorization — so the decision lives in the sealed cookie instead. It is protected with ASP.NET data
+protection and bound to the user and tenant it was issued for, and its expiry is carried *inside* the
+sealed value rather than left to the cookie's `Max-Age`, which a non-browser client is free to ignore. A
+record that cannot be unsealed (for example after a data-protection key rotation) is not a failure: the
+caller is simply re-authorized against the services.
+
+Deployments running more than one AuthProxy instance should configure a shared
+`DataProtectionKeysPath` so a record sealed by one instance can be read by the others; without it each
+instance re-resolves identity for callers whose record it did not issue.
 
 ---
 

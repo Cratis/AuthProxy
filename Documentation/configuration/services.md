@@ -128,11 +128,31 @@ as the built-in invite, registration and authentication-UI paths.
 Because an entry covers everything below it, name the specific leaf path whenever a sibling under the
 same parent is not public.
 
-An entry must be a rooted path of literal segments. Anything else — blank, unrooted, the bare `/`, a
-doubled `//`, or a value containing `{`, `}`, `?`, `#`, `*`, `[`, `]`, `\`, `%` or whitespace — is
-**discarded**, leaving that path authenticated. Discarding is deliberate: a blank value would otherwise
-match every request and turn the whole service anonymous. A discarded entry is silent, so if a declared
-path still returns the selection page, check its spelling first.
+### What a valid entry looks like
+
+An entry must be a rooted path whose segments are made only of the characters `A–Z`, `a–z`, `0–9`, `-`,
+`.`, `_` and `~`. Anything else is **refused**, leaving that path authenticated.
+
+Refusing rather than interpreting is deliberate, and every rule below is a case where a declared prefix
+would otherwise have meant one thing to the reader and another to the proxy:
+
+| Refused | Example | Why |
+|---------|---------|-----|
+| Blank, whitespace, or the bare `/` | `""`, `"/"`, `"///"` | An empty prefix matches *every* request and would turn the whole service anonymous — the worst outcome this feature can produce. |
+| Unrooted | `welcome` | Not a path prefix. |
+| An empty segment | `/a//b` | Not a legal route template. |
+| A `.` or `..` segment | `/public/../admin` | Reads as scoped to `/public` while naming `/admin`. Refused rather than resolved, so a prefix always means what it spells. |
+| Any character outside the permitted set | `/a{x}`, `/a*`, `/a?b`, `/a;b`, `/a:b`, `/a@b`, `/a\b` | `{`, `}` and `*` would make the router match `/aANYTHING/…` where the middlewares match only the literal. The rest are separators or delimiters to some parsers and literals to others. |
+| Percent-encoding | `/public%2fadmin`, `/public/%2e%2e/admin` | A prefix whose meaning depends on encoding cannot be reasoned about — and these are the classic separator-smuggling and traversal forms. |
+| Control characters or whitespace | `/a b`, `/a\tb` | Invisible differences between two entries that read identically, and the raw material of log and header injection. |
+| Non-ASCII characters | `/públic` | The same path has more than one Unicode spelling (`NFC` vs `NFD`), so which one is anonymous would depend on how the configuration file was saved. |
+| A path AuthProxy answers itself | `/.cratis`, `/.cratis/token`, `/_pages`, `/invite`, `/register`, `/signin-microsoft` | These do not become "more public" — they take the endpoint *away* from AuthProxy and hand it to a backend. |
+
+A dot *inside* a segment is fine, so `/.well-known/acme-challenge` and `/public/health.json` are both
+valid. Only a segment that is exactly `.` or `..` is refused.
+
+A refused entry is reported at startup as a warning naming the entry and the reason, so a declared path
+that still returns the selection page can be diagnosed from the log rather than by inspection.
 
 `/api` chooses the endpoint the same way the authenticated routes do: a prefix under `/api` is served by
 the service's `Backend`, anything else by its `Frontend`, falling back to whichever endpoint the service
