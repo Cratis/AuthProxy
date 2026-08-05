@@ -22,12 +22,14 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="principalEnrichers">Enrichers that augment the principal before it is sent to the identity endpoint.</param>
 /// <param name="memoryCache">The memory cache used to deduplicate concurrent identity resolutions.</param>
+/// <param name="authorizationCache">The tamper-proof record of a previously resolved authorization.</param>
 /// <param name="logger">The logger.</param>
 public class IdentityDetailsResolver(
     IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
     IEnumerable<IIdentityDetailsPrincipalEnricher> principalEnrichers,
     IMemoryCache memoryCache,
+    IIdentityAuthorizationCache authorizationCache,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
     static readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(30);
@@ -49,7 +51,13 @@ public class IdentityDetailsResolver(
         // otherwise shadow the invite claims and cause the Lobby to return the wrong flow type.
         var hasPendingInvite = context.HasPendingInvitation();
 
-        if (!hasPendingInvite && context.Request.Cookies.ContainsKey(Cookies.Identity))
+        // Skipping the identity endpoints means skipping the authorization answer they carry, so what
+        // permits the skip has to be something the caller could not have written. The readable
+        // .cratis-identity cookie is not that — it is non-HTTP-only by design and its value was never
+        // examined here, so sending any value for it used to be enough to be treated as authorized, for as
+        // long as the caller chose to keep sending it. The sealed record is checked instead, and it is
+        // checked against this principal and this tenant.
+        if (!hasPendingInvite && authorizationCache.IsAuthorized(context, principal, tenantId))
         {
             return BuildAuthorizedResult(principal, details: null);
         }
@@ -58,7 +66,7 @@ public class IdentityDetailsResolver(
 
         if (!hasPendingInvite && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
-            WriteIdentityCookie(context, cached);
+            WriteIdentityState(context, cached, principal, tenantId);
             logger.IdentityDetailsCacheHit(principal.UserId);
             return cached;
         }
@@ -70,7 +78,7 @@ public class IdentityDetailsResolver(
             // Double-check inside the lock — another request may have populated the cache while we waited.
             if (!hasPendingInvite && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
             {
-                WriteIdentityCookie(context, cached);
+                WriteIdentityState(context, cached, principal, tenantId);
                 logger.IdentityDetailsCacheHit(principal.UserId);
                 return cached;
             }
@@ -108,7 +116,7 @@ public class IdentityDetailsResolver(
             }
 
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
-            WriteIdentityCookie(context, identityResult);
+            WriteIdentityState(context, identityResult, principal, tenantId);
             logger.IdentityDetailsCookieWritten(principal.UserId);
             memoryCache.Set(cacheKey, identityResult, _cacheTtl);
             return identityResult;
@@ -128,8 +136,13 @@ public class IdentityDetailsResolver(
             principal.UserRoles,
             details!);
 
-    void WriteIdentityCookie(HttpContext context, IdentityProviderResult result)
+    void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId)
     {
+        // Two cookies, deliberately: the readable one the frontend renders from, and the sealed record
+        // that is allowed to skip this resolution next time. They are written together so the authorized
+        // outcome and the proof of it can never drift apart.
+        authorizationCache.Record(context, principal, tenantId);
+
         var json = JsonSerializer.Serialize(result, _cookieSerializerOptions);
         var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
 

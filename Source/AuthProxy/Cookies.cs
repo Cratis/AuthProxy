@@ -10,8 +10,21 @@ public static class Cookies
 {
     /// <summary>
     /// Cookie holding the enriched identity details from the application's identity provider endpoint.
+    /// Intentionally <em>not</em> HTTP-only so client-side script can render the signed-in user, and
+    /// therefore never evidence of anything — see <see cref="IdentityAuthorization"/>.
     /// </summary>
     public const string Identity = ".cratis-identity";
+
+    /// <summary>
+    /// HTTP-only cookie holding the sealed record that a principal was authorized in a tenant, used to
+    /// skip the <c>/.cratis/me</c> authorization call on subsequent requests.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="Identity"/> precisely because that one is readable and writable by the
+    /// client. This carries the authorization decision, so it is sealed with data protection and bound to
+    /// the principal and tenant it was issued for.
+    /// </remarks>
+    public const string IdentityAuthorization = ".cratis-identity-authorization";
 
     /// <summary>
     /// Short-lived HTTP-only cookie used to carry the invite token across the OIDC redirect.
