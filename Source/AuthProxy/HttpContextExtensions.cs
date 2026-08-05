@@ -11,7 +11,6 @@ namespace Cratis.AuthProxy;
 /// </summary>
 public static class HttpContextExtensions
 {
-    const string SignInPathPrefix = "/signin-";
     const string FetchDestinationHeader = "Sec-Fetch-Dest";
     const string HtmlMediaType = "text/html";
 
@@ -132,7 +131,7 @@ public static class HttpContextExtensions
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if the request is part of authentication bootstrap; otherwise <see langword="false"/>.</returns>
     public static bool IsAuthenticationBootstrap(this HttpContext context) =>
-        context.IsAuthenticationUI() || (context.Request.Path.Value?.StartsWith(SignInPathPrefix, StringComparison.OrdinalIgnoreCase) ?? false);
+        context.IsAuthenticationUI() || (context.Request.Path.Value?.StartsWith(WellKnownPaths.SignInPrefix, StringComparison.OrdinalIgnoreCase) ?? false);
 
     /// <summary>
     /// Attempts to extract the invitation token from the current invitation request path.

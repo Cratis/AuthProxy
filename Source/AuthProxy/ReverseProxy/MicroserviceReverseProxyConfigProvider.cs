@@ -69,6 +69,7 @@ public class MicroserviceReverseProxyConfigProvider(
         {
             var key = name.ToLowerInvariant();
 
+            ReportRefusedAnonymousPaths(key, ms, logger);
             routes.AddRange(AnonymousRoutes(key, ms, claimedAnonymousPaths, logger));
 
             if (ms.Backend is not null)
@@ -114,6 +115,26 @@ public class MicroserviceReverseProxyConfigProvider(
         }
 
         return routes;
+    }
+
+    /// <summary>
+    /// Reports every declared anonymous path that was refused, and why.
+    /// </summary>
+    /// <param name="microserviceKey">The lower-cased service key.</param>
+    /// <param name="service">The service configuration.</param>
+    /// <param name="logger">The logger, used to name each refused entry.</param>
+    /// <remarks>
+    /// A refusal is fail-closed, so nothing breaks loudly — the path keeps demanding a login. That is the
+    /// safe outcome and an invisible one: an operator who mistypes a prefix, or pastes one carrying an
+    /// encoded character, gets a service that behaves exactly as if they had never declared it. Startup is
+    /// the only place the two can be compared, so the refusal is named here.
+    /// </remarks>
+    static void ReportRefusedAnonymousPaths(string microserviceKey, C.Service service, ILogger logger)
+    {
+        foreach (var refused in AnonymousPaths.Evaluate(service).Where(_ => !_.IsUsable))
+        {
+            logger.AnonymousPathRefused(refused.DeclaredForDisplay, microserviceKey, refused.Rejection);
+        }
     }
 
     /// <summary>
