@@ -5,6 +5,7 @@
     <Project Path="Source/Aspire.Specs/Aspire.Specs.csproj" />
     <Project Path="Source/Composition/Composition.csproj" />
     <Project Path="Source/AuthProxy.Specs/AuthProxy.Specs.csproj" />
+    <Project Path="Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj" />
     <Project Path="Source/TestApp/TestApp.csproj" />
   </Folder>
 </Solution>

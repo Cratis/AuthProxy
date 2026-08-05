@@ -65,6 +65,7 @@ public class when_invite_claim_forwarding_is_configured : Specification
             httpClientFactory,
             enrichers,
             Substitute.For<IMemoryCache>(),
+            Substitute.For<IIdentityAuthorizationCache>(),
             Substitute.For<ILogger<IdentityDetailsResolver>>());
 
         _context = new DefaultHttpContext();

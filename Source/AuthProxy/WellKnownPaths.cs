@@ -9,6 +9,18 @@ namespace Cratis.AuthProxy;
 public static class WellKnownPaths
 {
     /// <summary>
+    /// The path prefix under which AuthProxy answers its own endpoints. Everything below it belongs to the
+    /// proxy rather than to a service, so it can never be routed to a backend.
+    /// </summary>
+    public const string Cratis = "/.cratis";
+
+    /// <summary>
+    /// The path prefix the authentication handlers use for provider callbacks. The provider scheme is
+    /// appended directly rather than as a segment (e.g. <c>/signin-microsoft</c>).
+    /// </summary>
+    public const string SignInPrefix = "/signin-";
+
+    /// <summary>
     /// The well-known path for the Cratis identity details endpoint on a microservice.
     /// </summary>
     public const string IdentityDetails = "/.cratis/me";

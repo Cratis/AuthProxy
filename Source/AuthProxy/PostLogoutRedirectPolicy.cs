@@ -48,8 +48,10 @@ public static class PostLogoutRedirectPolicy
             return false;
         }
 
-        // A relative, single-slash URL is always same-site and therefore safe.
-        if (Uri.TryCreate(redirect, UriKind.Relative, out _) && redirect.StartsWith('/') && !redirect.StartsWith("//", StringComparison.Ordinal))
+        // A same-site relative URL is always safe. See RelativeRedirect for why a single leading slash is
+        // not the whole test — '/\evil.test' and a slash followed by a stripped control character both
+        // navigate off-site.
+        if (RelativeRedirect.IsSameSiteRelative(redirect))
         {
             return true;
         }

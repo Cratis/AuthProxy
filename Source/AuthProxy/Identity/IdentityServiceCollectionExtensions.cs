@@ -18,6 +18,7 @@ public static class IdentityServiceCollectionExtensions
         builder.Services.AddHttpClient();
         builder.Services.AddMemoryCache();
         builder.Services.AddSingleton<IIdentityDetailsPrincipalEnricher, InviteTokenClaimsPrincipalEnricher>();
+        builder.Services.AddSingleton<IIdentityAuthorizationCache, IdentityAuthorizationCache>();
         builder.Services.AddSingleton<IIdentityDetailsResolver, IdentityDetailsResolver>();
 
         return builder;

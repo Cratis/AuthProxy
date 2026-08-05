@@ -135,6 +135,7 @@ public class LogoutMiddleware(
     {
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         context.Response.Cookies.Delete(Cookies.Identity);
+        context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
         context.Response.Cookies.Delete(Cookies.Tenant);
         context.Response.Cookies.Delete(Cookies.Tenants);
         context.Response.Cookies.Delete(Cookies.InviteToken);

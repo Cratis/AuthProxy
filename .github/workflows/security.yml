@@ -1,0 +1,97 @@
+name: Security
+
+# Runs on every pull request, deliberately without a `paths:` filter.
+#
+# AuthProxy is the component that decides who reaches everything behind it, so the security specs are not
+# gated on which files a change happens to touch: a workflow edit, a dependency bump, or a configuration
+# default can all move the security posture without any file under Source/ changing. The suite is fast
+# enough to run unconditionally, and a gate that only sometimes runs is not a gate.
+
+env:
+  DOTNET_VERSION: "10.0.x"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - "**"
+  push:
+    branches:
+      - main
+
+jobs:
+  security-specs:
+    name: Security specs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build security specs
+        run: dotnet build Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj --configuration Release
+
+      - name: Run security specs
+        run: >
+          dotnet test Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=security-specs.trx"
+          --results-directory TestResults
+
+      - name: Upload security spec results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-spec-results
+          path: TestResults
+          retention-days: 14
+
+  vulnerable-dependencies:
+    name: Vulnerable dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      # OWASP A06 — Vulnerable and Outdated Components. `dotnet list package` reports advisories but always
+      # exits 0, so the output is inspected and the job failed explicitly; otherwise a known-vulnerable
+      # dependency would be reported into a green check that nobody reads.
+      - name: Check for known vulnerable packages
+        run: |
+          set -euo pipefail
+
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt
+
+          if grep -qE '^\s*>\s' vulnerable.txt; then
+            echo "::error::One or more packages have known vulnerabilities. See the report above."
+            exit 1
+          fi
+
+          echo "No known vulnerable packages."
+
+      - name: Upload dependency report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerable-dependency-report
+          path: vulnerable.txt
+          retention-days: 14

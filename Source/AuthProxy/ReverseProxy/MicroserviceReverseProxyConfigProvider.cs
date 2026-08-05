@@ -96,6 +96,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         {
             var key = name.ToLowerInvariant();
 
+            ReportRefusedAnonymousPaths(key, ms, logger);
             routes.AddRange(AnonymousRoutes(key, ms, claimedAnonymousPaths, logger));
 
             if (ms.Backend is not null)
@@ -141,6 +142,26 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         }
 
         return routes;
+    }
+
+    /// <summary>
+    /// Reports every declared anonymous path that was refused, and why.
+    /// </summary>
+    /// <param name="microserviceKey">The lower-cased service key.</param>
+    /// <param name="service">The service configuration.</param>
+    /// <param name="logger">The logger, used to name each refused entry.</param>
+    /// <remarks>
+    /// A refusal is fail-closed, so nothing breaks loudly — the path keeps demanding a login. That is the
+    /// safe outcome and an invisible one: an operator who mistypes a prefix, or pastes one carrying an
+    /// encoded character, gets a service that behaves exactly as if they had never declared it. Startup is
+    /// the only place the two can be compared, so the refusal is named here.
+    /// </remarks>
+    static void ReportRefusedAnonymousPaths(string microserviceKey, C.Service service, ILogger logger)
+    {
+        foreach (var refused in AnonymousPaths.Evaluate(service).Where(_ => !_.IsUsable))
+        {
+            logger.AnonymousPathRefused(refused.DeclaredForDisplay, microserviceKey, refused.Rejection);
+        }
     }
 
     /// <summary>
@@ -255,7 +276,12 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             Order = 1,
         };
 
-        // Query-parameter–matched API route (adds the header for downstream)
+        // Query-parameter–matched API route (adds the header for downstream).
+        // Ordered behind the header-matched route rather than beside it: a caller that sends both a
+        // Service-ID header and a ?service= parameter satisfies both, and two candidates at the same order
+        // with the same template are an AmbiguousMatchException. Endpoint selection runs ahead of
+        // authentication, so that surfaces to an unauthenticated caller as a bare 500 — trivially
+        // reachable, and in Development a stack trace. A distinct order makes the header win instead.
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-backend-query-api",
@@ -275,7 +301,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     }
                 ],
             },
-            Order = 1,
+            Order = 2,
         };
 
         // Plain /api catch-all when there is only one microservice.
@@ -317,7 +343,8 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             Order = 10,
         };
 
-        // Query-parameter–matched frontend route
+        // Query-parameter–matched frontend route, ordered behind the header-matched one for the same
+        // reason as the backend pair: satisfying both must select one route, not raise an ambiguity.
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-frontend-query",
@@ -337,7 +364,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     }
                 ],
             },
-            Order = 10,
+            Order = 11,
         };
     }
 
