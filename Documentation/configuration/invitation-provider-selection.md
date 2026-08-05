@@ -1,6 +1,6 @@
 # Provider Selection Pages
 
-When multiple identity providers are configured, Ingress serves a provider-selection page
+When multiple identity providers are configured, AuthProxy serves a provider-selection page
 so the user can choose which provider to sign in with.  Two pages serve this role depending
 on the flow that triggered them:
 
@@ -15,9 +15,9 @@ styled.  This guide explains how to replace either or both with fully branded cu
 
 ---
 
-## How Ingress injects provider data
+## How AuthProxy injects provider data
 
-Before serving either page, Ingress sets a short-lived, **non-HTTP-only** cookie named
+Before serving either page, AuthProxy sets a short-lived, **non-HTTP-only** cookie named
 `.cratis-providers`.  The value is a URL-encoded JSON array — one entry per configured
 identity provider:
 
@@ -42,7 +42,7 @@ identity provider:
 |-------|------|-------------|
 | `name` | `string` | Human-readable display name taken from `Authentication:OidcProviders[].Name`. |
 | `type` | `string` | Provider brand — `Microsoft`, `Google`, `GitHub`, `Apple`, or `Custom`. Use this to pick logos or apply brand-specific styling. |
-| `loginUrl` | `string` | Ingress-relative URL that initiates the OIDC/OAuth challenge for this provider. Navigating to this URL starts the login flow and, after a successful login, redirects the user back to the original destination. |
+| `loginUrl` | `string` | AuthProxy-relative URL that initiates the OIDC/OAuth challenge for this provider. Navigating to this URL starts the login flow and, after a successful login, redirects the user back to the original destination. |
 
 The cookie expires after 15 minutes and is deleted automatically by the browser after that time.
 
@@ -144,20 +144,20 @@ the invitation variant and "Sign in to continue" in the direct-access variant.
 
 1. Create the HTML file(s) named exactly `select-provider.html` and/or `invitation-select-provider.html`.
 2. Place any CSS, images, or other assets in the same directory.
-3. Mount the directory into your container and point `Ingress:PagesPath` at the mount path:
+3. Mount the directory into your container and point `Cratis:AuthProxy:PagesPath` at the mount path:
 
 ```yaml
 # docker-compose.yml
 services:
-  ingress:
-    image: cratis/ingress:latest
+  authproxy:
+    image: cratis/authproxy:latest
     volumes:
       - ./my-pages:/mnt/pages
     environment:
-      Ingress__PagesPath: /mnt/pages
+      Cratis__AuthProxy__PagesPath: /mnt/pages
 ```
 
-Ingress resolves each page file by name — if a file exists in the configured `PagesPath` it is
+AuthProxy resolves each page file by name — if a file exists in the configured `PagesPath` it is
 used; otherwise the built-in default is served.
 
 ---

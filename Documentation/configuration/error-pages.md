@@ -1,13 +1,13 @@
 # Custom Error Pages
 
-Ingress serves user-friendly HTML pages for error conditions instead of bare HTTP status codes.
+AuthProxy serves user-friendly HTML pages for error conditions instead of bare HTTP status codes.
 Every error page can be **overridden** by mounting a directory of custom pages into the container.
 
 ---
 
 ## Built-in pages
 
-The following pages are included with Ingress and are served automatically when the corresponding
+The following pages are included with AuthProxy and are served automatically when the corresponding
 condition is detected:
 
 | File name | Condition | HTTP status |
@@ -25,14 +25,16 @@ condition is detected:
 
 ## Overriding pages
 
-Mount a directory into the container and point `Ingress:PagesPath` at the mount path.
-Ingress looks up each page by its conventional file name inside that directory.
+Mount a directory into the container and point `Cratis:AuthProxy:PagesPath` at the mount path.
+AuthProxy looks up each page by its conventional file name inside that directory.
 Any page file that is present overrides the built-in default; missing files fall back to the built-in version.
 
 ```json
 {
-  "Ingress": {
-    "PagesPath": "/mnt/pages"
+  "Cratis": {
+    "AuthProxy": {
+      "PagesPath": "/mnt/pages"
+    }
   }
 }
 ```
@@ -40,19 +42,19 @@ Any page file that is present overrides the built-in default; missing files fall
 Equivalent environment variable:
 
 ```
-Ingress__PagesPath=/mnt/pages
+Cratis__AuthProxy__PagesPath=/mnt/pages
 ```
 
 ### Container mount example (Docker Compose)
 
 ```yaml
 services:
-  ingress:
-    image: cratis/ingress:latest
+  authproxy:
+    image: cratis/authproxy:latest
     volumes:
       - ./my-pages:/mnt/pages
     environment:
-      Ingress__PagesPath: /mnt/pages
+      Cratis__AuthProxy__PagesPath: /mnt/pages
 ```
 
 ### Page assets
@@ -86,7 +88,7 @@ or cannot be parsed at all. This typically indicates a truncated or otherwise co
 ### `invitation-select-provider.html`
 
 Served when a valid invite link is followed and **two or more** identity providers are configured.
-Before serving the page, Ingress injects the `.cratis-providers` cookie (see below) so the page
+Before serving the page, AuthProxy injects the `.cratis-providers` cookie (see below) so the page
 can render a sign-in button for each available provider without an additional HTTP round-trip.
 
 The built-in page reads the cookie with JavaScript and renders one sign-in button per provider.
@@ -106,7 +108,7 @@ If you prefer to redirect users to a custom URL instead of serving this page, co
 
 ## Provider info cookie (`.cratis-providers`)
 
-When Ingress serves the `invitation-select-provider.html` page it sets a short-lived, **non-HTTP-only**
+When AuthProxy serves the `invitation-select-provider.html` page it sets a short-lived, **non-HTTP-only**
 cookie named `.cratis-providers`.  The cookie value is a URL-encoded JSON array where each element
 describes one configured identity provider:
 
@@ -129,7 +131,7 @@ describes one configured identity provider:
 |-------|-------------|
 | `name` | Display name of the provider (from `Authentication:OidcProviders[].Name`). |
 | `type` | Provider type hint — `Microsoft`, `Google`, `GitHub`, `Apple`, or `Custom`. |
-| `loginUrl` | Ingress-relative URL that initiates the OIDC/OAuth challenge for the provider. |
+| `loginUrl` | AuthProxy-relative URL that initiates the OIDC/OAuth challenge for the provider. |
 
 A custom `invitation-select-provider.html` page can read this cookie with JavaScript:
 

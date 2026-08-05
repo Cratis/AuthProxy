@@ -75,6 +75,23 @@ authproxy
 
 See [Services](../configuration/services.md) for the underlying configuration model.
 
+### Anonymous paths
+
+Declare the request paths on a service that should be served without a session — a magic-link
+landing page, a signed-token report, a public webhook receiver. Call `WithAnonymousPaths` once
+per service; each call accumulates entries:
+
+```csharp
+authproxy.WithAnonymousPaths("main", "/welcome", "/api/webhooks/payments");
+```
+
+Each entry is a rooted path prefix, matched case-insensitively on segment boundaries — `/welcome`
+covers `/welcome` and `/welcome/anything`, but not `/welcomex`. AuthProxy still strips inbound
+identity headers on these paths and the application remains responsible for authorizing them.
+
+See [Anonymous paths](../configuration/services.md#anonymous-paths) for the full matching rules
+and what the flag does and does not change.
+
 ---
 
 ## Authentication
