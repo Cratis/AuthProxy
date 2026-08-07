@@ -22,4 +22,10 @@ enum InviteExchangeResult
     /// the email the invitation was issued for.
     /// </summary>
     EmailMismatch = 3,
+
+    /// <summary>
+    /// The exchange was not attempted because the invitation is bound to an email address and the identity
+    /// provider supplied no address for the authenticating account, so the binding could not be evaluated.
+    /// </summary>
+    EmailUnavailable = 4,
 }

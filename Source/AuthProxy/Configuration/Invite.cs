@@ -58,6 +58,17 @@ public class Invite
     /// Regardless of this setting, the authenticated account's verified email is always forwarded
     /// to the exchange endpoint so the backend can enforce the binding itself.
     /// </summary>
+    /// <remarks>
+    /// The account's address is read from the <c>email</c> claim, then <c>ClaimTypes.Email</c>, and finally
+    /// <c>preferred_username</c> when that claim holds an address rather than a login name. A provider that
+    /// supplies no address at all cannot be bound against: the invite is refused with its own page rather than
+    /// reported as a mismatch. GitHub is the common case — <c>/user</c> returns a null email for an account
+    /// whose address is private, and AuthProxy makes no call to <c>/user/emails</c>.
+    /// <para>
+    /// No OAuth provider supplies <c>email_verified</c>, because nothing maps it. "Verified" is therefore only
+    /// enforced where the provider volunteers the claim; for an OAuth provider the address is taken on trust.
+    /// </para>
+    /// </remarks>
     public string EmailClaim { get; set; } = string.Empty;
 
     /// <summary>
