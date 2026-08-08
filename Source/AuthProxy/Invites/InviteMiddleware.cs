@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
@@ -105,6 +106,16 @@ public class InviteMiddleware(
                 await errorPageProvider.WriteErrorPageAsync(
                     context,
                     WellKnownPageNames.InvitationEmailMismatch,
+                    StatusCodes.Status403Forbidden);
+
+                return;
+            }
+
+            if (exchangeResult == InviteExchangeResult.EmailUnavailable)
+            {
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    WellKnownPageNames.InvitationEmailUnavailable,
                     StatusCodes.Status403Forbidden);
 
                 return;
@@ -233,16 +244,35 @@ public class InviteMiddleware(
     /// The value of the provider's <c>email_verified</c> claim when present; otherwise <see langword="null"/>.
     /// </param>
     /// <returns>The authenticated email, or an empty string when none is available.</returns>
+    /// <remarks>
+    /// <c>preferred_username</c> is a username, not an address — for a GitHub OAuth provider it is conventionally
+    /// mapped from <c>login</c>. It is read only when it actually holds an address, which several OIDC providers
+    /// put there (Entra's is the user principal name). Returning a login name here would make a provider that
+    /// supplied no address at all indistinguishable from one that supplied somebody else's.
+    /// </remarks>
     static string ResolveAuthenticatedEmail(HttpContext context, out bool? emailVerified)
     {
         emailVerified = bool.TryParse(context.User.FindFirst("email_verified")?.Value, out var verified)
             ? verified
             : null;
 
+        var preferredUsername = context.User.FindFirst("preferred_username")?.Value;
+
         return context.User.FindFirst("email")?.Value
             ?? context.User.FindFirst(ClaimTypes.Email)?.Value
-            ?? context.User.FindFirst("preferred_username")?.Value
+            ?? (IsAnEmailAddress(preferredUsername) ? preferredUsername : null)
             ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Determines whether a claim value is an email address rather than a username.
+    /// </summary>
+    /// <param name="value">The claim value to check.</param>
+    /// <returns><see langword="true"/> when the value carries a local part and a domain; otherwise <see langword="false"/>.</returns>
+    static bool IsAnEmailAddress([NotNullWhen(true)] string? value)
+    {
+        var at = value?.IndexOf('@', StringComparison.Ordinal) ?? -1;
+        return at > 0 && at < value!.Length - 1;
     }
 
     async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken)
@@ -271,10 +301,17 @@ public class InviteMiddleware(
         // An invitation is otherwise a pure bearer link - anyone with the URL could sign in with their
         // own account and be provisioned as the invited user. Bind the invite to its intended recipient
         // by requiring the authenticating account's verified email to match the invited email.
-        if (!IsInvitedEmailBound(inviteToken, email, emailVerified))
+        var binding = EvaluateInvitedEmailBinding(inviteToken, email, emailVerified);
+        if (binding == InviteExchangeResult.EmailUnavailable)
+        {
+            logger.InviteEmailUnavailable(subject);
+            return binding;
+        }
+
+        if (binding == InviteExchangeResult.EmailMismatch)
         {
             logger.InviteEmailMismatch(subject);
-            return InviteExchangeResult.EmailMismatch;
+            return binding;
         }
 
         using var client = httpClientFactory.CreateClient();
@@ -313,17 +350,23 @@ public class InviteMiddleware(
     }
 
     /// <summary>
-    /// Determines whether the invite may be exchanged for the given authenticated account, enforcing that
-    /// the invited email (when the token carries one) matches the account's verified email.
+    /// Evaluates the invite against the authenticated account, enforcing that the invited email (when the
+    /// token carries one) matches the account's verified email.
     /// </summary>
     /// <param name="inviteToken">The validated invite token.</param>
     /// <param name="authenticatedEmail">The authenticating account's email.</param>
     /// <param name="emailVerified">The provider-supplied verification status of <paramref name="authenticatedEmail"/>.</param>
     /// <returns>
-    /// <see langword="true"/> when the invite is not bound to a specific email, or the authenticated
-    /// verified email matches the invited email; otherwise <see langword="false"/>.
+    /// <see cref="InviteExchangeResult.Success"/> when the invite is not bound to a specific email or the
+    /// authenticated email matches it; <see cref="InviteExchangeResult.EmailUnavailable"/> when the provider
+    /// supplied no address to bind against; otherwise <see cref="InviteExchangeResult.EmailMismatch"/>.
     /// </returns>
-    bool IsInvitedEmailBound(string inviteToken, string authenticatedEmail, bool? emailVerified)
+    /// <remarks>
+    /// The two failures are kept apart deliberately. A provider that cannot tell us who this is and a provider
+    /// that told us it is somebody else are different facts, and collapsing them reports a specific, wrong cause
+    /// to an invitee whose account and address are both correct — leaving them no action that could work.
+    /// </remarks>
+    InviteExchangeResult EvaluateInvitedEmailBinding(string inviteToken, string authenticatedEmail, bool? emailVerified)
     {
         var emailClaim = config.CurrentValue.Invite?.EmailClaim;
         if (string.IsNullOrWhiteSpace(emailClaim)
@@ -331,18 +374,24 @@ public class InviteMiddleware(
             || string.IsNullOrWhiteSpace(invitedEmail))
         {
             // The invite does not target a specific email - there is nothing to bind against.
-            return true;
+            return InviteExchangeResult.Success;
+        }
+
+        if (string.IsNullOrWhiteSpace(authenticatedEmail))
+        {
+            return InviteExchangeResult.EmailUnavailable;
         }
 
         // The invite is bound to a specific email, so the account must own that email and the provider
         // must not have flagged it as unverified.
         if (emailVerified == false)
         {
-            return false;
+            return InviteExchangeResult.EmailMismatch;
         }
 
-        return !string.IsNullOrWhiteSpace(authenticatedEmail)
-            && string.Equals(invitedEmail, authenticatedEmail, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(invitedEmail, authenticatedEmail, StringComparison.OrdinalIgnoreCase)
+            ? InviteExchangeResult.Success
+            : InviteExchangeResult.EmailMismatch;
     }
 
     bool IsTenantIssuedInvite(string inviteToken, HttpContext context)

@@ -14,6 +14,9 @@ internal static partial class InviteMiddlewareLogging
     [LoggerMessage(LogLevel.Warning, "Invite exchange rejected because the authenticated account's verified email does not match the invited email for subject {Subject}")]
     internal static partial void InviteEmailMismatch(this ILogger logger, string subject);
 
+    [LoggerMessage(LogLevel.Warning, "Invite exchange rejected because the identity provider supplied no email address for subject {Subject} - the invitation is bound to one and cannot be evaluated")]
+    internal static partial void InviteEmailUnavailable(this ILogger logger, string subject);
+
     [LoggerMessage(LogLevel.Warning, "Invite exchange URL is not configured - skipping invite exchange")]
     internal static partial void InviteExchangeUrlNotConfigured(this ILogger logger);
 
