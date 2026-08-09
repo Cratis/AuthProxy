@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Not Authorized</title>
+    <style>
+        body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.12); padding: 2.5rem 3rem; text-align: center; max-width: 480px; }
+        h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 .75rem; color: #333; }
+        p  { color: #666; margin: 0 0 1.5rem; }
+        a.button { display: inline-block; background: #333; color: #fff; text-decoration: none; border-radius: 6px; padding: .65rem 1.4rem; font-size: .95rem; font-weight: 600; }
+        a.button:hover { background: #111; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Not authorized</h1>
+        <p>You are signed in, but this account does not have access. If you have another account that does, sign out and sign in with that one.</p>
+        <a class="button" href="/.cratis/logout?redirect=/">Sign out</a>
+    </div>
+</body>
+</html>

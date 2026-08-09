@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
@@ -16,6 +17,7 @@ builder.Configuration.AddEnvironmentVariables();
 
 builder.AddIngressConfiguration();
 builder.AddIngressAuthentication();
+builder.AddIngressAuthorization();
 builder.AddTenancy();
 builder.AddIdentityResolution();
 builder.AddInvites();

@@ -19,6 +19,18 @@ public static class WellKnownPageNames
     public const string Forbidden = "403.html";
 
     /// <summary>
+    /// The page returned when an authenticated caller does not satisfy the claim requirements declared in
+    /// <c>Cratis:AuthProxy:Authorization</c> — signed in, but not someone this deployment lets in.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="Forbidden"/>, which answers the application refusing a caller it does
+    /// recognize. This one is the proxy refusing before the application is ever reached, and it is the only
+    /// refusal whose remedy is to come back as somebody else — so the page has to offer signing out, or the
+    /// person is stuck on it.
+    /// </remarks>
+    public const string NotAuthorized = "not-authorized.html";
+
+    /// <summary>
     /// The page returned when the resolved tenant does not exist in the system.
     /// </summary>
     public const string TenantNotFound = "tenant-not-found.html";

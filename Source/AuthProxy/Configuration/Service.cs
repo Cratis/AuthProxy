@@ -55,6 +55,21 @@ public class Service
     public IList<string> AnonymousPaths { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets the authorization requirements that apply to requests routed to this service.
+    /// </summary>
+    /// <remarks>
+    /// These are applied <em>in addition to</em> any declared at the root — a service can narrow who gets
+    /// in, never widen it. Leave unset to require only what the root requires.
+    /// <para>
+    /// The service a request targets is resolved the way the route table resolves it: the single
+    /// configured service when there is only one, otherwise the <c>Service-ID</c> header or the
+    /// <c>service</c> query parameter. A request in a multi-service deployment that names no service
+    /// matches no service route either, so only the root requirements apply to it.
+    /// </para>
+    /// </remarks>
+    public Authorization? Authorization { get; set; }
+
+    /// <summary>
     /// Gets or sets whether to call the <c>/.cratis/me</c> identity endpoint on this service
     /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
