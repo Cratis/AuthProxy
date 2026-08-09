@@ -19,12 +19,12 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <!-- Analysis -->
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" NoWarn="NU5104" />
-    <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.140" />
+    <PackageVersion Include="Roslynator.Analyzers" Version="4.16.0" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.141" />
     <!-- Specifications -->
     <PackageVersion Include="Cratis.Specifications.XUnit" Version="4.0.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="NSubstitute" Version="6.0.0" />
+    <PackageVersion Include="NSubstitute" Version="6.1.0" />
   </ItemGroup>
 </Project>
