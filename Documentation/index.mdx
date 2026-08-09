@@ -43,6 +43,9 @@ AuthProxy is a plain ASP.NET Core service. It pairs naturally with [Arc](/arc/)'
   <SimpleCard title="Authentication" icon="seti:lock" link="/authproxy/configuration/authentication/">
     OpenID Connect and OAuth 2.0 (single or multi-provider), plus JWT Bearer. Unauthenticated requests are challenged or sent to a provider-selection page.
   </SimpleCard>
+  <SimpleCard title="Authorization" icon="seti:lock" link="/authproxy/configuration/authorization/">
+    Require a claim — a role, a group, a GitHub organization or team — before any request is forwarded. Authenticating everyone is not the same as letting everyone in.
+  </SimpleCard>
   <SimpleCard title="Identity enrichment" icon="seti:json" link="/authproxy/configuration/services/#identity-enrichment">
     Calls a <code>/.cratis/me</code> endpoint on your service and attaches the enriched identity to forwarded requests as a trusted header.
   </SimpleCard>

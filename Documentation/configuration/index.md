@@ -8,6 +8,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
   "Cratis": {
     "AuthProxy": {
       "Authentication": { ... },
+      "Authorization": { ... },
       "TenantResolutions": [ ... ],
       "TenantVerification": { ... },
       "Tenants": { ... },
@@ -22,7 +23,8 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 
 | Topic | Description |
 |-------|-------------|
-| [Authentication](authentication.md) | OIDC providers and JWT Bearer configuration. |
+| [Authentication](authentication.md) | OIDC providers, OAuth 2.0 providers such as GitHub, and JWT Bearer configuration. |
+| [Authorization](authorization.md) | Requiring a claim — a role, a group, a GitHub organization or team — before any request is forwarded. |
 | [Tenancy](tenancy.md) | How the auth proxy resolves the current tenant from each request, and how to verify tenant existence. |
 | [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
 | [Services](services.md) | Routing requests to backend and frontend services. |
