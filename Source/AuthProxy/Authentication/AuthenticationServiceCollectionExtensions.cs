@@ -64,6 +64,7 @@ public static class AuthenticationServiceCollectionExtensions
         RegisterOidcProviders(authBuilder, authConfig.OidcProviders);
         RegisterOAuthProviders(authBuilder, authConfig.OAuthProviders);
 
+        builder.Services.AddSingleton<IProviderClaimsEnricher, GitHubMembershipClaimsEnricher>();
         builder.Services.AddSingleton<ClientCredentialsServiceResolver>();
         builder.Services.AddSingleton<ClientCredentialsVerifier>();
         builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
@@ -264,10 +265,44 @@ public static class AuthenticationServiceCollectionExtensions
                         using var user = JsonDocument.Parse(
                             await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
                         ctx.RunClaimActions(user.RootElement);
+
+                        await EnrichProviderClaims(ctx, capturedProvider);
                     },
                     OnTicketReceived = HandleTicketReceived
                 };
             });
+        }
+    }
+
+    /// <summary>
+    /// Adds any provider-specific claims that do not come from the user-information endpoint.
+    /// </summary>
+    /// <param name="context">The ticket-creation context.</param>
+    /// <param name="provider">The provider completing the sign-in.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// Runs after <c>RunClaimActions</c>, on the identity that is about to be signed into the cookie, so
+    /// what an enricher adds is persisted with the session and travels with every later request — no
+    /// second call to the provider, and nothing to re-fetch. An enricher that has nothing to contribute for
+    /// this provider is not called at all, so a deployment with no such provider pays for none of this.
+    /// </remarks>
+    static async Task EnrichProviderClaims(OAuthCreatingTicketContext context, C.OAuthProvider provider)
+    {
+        if (context.Identity is null || string.IsNullOrEmpty(context.AccessToken))
+        {
+            return;
+        }
+
+        var enrichers = context.HttpContext.RequestServices.GetServices<IProviderClaimsEnricher>();
+
+        foreach (var enricher in enrichers.Where(_ => _.CanEnrich(provider)))
+        {
+            await enricher.Enrich(
+                context.Identity,
+                provider,
+                context.Backchannel,
+                context.AccessToken,
+                context.HttpContext.RequestAborted);
         }
     }
 
