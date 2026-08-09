@@ -136,8 +136,8 @@ public class TenantSelectionMiddleware(
             StatusCodes.Status200OK);
     }
 
-    static string RevalidationCacheKey(string userId, string tenantId) =>
-        $"{RevalidationCacheKeyPrefix}:{userId}:{tenantId.ToLowerInvariant()}";
+    static IdentityAccountTenantKey RevalidationCacheKey(IdentityAccountBinding account, string tenantId) =>
+        IdentityAccountTenantKey.Create(RevalidationCacheKeyPrefix, account, tenantId);
 
     async Task HandleTenantSelection(HttpContext context, Tenancy.SelectionOptions selectionOptions)
     {
@@ -208,7 +208,8 @@ public class TenantSelectionMiddleware(
             return true;
         }
 
-        if (memoryCache.TryGetValue(RevalidationCacheKey(principal.UserId, resolution.TenantId), out _))
+        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, out var account);
+        if (hasReusableBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, resolution.TenantId), out _))
         {
             return true;
         }
@@ -243,12 +244,12 @@ public class TenantSelectionMiddleware(
         }
 
         var principal = context.BuildClientPrincipal();
-        if (principal is null)
+        if (principal is null || !IdentityAccountBinding.TryCreate(principal, out var account))
         {
             return;
         }
 
-        memoryCache.Set(RevalidationCacheKey(principal.UserId, tenantId), true, interval);
+        memoryCache.Set(RevalidationCacheKey(account, tenantId), true, interval);
     }
 
     bool IsSafeRelativeUrl(string? url) => RelativeRedirect.IsSameSiteRelative(url);

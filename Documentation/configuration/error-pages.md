@@ -20,6 +20,8 @@ condition is detected:
 | `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
+| `invitation-email-unavailable.html` | Email binding is enabled, but the identity provider supplied no authenticated-session email address during invite exchange (Phase 2). | 403 |
+| `invitation-email-mismatch.html` | Email binding is enabled, and the identity provider supplied another address or explicitly reported `email_verified=false` during invite exchange (Phase 2). | 403 |
 
 ---
 
@@ -103,6 +105,20 @@ The user should sign in with their existing account rather than completing the i
 
 If you prefer to redirect users to a custom URL instead of serving this page, configure
 `Invite.SubjectAlreadyExistsUrl` (see [Invitation for Creating Organization](lobby/invitation-for-creating-organization.md#configuration)).
+
+### `invitation-email-unavailable.html`
+
+Served during Phase 2 when `Invite.EmailClaim` binds the invitation to an address but the identity provider
+supplied no authenticated-session email address. This is not evidence that the invitee used the wrong account;
+it means AuthProxy has no address to compare. Customize this page to help the user choose a provider or account
+that exposes an address.
+
+### `invitation-email-mismatch.html`
+
+Served during Phase 2 when the provider supplied an address different from the invited address, or explicitly
+reported `email_verified=false`. An absent `email_verified` claim is not universal proof of ownership and is
+forwarded as `null`; OAuth providers do not currently map that claim. See
+[Invitation to Organization](lobby/invitation-to-organization.md) for the complete binding behavior.
 
 ---
 

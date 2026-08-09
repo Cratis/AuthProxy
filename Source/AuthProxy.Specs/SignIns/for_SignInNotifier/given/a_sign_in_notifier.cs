@@ -27,10 +27,21 @@ public class a_sign_in_notifier : Specification
     ],
     "github"));
 
+    protected virtual SignInNotifier CreateNotifier(
+        C.AuthProxy configuration,
+        IOptionsMonitor<C.AuthProxy> optionsMonitor,
+        IHttpClientFactory httpClientFactory) =>
+        new(
+            optionsMonitor,
+            new ClientLocationResolver(),
+            httpClientFactory,
+            Substitute.For<ILogger<SignInNotifier>>());
+
     void Establish()
     {
+        var configuration = CreateConfig();
         _config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        _config.CurrentValue.Returns(CreateConfig());
+        _config.CurrentValue.Returns(configuration);
 
         _handler = new RecordingHttpMessageHandler(NotifyStatusCode);
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
@@ -44,10 +55,6 @@ public class a_sign_in_notifier : Specification
         _httpContext.Request.Headers["X-Geo-City"] = "Oslo";
         _httpContext.Request.Headers["X-Geo-Country"] = "NO";
 
-        _notifier = new SignInNotifier(
-            _config,
-            new ClientLocationResolver(),
-            httpClientFactory,
-            Substitute.For<ILogger<SignInNotifier>>());
+        _notifier = CreateNotifier(configuration, _config, httpClientFactory);
     }
 }

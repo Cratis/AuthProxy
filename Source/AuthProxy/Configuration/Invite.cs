@@ -50,23 +50,25 @@ public class Invite
     public string TenantClaim { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the claim name in the invite token that holds the email address the
-    /// invitation was issued for. Empty by default, which leaves email-binding enforcement off.
-    /// When set (for example to <c>email</c>) and the validated invite token carries that claim,
-    /// the authenticating account's verified email must match it at the Phase-2 exchange or the
-    /// invite is rejected, binding the invitation to its intended recipient.
-    /// Regardless of this setting, the authenticated account's verified email is always forwarded
-    /// to the exchange endpoint so the backend can enforce the binding itself.
+    /// Gets or sets the claim name in the invite token that holds the email address for which the invitation
+    /// was issued. An empty value disables AuthProxy's email-binding enforcement. When configured and present
+    /// in a validated invite token, AuthProxy compares it with provider-supplied email evidence from the
+    /// authenticated session before the Phase-2 exchange. The provider-supplied address and its reported
+    /// verification status are forwarded to the exchange endpoint regardless of this setting.
     /// </summary>
     /// <remarks>
-    /// The account's address is read from the <c>email</c> claim, then <c>ClaimTypes.Email</c>, and finally
-    /// <c>preferred_username</c> when that claim holds an address rather than a login name. A provider that
-    /// supplies no address at all cannot be bound against: the invite is refused with its own page rather than
-    /// reported as a mismatch. GitHub is the common case — <c>/user</c> returns a null email for an account
-    /// whose address is private, and AuthProxy makes no call to <c>/user/emails</c>.
+    /// AuthProxy reads the address from <c>email</c>, then <c>ClaimTypes.Email</c>, and finally
+    /// <c>preferred_username</c> only when that value has an email-address shape. If no address is available,
+    /// AuthProxy rejects the invite with <c>invitation-email-unavailable.html</c>. If the address differs from
+    /// the invited address, or the provider explicitly supplies <c>email_verified=false</c>, AuthProxy rejects
+    /// it with <c>invitation-email-mismatch.html</c>.
     /// <para>
-    /// No OAuth provider supplies <c>email_verified</c>, because nothing maps it. "Verified" is therefore only
-    /// enforced where the provider volunteers the claim; for an OAuth provider the address is taken on trust.
+    /// The <c>email_verified</c> claim is provider-supplied evidence, not a universal AuthProxy attestation.
+    /// An explicit <see langword="false"/> is rejected; a missing or unparsable value is forwarded as
+    /// <see langword="null"/> and does not independently prove ownership. OAuth provider registrations do not
+    /// currently map <c>email_verified</c>, so their address is accepted as provider-supplied session evidence
+    /// with a <see langword="null"/> verification status. For example, GitHub's <c>/user</c> response can omit
+    /// a private email address, and AuthProxy does not make a separate <c>/user/emails</c> request.
     /// </para>
     /// </remarks>
     public string EmailClaim { get; set; } = string.Empty;

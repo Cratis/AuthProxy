@@ -1,5 +1,25 @@
 # Aspire Hosting Integration
 
+## Canonical provider identity
+
+Use the canonical provider helpers when every downstream identity path must use one explicitly selected
+provider subject:
+
+```csharp
+authProxy.WithCanonicalOidcProvider(
+    "Microsoft Entra",
+    OidcProviderType.Microsoft,
+    "https://login.microsoftonline.com/<tenant-id>/v2.0",
+    clientId,
+    clientSecret,
+    "entra-workforce",
+    "oid");
+```
+
+For OAuth providers, `WithCanonicalOAuthProvider` additionally requires the explicit issuer assigned to the
+authenticated user-information flow. The existing `WithOidcProvider` and `WithOAuthProvider` helpers remain
+unchanged and retain legacy identity behavior.
+
 The `Cratis.AuthProxy.Aspire` NuGet package adds first-class .NET Aspire support for AuthProxy.
 Instead of configuring environment variables by hand, you wire up authentication, tenancy, and
 service routing with a concise fluent API in your `AppHost`.

@@ -43,4 +43,10 @@ public class OidcProvider
     /// Gets or sets extra OAuth scopes to request (in addition to <c>openid profile email</c>).
     /// </summary>
     public IList<string> Scopes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the optional canonical federated identity contract for this provider.
+    /// When absent, the provider retains the legacy claim-selection and forwarding behavior.
+    /// </summary>
+    public CanonicalIdentity? CanonicalIdentity { get; set; }
 }

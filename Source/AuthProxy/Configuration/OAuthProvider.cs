@@ -63,4 +63,11 @@ public class OAuthProvider
     /// value is the JSON field name in the user-info response (e.g. <c>login</c>).
     /// </summary>
     public IDictionary<string, string> ClaimMappings { get; set; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Gets or sets the optional canonical federated identity contract for this provider.
+    /// OAuth providers must configure an explicit issuer because OAuth user-info does not establish one.
+    /// When absent, the provider retains the legacy claim-selection and forwarding behavior.
+    /// </summary>
+    public CanonicalIdentity? CanonicalIdentity { get; set; }
 }

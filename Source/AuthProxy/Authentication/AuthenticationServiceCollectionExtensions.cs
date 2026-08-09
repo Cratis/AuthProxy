@@ -26,6 +26,8 @@ public static class AuthenticationServiceCollectionExtensions
     /// </summary>
     public const string AuthenticationSchemeStateKey = "Cratis.AuthProxy.AuthenticationScheme";
 
+    const string ValidatedIssuerStateKey = "Cratis.AuthProxy.ValidatedIssuer";
+
     /// <summary>
     /// Registers cookie authentication, all configured OIDC providers, all configured OAuth providers,
     /// and (optionally) JWT Bearer for machine-to-machine flows.
@@ -69,6 +71,8 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
         builder.Services.AddSingleton<ClientCredentialsGrantService>();
         builder.Services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
+        builder.Services.AddSingleton<ICanonicalIdentityResolver, CanonicalIdentityResolver>();
+        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
         builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
@@ -124,6 +128,16 @@ public static class AuthenticationServiceCollectionExtensions
         options.ExpireTimeSpan = session.Lifetime > TimeSpan.Zero ? session.Lifetime : C.Session.DefaultLifetime;
         options.SlidingExpiration = session.SlidingExpiration;
 
+        var existingValidatePrincipal = options.Events.OnValidatePrincipal;
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            await existingValidatePrincipal(context);
+            if (context.Principal is not null)
+            {
+                await ValidateCanonicalSession(context);
+            }
+        };
+
         // Redirect unauthenticated users to the provider selection page (multiple providers)
         // or directly to the single provider login endpoint.
         options.Events.OnRedirectToLogin = async ctx =>
@@ -170,19 +184,27 @@ public static class AuthenticationServiceCollectionExtensions
         foreach (var provider in providers)
         {
             var scheme = OidcProviderScheme.FromName(provider.Name);
+            var capturedProvider = provider;
             authBuilder.AddOpenIdConnect(scheme, options =>
             {
-                options.Authority = provider.Authority;
-                options.ClientId = provider.ClientId;
-                options.ClientSecret = provider.ClientSecret;
+                options.Authority = capturedProvider.Authority;
+                options.ClientId = capturedProvider.ClientId;
+                options.ClientSecret = capturedProvider.ClientSecret;
                 options.ResponseType = "code";
                 options.SaveTokens = true;
                 options.GetClaimsFromUserInfoEndpoint = true;
+                if (capturedProvider.CanonicalIdentity is not null)
+                {
+                    // Canonical providers select one exact protocol claim name. Preserve those names instead
+                    // of applying the legacy WS-* inbound mapping; noncanonical providers remain unchanged.
+                    options.MapInboundClaims = false;
+                }
+
                 options.Scope.Add("openid");
                 options.Scope.Add("profile");
                 options.Scope.Add("email");
 
-                foreach (var scope in provider.Scopes)
+                foreach (var scope in capturedProvider.Scopes)
                 {
                     options.Scope.Add(scope);
                 }
@@ -205,7 +227,17 @@ public static class AuthenticationServiceCollectionExtensions
 
                 options.Events = new OpenIdConnectEvents
                 {
-                    OnTicketReceived = HandleTicketReceived
+                    OnTokenValidated = context =>
+                    {
+                        context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
+                        return Task.CompletedTask;
+                    },
+                    OnTicketReceived = context => HandleTicketReceived(
+                        context,
+                        () => CanonicalSessionRegistrationFingerprint.Create(
+                            scheme,
+                            capturedProvider,
+                            (OpenIdConnectOptions)context.Options))
                 };
             });
         }
@@ -265,7 +297,12 @@ public static class AuthenticationServiceCollectionExtensions
                             await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
                         ctx.RunClaimActions(user.RootElement);
                     },
-                    OnTicketReceived = HandleTicketReceived
+                    OnTicketReceived = context => HandleTicketReceived(
+                        context,
+                        () => CanonicalSessionRegistrationFingerprint.Create(
+                            scheme,
+                            capturedProvider,
+                            (OAuthOptions)context.Options))
                 };
             });
         }
@@ -281,14 +318,37 @@ public static class AuthenticationServiceCollectionExtensions
     /// the normal login flow.
     /// </summary>
     /// <param name="context">The ticket-received context.</param>
+    /// <param name="createRegistrationFingerprint">Creates the fingerprint that binds a canonical session to its provider registration.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// This handler only runs when a provider callback delivers a fresh ticket — that is, on the exact
     /// logged-out to signed-in transition. A request that reuses an existing session cookie never reaches it,
     /// so a sign-in is notified once per real sign-in and never on ordinary proxied traffic.
     /// </remarks>
-    static async Task HandleTicketReceived(TicketReceivedContext context)
+    static async Task HandleTicketReceived(TicketReceivedContext context, Func<string> createRegistrationFingerprint)
     {
+        var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
+        string? validatedIssuer = null;
+        context.Properties?.Items.TryGetValue(ValidatedIssuerStateKey, out validatedIssuer);
+        var canonicalResolution = canonicalIdentityResolver.Resolve(
+            context.Principal,
+            context.Scheme.Name,
+            validatedIssuer,
+            isFreshAuthentication: true);
+        context.Properties?.Items.Remove(ValidatedIssuerStateKey);
+        context.Properties?.Items.Remove(CanonicalSessionRegistrationFingerprint.StateKey);
+        if (canonicalResolution.IsConfigured
+            && (!canonicalResolution.Succeeded || canonicalResolution.Principal is null))
+        {
+            context.Fail("Canonical federated identity could not be resolved.");
+            return;
+        }
+
+        if (canonicalResolution.Principal is not null)
+        {
+            context.Principal = canonicalResolution.Principal;
+        }
+
         if (context.Properties is not null
             && context.Properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode)
             && linkMode == "true")
@@ -301,6 +361,11 @@ public static class AuthenticationServiceCollectionExtensions
             context.Response.Redirect(context.Properties.RedirectUri ?? "/");
             context.HandleResponse();
             return;
+        }
+
+        if (canonicalResolution.IsConfigured)
+        {
+            context.Properties!.Items[CanonicalSessionRegistrationFingerprint.StateKey] = createRegistrationFingerprint();
         }
 
         // A non-link ticket means a real sign-in is completing. Record which provider established this session so
@@ -321,5 +386,116 @@ public static class AuthenticationServiceCollectionExtensions
         {
             context.ReturnUri = redirectUri;
         }
+    }
+
+    static async Task ValidateCanonicalSession(CookieValidatePrincipalContext context)
+    {
+        var reservedClaims = context.Principal!.Claims.Where(_ => CanonicalIdentityClaims.IsReserved(_.Type)).ToArray();
+        var fingerprintKeys = context.Properties.Items.Keys
+            .Where(_ => string.Equals(_, CanonicalSessionRegistrationFingerprint.StateKey, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (reservedClaims.Length == 0 && fingerprintKeys.Length == 0)
+        {
+            try
+            {
+                var authentication = context.HttpContext.RequestServices
+                    .GetRequiredService<IOptionsMonitor<C.Authentication>>()
+                    .CurrentValue;
+                if (!context.Properties.Items.TryGetValue(AuthenticationSchemeStateKey, out var legacyProviderScheme)
+                    || string.IsNullOrWhiteSpace(legacyProviderScheme)
+                    || !IsConfiguredCanonicalProvider(authentication, legacyProviderScheme))
+                {
+                    return;
+                }
+            }
+            catch (OptionsValidationException)
+            {
+                await RejectCanonicalSession(context);
+                return;
+            }
+
+            await RejectCanonicalSession(context);
+            return;
+        }
+
+        if (reservedClaims.Length == 0
+            || fingerprintKeys.Length != 1
+            || !string.Equals(fingerprintKeys[0], CanonicalSessionRegistrationFingerprint.StateKey, StringComparison.Ordinal)
+            || !context.Properties.Items.TryGetValue(CanonicalSessionRegistrationFingerprint.StateKey, out var storedFingerprint)
+            || !CanonicalSessionRegistrationFingerprint.IsWellFormed(storedFingerprint)
+            || !context.Properties.Items.TryGetValue(AuthenticationSchemeStateKey, out var providerScheme)
+            || string.IsNullOrWhiteSpace(providerScheme))
+        {
+            await RejectCanonicalSession(context);
+            return;
+        }
+
+        try
+        {
+            var services = context.HttpContext.RequestServices;
+            var resolver = services.GetRequiredService<ICanonicalIdentityResolver>();
+            var resolution = resolver.Resolve(context.Principal, context.Scheme.Name);
+            if (!resolution.IsConfigured
+                || !resolution.Succeeded
+                || resolution.Identity is null
+                || !TryCreateCurrentRegistrationFingerprint(services, providerScheme, out var expectedFingerprint)
+                || !string.Equals(storedFingerprint, expectedFingerprint, StringComparison.Ordinal))
+            {
+                await RejectCanonicalSession(context);
+            }
+        }
+        catch (OptionsValidationException)
+        {
+            await RejectCanonicalSession(context);
+        }
+    }
+
+    static bool IsConfiguredCanonicalProvider(C.Authentication authentication, string scheme) =>
+        authentication.OidcProviders.Any(_ =>
+            _.CanonicalIdentity is not null
+            && string.Equals(OidcProviderScheme.FromName(_.Name), scheme, StringComparison.Ordinal))
+        || authentication.OAuthProviders.Any(_ =>
+            _.CanonicalIdentity is not null
+            && string.Equals(OidcProviderScheme.FromName(_.Name), scheme, StringComparison.Ordinal));
+
+    static bool TryCreateCurrentRegistrationFingerprint(IServiceProvider services, string scheme, out string fingerprint)
+    {
+        var authentication = services.GetRequiredService<IOptionsMonitor<C.Authentication>>().CurrentValue;
+        var oidcProviders = authentication.OidcProviders
+            .Where(_ => string.Equals(OidcProviderScheme.FromName(_.Name), scheme, StringComparison.Ordinal))
+            .ToArray();
+        var oauthProviders = authentication.OAuthProviders
+            .Where(_ => string.Equals(OidcProviderScheme.FromName(_.Name), scheme, StringComparison.Ordinal))
+            .ToArray();
+
+        if (oidcProviders.Length + oauthProviders.Length != 1)
+        {
+            fingerprint = string.Empty;
+            return false;
+        }
+
+        if (oidcProviders.Length == 1 && oidcProviders[0].CanonicalIdentity is not null)
+        {
+            var options = services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get(scheme);
+            fingerprint = CanonicalSessionRegistrationFingerprint.Create(scheme, oidcProviders[0], options);
+            return true;
+        }
+
+        if (oauthProviders.Length == 1 && oauthProviders[0].CanonicalIdentity is not null)
+        {
+            var options = services.GetRequiredService<IOptionsMonitor<OAuthOptions>>().Get(scheme);
+            fingerprint = CanonicalSessionRegistrationFingerprint.Create(scheme, oauthProviders[0], options);
+            return true;
+        }
+
+        fingerprint = string.Empty;
+        return false;
+    }
+
+    static async Task RejectCanonicalSession(CookieValidatePrincipalContext context)
+    {
+        context.RejectPrincipal();
+        await context.HttpContext.SignOutAsync(context.Scheme.Name);
     }
 }

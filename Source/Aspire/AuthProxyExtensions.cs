@@ -189,6 +189,40 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Adds an OIDC provider with an explicit canonical federated identity contract.
+    /// </summary>
+    /// <typeparam name="T">The resource type, which must support environment variables.</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="name">The provider display name used to derive the ASP.NET authentication scheme.</param>
+    /// <param name="type">The provider brand used by the login user interface.</param>
+    /// <param name="authority">The OIDC discovery authority.</param>
+    /// <param name="clientId">The registered OIDC client identifier.</param>
+    /// <param name="clientSecret">The registered OIDC client secret.</param>
+    /// <param name="providerKey">The stable lowercase provider key, independent of display name and scheme.</param>
+    /// <param name="subjectClaimType">The one exact claim type used as the canonical provider subject.</param>
+    /// <param name="scopes">Optional additional OIDC scopes.</param>
+    /// <returns>The same resource builder for chaining.</returns>
+    public static IResourceBuilder<T> WithCanonicalOidcProvider<T>(
+        this IResourceBuilder<T> builder,
+        string name,
+        OidcProviderType type,
+        string authority,
+        string clientId,
+        string clientSecret,
+        string providerKey,
+        string subjectClaimType,
+        IEnumerable<string>? scopes = null)
+        where T : IResourceWithEnvironment
+    {
+        builder.WithOidcProvider(name, type, authority, clientId, clientSecret, scopes);
+        var index = GetOrCreateAnnotation(builder.Resource).OidcProviderCount - 1;
+        var prefix = $"{ConfigPrefix}__Authentication__OidcProviders__{index}__CanonicalIdentity";
+        return builder
+            .WithEnvironment($"{prefix}__ProviderKey", providerKey)
+            .WithEnvironment($"{prefix}__SubjectClaimType", subjectClaimType);
+    }
+
+    /// <summary>
     /// Adds a regular OAuth 2.0 (non-OIDC) provider such as GitHub to the AuthProxy authentication configuration.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
@@ -247,6 +281,65 @@ public static class AuthProxyExtensions
         }
 
         return builder;
+    }
+
+    /// <summary>
+    /// Adds an OAuth provider with an explicit canonical federated identity contract.
+    /// </summary>
+    /// <typeparam name="T">The resource type, which must support environment variables.</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="name">The provider display name used to derive the ASP.NET authentication scheme.</param>
+    /// <param name="type">The provider brand used by the login user interface.</param>
+    /// <param name="authorizationEndpoint">The OAuth authorization endpoint.</param>
+    /// <param name="tokenEndpoint">The OAuth token endpoint.</param>
+    /// <param name="userInformationEndpoint">The authenticated user-information endpoint.</param>
+    /// <param name="clientId">The registered OAuth client identifier.</param>
+    /// <param name="clientSecret">The registered OAuth client secret.</param>
+    /// <param name="providerKey">The stable lowercase provider key, independent of display name and scheme.</param>
+    /// <param name="subjectClaimType">
+    /// The one exact claim on the resulting authenticated principal used as the canonical provider subject. When the
+    /// provider's raw user-information field has another name, map it to this claim through <paramref name="claimMappings"/>.
+    /// </param>
+    /// <param name="issuer">The explicit absolute HTTPS issuer assigned to this provider registration.</param>
+    /// <param name="scopes">Optional additional OAuth scopes.</param>
+    /// <param name="claimMappings">
+    /// Optional mappings whose key is the resulting principal claim type and whose value is the raw user-information
+    /// JSON field. For example, <c>{ ["sub"] = "id" }</c> maps a raw <c>id</c> field to the <c>sub</c> claim selected by
+    /// <paramref name="subjectClaimType"/>.
+    /// </param>
+    /// <returns>The same resource builder for chaining.</returns>
+    public static IResourceBuilder<T> WithCanonicalOAuthProvider<T>(
+        this IResourceBuilder<T> builder,
+        string name,
+        OidcProviderType type,
+        string authorizationEndpoint,
+        string tokenEndpoint,
+        string userInformationEndpoint,
+        string clientId,
+        string clientSecret,
+        string providerKey,
+        string subjectClaimType,
+        string issuer,
+        IEnumerable<string>? scopes = null,
+        IDictionary<string, string>? claimMappings = null)
+        where T : IResourceWithEnvironment
+    {
+        builder.WithOAuthProvider(
+            name,
+            type,
+            authorizationEndpoint,
+            tokenEndpoint,
+            userInformationEndpoint,
+            clientId,
+            clientSecret,
+            scopes,
+            claimMappings);
+        var index = GetOrCreateAnnotation(builder.Resource).OAuthProviderCount - 1;
+        var prefix = $"{ConfigPrefix}__Authentication__OAuthProviders__{index}__CanonicalIdentity";
+        return builder
+            .WithEnvironment($"{prefix}__ProviderKey", providerKey)
+            .WithEnvironment($"{prefix}__SubjectClaimType", subjectClaimType)
+            .WithEnvironment($"{prefix}__Issuer", issuer);
     }
 
     /// <summary>

@@ -41,6 +41,7 @@ namespace Cratis.AuthProxy.Invites;
 /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="canonicalIdentityResolver">The shared canonical identity resolver, or <see langword="null"/> for legacy-compatible direct construction.</param>
 public class InviteMiddleware(
     RequestDelegate next,
     IInviteTokenValidator tokenValidator,
@@ -49,7 +50,8 @@ public class InviteMiddleware(
     ITenantResolver tenantResolver,
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
-    ILogger<InviteMiddleware> logger)
+    ILogger<InviteMiddleware> logger,
+    ICanonicalIdentityResolver? canonicalIdentityResolver)
 {
     /// <summary>The route prefix that triggers invite handling.</summary>
     public const string InvitePathPrefix = WellKnownPaths.InvitePathPrefix;
@@ -66,6 +68,30 @@ public class InviteMiddleware(
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter() }
     };
+
+    /// <summary>
+    /// Initializes a legacy-compatible instance that sanitizes reserved canonical claims without resolving canonical providers.
+    /// </summary>
+    /// <param name="next">The next middleware in the pipeline.</param>
+    /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
+    /// <param name="config">The auth proxy configuration monitor.</param>
+    /// <param name="authConfig">The authentication configuration monitor.</param>
+    /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
+    /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
+    /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
+    /// <param name="logger">The logger.</param>
+    public InviteMiddleware(
+        RequestDelegate next,
+        IInviteTokenValidator tokenValidator,
+        IOptionsMonitor<C.AuthProxy> config,
+        IOptionsMonitor<C.Authentication> authConfig,
+        ITenantResolver tenantResolver,
+        IHttpClientFactory httpClientFactory,
+        IErrorPageProvider errorPageProvider,
+        ILogger<InviteMiddleware> logger)
+        : this(next, tokenValidator, config, authConfig, tenantResolver, httpClientFactory, errorPageProvider, logger, null)
+    {
+    }
 
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -284,33 +310,43 @@ public class InviteMiddleware(
             return InviteExchangeResult.Failed;
         }
 
-        var subject = context.User.FindFirst("sub")?.Value
+        var canonicalResolution = canonicalIdentityResolver?.Resolve(context.User, context.User.Identity?.AuthenticationType)
+            ?? CanonicalIdentityResolution.SanitizedLegacy(context.User);
+        if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
+        {
+            return InviteExchangeResult.Failed;
+        }
+
+        var subject = canonicalResolution.Identity?.Subject
+            ?? context.User.FindFirst("sub")?.Value
             ?? context.User.FindFirst("oid")?.Value
             ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? context.User.FindFirst("id")?.Value
             ?? string.Empty;
 
-        var identityProvider = context.User.FindFirst("iss")?.Value
+        var identityProvider = canonicalResolution.Identity?.ProviderKey
+            ?? context.User.FindFirst("iss")?.Value
             ?? context.User.FindFirst("identity_provider")?.Value
             ?? context.User.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
             ?? context.User.Identity?.AuthenticationType
             ?? string.Empty;
 
         var email = ResolveAuthenticatedEmail(context, out var emailVerified);
+        var logSubject = canonicalResolution.Identity is null ? subject : string.Empty;
 
         // An invitation is otherwise a pure bearer link - anyone with the URL could sign in with their
-        // own account and be provisioned as the invited user. Bind the invite to its intended recipient
-        // by requiring the authenticating account's verified email to match the invited email.
+        // own account and be provisioned as the invited user. Bind the invite to its intended recipient by
+        // requiring provider-supplied authenticated-session email evidence to match the invited email.
         var binding = EvaluateInvitedEmailBinding(inviteToken, email, emailVerified);
         if (binding == InviteExchangeResult.EmailUnavailable)
         {
-            logger.InviteEmailUnavailable(subject);
+            logger.InviteEmailUnavailable(logSubject);
             return binding;
         }
 
         if (binding == InviteExchangeResult.EmailMismatch)
         {
-            logger.InviteEmailMismatch(subject);
+            logger.InviteEmailMismatch(logSubject);
             return binding;
         }
 
@@ -318,9 +354,20 @@ public class InviteMiddleware(
         using var request = new HttpRequestMessage(HttpMethod.Post, exchangeUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", inviteToken);
 
-        // Forward the provider-verified email (and its verification status) so the backend can perform
-        // its own defense-in-depth check of invited-email vs. authenticated-email at accept time.
-        request.Content = JsonContent.Create(new { subject, identityProvider, email, emailVerified });
+        // Forward the provider-supplied authenticated-session email evidence and any email_verified value so the
+        // backend can perform its own defense-in-depth check at accept time. The value can be true, false, or null;
+        // OAuth providers may not supply an independent email verification claim.
+        request.Content = canonicalResolution.Identity is { } canonicalIdentity
+            ? JsonContent.Create(new
+            {
+                subject,
+                providerKey = canonicalIdentity.ProviderKey,
+                issuer = canonicalIdentity.NormalizedIssuer,
+                identityProvider,
+                email,
+                emailVerified
+            })
+            : JsonContent.Create(new { subject, identityProvider, email, emailVerified });
 
         HttpResponseMessage response;
         try
@@ -335,27 +382,30 @@ public class InviteMiddleware(
 
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
-            logger.InviteSubjectAlreadyExists(subject);
+            logger.InviteSubjectAlreadyExists(logSubject);
             return InviteExchangeResult.DuplicateSubject;
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            logger.InviteExchangeEndpointFailed((int)response.StatusCode, subject);
+            logger.InviteExchangeEndpointFailed((int)response.StatusCode, logSubject);
             return InviteExchangeResult.Failed;
         }
 
-        logger.InviteExchangedSuccessfully(subject);
+        logger.InviteExchangedSuccessfully(logSubject);
         return InviteExchangeResult.Success;
     }
 
     /// <summary>
     /// Evaluates the invite against the authenticated account, enforcing that the invited email (when the
-    /// token carries one) matches the account's verified email.
+    /// token carries one) matches provider-supplied authenticated-session email evidence.
     /// </summary>
     /// <param name="inviteToken">The validated invite token.</param>
     /// <param name="authenticatedEmail">The authenticating account's email.</param>
-    /// <param name="emailVerified">The provider-supplied verification status of <paramref name="authenticatedEmail"/>.</param>
+    /// <param name="emailVerified">
+    /// The provider's <c>email_verified</c> value: <see langword="true"/>, <see langword="false"/>, or
+    /// <see langword="null"/> when the provider supplies no independent verification claim.
+    /// </param>
     /// <returns>
     /// <see cref="InviteExchangeResult.Success"/> when the invite is not bound to a specific email or the
     /// authenticated email matches it; <see cref="InviteExchangeResult.EmailUnavailable"/> when the provider

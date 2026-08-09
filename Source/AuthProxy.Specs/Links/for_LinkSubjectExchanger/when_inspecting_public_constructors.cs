@@ -1,0 +1,41 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Cratis.AuthProxy.Authentication;
+
+namespace Cratis.AuthProxy.Links.for_LinkSubjectExchanger;
+
+/// <summary>
+/// Specifies the released and resolver-aware public constructor contracts for <see cref="LinkSubjectExchanger"/>.
+/// </summary>
+public class when_inspecting_public_constructors : Specification
+{
+    bool _hasReleasedConstructor;
+    bool _hasResolverAwareConstructor;
+
+    void Because()
+    {
+        var constructors = typeof(LinkSubjectExchanger).GetConstructors();
+        _hasReleasedConstructor = constructors.Any(_ => HasParameters(_, ReleasedParameterTypes));
+        _hasResolverAwareConstructor = constructors.Any(_ => HasParameters(_, ResolverAwareParameterTypes));
+    }
+
+    [Fact] void should_keep_the_released_three_argument_constructor() => _hasReleasedConstructor.ShouldBeTrue();
+    [Fact] void should_expose_the_resolver_aware_constructor() => _hasResolverAwareConstructor.ShouldBeTrue();
+
+    static Type[] ReleasedParameterTypes =>
+    [
+        typeof(IOptionsMonitor<C.AuthProxy>),
+        typeof(IHttpClientFactory),
+        typeof(ILogger<LinkSubjectExchanger>)
+    ];
+
+    static Type[] ResolverAwareParameterTypes =>
+    [
+        .. ReleasedParameterTypes,
+        typeof(ICanonicalIdentityResolver)
+    ];
+
+    static bool HasParameters(System.Reflection.ConstructorInfo constructor, Type[] expected) =>
+        constructor.GetParameters().Select(_ => _.ParameterType).SequenceEqual(expected);
+}

@@ -16,10 +16,10 @@ namespace Cratis.AuthProxy.Identity;
 public interface IIdentityAuthorizationCache
 {
     /// <summary>
-    /// Records that the given principal was authorized in the given tenant.
+    /// Records that the given principal's validated account binding was authorized in the given tenant.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>, whose response the record is written to.</param>
-    /// <param name="principal">The authorized principal.</param>
+    /// <param name="principal">The authorized principal. Canonical principals bind provider, issuer, and subject; legacy principals bind the released user identifier.</param>
     /// <param name="tenantId">The tenant the principal was authorized in.</param>
     void Record(HttpContext context, ClientPrincipal principal, string tenantId);
 
@@ -28,7 +28,7 @@ public interface IIdentityAuthorizationCache
     /// this tenant.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <param name="principal">The principal to check.</param>
+    /// <param name="principal">The principal whose validated canonical or legacy account binding is checked.</param>
     /// <param name="tenantId">The tenant to check.</param>
     /// <returns><see langword="true"/> when a valid, unexpired record for this principal and tenant is present; otherwise <see langword="false"/>.</returns>
     bool IsAuthorized(HttpContext context, ClientPrincipal principal, string tenantId);

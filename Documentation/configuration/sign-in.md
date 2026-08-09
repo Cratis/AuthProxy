@@ -29,7 +29,8 @@ the sign-in: the call is best-effort and any error is logged and swallowed.
 
 ## The payload
 
-AuthProxy posts the following JSON to the configured [`NotifyUrl`](#configuration):
+AuthProxy posts one of two JSON bodies to the configured [`NotifyUrl`](#configuration). A provider without
+[canonical federated identity](authentication.md#canonical-federated-identity) keeps the legacy body:
 
 ```json
 {
@@ -43,8 +44,27 @@ AuthProxy posts the following JSON to the configured [`NotifyUrl`](#configuratio
 }
 ```
 
-- **`subject`** / **`identityProvider`** — read from the freshly authenticated principal, exactly as the invite
-  and link exchanges do.
+An opted-in canonical provider adds `providerKey` and `issuer`; `subject` is the exact configured canonical
+subject and `identityProvider` becomes the same compatibility value as `providerKey`:
+
+```json
+{
+  "subject": "<configured canonical subject>",
+  "providerKey": "<configured stable provider key>",
+  "issuer": "<normalized validated or configured issuer>",
+  "identityProvider": "<same value as providerKey>",
+  "ipAddress": "<resolved client IP>",
+  "location": "<approximate location, may be empty>",
+  "browser": "<parsed browser, e.g. Chrome>",
+  "operatingSystem": "<parsed OS, e.g. Windows>",
+  "userAgent": "<raw User-Agent header>"
+}
+```
+
+- **Identity fields** — legacy providers select `subject` and `identityProvider` from the freshly
+  authenticated principal. Canonical providers send the complete `(providerKey, issuer, subject)` tuple.
+  Consumers must bind all three tuple components; neither `subject` alone nor `identityProvider` is a stable
+  cross-provider account key.
 - **`ipAddress`** — the client IP, taken from the left-most `X-Forwarded-For` entry (falling back to the
   connection's remote address).
 - **`location`** — a best-effort, coarse location. See [Approximate location](#approximate-location) below.
@@ -55,6 +75,10 @@ AuthProxy posts the following JSON to the configured [`NotifyUrl`](#configuratio
 
 Unlike the invite and link exchanges, the sign-in notification carries **no bearer token** — there is no
 user-supplied token in this flow. It relies on the endpoint being network-isolated (see [Security](#security)).
+
+Canonical identity is opt-in per provider, so an application migrating provider registrations must accept
+both body shapes. A notification says that a provider authenticated the tuple; it does not grant application
+membership, roles, scopes, or authorization.
 
 ---
 
@@ -107,7 +131,7 @@ posted).
 
 ## Security
 
-The notification endpoint is a service-to-service back-channel: it is reachable by AuthProxy, not by browsers.
-It trusts the subject AuthProxy delivers from a real provider authentication — never a client-supplied subject.
-Point `NotifyUrl` at an internal application address that is **network-isolated** from public traffic, exactly
-as for the invite and link exchanges.
+The notification JSON is not signed and carries no bearer credential. Point `NotifyUrl` at an internal
+application address that is **network-isolated** from public traffic, or authenticate AuthProxy separately at
+the application endpoint. Treat the identity tuple as authenticated provider metadata, then apply the
+application's own authorization policy before changing any access or membership.

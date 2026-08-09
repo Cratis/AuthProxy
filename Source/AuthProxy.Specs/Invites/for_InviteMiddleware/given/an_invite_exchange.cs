@@ -31,6 +31,32 @@ public class an_invite_exchange : Specification
     /// </summary>
     protected virtual string InviteEmailClaim => string.Empty;
 
+    /// <summary>
+    /// Configures authentication providers needed by a concrete exchange specification.
+    /// </summary>
+    /// <param name="configuration">The root configuration to enrich.</param>
+    protected virtual void ConfigureAuthentication(C.AuthProxy configuration)
+    {
+    }
+
+    protected virtual InviteMiddleware CreateMiddleware(
+        C.AuthProxy configuration,
+        IOptionsMonitor<C.AuthProxy> optionsMonitor,
+        IHttpClientFactory httpClientFactory) =>
+        new(
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
+            new InviteTokenValidator(optionsMonitor),
+            optionsMonitor,
+            EmptyAuthConfig(),
+            Substitute.For<ITenantResolver>(),
+            httpClientFactory,
+            _errorPageProvider,
+            Substitute.For<ILogger<InviteMiddleware>>());
+
     void Establish()
     {
         var (privateKey, publicKeyPem) = TokenFixture.GenerateKeyPair();
@@ -47,6 +73,7 @@ public class an_invite_exchange : Specification
                 EmailClaim = InviteEmailClaim,
             }
         };
+        ConfigureAuthentication(config);
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
@@ -58,19 +85,7 @@ public class an_invite_exchange : Specification
             .WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>())
             .Returns(Task.CompletedTask);
 
-        _middleware = new InviteMiddleware(
-            _ =>
-            {
-                _nextCalled = true;
-                return Task.CompletedTask;
-            },
-            new InviteTokenValidator(optionsMonitor),
-            optionsMonitor,
-            EmptyAuthConfig(),
-            Substitute.For<ITenantResolver>(),
-            httpClientFactory,
-            _errorPageProvider,
-            Substitute.For<ILogger<InviteMiddleware>>());
+        _middleware = CreateMiddleware(config, optionsMonitor, httpClientFactory);
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/";

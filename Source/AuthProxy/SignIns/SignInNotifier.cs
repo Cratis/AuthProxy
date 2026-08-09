@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using Cratis.AuthProxy.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -19,12 +20,30 @@ namespace Cratis.AuthProxy.SignIns;
 /// <param name="locationResolver">The resolver for the request's approximate location.</param>
 /// <param name="httpClientFactory">The HTTP client factory used for the notification call.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="canonicalIdentityResolver">The shared canonical identity resolver, or <see langword="null"/> for legacy-compatible direct construction.</param>
 public class SignInNotifier(
     IOptionsMonitor<C.AuthProxy> config,
     IClientLocationResolver locationResolver,
     IHttpClientFactory httpClientFactory,
-    ILogger<SignInNotifier> logger) : ISignInNotifier
+    ILogger<SignInNotifier> logger,
+    ICanonicalIdentityResolver? canonicalIdentityResolver) : ISignInNotifier
 {
+    /// <summary>
+    /// Initializes a legacy-compatible notifier that sanitizes reserved canonical claims without resolving canonical providers.
+    /// </summary>
+    /// <param name="config">The auth proxy configuration monitor.</param>
+    /// <param name="locationResolver">The resolver for the request's approximate location.</param>
+    /// <param name="httpClientFactory">The HTTP client factory used for the notification call.</param>
+    /// <param name="logger">The logger.</param>
+    public SignInNotifier(
+        IOptionsMonitor<C.AuthProxy> config,
+        IClientLocationResolver locationResolver,
+        IHttpClientFactory httpClientFactory,
+        ILogger<SignInNotifier> logger)
+        : this(config, locationResolver, httpClientFactory, logger, null)
+    {
+    }
+
     /// <inheritdoc/>
     public async Task<SignInNotificationResult> Notify(HttpContext context, ClaimsPrincipal? principal)
     {
@@ -34,7 +53,15 @@ public class SignInNotifier(
             return SignInNotificationResult.Skipped;
         }
 
-        var subject = principal?.FindFirst("sub")?.Value
+        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, principal?.Identity?.AuthenticationType)
+            ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
+        if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
+        {
+            return SignInNotificationResult.Failed;
+        }
+
+        var subject = canonicalResolution.Identity?.Subject
+            ?? principal?.FindFirst("sub")?.Value
             ?? principal?.FindFirst("oid")?.Value
             ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? principal?.FindFirst("id")?.Value
@@ -46,7 +73,8 @@ public class SignInNotifier(
             return SignInNotificationResult.Failed;
         }
 
-        var identityProvider = principal?.FindFirst("iss")?.Value
+        var identityProvider = canonicalResolution.Identity?.ProviderKey
+            ?? principal?.FindFirst("iss")?.Value
             ?? principal?.FindFirst("identity_provider")?.Value
             ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
             ?? principal?.Identity?.AuthenticationType
@@ -56,9 +84,20 @@ public class SignInNotifier(
         var userAgent = UserAgentParser.Parse(context.Request.Headers.UserAgent.ToString());
 
         using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, notifyUrl)
-        {
-            Content = JsonContent.Create(new
+        var content = canonicalResolution.Identity is { } canonicalIdentity
+            ? JsonContent.Create(new
+            {
+                subject,
+                providerKey = canonicalIdentity.ProviderKey,
+                issuer = canonicalIdentity.NormalizedIssuer,
+                identityProvider,
+                ipAddress = location.IpAddress,
+                location = location.Location,
+                browser = userAgent.Browser,
+                operatingSystem = userAgent.OperatingSystem,
+                userAgent = userAgent.Raw,
+            })
+            : JsonContent.Create(new
             {
                 subject,
                 identityProvider,
@@ -67,7 +106,11 @@ public class SignInNotifier(
                 browser = userAgent.Browser,
                 operatingSystem = userAgent.OperatingSystem,
                 userAgent = userAgent.Raw,
-            }),
+            });
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, notifyUrl)
+        {
+            Content = content,
         };
 
         HttpResponseMessage response;
@@ -87,7 +130,7 @@ public class SignInNotifier(
             return SignInNotificationResult.Failed;
         }
 
-        logger.SignInNotified(subject);
+        logger.SignInNotified(canonicalResolution.Identity is null ? subject : string.Empty);
         return SignInNotificationResult.Notified;
     }
 }

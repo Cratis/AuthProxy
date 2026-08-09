@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Identity;
@@ -19,8 +18,10 @@ namespace Cratis.AuthProxy.Identity;
 /// data protection, so the value that skips the <c>/.cratis/me</c> authorization call is one only
 /// AuthProxy can have produced.
 /// <para>
-/// The sealed payload names the principal and the tenant it was issued for, and both are compared against
-/// the current request rather than trusted. Sealing alone would not be enough: a sealed record is still a
+/// The versioned structured payload names the principal's account binding and the tenant it was issued for,
+/// and both are compared against the current request rather than trusted. A canonical binding contains the
+/// complete provider, normalized issuer, and subject tuple; a legacy binding preserves the released user-ID
+/// behavior. Sealing alone would not be enough: a sealed record is still a
 /// bearer value, so without the comparison a caller could keep a record issued for one tenant and present
 /// it while acting in another, or a record from an old session could authorize whoever holds the browser
 /// next. The expiry is carried inside the sealed payload rather than left to the cookie's
@@ -33,14 +34,18 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="logger">The logger.</param>
 public class IdentityAuthorizationCache(
     IDataProtectionProvider dataProtectionProvider,
-    IOptionsMonitor<C.AuthProxy> config,
+    Microsoft.Extensions.Options.IOptionsMonitor<C.AuthProxy> config,
     ILogger<IdentityAuthorizationCache> logger) : IIdentityAuthorizationCache
 {
     /// <summary>
-    /// The purpose string binding the protector to this use. A record sealed for one purpose cannot be
-    /// unsealed for another, so an unrelated protected value cannot be replayed here.
+    /// The original purpose string retained only to validate unexpired legacy-principal records issued by version one.
     /// </summary>
-    const string ProtectorPurpose = "Cratis.AuthProxy.Identity.Authorization.v1";
+    const string LegacyProtectorPurpose = "Cratis.AuthProxy.Identity.Authorization.v1";
+
+    /// <summary>
+    /// The purpose string for versioned structured authorization records.
+    /// </summary>
+    const string ProtectorPurpose = "Cratis.AuthProxy.Identity.Authorization.v2";
 
     /// <summary>
     /// The lifetime used when no re-validation interval is configured.
@@ -48,6 +53,7 @@ public class IdentityAuthorizationCache(
     static readonly TimeSpan _defaultLifetime = TimeSpan.FromMinutes(10);
 
     readonly IDataProtector _protector = dataProtectionProvider.CreateProtector(ProtectorPurpose);
+    readonly IDataProtector _legacyProtector = dataProtectionProvider.CreateProtector(LegacyProtectorPurpose);
 
     /// <summary>
     /// Gets how long a recorded authorization stays valid, mirroring the identity cookie's own lifetime.
@@ -65,9 +71,20 @@ public class IdentityAuthorizationCache(
     /// <inheritdoc/>
     public void Record(HttpContext context, ClientPrincipal principal, string tenantId)
     {
+        if (!IdentityAccountBinding.TryCreate(principal, out var account))
+        {
+            return;
+        }
+
         var lifetime = Lifetime;
         var expires = DateTimeOffset.UtcNow.Add(lifetime);
-        var payload = $"{expires.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)}|{principal.UserId}|{tenantId}";
+        var payload = JsonSerializer.Serialize(new IdentityAuthorizationRecord
+        {
+            Version = IdentityAuthorizationRecord.CurrentVersion,
+            ExpiresAt = expires.ToUnixTimeSeconds(),
+            TenantId = tenantId,
+            Account = account
+        });
 
         context.Response.Cookies.Append(Cookies.IdentityAuthorization, _protector.Protect(payload), new CookieOptions
         {
@@ -82,36 +99,75 @@ public class IdentityAuthorizationCache(
     /// <inheritdoc/>
     public bool IsAuthorized(HttpContext context, ClientPrincipal principal, string tenantId)
     {
+        if (!IdentityAccountBinding.TryCreate(principal, out var account))
+        {
+            return false;
+        }
+
         if (!context.Request.Cookies.TryGetValue(Cookies.IdentityAuthorization, out var sealedRecord)
             || string.IsNullOrWhiteSpace(sealedRecord))
         {
             return false;
         }
 
-        string payload;
-
         try
         {
-            payload = _protector.Unprotect(sealedRecord);
+            var payload = _protector.Unprotect(sealedRecord);
+            var record = JsonSerializer.Deserialize<IdentityAuthorizationRecord>(payload);
+            return record?.Version == IdentityAuthorizationRecord.CurrentVersion
+                && record.Account is not null
+                && record.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                && string.Equals(record.TenantId, tenantId, StringComparison.OrdinalIgnoreCase)
+                && record.Account == account;
+        }
+        catch (System.Security.Cryptography.CryptographicException) when (!account.IsCanonical)
+        {
+            return IsAuthorizedByLegacyRecord(sealedRecord, account, tenantId);
         }
         catch (System.Security.Cryptography.CryptographicException)
         {
-            // Tampered, truncated, or sealed by a key this instance no longer has. Either way it is not
-            // evidence of anything, so the caller is re-authorized against the services rather than
-            // refused — a rotated data-protection key must not lock everyone out.
-            logger.IdentityAuthorizationRecordRejected();
-            return false;
+            return RejectRecord();
+        }
+        catch (JsonException)
+        {
+            return RejectRecord();
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Clear(HttpContext context) => context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
+
+    bool IsAuthorizedByLegacyRecord(string sealedRecord, IdentityAccountBinding account, string tenantId)
+    {
+        if (account.Subject.Contains('|') || tenantId.Contains('|'))
+        {
+            return RejectRecord();
+        }
+
+        string payload;
+        try
+        {
+            payload = _legacyProtector.Unprotect(sealedRecord);
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            return RejectRecord();
         }
 
         var parts = payload.Split('|', 3);
 
         return parts.Length == 3
             && long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var expiresAt)
-            && DateTimeOffset.FromUnixTimeSeconds(expiresAt) > DateTimeOffset.UtcNow
-            && string.Equals(parts[1], principal.UserId, StringComparison.Ordinal)
+            && expiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            && string.Equals(parts[1], account.Subject, StringComparison.Ordinal)
             && string.Equals(parts[2], tenantId, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <inheritdoc/>
-    public void Clear(HttpContext context) => context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
+    bool RejectRecord()
+    {
+        // Tampered, truncated, malformed, or sealed by a key this instance no longer has. It is not evidence
+        // of authorization, so the caller is re-authorized against the services rather than refused.
+        logger.IdentityAuthorizationRecordRejected();
+        return false;
+    }
 }

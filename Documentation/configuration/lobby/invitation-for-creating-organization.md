@@ -13,11 +13,11 @@ frontend to finish onboarding.
    - With multiple providers, AuthProxy serves `invitation-select-provider.html` so the user can
      choose how to sign in.
 4. After a successful login, AuthProxy re-validates the token, then calls `Invite.ExchangeUrl` with the
-   invite token and the authenticated user's subject and verified email.
+   invite token, authenticated subject, and provider-supplied authenticated-session email evidence.
    - The token is re-validated (signature, issuer, audience, lifetime) before it is forwarded.
    - If gateway email binding is enabled (`Invite.EmailClaim` is set) and the token was issued for a
-     specific email, the account's verified email must match, otherwise `invitation-email-mismatch.html`
-     is served.
+     specific email, a missing provider address serves `invitation-email-unavailable.html`; a different
+     address or explicit `email_verified=false` serves `invitation-email-mismatch.html`.
 5. If the exchange succeeds, AuthProxy redirects the user to `Invite.Lobby.Frontend.BaseUrl`.
 
 This flow is the right fit when the invited user is not entering an already-resolved tenant.
@@ -56,11 +56,23 @@ This flow is the right fit when the invited user is not entering an already-reso
 | `Issuer` | `string` | Expected `iss` claim. Leave empty to skip issuer validation. |
 | `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
 | `ExchangeUrl` | `string` | Absolute URL of the invite exchange endpoint. |
+| `EmailClaim` | `string` | Claim in the invite token that contains the invited email. Empty by default. When configured, provider-supplied authenticated-session email evidence must match; missing evidence and mismatched evidence use different error pages. |
 | `SubjectAlreadyExistsUrl` | `string` | Redirect target when the exchange endpoint returns HTTP 409. Leave empty to serve `invitation-subject-already-exists.html`. |
 | `AppendInvitationIdToQueryString` | `bool` | Appends `jti` from the invite token to the lobby redirect URL when enabled. |
 | `InvitationIdQueryStringKey` | `string` | Query-string key used when appending the invitation ID. |
 | `ClaimsToForward` | `InviteClaimForwarding[]` | Claim mappings forwarded from the invite token into the identity details request. |
 | `Lobby.Frontend.BaseUrl` | `string` | Lobby URL used after a successful invite exchange. |
+
+## Exchange request body
+
+The conditional legacy and canonical bodies are identical to the existing-organization flow. See
+[Invitation exchange request body](invitation-to-organization.md#exchange-request-body) for the exact JSON,
+the opt-in migration contract, and the `email_verified` limitations.
+
+The invitation token is the bearer credential, but the JSON callback body is not signed. Keep the application
+endpoint network-isolated or authenticate AuthProxy separately, validate the invitation token, bind canonical
+accounts by all three `(providerKey, issuer, subject)` components, and apply application authorization after
+authentication.
 
 ## Invite claim forwarding
 
@@ -96,6 +108,8 @@ AuthProxy serves dedicated pages for each invitation error:
 | `invitation-invalid.html` | The token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | The token is valid and multiple identity providers are configured. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated subject is already associated with an existing account. | 409 |
+| `invitation-email-unavailable.html` | Email binding is enabled, but the provider supplied no authenticated-session address. | 403 |
+| `invitation-email-mismatch.html` | Email binding is enabled, and the provider supplied another address or explicitly reported `email_verified=false`. | 403 |
 
 See [Error pages](../error-pages.md) for customization details and
 [Custom Invitation Provider-Selection Page](../invitation-provider-selection.md) for a full branded

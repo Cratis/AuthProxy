@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using Cratis.AuthProxy.Authentication;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -29,9 +30,23 @@ public static class ClientPrincipalExtensions
             return null;
         }
 
-        var identity = user.Identity;
+        var canonicalResolution = context.RequestServices is { } requestServices
+            ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, user.Identity.AuthenticationType)
+            : null;
+        if (canonicalResolution?.IsConfigured == true)
+        {
+            if (!canonicalResolution.Succeeded || canonicalResolution.Identity is null || canonicalResolution.Principal is null)
+            {
+                return null;
+            }
 
-        var userId = user.FindFirst("oid")?.Value
+            user = canonicalResolution.Principal;
+        }
+
+        var identity = user.Identity!;
+
+        var userId = canonicalResolution?.Identity?.Subject
+            ?? user.FindFirst("oid")?.Value
             ?? user.FindFirst("sub")?.Value
             ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? string.Empty;
@@ -44,18 +59,20 @@ public static class ClientPrincipalExtensions
             ?? user.Identity?.Name
             ?? string.Empty;
 
-        var roles = user.FindAll(ClaimTypes.Role)
+        var isCanonical = canonicalResolution?.IsConfigured == true && canonicalResolution.Succeeded;
+        var roles = user.Claims
+            .Where(claim => IsRoleClaim(claim.Type, isCanonical))
             .Select(c => c.Value)
             .Concat(["anonymous", "authenticated"])
             .Distinct();
 
         var claims = user.Claims
-            .Where(c => c.Type != ClaimTypes.Role)
+            .Where(c => !IsRoleClaim(c.Type, isCanonical))
             .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
 
         return new ClientPrincipal
         {
-            IdentityProvider = identity.AuthenticationType ?? "unknown",
+            IdentityProvider = canonicalResolution?.Identity?.ProviderKey ?? identity.AuthenticationType ?? "unknown",
             UserId = userId,
             UserDetails = userDetails,
             UserRoles = roles,
@@ -91,4 +108,10 @@ public static class ClientPrincipalExtensions
         requestMessage.Headers.Add(Headers.PrincipalId, principal.UserId);
         requestMessage.Headers.Add(Headers.PrincipalName, principal.UserDetails);
     }
+
+    static bool IsRoleClaim(string claimType, bool isCanonical) =>
+        string.Equals(claimType, ClaimTypes.Role, StringComparison.Ordinal)
+        || (isCanonical
+            && (string.Equals(claimType, "role", StringComparison.Ordinal)
+                || string.Equals(claimType, "roles", StringComparison.Ordinal)));
 }
