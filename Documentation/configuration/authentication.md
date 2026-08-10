@@ -278,6 +278,72 @@ principal, so an unauthenticated caller cannot smuggle identity headers downstre
 
 ---
 
+## OAuth 2.0 providers
+
+Not every provider publishes an OpenID Connect discovery document. GitHub is the common one that does not,
+so it is configured under `Cratis:AuthProxy:Authentication:OAuthProviders` with its endpoints named
+explicitly instead of discovered from an authority:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OAuthProviders": [
+          {
+            "Name": "GitHub",
+            "Type": "GitHub",
+            "AuthorizationEndpoint": "https://github.com/login/oauth/authorize",
+            "TokenEndpoint": "https://github.com/login/oauth/access_token",
+            "UserInformationEndpoint": "https://api.github.com/user",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>",
+            "Scopes": [ "read:user", "user:email" ],
+            "ClaimMappings": {
+              "sub": "id",
+              "name": "name",
+              "preferred_username": "login",
+              "email": "email"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+OAuth providers sit alongside OIDC providers in every other respect: they appear on the
+provider-selection page, they get a login endpoint at `/.cratis/login/{scheme}`, and the count of both
+together decides whether an unauthenticated browser is challenged directly or offered a choice.
+
+`ClaimMappings` is what turns the provider's user-info JSON into claims — the key is the claim type to
+create, the value is the field to read it from. The mapping above produces the claims AuthProxy reads when
+it builds the forwarded principal.
+
+> [!NOTE]
+> OAuth 2.0 has no standard end-session endpoint, so signing out of an OAuth-established session clears
+> the local session only — the user stays signed in at the provider. See [Logout](logout.md).
+
+### OAuthProviderConfig properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Name` | `string` | Display name shown on the login selection page, and the source of the scheme name. |
+| `Type` | `string` | Provider brand (`GitHub`, `Microsoft`, `Google`, `Apple`, or `Custom`). Picks the logo, and for GitHub also enables [organization and team claims](authorization.md#github-organizations-and-teams). |
+| `AuthorizationEndpoint` | `string` | The OAuth 2.0 authorization endpoint URL. |
+| `TokenEndpoint` | `string` | The OAuth 2.0 token endpoint URL. |
+| `UserInformationEndpoint` | `string` | The user-information (profile) API endpoint URL. |
+| `ClientId` | `string` | OAuth 2.0 client ID. |
+| `ClientSecret` | `string` | OAuth 2.0 client secret. |
+| `Scopes` | `string[]` | Scopes to request. Adding `read:org` to a GitHub provider also adds organization and team claims to the session. |
+| `ClaimMappings` | `object` | Claim type → user-info JSON field name. |
+
+Configuring a provider decides *who can sign in*, which on a public provider is everybody. To decide who
+may then get through, see [Authorization](authorization.md).
+
+---
+
 ## Session lifetime and re-validation
 
 Interactive browser sessions are cookie-based, and every cookie AuthProxy issues for identity or tenant

@@ -34,12 +34,14 @@ public class configured_canonical_provider_callbacks : Specification
             [$"{C.Authentication.SectionKey}:OidcProviders:0:CanonicalIdentity:ProviderKey"] = "entra-workforce",
             [$"{C.Authentication.SectionKey}:OidcProviders:0:CanonicalIdentity:SubjectClaimType"] = "oid",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:Name"] = "GitHub",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:Type"] = nameof(C.OidcProviderType.GitHub),
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationEndpoint"] = "https://github.example.com/authorize",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:TokenEndpoint"] = "https://github.example.com/token",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:UserInformationEndpoint"] = "https://github.example.com/user",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:VerifiedEmailEndpoint"] = "https://github.example.com/user/emails",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientId"] = "oauth-client",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientSecret"] = "oauth-secret",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:Scopes:0"] = "read:org",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:id"] = "id",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:ProviderKey"] = "github-workforce",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:SubjectClaimType"] = "id",
@@ -67,7 +69,9 @@ public class configured_canonical_provider_callbacks : Specification
                     new C.OAuthProvider
                     {
                         Name = "GitHub",
+                        Type = C.OidcProviderType.GitHub,
                         VerifiedEmailEndpoint = "https://github.example.com/user/emails",
+                        Scopes = ["read:org"],
                         ClaimMappings = new Dictionary<string, string> { ["id"] = "id" },
                         CanonicalIdentity = new C.CanonicalIdentity
                         {

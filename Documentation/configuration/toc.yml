@@ -2,6 +2,8 @@
   href: index.md
 - name: Authentication
   href: authentication.md
+- name: Authorization
+  href: authorization.md
 - name: Unauthenticated Responses
   href: unauthenticated-responses.md
 - name: Tenancy

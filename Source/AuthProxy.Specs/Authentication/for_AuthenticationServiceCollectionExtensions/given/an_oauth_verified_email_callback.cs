@@ -78,9 +78,13 @@ public class an_oauth_verified_email_callback : configured_canonical_provider_ca
                 }
             }
 
-            var content = isVerifiedEmailRequest
-                ? verifiedEmailResponse()
-                : """{"id":"github-subject","email":"untrusted@example.com"}""";
+            var content = request.RequestUri?.AbsolutePath switch
+            {
+                string path when path.EndsWith("/emails", StringComparison.Ordinal) => verifiedEmailResponse(),
+                string path when path.EndsWith("/orgs", StringComparison.Ordinal) => """[{"login":"Cratis"}]""",
+                string path when path.EndsWith("/teams", StringComparison.Ordinal) => """[{"slug":"ada","organization":{"login":"Cratis"}}]""",
+                _ => """{"id":"github-subject","email":"untrusted@example.com"}"""
+            };
             return Task.FromResult(new HttpResponseMessage(
                 isVerifiedEmailRequest ? verifiedEmailStatusCode() : HttpStatusCode.OK)
             {

@@ -19,6 +19,13 @@ public class AuthProxy
     public Authentication Authentication { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the authorization configuration applied to every service — the first gate an
+    /// authenticated caller has to pass before any request is forwarded.
+    /// Leave it empty (the default) to authenticate without authorizing, as the proxy has always done.
+    /// </summary>
+    public Authorization Authorization { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the browser-session hardening configuration: the bounded authentication session
     /// lifetime and the identity/tenant re-validation intervals.
     /// </summary>

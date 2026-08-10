@@ -15,6 +15,7 @@ condition is detected:
 |-----------|-----------|-------------|
 | `404.html` | The requested resource was not found. | 404 |
 | `403.html` | The identity resolver denied access. | 403 |
+| `not-authorized.html` | The caller is signed in but does not satisfy the claim requirements declared in [`Cratis:AuthProxy:Authorization`](authorization.md). | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
 | `select-provider.html` | A protected resource was requested and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
@@ -138,3 +139,23 @@ configuration and the limits of provider-supplied `email_verified` evidence.
 `tenant-not-found.html` is served when tenant verification is enabled and the platform reports
 that the resolved tenant ID does not exist. See [Tenant verification](tenancy.md#tenant-verification)
 for how to configure the verification endpoint.
+
+---
+
+## Not authorized
+
+`not-authorized.html` is served when [first-gate authorization](authorization.md) is configured and an
+authenticated caller does not satisfy a required claim — a GitHub organization they do not belong to, a
+role they do not hold. It is distinct from `403.html`, which answers the *application* refusing a caller it
+does recognize; this one is the proxy refusing before the application is reached at all.
+
+If you override it, **keep a way to sign out**. It is the only refusal whose remedy is to come back as
+somebody else, and someone who signed in with the wrong account is otherwise stuck looking at a page that
+will not change. The built-in page links to `/.cratis/logout?redirect=/`:
+
+```html
+<a href="/.cratis/logout?redirect=/">Sign out</a>
+```
+
+This is a good page to brand and to make specific — "ask #it-support for access to the planner" is far more
+useful to the person reading it than "not authorized".

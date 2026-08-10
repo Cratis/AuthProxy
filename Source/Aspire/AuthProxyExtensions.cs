@@ -145,6 +145,78 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Requires every authenticated caller to carry a claim before any request is forwarded.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="claim">
+    /// The claim type the caller must carry, for example <c>urn:github:organization</c> or <c>roles</c>.
+    /// </param>
+    /// <param name="anyOf">
+    /// The values that satisfy it. Pass none to require only that the claim is present. Values are
+    /// compared case-insensitively.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Authentication establishes who a caller is; on a public host that is not the same as deciding
+    /// whether they may be here. Without a requirement, any account the configured identity provider will
+    /// authenticate — for a public provider such as GitHub, every account on the internet — completes
+    /// sign-in and reaches the application.
+    /// <para>
+    /// Calling this more than once requires <em>all</em> of the claims: several calls compose as an
+    /// <em>and</em>, while several values in one call compose as an <em>or</em>. Express "in this
+    /// organization and on this team" as two calls, and "in either organization" as one call with two
+    /// values.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithRequiredClaim<T>(
+        this IResourceBuilder<T> builder,
+        string claim,
+        params string[] anyOf)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        var index = annotation.RequiredClaimCount++;
+
+        return WriteClaimRequirement(builder, $"{ConfigPrefix}__Authorization__RequiredClaims__{index}", claim, anyOf);
+    }
+
+    /// <summary>
+    /// Requires every authenticated caller reaching a named service to carry a claim.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">
+    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// </param>
+    /// <param name="claim">The claim type the caller must carry.</param>
+    /// <param name="anyOf">
+    /// The values that satisfy it. Pass none to require only that the claim is present.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Applied in addition to anything <see cref="WithRequiredClaim{T}"/> declares, so a service can narrow
+    /// who reaches it but never widen it.
+    /// </remarks>
+    public static IResourceBuilder<T> WithRequiredClaimForService<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        string claim,
+        params string[] anyOf)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        annotation.ServiceRequiredClaimCounts.TryGetValue(serviceName, out var index);
+        annotation.ServiceRequiredClaimCounts[serviceName] = index + 1;
+
+        return WriteClaimRequirement(
+            builder,
+            $"{ConfigPrefix}__Services__{serviceName}__Authorization__RequiredClaims__{index}",
+            claim,
+            anyOf);
+    }
+
+    /// <summary>
     /// Adds an OIDC provider to the AuthProxy authentication configuration.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
@@ -870,6 +942,32 @@ public static class AuthProxyExtensions
         var annotation = GetOrCreateAnnotation(builder.Resource);
         var idx = annotation.TenantResolutionCount++;
         return builder.WithEnvironment($"{ConfigPrefix}__TenantResolutions__{idx}__Strategy", strategy);
+    }
+
+    /// <summary>
+    /// Writes one claim requirement at the given configuration prefix.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="prefix">The indexed configuration prefix to write under.</param>
+    /// <param name="claim">The claim type the caller must carry.</param>
+    /// <param name="anyOf">The values that satisfy it.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    static IResourceBuilder<T> WriteClaimRequirement<T>(
+        IResourceBuilder<T> builder,
+        string prefix,
+        string claim,
+        string[] anyOf)
+        where T : IResourceWithEnvironment
+    {
+        builder.WithEnvironment($"{prefix}__Claim", claim);
+
+        for (var i = 0; i < anyOf.Length; i++)
+        {
+            builder.WithEnvironment($"{prefix}__AnyOf__{i}", anyOf[i]);
+        }
+
+        return builder;
     }
 
     static AuthProxyConfigAnnotation GetOrCreateAnnotation(IResource resource)

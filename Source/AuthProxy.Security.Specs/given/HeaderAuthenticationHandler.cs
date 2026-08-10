@@ -31,6 +31,17 @@ public class HeaderAuthenticationHandler(
     /// <summary>The scheme name the harness registers this under.</summary>
     public const string Scheme = "SecuritySpecScheme";
 
+    /// <summary>
+    /// The header a spec sends to give its caller extra claims, as <c>type=value</c> pairs separated by
+    /// semicolons.
+    /// </summary>
+    /// <remarks>
+    /// Everything the first authorization gate decides on is a claim, so a spec asking what a caller can
+    /// reach has to be able to say which claims they carry — including none, which is the interesting one.
+    /// A caller sending no such header is unchanged, so this is invisible to every spec that predates it.
+    /// </remarks>
+    public const string ClaimsHeader = "X-Security-Spec-Claims";
+
     /// <inheritdoc/>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -41,15 +52,30 @@ public class HeaderAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(ClaimTypes.NameIdentifier, user),
-                new Claim("oid", user),
-                new Claim(ClaimTypes.Name, user),
-            ],
-            Scheme);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user),
+            new("oid", user),
+            new(ClaimTypes.Name, user),
+        };
+
+        claims.AddRange(DeclaredClaims());
 
         return Task.FromResult(AuthenticateResult.Success(
-            new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme)));
+            new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme)), Scheme)));
+    }
+
+    IEnumerable<Claim> DeclaredClaims()
+    {
+        var declared = Request.Headers[ClaimsHeader].ToString();
+
+        foreach (var pair in declared.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var separator = pair.IndexOf('=', StringComparison.Ordinal);
+            if (separator > 0)
+            {
+                yield return new Claim(pair[..separator], pair[(separator + 1)..]);
+            }
+        }
     }
 }
