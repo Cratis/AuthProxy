@@ -112,6 +112,23 @@ identity headers on these paths and the application remains responsible for auth
 See [Anonymous paths](../configuration/services.md#anonymous-paths) for the full matching rules
 and what the flag does and does not change.
 
+### Trusted proxies
+
+Declare the peers directly in front of AuthProxy, so their `X-Forwarded-For` and `X-Forwarded-Proto`
+are believed and everybody else's are not:
+
+```csharp
+authproxy
+    .WithTrustedProxies("10.0.0.0/8", "203.0.113.7")
+    .WithForwardLimit(2);
+```
+
+`WithTrustedProxies` takes IP addresses and CIDR ranges and accumulates across calls; an entry that
+is neither is refused when the app host builds. `WithForwardLimit` is the number of hops a request
+legitimately passes through, and it decides which address ends up reported as the client — see
+[Trusted Proxies](../configuration/trusted-proxies.md) for how to choose it and what an untrusted
+caller can do while it is unset.
+
 ---
 
 ## Authentication

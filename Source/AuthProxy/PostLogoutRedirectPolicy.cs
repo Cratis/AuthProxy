@@ -12,9 +12,9 @@ namespace Cratis.AuthProxy;
 /// <remarks>
 /// The post-logout redirect target is an absolute URL and can therefore not be validated with the
 /// relative-URL check used for tenant selection. Instead it is validated against an allow-list of origins
-/// that combines the proxy's own public origin (honoring forwarded headers) with the configured service
-/// frontends, the lobby frontend, and any explicitly configured origins. A missing or disallowed target
-/// falls back to the application root (<c>/</c>).
+/// that combines the proxy's own public origin (honoring forwarded headers, within the configured
+/// trusted-proxy boundary) with the configured service frontends, the lobby frontend, and any explicitly
+/// configured origins. A missing or disallowed target falls back to the application root (<c>/</c>).
 /// </remarks>
 public static class PostLogoutRedirectPolicy
 {
@@ -69,7 +69,9 @@ public static class PostLogoutRedirectPolicy
 
     static IEnumerable<string> GetAllowedOrigins(HttpContext context, C.AuthProxy authProxyConfig)
     {
-        // The proxy's own public origin as seen by the browser (X-Forwarded-Proto is honored upstream).
+        // The proxy's own public origin as seen by the browser. The scheme is whatever the forwarded-headers
+        // middleware settled on, so it reflects X-Forwarded-Proto only as far as the configured trusted-proxy
+        // boundary allows — an untrusted caller cannot add a second origin to this list by naming a scheme.
         if (context.Request.Host.HasValue
             && Uri.TryCreate($"{context.Request.Scheme}://{context.Request.Host.Value}", UriKind.Absolute, out var self))
         {

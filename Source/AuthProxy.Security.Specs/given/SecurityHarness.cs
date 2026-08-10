@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cratis.AuthProxy.Security.given;
 
@@ -61,6 +62,15 @@ public class SecurityHarness : WebApplicationFactory<Program>
     /// Gets the origin AuthProxy forwards to, and the record of what reached it.
     /// </summary>
     public RecordingBackend Origin { get; }
+
+    /// <summary>
+    /// Gets everything this deployment warned about, including at startup.
+    /// </summary>
+    /// <remarks>
+    /// This deployment declares no trusted proxies, which is the compatibility fallback: it behaves exactly
+    /// as AuthProxy always has, and the only thing that tells its operator so is a warning at startup.
+    /// </remarks>
+    public CapturedLogs Logs { get; } = new();
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
@@ -136,6 +146,7 @@ public class SecurityHarness : WebApplicationFactory<Program>
     {
         builder
             .UseEnvironment("Production")
+            .ConfigureLogging(logging => logging.AddProvider(Logs))
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"{C.AuthProxy.SectionKey}:Services:app:Backend:BaseUrl"] = Origin.BaseUrl,

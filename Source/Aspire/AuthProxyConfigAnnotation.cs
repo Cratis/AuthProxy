@@ -24,6 +24,9 @@ sealed class AuthProxyConfigAnnotation : IResourceAnnotation
     /// <summary>Gets or sets the number of proxy-wide claim requirements that have been registered.</summary>
     public int RequiredClaimCount { get; set; }
 
+    /// <summary>Gets or sets the number of trusted proxies that have been declared.</summary>
+    public int TrustedProxyCount { get; set; }
+
     /// <summary>
     /// Gets the number of anonymous paths registered per service key, so that repeated calls append
     /// rather than overwrite the indices an earlier call already wrote.

@@ -30,6 +30,16 @@ namespace Cratis.AuthProxy.Security.given;
 /// </remarks>
 public sealed class RecordingBackend : IAsyncDisposable
 {
+    /// <summary>
+    /// The path AuthProxy is pointed at for sign-in notifications, so their bodies can be read back.
+    /// </summary>
+    /// <remarks>
+    /// A sign-in notification is the one thing about a request that leaves the proxy as a body rather than as
+    /// headers, and its <c>ipAddress</c> and <c>location</c> are the audit record a forged forwarded header
+    /// would poison. Reading it here means asserting on what the application would actually have been told.
+    /// </remarks>
+    public const string SignInNotificationPath = "/.security-spec/sign-ins";
+
     readonly WebApplication _app;
     readonly IdentityResponder _identityResponder;
 
@@ -66,6 +76,16 @@ public sealed class RecordingBackend : IAsyncDisposable
     public ConcurrentQueue<ForwardedRequest> Received { get; } = new();
 
     /// <summary>
+    /// Gets the body of every sign-in notification the proxy has posted, most recent last.
+    /// </summary>
+    public ConcurrentQueue<string> SignInNotifications { get; } = new();
+
+    /// <summary>
+    /// Gets the absolute URL AuthProxy should be configured to post sign-in notifications to.
+    /// </summary>
+    public string SignInNotificationUrl => $"{BaseUrl.TrimEnd('/')}{SignInNotificationPath}";
+
+    /// <summary>
     /// Starts a new recording origin.
     /// </summary>
     /// <returns>The started origin.</returns>
@@ -92,6 +112,14 @@ public sealed class RecordingBackend : IAsyncDisposable
         // 403 attributable to the behavior under test rather than to the origin refusing.
         app.MapGet(WellKnownPaths.IdentityDetails, (IdentityResponder responder) => responder.Respond());
 
+        app.MapPost(SignInNotificationPath, async (HttpContext context, RecordingState recording) =>
+        {
+            using var reader = new StreamReader(context.Request.Body);
+            recording.RecordSignIn(await reader.ReadToEndAsync());
+
+            return Results.Ok();
+        });
+
         app.MapFallback(() => Results.Text("origin", "text/plain"));
 
         await app.StartAsync();
@@ -102,7 +130,7 @@ public sealed class RecordingBackend : IAsyncDisposable
             .First();
 
         var backend = new RecordingBackend(app, address, identityResponder);
-        state.Attach(backend.Received);
+        state.Attach(backend.Received, backend.SignInNotifications);
 
         return backend;
     }
@@ -134,9 +162,19 @@ public sealed class RecordingBackend : IAsyncDisposable
     public bool ReceivedAnythingFor(string path) => LastRequestTo(path) is not null;
 
     /// <summary>
+    /// Gets the body of the most recent sign-in notification, or <see langword="null"/> when none was posted.
+    /// </summary>
+    /// <returns>The last sign-in notification body.</returns>
+    public string? LastSignInNotification() => SignInNotifications.LastOrDefault();
+
+    /// <summary>
     /// Forgets every recorded request, so one spec's traffic cannot be read as another's.
     /// </summary>
-    public void Clear() => Received.Clear();
+    public void Clear()
+    {
+        Received.Clear();
+        SignInNotifications.Clear();
+    }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
@@ -159,8 +197,15 @@ public sealed class RecordingBackend : IAsyncDisposable
     sealed class RecordingState
     {
         ConcurrentQueue<ForwardedRequest>? _target;
+        ConcurrentQueue<string>? _signInNotifications;
 
-        public void Attach(ConcurrentQueue<ForwardedRequest> target) => _target = target;
+        public void Attach(ConcurrentQueue<ForwardedRequest> target, ConcurrentQueue<string> signInNotifications)
+        {
+            _target = target;
+            _signInNotifications = signInNotifications;
+        }
+
+        public void RecordSignIn(string body) => _signInNotifications?.Enqueue(body);
 
         public void Record(HttpContext context) =>
             _target?.Enqueue(new ForwardedRequest(

@@ -18,6 +18,8 @@
   href: link.md
 - name: Sign-in Notifications
   href: sign-in.md
+- name: Trusted Proxies
+  href: trusted-proxies.md
 - name: Services
   href: services.md
 - name: Public Application Surfaces

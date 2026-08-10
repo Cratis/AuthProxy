@@ -5,6 +5,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
+using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Registrations;
@@ -12,7 +13,6 @@ using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -45,12 +45,21 @@ public static class IngressExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        builder.Services.Configure<ForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownIPNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
+        builder.Services
+            .AddOptions<C.Ingress>()
+            .BindConfiguration(C.Ingress.SectionKey)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
+        builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
+
+        // The forwarded-headers middleware and everything downstream that asks whether a request came through
+        // the deployment's own infrastructure are configured from the one policy, so the boundary is stated
+        // once and cannot be two different boundaries in two places.
+        builder.Services
+            .AddOptions<ForwardedHeadersOptions>()
+            .Configure<ITrustedProxyPolicy>((options, policy) => policy.ApplyTo(options));
 
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
@@ -75,6 +84,18 @@ public static class IngressExtensions
     /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>
     public static WebApplication UseIngress(this WebApplication app)
     {
+        var trustedProxyPolicy = app.Services.GetRequiredService<ITrustedProxyPolicy>();
+        if (trustedProxyPolicy.IsLegacyAllowAll)
+        {
+            app.Logger.TrustedProxyBoundaryNotConfigured(
+                nameof(C.TrustedProxyMode.Configured),
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}",
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}");
+        }
+
+        // Who actually connected has to be recorded before the forwarded headers are applied, because
+        // applying them replaces the answer with whatever the header claimed.
+        app.UseMiddleware<TrustedProxyMiddleware>();
         app.UseForwardedHeaders();
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();

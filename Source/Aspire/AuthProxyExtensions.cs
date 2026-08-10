@@ -203,6 +203,86 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Declares the peers whose forwarded headers AuthProxy believes.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="addressesOrCidrs">
+    /// The addresses and ranges of the infrastructure directly in front of AuthProxy — an ingress
+    /// controller, load balancer, service mesh sidecar, or CDN egress range. Write a peer as <c>10.0.0.7</c>
+    /// or <c>2001:db8::1</c>, and a range as <c>10.0.0.0/8</c> or <c>2001:db8::/32</c>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <exception cref="InvalidTrustedProxy">Thrown when an entry is neither an address nor a CIDR range.</exception>
+    /// <remarks>
+    /// <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c> are ordinary request headers, so any caller that
+    /// can open a connection to AuthProxy can send them. Until this is declared, AuthProxy believes all of
+    /// them: the address recorded against every sign-in is whatever the caller wrote, and a spoofed
+    /// <c>X-Forwarded-Proto: https</c> makes an unencrypted request look encrypted, which is what decides
+    /// whether the session cookies carry <c>Secure</c>.
+    /// <para>
+    /// Declare the peers rather than the clients. AuthProxy matches the address it accepted the connection
+    /// from, which in a container deployment is the ingress, never a browser.
+    /// </para>
+    /// <para>
+    /// Calling this more than once appends, so the peers may be declared wherever each one is known.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithTrustedProxies<T>(
+        this IResourceBuilder<T> builder,
+        params string[] addressesOrCidrs)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        var index = annotation.TrustedProxyCount;
+
+        foreach (var entry in addressesOrCidrs)
+        {
+            if (!TrustedProxyEntry.IsResolvable(entry))
+            {
+                throw new InvalidTrustedProxy(entry);
+            }
+
+            builder.WithEnvironment($"{ConfigPrefix}__Ingress__TrustedProxies__{index}", entry);
+            index++;
+        }
+
+        annotation.TrustedProxyCount = index;
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Declares how many trusted proxies a request legitimately passes through.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="hops">
+    /// The number of <c>X-Forwarded-For</c> entries consumed from the right. Defaults in AuthProxy to
+    /// <c>1</c> — an ingress controller on its own. A CDN in front of a load balancer is <c>2</c>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// This is what decides which address is reported as the client. Count too few hops and the reported
+    /// address is the deployment's own inner proxy; count more hops than the deployment has and the reported
+    /// address is whatever the outermost caller chose to write. Every hop counted must itself be declared
+    /// through <see cref="WithTrustedProxies{T}"/>, so raising this alone changes nothing.
+    /// <para>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="WithTrustedProxies{T}"/>. An optional argument is baked into the call site when the app
+    /// host is compiled, so adding one would change that method's signature and every already-built app host
+    /// would fail to bind against the new package until it is rebuilt.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithForwardLimit<T>(
+        this IResourceBuilder<T> builder,
+        int hops)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment(
+            $"{ConfigPrefix}__Ingress__ForwardLimit",
+            hops.ToString(CultureInfo.InvariantCulture));
+
+    /// <summary>
     /// Requires every authenticated caller to carry a claim before any request is forwarded.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
