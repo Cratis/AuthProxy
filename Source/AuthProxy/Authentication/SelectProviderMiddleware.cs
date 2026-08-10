@@ -17,8 +17,11 @@ namespace Cratis.AuthProxy.Authentication;
 /// enabled and a lobby URL is configured), unauthenticated requests without an invite token or
 /// pending invite cookie are immediately answered with the <c>invitation-required.html</c> page
 /// instead of being redirected to a login provider.
-/// Skips invite paths, authentication paths, paths a service declares in
-/// <see cref="C.Service.AnonymousPaths"/>, and requests with a pending invite cookie.
+/// Skips invite paths, registration paths, a provider's login-challenge endpoint, the providers and
+/// token endpoints, paths a service declares in <see cref="C.Service.AnonymousPaths"/>, and requests
+/// with a pending invite cookie. It does NOT skip its own selection-page path — a request landing there
+/// directly (e.g. a redirect from the cookie authentication handler, or an invite flow) is exactly what
+/// this middleware answers.
 /// Both answers are only served to a browser navigating to a document; every other caller is refused
 /// with <c>401</c>, because a page or a login redirect reads as a delivered success to a client that
 /// checks the status code.
@@ -49,7 +52,9 @@ public class SelectProviderMiddleware(
         if (context.User.Identity?.IsAuthenticated == true
             || context.IsInvitation()
             || context.IsRegistration()
-            || context.IsAuthenticationUI()
+            || context.IsLoginChallenge()
+            || context.IsProviders()
+            || context.IsToken()
             || context.IsAnonymousPath(proxyConfig.CurrentValue)
             || context.HasPendingInvitation())
         {
@@ -112,9 +117,36 @@ public class SelectProviderMiddleware(
         }
 
         var scheme = OidcProviderScheme.FromName(providers[0].Name);
-        var returnUrl = context.GetPathAndQuery();
+        var returnUrl = ResolveReturnUrl(context);
         var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
         await context.ChallengeAsync(scheme, properties);
+    }
+
+    /// <summary>
+    /// Resolves where the caller should land after signing in.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns>The resolved return URL.</returns>
+    /// <remarks>
+    /// Ordinarily the current request IS the destination — this middleware answers in place of
+    /// whatever the caller was navigating to, so its path and query say where that was. The one
+    /// exception is a request that already landed on the selection page's own path carrying an
+    /// explicit <c>returnUrl</c> — the cookie authentication handler's redirect, or the invite flow,
+    /// send callers there this way — in which case that query value, not the wrapper URL around it, is
+    /// the real destination.
+    /// </remarks>
+    static string ResolveReturnUrl(HttpContext context)
+    {
+        if (context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage))
+        {
+            var explicitReturnUrl = context.Request.Query["returnUrl"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(explicitReturnUrl))
+            {
+                return explicitReturnUrl;
+            }
+        }
+
+        return context.GetPathAndQuery();
     }
 
     /// <summary>

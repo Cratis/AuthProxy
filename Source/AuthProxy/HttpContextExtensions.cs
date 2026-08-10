@@ -59,6 +59,20 @@ public static class HttpContextExtensions
         || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage);
 
     /// <summary>
+    /// Determines whether the request targets a specific provider's login challenge endpoint
+    /// (e.g. <c>/.cratis/login/github</c>) — as opposed to the provider-selection page itself.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if the request initiates a specific provider's challenge; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// <see cref="Cratis.AuthProxy.Authentication.SelectProviderMiddleware"/> uses this instead of <see cref="IsLogin"/> to decide
+    /// whether to defer to a later handler: it must defer for a challenge-initiation request (there is
+    /// one further down the pipeline that starts it), but must NOT defer for the selection page's own
+    /// path — that page is what it answers.
+    /// </remarks>
+    public static bool IsLoginChallenge(this HttpContext context) => context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPrefix);
+
+    /// <summary>
     /// Determines whether the request targets the well-known providers endpoint.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
