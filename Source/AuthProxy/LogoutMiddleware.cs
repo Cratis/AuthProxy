@@ -139,6 +139,9 @@ public class LogoutMiddleware(
         context.Response.Cookies.Delete(Cookies.Tenant);
         context.Response.Cookies.Delete(Cookies.Tenants);
         context.Response.Cookies.Delete(Cookies.InviteToken);
+        context.Response.Cookies.Delete(Cookies.InvitationEntryState);
+        context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
+        context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
         context.Response.Cookies.Delete(Cookies.Registration);
         context.Response.Cookies.Delete(Cookies.Providers);
         ClearTransientAuthenticationCookies(context);

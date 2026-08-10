@@ -138,9 +138,22 @@ AuthProxy preserves its legacy claim-selection and payload behavior, except that
 
 | Property | Applies to | Contract |
 |----------|------------|----------|
+| `InvitationCompletionEnabled` | OIDC and OAuth | Opts this provider into signed invitation completion. Defaults to `false`; ordinary sign-in remains available. Enable only when the provider can produce the exact verified email evidence below. |
+| `InvitationIdentityBindingCompletionEnabled` | OIDC and OAuth | Opts this provider into signed invitations already bound by the invitation issuer to an immutable provider subject. Defaults to `false`. This mode does not infer email ownership; enable it only for a tenant-scoped immutable subject and framework-validated issuer. |
 | `ProviderKey` | OIDC and OAuth | Stable lowercase ASCII key, independent of display name and authentication scheme. Keys must be unique across configured providers. |
 | `SubjectClaimType` | OIDC and OAuth | Exact claim type on the resulting authenticated `ClaimsPrincipal` that supplies the subject. Exactly one nonempty value is required, and the claim type must be outside the entire case-insensitive `urn:cratis:identity:*` namespace reserved for AuthProxy-authored metadata. There is no fallback to `sub`, name, username, or email. For OAuth user-info fields, map the raw JSON field to this principal claim with `ClaimMappings`. |
+| `EmailClaimType` | OIDC and OAuth | Exact provider-derived claim used for a signed invitation attestation. Defaults to `email`; exactly one address-shaped value is required during invitation completion. |
+| `EmailVerifiedClaimType` | OIDC and OAuth | Exact provider-derived boolean claim proving ownership of `EmailClaimType`. Defaults to `email_verified`; only one value equal to `true` is accepted. |
+| `AssuranceClaimType` | OIDC and OAuth | Exact provider-derived assurance claim. Defaults to `acr`; it must be present exactly once for invitation completion. |
 | `Issuer` | OAuth only | Explicit absolute HTTPS issuer assigned to the authenticated user-info flow. OIDC providers must omit it because AuthProxy uses the issuer from the framework-validated OIDC token. |
+
+An identity-bound invitation carries both `recipient_provider_key` and `recipient_identity_binding` in the signed
+invitation capability. AuthProxy accepts only one exact 43-character base64url SHA-256 binding, restricts provider
+selection to the exact canonical provider key, and completes only through a provider explicitly opted into
+`InvitationIdentityBindingCompletionEnabled`. AuthProxy treats the binding as opaque: the invitation authority must
+independently recompute and compare it from the attested provider key, validated issuer, and immutable subject.
+For Microsoft Entra, use a tenant-specific authority and `SubjectClaimType=oid`; never substitute email,
+`preferred_username`, or the mutable display name for the object identifier.
 
 For OAuth, `SubjectClaimType` names the claim after the configured user-info claim actions have run, not
 the raw JSON property returned by the provider. This complete example maps the raw user-info `id` field to
@@ -158,9 +171,10 @@ a principal `sub` claim and then selects that `sub` claim as the canonical subje
             "AuthorizationEndpoint": "https://github.example.com/login/oauth/authorize",
             "TokenEndpoint": "https://github.example.com/login/oauth/access_token",
             "UserInformationEndpoint": "https://github.example.com/api/user",
+            "VerifiedEmailEndpoint": "https://github.example.com/api/user/emails",
             "ClientId": "<client-id>",
             "ClientSecret": "<client-secret>",
-            "Scopes": ["read:user"],
+            "Scopes": ["read:user", "user:email"],
             "ClaimMappings": {
               "sub": "id"
             },
@@ -180,6 +194,17 @@ a principal `sub` claim and then selects that `sub` claim as the canonical subje
 Given a user-info response such as `{ "id": 12345, "login": "octocat" }`, the mapping produces the
 principal claim `sub=12345`; canonical resolution reads that resulting `sub` claim. Without the mapping,
 setting `SubjectClaimType` to `sub` fails closed because no such principal claim exists.
+
+For OAuth providers such as GitHub whose ordinary user-information response can omit private addresses, configure
+`VerifiedEmailEndpoint`. AuthProxy calls it with the provider access token and accepts exactly one JSON-array entry
+whose `primary` and `verified` properties are both `true` and whose `email` property is nonempty. It replaces any
+ordinary user-information email with that verified value and writes the configured email-verification claim as
+`true`. A malformed, ambiguous, missing, or non-success response establishes no invitation email evidence. Request
+the provider scope needed by that endpoint (`user:email` for GitHub).
+
+When a provider supplies no configured assurance claim, AuthProxy records the successfully completed protocol as
+`oidc` or `oauth` in `AssuranceClaimType`. A provider-supplied value such as OIDC `acr` takes precedence. These values
+describe authentication assurance only; they do not grant application roles or membership.
 
 AuthProxy normalizes issuer scheme and host casing, removes a default port and trailing slash, and rejects
 userinfo, query strings, and fragments. Plain HTTP is accepted only for a loopback development issuer.

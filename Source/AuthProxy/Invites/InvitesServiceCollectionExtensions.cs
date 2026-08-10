@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Extensions.Options;
+
 namespace Cratis.AuthProxy.Invites;
 
 /// <summary>
@@ -16,6 +18,10 @@ public static class InvitesServiceCollectionExtensions
     public static WebApplicationBuilder AddInvites(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<IInviteTokenValidator, InviteTokenValidator>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<IInvitationAttestationIssuer, InvitationAttestationIssuer>();
+        builder.Services.AddSingleton<IInvitationEntryStateProtector, InvitationEntryStateProtector>();
+        builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, InvitationAttestationConfigurationValidator>();
 
         return builder;
     }

@@ -162,7 +162,27 @@ authproxy.WithOAuthProvider(
     });
 ```
 
+For invitation acceptance, also configure the OAuth provider's `VerifiedEmailEndpoint` as
+`https://api.github.com/user/emails` through AuthProxy configuration. The `user:email` scope shown above lets
+AuthProxy establish exactly one primary verified address instead of trusting the nullable address on `/user`.
+
 See [Authentication](../configuration/authentication.md) for the full configuration reference.
+
+For an invite system that creates or links accounts, enable signed two-stage attestations after calling
+`WithInvite`:
+
+```csharp
+authproxy.WithSignedInvitationAttestations(
+    stageUrl: "https://lobby.example.com/_invite/stage",
+    issuer: "https://auth.example.com",
+    audience: "ada-lobby",
+    keyId: "invite-2026-08",
+    privateKeyPem: invitationSigningKey);
+```
+
+Load `invitationSigningKey` from a secret provider and configure the invitation authority with only the matching
+public key. See [Invitation to Organization](../configuration/lobby/invitation-to-organization.md) for the claims,
+two calls, verification rules, and rotation sequence.
 
 ---
 

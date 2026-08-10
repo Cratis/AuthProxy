@@ -22,4 +22,5 @@ public class when_a_configured_oauth_callback_is_received : configured_canonical
 
     [Fact] void should_apply_the_enriched_principal() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.ProviderKey)!.Value.ShouldEqual("github-workforce");
     [Fact] void should_use_the_configured_issuer() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.Issuer)!.Value.ShouldEqual("https://github.example.com");
+    [Fact] void should_derive_oauth_protocol_assurance() => _ticketContext.Principal!.FindFirst("acr")!.Value.ShouldEqual("oauth");
 }

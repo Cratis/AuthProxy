@@ -40,6 +40,15 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
         {
             ValidateScheme(provider.Name, provider.CanonicalIdentity, schemes, failures);
             ValidateIdentity(provider.CanonicalIdentity, false, keys, failures);
+            if (!string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)
+                && (!Uri.TryCreate(provider.VerifiedEmailEndpoint, UriKind.Absolute, out var endpoint)
+                    || (!string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                        && !(string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && endpoint.IsLoopback))
+                    || !string.IsNullOrEmpty(endpoint.UserInfo)
+                    || !string.IsNullOrEmpty(endpoint.Fragment)))
+            {
+                failures.Add("OAuth verified-email endpoints must be absolute HTTPS URLs, except for loopback development endpoints.");
+            }
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
@@ -78,6 +87,24 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
             || CanonicalIdentityClaims.IsReserved(identity.SubjectClaimType))
         {
             failures.Add("Canonical subject claim types must be nonempty, bounded, and outside the reserved Cratis namespace.");
+        }
+
+        var evidenceClaimTypes = new[]
+        {
+            identity.SubjectClaimType,
+            identity.EmailClaimType,
+            identity.EmailVerifiedClaimType,
+            identity.AssuranceClaimType,
+        };
+        if (evidenceClaimTypes.Any(_ =>
+                string.IsNullOrWhiteSpace(_)
+                || !string.Equals(_, _.Trim(), StringComparison.Ordinal)
+                || _.Length > 256
+                || _.Any(char.IsControl)
+                || CanonicalIdentityClaims.IsReserved(_))
+            || evidenceClaimTypes.Distinct(StringComparer.Ordinal).Count() != evidenceClaimTypes.Length)
+        {
+            failures.Add("Canonical subject, email, email-verification, and assurance claim types must be distinct, nonempty, bounded, and outside the reserved Cratis namespace.");
         }
 
         if (isOidc && identity.Issuer is not null)

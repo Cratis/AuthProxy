@@ -162,6 +162,11 @@ public static class IngressExtensions
 
             var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
             var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
+            if (!InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
             await context.ChallengeAsync(scheme, properties);
         })
         .AllowAnonymous();
@@ -180,6 +185,11 @@ public static class IngressExtensions
 
             var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
             var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
+            if (!InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
             await context.ChallengeAsync(scheme, properties);
         })
         .AllowAnonymous();

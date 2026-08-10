@@ -42,6 +42,17 @@ public class OAuthProvider
     public string UserInformationEndpoint { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets an optional endpoint that returns the authenticated account's email addresses with explicit
+    /// primary and verification flags.
+    /// </summary>
+    /// <remarks>
+    /// This supports providers such as GitHub whose regular user-information endpoint can omit a private email and
+    /// does not establish verification. The endpoint must return a JSON array with <c>email</c>, <c>verified</c>,
+    /// and <c>primary</c> properties. AuthProxy selects exactly one primary, verified address.
+    /// </remarks>
+    public string VerifiedEmailEndpoint { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the OAuth client ID registered with the provider.
     /// </summary>
     [Required]

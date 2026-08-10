@@ -12,16 +12,19 @@ public class when_inspecting_public_constructors : Specification
 {
     bool _hasReleasedConstructor;
     bool _hasResolverAwareConstructor;
+    bool _hasAttestationAwareConstructor;
 
     void Because()
     {
         var constructors = typeof(InviteMiddleware).GetConstructors();
         _hasReleasedConstructor = constructors.Any(_ => HasParameters(_, ReleasedParameterTypes));
         _hasResolverAwareConstructor = constructors.Any(_ => HasParameters(_, ResolverAwareParameterTypes));
+        _hasAttestationAwareConstructor = constructors.Any(_ => HasParameters(_, AttestationAwareParameterTypes));
     }
 
     [Fact] void should_keep_the_released_eight_argument_constructor() => _hasReleasedConstructor.ShouldBeTrue();
     [Fact] void should_expose_the_resolver_aware_constructor() => _hasResolverAwareConstructor.ShouldBeTrue();
+    [Fact] void should_expose_the_attestation_aware_constructor() => _hasAttestationAwareConstructor.ShouldBeTrue();
 
     static Type[] ReleasedParameterTypes =>
     [
@@ -39,6 +42,13 @@ public class when_inspecting_public_constructors : Specification
     [
         .. ReleasedParameterTypes,
         typeof(ICanonicalIdentityResolver)
+    ];
+
+    static Type[] AttestationAwareParameterTypes =>
+    [
+        .. ResolverAwareParameterTypes,
+        typeof(IInvitationAttestationIssuer),
+        typeof(IInvitationEntryStateProtector)
     ];
 
     static bool HasParameters(System.Reflection.ConstructorInfo constructor, Type[] expected) =>

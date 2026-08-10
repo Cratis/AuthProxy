@@ -38,4 +38,5 @@ public class when_a_configured_oidc_callback_receives_a_validated_token : config
     [Fact] void should_apply_the_enriched_principal() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.ProviderKey)!.Value.ShouldEqual("entra-workforce");
     [Fact] void should_use_the_framework_validated_token_issuer() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.Issuer)!.Value.ShouldEqual(ValidatedIssuer);
     [Fact] void should_not_use_the_spoofed_issuer_claim() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.Issuer)!.Value.ShouldNotEqual("https://spoofed.example.com");
+    [Fact] void should_derive_oidc_protocol_assurance() => _ticketContext.Principal!.FindFirst("acr")!.Value.ShouldEqual("oidc");
 }

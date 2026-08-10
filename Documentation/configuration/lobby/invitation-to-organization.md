@@ -7,19 +7,20 @@ user can continue directly into the application instead of being sent to the lob
 ## Flow
 
 1. The user opens `https://your-authproxy/invite/<token>`.
-2. AuthProxy validates the token and starts authentication in the same way as any other invite.
-3. After login, AuthProxy **re-validates the token** (signature, issuer, audience, and lifetime) before
-   forwarding it, so AuthProxy is the authoritative validator across both phases.
-4. If `Invite.EmailClaim` is configured (opt-in) and the token carries that claim, AuthProxy binds the
-   invite to its recipient using provider-supplied authenticated-session email evidence. If the provider
-   supplies no address, AuthProxy serves `invitation-email-unavailable.html`. If it supplies another address,
-   or explicitly reports `email_verified=false`, AuthProxy serves `invitation-email-mismatch.html`.
-5. AuthProxy exchanges the invite at `Invite.ExchangeUrl`, always forwarding the provider-supplied address and
-   any `email_verified` value so the backend can apply its own binding check — whether or not gateway
-   enforcement is on.
-6. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
+2. AuthProxy validates the token, creates an independent 256-bit transaction and challenge, and calls
+   `Invite.StageUrl`. The signed `invite-stage` attestation binds those values to the exact capability hash,
+   invitation ID, and tenant before provider authentication starts.
+3. AuthProxy protects the pending state in an HTTP-only cookie and binds it into the provider's protected
+   challenge state. A browser can carry the values but cannot author or substitute them.
+4. After login, AuthProxy **re-validates the token** (signature, issuer, audience, and lifetime), the protected
+   pending state, and the provider challenge binding.
+5. AuthProxy requires one canonical provider identity, one provider-derived email with an exact verified value
+   of `true`, one provider-derived assurance value, and the authentication-ticket issue time.
+6. AuthProxy calls `Invite.ExchangeUrl` with a signed `invite-complete` attestation. The JSON body contains only
+   the opaque transaction ID; the browser and request body never supply identity authority.
+7. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
    for the request.
-7. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
+8. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
 
 If the tenant IDs do not match, or AuthProxy cannot resolve a tenant for the request, the invite is
 treated like lobby onboarding and falls back to the configured lobby behavior.
@@ -31,9 +32,22 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
   "Cratis": {
     "AuthProxy": {
       "Invite": {
-        "ExchangeUrl": "https://studio.example.com/internal/invites/exchange",
+        "StageUrl": "https://lobby.example.com/_invite/stage",
+        "ExchangeUrl": "https://lobby.example.com/_invite/exchange",
         "TenantClaim": "tenant_id",
         "EmailClaim": "email",
+        "Attestation": {
+          "Issuer": "https://auth.example.com",
+          "Audience": "ada-lobby",
+          "ActiveKeyId": "invite-2026-08",
+          "Lifetime": "00:01:00",
+          "SigningKeys": [
+            {
+              "KeyId": "invite-2026-08",
+              "PrivateKeyPem": "<load-from-secret-provider>"
+            }
+          ]
+        },
         "Lobby": {
           "Frontend": { "BaseUrl": "http://lobby-service:3000/" }
         }
@@ -45,54 +59,88 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `ExchangeUrl` | `string` | Absolute URL of the invite exchange endpoint. |
+| `StageUrl` | `string` | Absolute URL of the Lobby invitation authority's pre-authentication staging endpoint. Required when `Attestation` is configured. |
+| `ExchangeUrl` | `string` | Absolute URL of the same Lobby invitation authority's completion endpoint. |
 | `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID. |
-| `EmailClaim` | `string` | Claim in the invite token that contains the email the invitation was issued for. **Empty by default, which leaves gateway email-binding enforcement off.** Set it (for example to `email`) to require provider-supplied authenticated-session email evidence to match the invited email at the exchange. The email and any provider-supplied `email_verified` value are forwarded regardless of this setting. |
+| `EmailClaim` | `string` | Claim in the invite token that contains the invited email. Required by the signed protocol. |
+| `Attestation.Issuer` | `string` | Exact issuer the invitation authority validates. |
+| `Attestation.Audience` | `string` | Exact invitation-authority audience. |
+| `Attestation.ActiveKeyId` | `string` | Key ID used for newly signed attestations. |
+| `Attestation.SigningKeys` | `array` | RSA private signing keys. Load private PEM values from a secret provider; pin only the matching public keys downstream. |
+| `Attestation.Lifetime` | `TimeSpan` | Short-lived token lifetime from 10 through 60 seconds. Defaults to 60 seconds. |
 | `Lobby.Frontend.BaseUrl` | `string` | Fallback redirect if the invite cannot continue directly into the organization. |
 
-## Exchange request body
+## Signed protocol
 
-Providers without [canonical federated identity](../authentication.md#canonical-federated-identity) keep the
-legacy request body:
-
-```json
-{
-  "subject": "<provider subject>",
-  "identityProvider": "<issuer / provider>",
-  "email": "<provider-supplied address or empty string>",
-  "emailVerified": null
-}
-```
-
-Canonical providers send:
+The staging call uses `Authorization: Bearer <stage-attestation>` and this bounded body:
 
 ```json
 {
-  "subject": "<configured canonical subject>",
-  "providerKey": "<configured stable provider key>",
-  "issuer": "<normalized validated or configured issuer>",
-  "identityProvider": "<same value as providerKey>",
-  "email": "<provider-supplied address or empty string>",
-  "emailVerified": null
+  "invitationTransaction": "<opaque transaction>",
+  "invitationToken": "<exact signed invitation capability>",
+  "invitationChallenge": "<independent opaque challenge>"
 }
 ```
 
-`emailVerified` is a JSON boolean when the provider supplies a parseable value; otherwise it is `null` as
-shown above.
+The completion call uses `Authorization: Bearer <complete-attestation>` and a body with no identity fields:
 
-Canonical identity is opt-in per provider, so the exchange endpoint must accept both shapes during migration.
-For canonical providers, bind the account with all three `(providerKey, issuer, subject)` components. A
-successful provider sign-in and invite exchange does not decide application membership, roles, or authorization;
-the application owns those decisions.
+```json
+{
+  "invitationTransaction": "<opaque transaction>"
+}
+```
 
-The `email_verified` value is provider-supplied evidence, not a universal guarantee. AuthProxy rejects an
-explicit `false`, but an absent claim becomes `null` and does not independently prove address ownership.
-OAuth providers do not currently map `email_verified`, so their address is forwarded with `null`. If a provider
-does not supply an address at all, the unavailable page is used rather than misreporting a mismatch.
+Both RS256 JWTs require `kid`, `iss`, `aud`, `jti`, `iat`, `nbf`, and `exp`. They bind `purpose`, `tenant_id`,
+`invitation_id`, `invitation_transaction`, `invitation_challenge`, and `capability_hash`. Every completion
+attestation additionally carries `provider_key`, `provider_issuer`, `provider_subject`, `assurance`, and
+`authenticated_at`. Email-targeted completion also carries `email` and `email_verified=true`.
 
-> **Security.** The signed invitation remains the bearer credential, but this JSON body is not itself signed.
-> Keep `Invite.ExchangeUrl` network-isolated from public traffic or authenticate AuthProxy separately, and
-> validate the invitation token at the application boundary before trusting invite claims.
+The same Lobby invitation authority owns both endpoints. It must independently validate the raw invitation during staging, compare its exact SHA-256
+hash to `capability_hash`, persist no raw capability, and atomically consume the transaction and complete-attestation
+`jti` exactly once. It must reject a wrong purpose, signature, key ID, issuer, audience, lifetime, tenant,
+invitation, transaction, challenge, or capability hash.
+
+Configure [canonical federated identity](../authentication.md#canonical-federated-identity) for every provider.
+The selected email, verification, and assurance claim types must name provider-derived claims. Missing, duplicate,
+empty, unverified, or ambiguous evidence fails closed before the completion endpoint is called.
+Set `CanonicalIdentity.InvitationCompletionEnabled=true` only for providers that can supply that evidence. Signed
+invitation provider selection hides every other provider while leaving it available for ordinary sign-in. Microsoft
+Entra commonly omits `email_verified`; do not enable it unless the tenant maps an equivalent trustworthy custom
+claim and configures its exact claim type. AuthProxy never promotes `email` or `preferred_username` to verified
+evidence implicitly.
+
+Every signed invitation must select exactly one recipient-authority mode: either one nonempty invited-email claim,
+or the exact immutable provider-binding pair below. Missing, duplicate, partial, or mixed recipient claims are
+rejected before staging and again before completion.
+
+For a recipient already known by immutable provider identity, the signed invitation may carry both
+`recipient_provider_key` and `recipient_identity_binding`. The binding is a canonical 43-character base64url
+HMAC-SHA-256 value over the provider key, tenant-specific validated issuer, and immutable provider subject using
+the invitation authority's documented length-delimited input format. AuthProxy validates the claim shape, restricts
+the chooser and callback to the exact provider key, and emits the provider key, validated issuer, subject,
+assurance, and authentication time without inventing email evidence. The invitation authority remains responsible
+for independently recomputing the opaque binding and comparing it to the staged capability before atomic
+consumption. Enable this route with
+`CanonicalIdentity.InvitationIdentityBindingCompletionEnabled=true`; email-targeted invitations continue to require
+`InvitationCompletionEnabled=true` and exact verified-email evidence.
+
+For Microsoft Entra identity-bound invitations, configure a tenant-specific authority and
+`CanonicalIdentity.SubjectClaimType=oid`. The framework-validated tenant issuer plus immutable object ID is the
+identity tuple; `email` and `preferred_username` are not substitutes.
+
+> **Compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange for existing
+> deployments. That legacy mode is not sufficient authority for creating or linking an account. Enable the signed
+> protocol before an application treats invitation completion as identity proof.
+
+## Rotate signing keys
+
+1. Add the new public key to the invitation authority's pinned verification set.
+2. Add the new private key and key ID to `SigningKeys` without changing `ActiveKeyId`.
+3. Deploy both sides, then switch `ActiveKeyId`.
+4. Keep the previous public key until every token it signed has expired, then remove the old key from both sides.
+
+AuthProxy selects exactly one active key and always writes its `kid`. It never logs private key material or
+attestation payloads.
 
 ## Requirements
 

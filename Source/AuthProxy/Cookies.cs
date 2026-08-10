@@ -32,6 +32,11 @@ public static class Cookies
     public const string InviteToken = ".cratis-invite";
 
     /// <summary>
+    /// Short-lived HTTP-only cookie holding AuthProxy's protected invitation transaction and challenge.
+    /// </summary>
+    public const string InvitationEntryState = ".cratis-invite-state";
+
+    /// <summary>
     /// Short-lived HTTP-only cookie used to carry an in-flight registration across the OIDC redirect.
     /// </summary>
     public const string Registration = ".cratis-registration";

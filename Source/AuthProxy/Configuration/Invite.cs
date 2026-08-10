@@ -26,10 +26,29 @@ public class Invite
     public string Audience { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the absolute URL of the Studio invite-exchange endpoint,
-    /// e.g. <c>https://studio.example.com/internal/invites/exchange</c>.
+    /// Gets or sets the absolute URL of the invitation authority's completion endpoint,
+    /// e.g. <c>https://lobby.example.com/_invite/exchange</c>.
     /// </summary>
     public string ExchangeUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the absolute URL of the same invitation authority's staging endpoint.
+    /// </summary>
+    /// <remarks>
+    /// AuthProxy calls this endpoint before starting provider authentication. The call binds the exact invitation
+    /// capability to a new transaction and challenge under a signed stage attestation.
+    /// </remarks>
+    public string StageUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the signed invitation-attestation configuration.
+    /// </summary>
+    /// <remarks>
+    /// Configure this together with <see cref="StageUrl"/> to enable the two-stage, positively authenticated
+    /// invitation protocol. Without it, AuthProxy retains the released legacy exchange for compatibility; do not
+    /// use that legacy mode as an authority for creating or linking an account.
+    /// </remarks>
+    public InvitationAttestation? Attestation { get; set; }
 
     /// <summary>
     /// Gets or sets the URL to redirect to when the authenticated user's subject is already

@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using System.Security.Claims;
+using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.SignIns;
 using Microsoft.AspNetCore.Authentication;
@@ -237,7 +239,9 @@ public static class AuthenticationServiceCollectionExtensions
                         () => CanonicalSessionRegistrationFingerprint.Create(
                             scheme,
                             capturedProvider,
-                            (OpenIdConnectOptions)context.Options))
+                            (OpenIdConnectOptions)context.Options),
+                        capturedProvider.CanonicalIdentity,
+                        "oidc")
                 };
             });
         }
@@ -296,13 +300,22 @@ public static class AuthenticationServiceCollectionExtensions
                         using var user = JsonDocument.Parse(
                             await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
                         ctx.RunClaimActions(user.RootElement);
+
+                        if (capturedProvider.CanonicalIdentity is not null
+                            && !string.IsNullOrWhiteSpace(capturedProvider.VerifiedEmailEndpoint)
+                            && InvitationAuthenticationState.IsBound(ctx.Properties))
+                        {
+                            await AddVerifiedOAuthEmail(ctx, capturedProvider);
+                        }
                     },
                     OnTicketReceived = context => HandleTicketReceived(
                         context,
                         () => CanonicalSessionRegistrationFingerprint.Create(
                             scheme,
                             capturedProvider,
-                            (OAuthOptions)context.Options))
+                            (OAuthOptions)context.Options),
+                        capturedProvider.CanonicalIdentity,
+                        "oauth")
                 };
             });
         }
@@ -319,13 +332,19 @@ public static class AuthenticationServiceCollectionExtensions
     /// </summary>
     /// <param name="context">The ticket-received context.</param>
     /// <param name="createRegistrationFingerprint">Creates the fingerprint that binds a canonical session to its provider registration.</param>
+    /// <param name="canonicalIdentity">The canonical identity contract configured for the provider, when present.</param>
+    /// <param name="protocolAssurance">The assurance AuthProxy derives from the successful provider protocol.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// This handler only runs when a provider callback delivers a fresh ticket — that is, on the exact
     /// logged-out to signed-in transition. A request that reuses an existing session cookie never reaches it,
     /// so a sign-in is notified once per real sign-in and never on ordinary proxied traffic.
     /// </remarks>
-    static async Task HandleTicketReceived(TicketReceivedContext context, Func<string> createRegistrationFingerprint)
+    static async Task HandleTicketReceived(
+        TicketReceivedContext context,
+        Func<string> createRegistrationFingerprint,
+        C.CanonicalIdentity? canonicalIdentity,
+        string protocolAssurance)
     {
         var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
         string? validatedIssuer = null;
@@ -347,6 +366,11 @@ public static class AuthenticationServiceCollectionExtensions
         if (canonicalResolution.Principal is not null)
         {
             context.Principal = canonicalResolution.Principal;
+        }
+
+        if (canonicalResolution.IsConfigured && canonicalIdentity is not null)
+        {
+            AddProtocolAssurance(context.Principal!, canonicalIdentity.AssuranceClaimType, protocolAssurance);
         }
 
         if (context.Properties is not null
@@ -386,6 +410,76 @@ public static class AuthenticationServiceCollectionExtensions
         {
             context.ReturnUri = redirectUri;
         }
+    }
+
+    static async Task AddVerifiedOAuthEmail(OAuthCreatingTicketContext context, C.OAuthProvider provider)
+    {
+        if (context.Principal?.Identity is not ClaimsIdentity claimsIdentity)
+        {
+            return;
+        }
+
+        var identity = provider.CanonicalIdentity!;
+        foreach (var claim in claimsIdentity.Claims
+                     .Where(_ => string.Equals(_.Type, identity.EmailClaimType, StringComparison.Ordinal)
+                         || string.Equals(_.Type, identity.EmailVerifiedClaimType, StringComparison.Ordinal))
+                     .ToArray())
+        {
+            claimsIdentity.RemoveClaim(claim);
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, provider.VerifiedEmailEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
+
+            using var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            var verifiedPrimaryEmails = document.RootElement.EnumerateArray()
+                .Where(_ => _.ValueKind == JsonValueKind.Object
+                    && _.TryGetProperty("primary", out var primary)
+                    && primary.ValueKind == JsonValueKind.True
+                    && _.TryGetProperty("verified", out var verified)
+                    && verified.ValueKind == JsonValueKind.True
+                    && _.TryGetProperty("email", out var email)
+                    && email.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(email.GetString()))
+                .Select(_ => _.GetProperty("email").GetString()!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (verifiedPrimaryEmails.Length != 1)
+            {
+                return;
+            }
+
+            claimsIdentity.AddClaim(new Claim(identity.EmailClaimType, verifiedPrimaryEmails[0]));
+            claimsIdentity.AddClaim(new Claim(identity.EmailVerifiedClaimType, bool.TrueString.ToLowerInvariant()));
+        }
+        catch (Exception exception) when (
+            (exception is HttpRequestException or JsonException or TaskCanceledException)
+            && !context.HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            return;
+        }
+    }
+
+    static void AddProtocolAssurance(ClaimsPrincipal principal, string assuranceClaimType, string protocolAssurance)
+    {
+        if (principal.Claims.Any(_ => string.Equals(_.Type, assuranceClaimType, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        var identity = principal.Identities.FirstOrDefault();
+        identity?.AddClaim(new Claim(assuranceClaimType, protocolAssurance));
     }
 
     static async Task ValidateCanonicalSession(CookieValidatePrincipalContext context)

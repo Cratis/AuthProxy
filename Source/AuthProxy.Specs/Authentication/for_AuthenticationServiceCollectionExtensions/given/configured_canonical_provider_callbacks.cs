@@ -37,8 +37,10 @@ public class configured_canonical_provider_callbacks : Specification
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationEndpoint"] = "https://github.example.com/authorize",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:TokenEndpoint"] = "https://github.example.com/token",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:UserInformationEndpoint"] = "https://github.example.com/user",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:VerifiedEmailEndpoint"] = "https://github.example.com/user/emails",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientId"] = "oauth-client",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientSecret"] = "oauth-secret",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:id"] = "id",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:ProviderKey"] = "github-workforce",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:SubjectClaimType"] = "id",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:Issuer"] = "https://github.example.com"
@@ -65,6 +67,8 @@ public class configured_canonical_provider_callbacks : Specification
                     new C.OAuthProvider
                     {
                         Name = "GitHub",
+                        VerifiedEmailEndpoint = "https://github.example.com/user/emails",
+                        ClaimMappings = new Dictionary<string, string> { ["id"] = "id" },
                         CanonicalIdentity = new C.CanonicalIdentity
                         {
                             ProviderKey = "github-workforce",
