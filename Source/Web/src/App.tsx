@@ -4,12 +4,21 @@ import { ProgressSpinner } from 'primereact/progressspinner';
 import { ProviderButton } from './components/ProviderButton';
 import type { OidcProvider } from './types';
 
+const reasonMessages: Record<string, string> = {
+    'remote-failure': 'Signing in did not complete. Please try again.',
+    'access-denied': 'The sign-in was cancelled or not approved at the identity provider. Please try again.',
+    'invalid-session': 'Your session is no longer valid. Please sign in again.'
+};
+
 export default function App() {
     const [providers, setProviders] = useState<OidcProvider[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') ?? '/';
+    const query = new URLSearchParams(window.location.search);
+    const returnUrl = query.get('returnUrl') ?? '/';
+    const reason = query.get('reason');
+    const reasonMessage = reason ? reasonMessages[reason] : undefined;
 
     useEffect(() => {
         fetch('/.cratis/providers')
@@ -33,6 +42,9 @@ export default function App() {
                 title="Sign In"
                 className="w-full max-w-sm shadow-lg"
             >
+                {reasonMessage && (
+                    <p className="text-amber-600 text-sm text-center mb-4">{reasonMessage}</p>
+                )}
                 {loading && (
                     <div className="flex justify-center py-4">
                         <ProgressSpinner />

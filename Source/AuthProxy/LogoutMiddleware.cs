@@ -76,7 +76,7 @@ public class LogoutMiddleware(
 
         // Always clear the local session immediately. Even when the identity provider cannot be reached the
         // user must end up logged out locally.
-        await SignOutAndClearCookies(context);
+        await SessionTermination.SignOutAndClearCookies(context);
 
         context.Response.StatusCode = StatusCodes.Status302Found;
 
@@ -100,7 +100,7 @@ public class LogoutMiddleware(
     {
         // The identity provider has redirected back after ending its own session. Clear every AuthProxy cookie
         // (idempotent with the initiation leg) and redirect to the validated final destination.
-        await SignOutAndClearCookies(context);
+        await SessionTermination.SignOutAndClearCookies(context);
 
         var target = PostLogoutRedirectPolicy.ApplicationRoot;
         if (context.Request.Cookies.TryGetValue(Cookies.LogoutRedirect, out var carried))
@@ -130,41 +130,6 @@ public class LogoutMiddleware(
         && properties.Items.TryGetValue(AuthState.AuthenticationSchemeStateKey, out var scheme)
             ? scheme
             : null;
-
-    static async Task SignOutAndClearCookies(HttpContext context)
-    {
-        await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        context.Response.Cookies.Delete(Cookies.Identity);
-        context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
-        context.Response.Cookies.Delete(Cookies.Tenant);
-        context.Response.Cookies.Delete(Cookies.Tenants);
-        context.Response.Cookies.Delete(Cookies.InviteToken);
-        context.Response.Cookies.Delete(Cookies.InvitationEntryState);
-        context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
-        context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
-        context.Response.Cookies.Delete(Cookies.Registration);
-        context.Response.Cookies.Delete(Cookies.Providers);
-        ClearTransientAuthenticationCookies(context);
-    }
-
-    /// <summary>
-    /// Deletes the correlation and nonce cookies the OAuth/OIDC middleware leaves behind when a sign-in
-    /// handshake is abandoned. They carry random per-attempt names, so they are matched by their well-known
-    /// prefixes rather than by an exact name; the provider registration keeps them at the root path so the
-    /// browser still sends them on the logout request and they can be enumerated and cleared here.
-    /// </summary>
-    /// <param name="context">The <see cref="HttpContext"/> whose response the delete cookies are written to.</param>
-    static void ClearTransientAuthenticationCookies(HttpContext context)
-    {
-        var transientCookies = context.Request.Cookies.Keys
-            .Where(name => name.StartsWith(Cookies.CorrelationPrefix, StringComparison.Ordinal)
-                || name.StartsWith(Cookies.NoncePrefix, StringComparison.Ordinal));
-
-        foreach (var cookie in transientCookies)
-        {
-            context.Response.Cookies.Delete(cookie, new CookieOptions { Path = "/" });
-        }
-    }
 
     static void SetLogoutRedirectCookie(HttpContext context, string target)
     {

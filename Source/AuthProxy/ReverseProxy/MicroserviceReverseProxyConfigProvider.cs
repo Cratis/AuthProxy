@@ -31,9 +31,11 @@ namespace Cratis.AuthProxy.ReverseProxy;
 public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDisposable
 {
     /// <summary>
-    /// The YARP well-known authorization policy name that disables authorization for a route.
+    /// The YARP well-known authorization policy name that disables authorization for a route. Shared with
+    /// <see cref="Identity.IdentityForwardingGuardMiddleware"/>, which exempts routes carrying it from the
+    /// forwardable-identity requirement.
     /// </summary>
-    const string AnonymousAuthorizationPolicy = "anonymous";
+    internal const string AnonymousAuthorizationPolicy = "anonymous";
 
     /// <summary>
     /// The path prefix served by a service's backend rather than its frontend.

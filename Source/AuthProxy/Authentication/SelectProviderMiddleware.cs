@@ -98,7 +98,11 @@ public class SelectProviderMiddleware(
             return;
         }
 
-        if (providers.Count > 1)
+        // A single configured provider is normally challenged directly — but not when the caller was just
+        // sent back here after a failed or denied sign-in. Re-challenging immediately would race straight
+        // back into the very handshake that failed (a redirect loop when the cause persists); serving the
+        // page instead shows the reason and leaves the retry to the person.
+        if (providers.Count > 1 || HasSignInFailureReason(context))
         {
             var providersJson = JsonSerializer.Serialize(providers, _serializerOptions);
             context.Response.Cookies.Append(Cookies.Providers, providersJson, new CookieOptions
@@ -148,6 +152,16 @@ public class SelectProviderMiddleware(
 
         return context.GetPathAndQuery();
     }
+
+    /// <summary>
+    /// Determines whether the caller landed on the selection page carrying a sign-in failure reason —
+    /// the redirect a failed, denied, or terminated sign-in produces.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns><see langword="true"/> when a failure reason is present; otherwise <see langword="false"/>.</returns>
+    static bool HasSignInFailureReason(HttpContext context) =>
+        context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage)
+        && context.Request.Query.ContainsKey(SignInFailureReason.QueryKey);
 
     /// <summary>
     /// Refuses a caller that no page can answer, naming a credential it could come back with.
