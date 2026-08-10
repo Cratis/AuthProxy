@@ -51,6 +51,13 @@ public class AuthProxy
     public SignIn? SignIn { get; set; }
 
     /// <summary>
+    /// Gets or sets the private management listener configuration.
+    /// Set this section to open a second, private listener carrying the liveness and readiness endpoints.
+    /// Leave it unset — the default — and no additional socket is opened and no such endpoint exists.
+    /// </summary>
+    public Management? Management { get; set; }
+
+    /// <summary>
     /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
     /// </summary>
     public Logout Logout { get; set; } = new();

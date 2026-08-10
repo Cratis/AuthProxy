@@ -77,10 +77,15 @@ and now gets `401`, which it reads as unhealthy. The pod then fails to become re
 That probe was never testing much: it asserted that the login chooser renders, not that anything behind
 the proxy works. Replace it with one of:
 
+- The [management listener](management-listener.md) — an opt-in private port carrying AuthProxy's own
+  `/health/live` and `/health/ready`. This is the probe for the *proxy*: liveness answers while every
+  dependency is down, and readiness verifies that the instance could actually serve an authenticated
+  request.
 - A path the application serves and the deployment declares in
   [`AnonymousPaths`](services.md#anonymous-paths) — this actually exercises the proxy *and* the
   application, which is what a readiness probe is for.
-- A TCP socket probe, if all you need is "the container is listening".
+- A TCP socket probe, if all you need is "the container is listening". Note that this proves only that a
+  process accepted a connection — not that AuthProxy could serve anybody.
 
 Note that the bare `/` cannot be declared anonymous — it would match every request and turn the whole
 service anonymous, so it is rejected. Name a real path.

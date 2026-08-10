@@ -203,6 +203,65 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Opens a private management listener carrying AuthProxy's liveness and readiness endpoints.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="port">
+    /// The port the management listener binds. There is no default, because a port is the deployment's own
+    /// decision — name one nothing else in the deployment listens on, and not the port AuthProxy serves
+    /// traffic on.
+    /// </param>
+    /// <param name="bindAddress">
+    /// The address it binds. Defaults to <c>127.0.0.1</c>, which keeps it reachable from within the
+    /// container and from nowhere else. Widening it publishes the endpoints to everything that can route
+    /// to the address.
+    /// </param>
+    /// <param name="livePath">The path answering liveness. Defaults to <c>/health/live</c>.</param>
+    /// <param name="readyPath">The path answering readiness. Defaults to <c>/health/ready</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <exception cref="InvalidManagementPort">Thrown when <paramref name="port"/> is not a port number.</exception>
+    /// <remarks>
+    /// Without this, AuthProxy exposes no health surface at all and a deployment has to probe it with a TCP
+    /// socket check — which proves that a process accepted a connection, and nothing else. Liveness here
+    /// answers whenever the request loop is servicing requests, so a dependency outage never gets the
+    /// container restarted; readiness verifies local capability only, which today means the Data Protection
+    /// key ring that encrypts every session cookie and issued token.
+    /// <para>
+    /// The endpoints live only on this listener. They are answered on no other port, they are never added
+    /// to the reverse-proxy route table, and a service that serves its own <c>/health</c> keeps serving it.
+    /// </para>
+    /// <para>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="AddAuthProxy(IDistributedApplicationBuilder, string, string)"/>. An optional argument is
+    /// baked into the call site when the app host is compiled, so adding one changes that method's
+    /// signature and every already-built app host would fail to bind against the new package until it is
+    /// rebuilt.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithManagementListener<T>(
+        this IResourceBuilder<T> builder,
+        int port,
+        string bindAddress = "127.0.0.1",
+        string livePath = "/health/live",
+        string readyPath = "/health/ready")
+        where T : IResourceWithEnvironment
+    {
+        if (port is < 1 or > 65535)
+        {
+            throw new InvalidManagementPort(port);
+        }
+
+        const string prefix = $"{ConfigPrefix}__Management";
+
+        return builder
+            .WithEnvironment($"{prefix}__Port", port.ToString(CultureInfo.InvariantCulture))
+            .WithEnvironment($"{prefix}__BindAddress", bindAddress)
+            .WithEnvironment($"{prefix}__LivePath", livePath)
+            .WithEnvironment($"{prefix}__ReadyPath", readyPath);
+    }
+
+    /// <summary>
     /// Declares the peers whose forwarded headers AuthProxy believes.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>

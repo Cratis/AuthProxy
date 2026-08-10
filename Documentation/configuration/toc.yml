@@ -20,6 +20,8 @@
   href: sign-in.md
 - name: Trusted Proxies
   href: trusted-proxies.md
+- name: Management Listener
+  href: management-listener.md
 - name: Services
   href: services.md
 - name: Public Application Surfaces
