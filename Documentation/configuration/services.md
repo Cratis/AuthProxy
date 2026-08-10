@@ -193,8 +193,13 @@ actually declares.
 For each service with a `Backend` endpoint (and `ResolveIdentityDetails` not explicitly set to
 `false`), AuthProxy calls `GET {Backend.BaseUrl}/.cratis/me` after authentication.
 The response is stored in a short-lived cookie (`.cratis-identity`) and injected as
-the `X-MS-CLIENT-PRINCIPAL` header on every proxied request so that backend services can read
+the `x-ms-client-principal` header on every proxied request so that backend services can read
 identity details without re-calling the identity endpoint themselves.
+
+What exactly your service receives — the four identity headers, the guarantee that every value is
+US-ASCII, the `x-ms-client-principal-name*` sibling for names that are not, and why
+`x-ms-client-principal` stays the canonical value — is described in
+[Forwarded identity headers](./authentication.md#forwarded-identity-headers).
 
 ### Two settings, two questions
 

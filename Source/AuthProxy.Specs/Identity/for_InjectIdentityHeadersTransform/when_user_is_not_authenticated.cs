@@ -27,6 +27,7 @@ public class when_user_is_not_authenticated : Specification
         _transformContext.ProxyRequest.Headers.Add(Headers.Principal, "hostile-principal");
         _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalId, "hostile-id");
         _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalName, "hostile-name");
+        _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalNameExtended, "hostile-extended-name");
     }
 
     Task Because() => _transform.ApplyAsync(_transformContext).AsTask();
@@ -39,6 +40,9 @@ public class when_user_is_not_authenticated : Specification
 
     [Fact] void should_remove_the_hostile_principal_name_header() =>
         _transformContext.ProxyRequest.Headers.Contains(Headers.PrincipalName).ShouldBeFalse();
+
+    [Fact] void should_remove_the_hostile_extended_principal_name_header() =>
+        _transformContext.ProxyRequest.Headers.Contains(Headers.PrincipalNameExtended).ShouldBeFalse();
 
     [Fact] void should_not_set_tenant_id_header() =>
         _transformContext.ProxyRequest.Headers.Contains(Headers.TenantId).ShouldBeFalse();

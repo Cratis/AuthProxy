@@ -91,32 +91,56 @@ public static class ClientPrincipalExtensions
     }
 
     /// <summary>
-    /// Adds the three Microsoft Identity Platform headers to an
+    /// Adds the Microsoft Identity Platform headers to an
     /// <see cref="HttpRequest"/> from the given <paramref name="principal"/>.
     /// </summary>
     /// <param name="request">The <see cref="HttpRequest"/> to enrich with identity headers.</param>
     /// <param name="principal">The <see cref="ClientPrincipal"/> whose identity to forward.</param>
+    /// <remarks>
+    /// Every value goes through <see cref="HeaderValue.ToTransportValue"/>, so a name a header field cannot
+    /// carry is sent as an RFC 8187 <c>ext-value</c> and announced by the
+    /// <see cref="Headers.PrincipalNameExtended"/> sibling. An already-safe name is untouched and no
+    /// sibling is written — see <see cref="HeaderValue"/> for why the encoding is conditional.
+    /// </remarks>
     public static void SetMicrosoftIdentityHeaders(this HttpRequest request, ClientPrincipal principal)
     {
+        var userDetails = HeaderValue.ToTransportValue(principal.UserDetails);
+
         request.Headers[Headers.Principal] = principal.ToBase64();
-        request.Headers[Headers.PrincipalId] = principal.UserId;
-        request.Headers[Headers.PrincipalName] = principal.UserDetails;
+        request.Headers[Headers.PrincipalId] = HeaderValue.ToTransportValue(principal.UserId);
+        request.Headers[Headers.PrincipalName] = userDetails;
+        request.Headers.Remove(Headers.PrincipalNameExtended);
+
+        if (HeaderValue.RequiresExtendedValue(principal.UserDetails))
+        {
+            request.Headers[Headers.PrincipalNameExtended] = userDetails;
+        }
     }
 
     /// <summary>
-    /// Adds the three Microsoft Identity Platform headers to an
+    /// Adds the Microsoft Identity Platform headers to an
     /// <see cref="HttpRequestMessage"/> from the given <paramref name="principal"/>.
     /// </summary>
     /// <param name="requestMessage">The outgoing HTTP request message to enrich.</param>
     /// <param name="principal">The <see cref="ClientPrincipal"/> whose identity to forward.</param>
+    /// <inheritdoc cref="SetMicrosoftIdentityHeaders(HttpRequest, ClientPrincipal)" path="/remarks"/>
     public static void SetMicrosoftIdentityHeaders(this HttpRequestMessage requestMessage, ClientPrincipal principal)
     {
         requestMessage.Headers.Remove(Headers.Principal);
         requestMessage.Headers.Remove(Headers.PrincipalId);
         requestMessage.Headers.Remove(Headers.PrincipalName);
+        requestMessage.Headers.Remove(Headers.PrincipalNameExtended);
+
+        var userDetails = HeaderValue.ToTransportValue(principal.UserDetails);
+
         requestMessage.Headers.Add(Headers.Principal, principal.ToBase64());
-        requestMessage.Headers.Add(Headers.PrincipalId, principal.UserId);
-        requestMessage.Headers.Add(Headers.PrincipalName, principal.UserDetails);
+        requestMessage.Headers.Add(Headers.PrincipalId, HeaderValue.ToTransportValue(principal.UserId));
+        requestMessage.Headers.Add(Headers.PrincipalName, userDetails);
+
+        if (HeaderValue.RequiresExtendedValue(principal.UserDetails))
+        {
+            requestMessage.Headers.Add(Headers.PrincipalNameExtended, userDetails);
+        }
     }
 
     static bool IsRoleClaim(string claimType, bool isCanonical) =>

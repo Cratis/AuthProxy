@@ -53,7 +53,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.SetMicrosoftIdentityHeaders(principal);
-        request.Headers.Add(Headers.TenantId, tenantId);
+        request.Headers.Add(Headers.TenantId, HeaderValue.ToTransportValue(tenantId));
 
         using var timeoutSource = timeout > TimeSpan.Zero
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)

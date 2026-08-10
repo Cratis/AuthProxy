@@ -50,6 +50,7 @@ public class TenancyMiddleware(
         context.Request.Headers.Remove(Headers.Principal);
         context.Request.Headers.Remove(Headers.PrincipalId);
         context.Request.Headers.Remove(Headers.PrincipalName);
+        context.Request.Headers.Remove(Headers.PrincipalNameExtended);
         context.Request.Headers.Remove(Headers.TenantId);
 
         // 2. Resolve tenant.

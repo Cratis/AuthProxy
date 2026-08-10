@@ -405,6 +405,71 @@ instance re-resolves identity for callers whose record it did not issue.
 
 ---
 
+## Forwarded identity headers
+
+Once a request is authenticated, AuthProxy tells the backend who is calling. It does that with four
+headers, written on every proxied request and on every `/.cratis/me` call — and it strips any inbound copy
+first, so a backend can treat them as proof rather than as a claim.
+
+| Header | Carries | Encoding |
+|--------|---------|----------|
+| `x-ms-client-principal` | The full client principal as base64-encoded JSON | Always base64, so always US-ASCII |
+| `x-ms-client-principal-id` | The provider-local subject | Verbatim, or RFC 8187 when it is not US-ASCII |
+| `x-ms-client-principal-name` | The display name (`userDetails`) | Verbatim, or RFC 8187 when it is not US-ASCII |
+| `x-ms-client-principal-name*` | The RFC 8187 form of the display name | Present **only** when the name is not US-ASCII |
+| `Tenant-ID` | The resolved tenant | Verbatim, or RFC 8187 when it is not US-ASCII |
+
+### Every header value is US-ASCII
+
+A display name is whatever the identity provider says it is, and providers say things like
+`Søren Wærstad`, `Ольга Иванова`, `田中太郎`. An HTTP header field is octets, and .NET refuses to write a
+character above `U+007F` to one — it throws before a byte reaches the socket. So a name outside US-ASCII
+did not arrive garbled at the backend; the proxied request failed at the gateway and the identity-endpoint
+call failed silently, and the person could not use the application at all.
+
+AuthProxy now guarantees that every value it writes is printable US-ASCII. A value that already is one is
+sent **byte for byte unchanged** — if your users' names are ASCII, nothing about the wire format changes
+and no extra header appears. A value that is not is sent as an
+[RFC 8187](https://www.rfc-editor.org/rfc/rfc8187) `ext-value`: percent-encoded UTF-8 behind a
+self-describing `UTF-8''` prefix.
+
+```http
+x-ms-client-principal-name: UTF-8''S%C3%B8ren%20W%C3%A6rstad
+x-ms-client-principal-name*: UTF-8''S%C3%B8ren%20W%C3%A6rstad
+```
+
+The starred sibling is the same idiom `Content-Disposition` uses to pair `filename` with `filename*`
+(RFC 6266 §4.3). Its **presence is the signal**: when `x-ms-client-principal-name*` is there, the plain
+header carries an encoded value; when it is absent, the plain header is the name verbatim. The plain
+header is always populated either way, so a backend that gates on the three headers being present keeps
+working untouched.
+
+Because the encoder emits only RFC 8187 `attr-char` octets, a name can never introduce `CR`, `LF` or
+`NUL` into a header — header injection through a display name is structurally impossible rather than
+merely checked for.
+
+### `x-ms-client-principal` is the canonical value
+
+The base64 principal is the source of truth for identity. Its `userDetails` property is the exact
+original name — every code point, no encoding, no normalization — because base64 was never subject to the
+ASCII limit in the first place.
+
+Read `userDetails` when you need the name itself. Read `x-ms-client-principal-name` when you want a
+convenient header and can either accept the encoded form or decode it. Cratis Arc already takes the first
+route: its Microsoft Identity Platform handler builds the user from the base64 principal, so an
+Arc backend behind AuthProxy sees exact Unicode names with no changes on its side.
+
+```csharp
+// Decoding the header form yourself, when you are not on Arc.
+var name = request.Headers["x-ms-client-principal-name"].ToString();
+if (name.StartsWith("UTF-8''", StringComparison.Ordinal))
+{
+    name = Uri.UnescapeDataString(name["UTF-8''".Length..]);
+}
+```
+
+---
+
 ## JWT Bearer (API)
 
 For machine-to-machine calls, configure a JWT Bearer handler:

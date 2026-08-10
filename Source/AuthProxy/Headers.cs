@@ -24,6 +24,19 @@ public static class Headers
     public const string PrincipalName = "x-ms-client-principal-name";
 
     /// <summary>
+    /// The RFC 8187 <c>ext-value</c> form of the client principal name, sent alongside
+    /// <see cref="PrincipalName"/> only when the name could not travel as US-ASCII.
+    /// </summary>
+    /// <remarks>
+    /// The starred sibling is the established HTTP idiom for exactly this — <c>Content-Disposition</c>
+    /// pairs <c>filename</c> with <c>filename*</c> (RFC 6266 §4.3). Its presence is what tells a consumer
+    /// that <see cref="PrincipalName"/> carries an encoded value rather than a literal one; its absence
+    /// means the plain header is the name verbatim. The exact, unencoded value is always available in
+    /// <see cref="Principal"/> as <c>userDetails</c>, which remains the canonical source.
+    /// </remarks>
+    public const string PrincipalNameExtended = "x-ms-client-principal-name*";
+
+    /// <summary>
     /// Cratis tenant identifier.
     /// </summary>
     public const string TenantId = "Tenant-ID";

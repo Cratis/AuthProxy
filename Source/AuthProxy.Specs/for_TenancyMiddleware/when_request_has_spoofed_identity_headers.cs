@@ -29,6 +29,7 @@ public class when_request_has_spoofed_identity_headers : Specification
         _context.Request.Headers[Headers.Principal] = "spoofed-principal";
         _context.Request.Headers[Headers.PrincipalId] = "spoofed-id";
         _context.Request.Headers[Headers.PrincipalName] = "spoofed-name";
+        _context.Request.Headers[Headers.PrincipalNameExtended] = "UTF-8''spoofed-name";
         _context.Request.Headers[Headers.TenantId] = "spoofed-tenant";
     }
 
@@ -37,5 +38,6 @@ public class when_request_has_spoofed_identity_headers : Specification
     [Fact] void should_strip_the_principal_header() => Assert.False(_context.Request.Headers.ContainsKey(Headers.Principal));
     [Fact] void should_strip_the_principal_id_header() => Assert.False(_context.Request.Headers.ContainsKey(Headers.PrincipalId));
     [Fact] void should_strip_the_principal_name_header() => Assert.False(_context.Request.Headers.ContainsKey(Headers.PrincipalName));
+    [Fact] void should_strip_the_extended_principal_name_header() => Assert.False(_context.Request.Headers.ContainsKey(Headers.PrincipalNameExtended));
     [Fact] void should_strip_the_tenant_id_header() => Assert.False(_context.Request.Headers.ContainsKey(Headers.TenantId));
 }

@@ -11,6 +11,10 @@ namespace Cratis.AuthProxy.Identity;
 /// <c>x-ms-client-principal-name</c>) and the <c>Tenant-ID</c> header into every
 /// proxied request, based on the authenticated user and the resolved tenant.
 /// </summary>
+/// <remarks>
+/// Every inbound copy is removed first — including the <c>x-ms-client-principal-name*</c> sibling, which a
+/// caller could otherwise use to tell a backend a different name than the one the proxy vouched for.
+/// </remarks>
 public class InjectIdentityHeadersTransform : RequestTransform
 {
     /// <inheritdoc/>
@@ -21,13 +25,12 @@ public class InjectIdentityHeadersTransform : RequestTransform
         context.ProxyRequest.Headers.Remove(Headers.Principal);
         context.ProxyRequest.Headers.Remove(Headers.PrincipalId);
         context.ProxyRequest.Headers.Remove(Headers.PrincipalName);
+        context.ProxyRequest.Headers.Remove(Headers.PrincipalNameExtended);
 
         var principal = httpContext.BuildClientPrincipal();
         if (principal is not null)
         {
-            context.ProxyRequest.Headers.Add(Headers.Principal, principal.ToBase64());
-            context.ProxyRequest.Headers.Add(Headers.PrincipalId, principal.UserId);
-            context.ProxyRequest.Headers.Add(Headers.PrincipalName, principal.UserDetails);
+            context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
         }
 
         // Forward the resolved Tenant-ID if it was set by the tenancy middleware.
@@ -35,7 +38,7 @@ public class InjectIdentityHeadersTransform : RequestTransform
             && tenantId is string tid && !string.IsNullOrWhiteSpace(tid))
         {
             context.ProxyRequest.Headers.Remove(Headers.TenantId);
-            context.ProxyRequest.Headers.Add(Headers.TenantId, tid);
+            context.ProxyRequest.Headers.Add(Headers.TenantId, HeaderValue.ToTransportValue(tid));
         }
 
         return ValueTask.CompletedTask;

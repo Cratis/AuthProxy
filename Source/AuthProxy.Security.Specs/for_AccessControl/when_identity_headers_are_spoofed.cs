@@ -80,6 +80,21 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
     public void should_give_an_anonymous_caller_no_principal_at_all() =>
         Assert.False(_anonymousOnAnonymousPath!.Has(Headers.Principal));
 
+    /// <summary>
+    /// The sibling header is a second, quieter way to tell a backend a name. A caller that could smuggle it
+    /// through would be believed by anything that reads the encoded form in preference to the plain one, so
+    /// it is stripped exactly like the three it accompanies — and, both callers here having ASCII names,
+    /// nothing legitimate replaces it.
+    /// </summary>
+    [Fact]
+    public void should_not_carry_a_spoofed_extended_principal_name_for_an_anonymous_caller() =>
+        Assert.False(_anonymousOnAnonymousPath!.Has(Headers.PrincipalNameExtended));
+
+    /// <inheritdoc cref="should_not_carry_a_spoofed_extended_principal_name_for_an_anonymous_caller"/>
+    [Fact]
+    public void should_not_carry_a_spoofed_extended_principal_name_for_an_authenticated_caller() =>
+        Assert.False(_authenticatedOnProtectedPath!.Has(Headers.PrincipalNameExtended));
+
     static HttpRequestMessage Spoofed(HttpRequestMessage request)
     {
         var forgedPrincipal = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
@@ -88,6 +103,7 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
         request.Headers.TryAddWithoutValidation(Headers.Principal, forgedPrincipal);
         request.Headers.TryAddWithoutValidation(Headers.PrincipalId, "attacker");
         request.Headers.TryAddWithoutValidation(Headers.PrincipalName, "attacker");
+        request.Headers.TryAddWithoutValidation(Headers.PrincipalNameExtended, "UTF-8''attacker");
         request.Headers.TryAddWithoutValidation(Headers.TenantId, "victim-tenant");
 
         return request;

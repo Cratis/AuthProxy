@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using System.Text;
 using System.Text.Encodings.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
@@ -42,6 +43,27 @@ public class HeaderAuthenticationHandler(
     /// </remarks>
     public const string ClaimsHeader = "X-Security-Spec-Claims";
 
+    /// <summary>
+    /// The header a spec sends to give its caller claims whose values are not US-ASCII — the same
+    /// <c>type=value</c> pair format as <see cref="ClaimsHeader"/>, base64-encoded UTF-8.
+    /// </summary>
+    /// <remarks>
+    /// A spec cannot declare a name like <c>Søren Wærstad</c> through <see cref="ClaimsHeader"/>, because
+    /// that header is itself subject to the very limitation these specs exist to prove is handled. Encoding
+    /// it here keeps the harness honest: the spec's own transport is a spec concern, and nothing about the
+    /// production path is relaxed to accommodate it — the claim arrives at
+    /// <c>BuildClientPrincipal</c> as an ordinary .NET string, exactly as a real provider's would.
+    /// </remarks>
+    public const string EncodedClaimsHeader = "X-Security-Spec-Claims-Encoded";
+
+    /// <summary>
+    /// Encodes claim declarations so a spec can put them on <see cref="EncodedClaimsHeader"/>.
+    /// </summary>
+    /// <param name="declarations">The <c>type=value</c> pairs, separated by semicolons.</param>
+    /// <returns>The declarations in the form the header carries.</returns>
+    public static string EncodeClaims(string declarations) =>
+        Convert.ToBase64String(Encoding.UTF8.GetBytes(declarations));
+
     /// <inheritdoc/>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -65,10 +87,8 @@ public class HeaderAuthenticationHandler(
             new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme)), Scheme)));
     }
 
-    IEnumerable<Claim> DeclaredClaims()
+    static IEnumerable<Claim> Parse(string declared)
     {
-        var declared = Request.Headers[ClaimsHeader].ToString();
-
         foreach (var pair in declared.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var separator = pair.IndexOf('=', StringComparison.Ordinal);
@@ -77,5 +97,23 @@ public class HeaderAuthenticationHandler(
                 yield return new Claim(pair[..separator], pair[(separator + 1)..]);
             }
         }
+    }
+
+    IEnumerable<Claim> DeclaredClaims() =>
+        Parse(Request.Headers[ClaimsHeader].ToString()).Concat(Parse(EncodedDeclarations()));
+
+    string EncodedDeclarations()
+    {
+        var encoded = Request.Headers[EncodedClaimsHeader].ToString();
+        if (string.IsNullOrEmpty(encoded))
+        {
+            return string.Empty;
+        }
+
+        var octets = new byte[encoded.Length];
+
+        return Convert.TryFromBase64String(encoded, octets, out var written)
+            ? Encoding.UTF8.GetString(octets, 0, written)
+            : string.Empty;
     }
 }
