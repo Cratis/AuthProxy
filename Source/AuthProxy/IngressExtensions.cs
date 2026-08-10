@@ -78,6 +78,17 @@ public static class IngressExtensions
         app.UseForwardedHeaders();
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
+
+        // Without an explicit UseRouting(), ASP.NET Core's implicit routing insertion matches an endpoint
+        // before UseStaticFiles ever runs whenever the reverse proxy has a configured route — YARP's
+        // catch-all matches every path, including this app's own bundled assets. UseStaticFiles is
+        // endpoint-aware and skips serving a file once an endpoint is already selected for the request
+        // (see https://learn.microsoft.com/aspnet/core/fundamentals/static-files), so every asset request
+        // fell through to SelectProviderMiddleware and was refused with 401 instead of being served. Placing
+        // UseRouting() here, right after UseStaticFiles(), anchors endpoint matching to this exact position
+        // so static files are always served before any route — including the reverse proxy's — can claim
+        // the request.
+        app.UseRouting();
         app.UseAuthentication();
         app.UseMiddleware<LogoutMiddleware>();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
