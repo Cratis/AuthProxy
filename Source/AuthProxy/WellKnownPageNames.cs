@@ -94,4 +94,15 @@ public static class WellKnownPageNames
     /// valid invitation token or pending invite cookie.
     /// </summary>
     public const string InvitationRequired = "invitation-required.html";
+
+    /// <summary>
+    /// The page returned when a credential-link callback completes without the application having recorded
+    /// the link — the exchange could not be performed, or the application refused it.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately generic: the same page answers every cause, so a caller cannot tell "the provider
+    /// identity is unknown" from "the account does not exist" or "the endpoint was unreachable". The cause
+    /// is logged for the operator instead.
+    /// </remarks>
+    public const string LinkFailed = "link-failed.html";
 }

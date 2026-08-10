@@ -422,13 +422,7 @@ public static class AuthenticationServiceCollectionExtensions
             && context.Properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode)
             && linkMode == "true")
         {
-            var exchanger = context.HttpContext.RequestServices.GetRequiredService<ILinkSubjectExchanger>();
-            await exchanger.Exchange(context.Principal, context.Properties);
-
-            // Short-circuit before the RemoteAuthenticationHandler signs the ticket into the cookie scheme:
-            // the linked identity must never replace the primary session. Hand the browser back to the app.
-            context.Response.Redirect(context.Properties.RedirectUri ?? "/");
-            context.HandleResponse();
+            await LinkCallbackCompletion.Complete(context, context.Properties);
             return;
         }
 

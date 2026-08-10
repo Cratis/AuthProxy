@@ -39,8 +39,14 @@ popup avoids both problems.
    `POST`s them to the configured [`ExchangeUrl`](#configuration), authenticated with the link token as the
    bearer credential — exactly mirroring the [invite exchange](./lobby/invitation-to-organization.md). The
    user's original session is preserved.
-4. **AuthProxy returns to the application.** The browser is redirected to the supplied `returnUrl`, where the
-   application correlates the token back to the signed-in user, records the association, and closes the popup.
+4. **AuthProxy returns to the application — but only when the exchange succeeded.** On success the browser is
+   redirected to the supplied `returnUrl`, where the application correlates the token back to the signed-in
+   user, records the association, and closes the popup. If the exchange did not succeed — the endpoint is not
+   configured, the link token or the provider subject could not be resolved, the endpoint was unreachable, or
+   the application answered with a non-2xx status — the browser receives a generic link-failure page with
+   HTTP `403` instead, and never the completion redirect. The page is the same for every cause, so it reveals
+   nothing about which one occurred; the cause is logged for the operator. In every case the user's primary
+   session is left exactly as it was.
 
 The request body posted to `ExchangeUrl` depends on whether the selected provider opts into
 [canonical federated identity](authentication.md#canonical-federated-identity).
@@ -103,8 +109,10 @@ Equivalent environment variable:
 Cratis__AuthProxy__Link__ExchangeUrl=https://studio.example.com/api/internal/identity-providers/link
 ```
 
-When `ExchangeUrl` is empty or the `Link` section is absent, the link callback is skipped (the subject is not
-posted anywhere) and the flow is effectively disabled.
+When `ExchangeUrl` is empty or the `Link` section is absent, there is nowhere to post the subject, so the link
+callback cannot complete: the browser receives the generic link-failure page (HTTP `403`) rather than the
+completion redirect. The flow is effectively disabled, and it fails visibly rather than reporting success for
+a link that was never recorded.
 
 > **Security.** The JSON callback body is not signed. The one-time bearer token binds the operation to the
 > signed-in application user, but it does not by itself prove that AuthProxy sent the HTTP request. Keep
