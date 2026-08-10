@@ -210,8 +210,7 @@ public class IdentityDetailsResolver(
 
         if (!httpResponse.IsSuccessStatusCode)
         {
-            var errorBody = await httpResponse.Content.ReadAsStringAsync();
-            logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode, errorBody);
+            logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode);
             return new JsonObject();
         }
 

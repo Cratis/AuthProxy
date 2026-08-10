@@ -5,6 +5,6 @@ namespace Cratis.AuthProxy.Authorization;
 
 internal static partial class AccessControlMiddlewareLogging
 {
-    [LoggerMessage(LogLevel.Warning, "Authenticated caller does not satisfy the required claim '{Claim}' for request {Path}. Serving the not-authorized page.")]
-    internal static partial void AccessDenied(this ILogger logger, string claim, string path);
+    [LoggerMessage(LogLevel.Warning, "Authenticated caller does not satisfy the required claim '{Claim}' for route {Route}. Serving the not-authorized page.")]
+    internal static partial void AccessDenied(this ILogger logger, string claim, string route);
 }

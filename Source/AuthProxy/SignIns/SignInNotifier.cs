@@ -130,7 +130,7 @@ public class SignInNotifier(
             return SignInNotificationResult.Failed;
         }
 
-        logger.SignInNotified(canonicalResolution.Identity is null ? subject : string.Empty);
+        logger.SignInNotified();
         return SignInNotificationResult.Notified;
     }
 }

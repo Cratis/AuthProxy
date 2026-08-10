@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.given;
 using Microsoft.AspNetCore.Authentication;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;
@@ -11,6 +12,8 @@ namespace Cratis.AuthProxy.Identity.for_IdentityForwardingGuardMiddleware.given;
 
 public class a_proxied_request : Specification
 {
+    protected readonly RecordingLogger<IdentityForwardingGuardMiddleware> _logger = new();
+
     protected IdentityForwardingGuardMiddleware _middleware;
     protected DefaultHttpContext _context;
     protected bool _nextCalled;
@@ -25,7 +28,7 @@ public class a_proxied_request : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            Substitute.For<ILogger<IdentityForwardingGuardMiddleware>>());
+            _logger);
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/api/things";

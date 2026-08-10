@@ -14,6 +14,6 @@ internal static partial class SignInNotifierLogging
     [LoggerMessage(LogLevel.Warning, "Sign-in notification endpoint returned {StatusCode}")]
     internal static partial void SignInNotifyEndpointFailed(this ILogger logger, int statusCode);
 
-    [LoggerMessage(LogLevel.Information, "Sign-in notified for subject {Subject}")]
-    internal static partial void SignInNotified(this ILogger logger, string subject);
+    [LoggerMessage(LogLevel.Information, "Sign-in notified")]
+    internal static partial void SignInNotified(this ILogger logger);
 }

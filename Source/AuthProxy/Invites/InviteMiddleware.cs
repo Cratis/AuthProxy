@@ -148,7 +148,7 @@ public class InviteMiddleware(
             var validationResult = tokenValidator.ValidateDetailed(inviteToken);
             if (validationResult != InviteTokenValidationResult.Valid)
             {
-                logger.InviteExchangeTokenValidationFailed(context.Request.Path);
+                logger.InviteExchangeTokenValidationFailed(validationResult);
                 context.Response.Cookies.Delete(Cookies.InviteToken);
                 context.Response.Cookies.Delete(Cookies.InvitationEntryState);
                 context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
@@ -245,7 +245,7 @@ public class InviteMiddleware(
             var validationResult = tokenValidator.ValidateDetailed(token);
             if (validationResult != InviteTokenValidationResult.Valid)
             {
-                logger.InviteTokenValidationFailed(context.Request.Path);
+                logger.InviteTokenValidationFailed(validationResult);
 
                 var pageName = validationResult == InviteTokenValidationResult.Expired
                     ? WellKnownPageNames.InvitationExpired
@@ -634,7 +634,7 @@ public class InviteMiddleware(
                 return (true, entryState);
             }
 
-            logger.InviteExchangeEndpointFailed((int)response.StatusCode, string.Empty);
+            logger.InviteExchangeEndpointFailed((int)response.StatusCode);
         }
         catch (Exception exception)
         {
@@ -693,11 +693,11 @@ public class InviteMiddleware(
 
             if (!response.IsSuccessStatusCode)
             {
-                logger.InviteExchangeEndpointFailed((int)response.StatusCode, string.Empty);
+                logger.InviteExchangeEndpointFailed((int)response.StatusCode);
                 return InviteExchangeResult.Failed;
             }
 
-            logger.InviteExchangedSuccessfully(string.Empty);
+            logger.InviteExchangedSuccessfully();
             return InviteExchangeResult.Success;
         }
         catch (Exception exception)
@@ -800,7 +800,6 @@ public class InviteMiddleware(
             ?? string.Empty;
 
         var email = ResolveAuthenticatedEmail(context, out var emailVerified);
-        var logSubject = canonicalResolution.Identity is null ? subject : string.Empty;
 
         // An invitation is otherwise a pure bearer link - anyone with the URL could sign in with their
         // own account and be provisioned as the invited user. Bind the invite to its intended recipient by
@@ -808,13 +807,13 @@ public class InviteMiddleware(
         var binding = EvaluateInvitedEmailBinding(inviteToken, email, emailVerified);
         if (binding == InviteExchangeResult.EmailUnavailable)
         {
-            logger.InviteEmailUnavailable(logSubject);
+            logger.InviteEmailUnavailable();
             return binding;
         }
 
         if (binding == InviteExchangeResult.EmailMismatch)
         {
-            logger.InviteEmailMismatch(logSubject);
+            logger.InviteEmailMismatch();
             return binding;
         }
 
@@ -850,17 +849,17 @@ public class InviteMiddleware(
 
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
-            logger.InviteSubjectAlreadyExists(logSubject);
+            logger.InviteSubjectAlreadyExists();
             return InviteExchangeResult.DuplicateSubject;
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            logger.InviteExchangeEndpointFailed((int)response.StatusCode, logSubject);
+            logger.InviteExchangeEndpointFailed((int)response.StatusCode);
             return InviteExchangeResult.Failed;
         }
 
-        logger.InviteExchangedSuccessfully(logSubject);
+        logger.InviteExchangedSuccessfully();
         return InviteExchangeResult.Success;
     }
 

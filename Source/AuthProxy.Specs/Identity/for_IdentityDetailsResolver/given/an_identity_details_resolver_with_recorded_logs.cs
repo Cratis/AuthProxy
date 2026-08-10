@@ -3,6 +3,7 @@
 
 using System.Net;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.given;
 
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.given;
 
@@ -15,14 +16,15 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
     protected const string Issuer = "https://sensitive-issuer.example.com";
     protected const string Subject = "sensitive-canonical-subject";
     protected const string TenantId = "tenant-a";
+    protected const string SensitiveResponseBody = "sensitive-downstream-response-body";
 
     protected RecordingLogger<IdentityDetailsResolver> _logger;
 
-    protected IdentityDetailsResolver CreateResolver(HttpStatusCode statusCode = HttpStatusCode.OK)
+    protected IdentityDetailsResolver CreateResolver(HttpStatusCode statusCode = HttpStatusCode.OK, string body = "{}")
     {
         _logger = new RecordingLogger<IdentityDetailsResolver>();
         var clients = Substitute.For<IHttpClientFactory>();
-        clients.CreateClient(Arg.Any<string>()).Returns(new HttpClient(new IdentityResponseHandler(statusCode)));
+        clients.CreateClient(Arg.Any<string>()).Returns(new HttpClient(new IdentityResponseHandler(statusCode, body)));
         var configuration = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         configuration.CurrentValue.Returns(new C.AuthProxy
         {
@@ -57,56 +59,17 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
 
     protected void ShouldNotContainCanonicalIdentity()
     {
-        var messages = string.Join(Environment.NewLine, _logger.Messages);
-        messages.ShouldNotContain(ProviderKey);
-        messages.ShouldNotContain(Issuer);
-        messages.ShouldNotContain(Subject);
-    }
-
-    /// <summary>
-    /// Records formatted log messages while keeping every log level enabled.
-    /// </summary>
-    /// <typeparam name="TCategoryName">The logger category.</typeparam>
-    protected sealed class RecordingLogger<TCategoryName> : ILogger<TCategoryName>
-    {
-        readonly List<string> _messages = [];
-
-        /// <summary>
-        /// Gets the formatted messages recorded by the logger.
-        /// </summary>
-        public IReadOnlyList<string> Messages => _messages;
-
-        /// <inheritdoc/>
-        public IDisposable BeginScope<TState>(TState state)
-            where TState : notnull => EmptyScope.Instance;
-
-        /// <inheritdoc/>
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        /// <inheritdoc/>
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
-            _messages.Add(formatter(state, exception));
-
-        sealed class EmptyScope : IDisposable
-        {
-            public static readonly EmptyScope Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
+        _logger.Text.ShouldNotContain(ProviderKey);
+        _logger.Text.ShouldNotContain(Issuer);
+        _logger.Text.ShouldNotContain(Subject);
     }
 
     /// <summary>
     /// Returns a configured identity endpoint response.
     /// </summary>
     /// <param name="statusCode">The status code returned by the identity endpoint.</param>
-    sealed class IdentityResponseHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    /// <param name="body">The response body returned by the identity endpoint.</param>
+    sealed class IdentityResponseHandler(HttpStatusCode statusCode, string body) : HttpMessageHandler
     {
         /// <summary>
         /// Sends the identity endpoint request and returns the configured response.
@@ -115,6 +78,6 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
         /// <param name="cancellationToken">The token used to cancel the request.</param>
         /// <returns>The configured identity endpoint response.</returns>
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(statusCode) { Content = new StringContent("{}") });
+            Task.FromResult(new HttpResponseMessage(statusCode) { Content = new StringContent(body) });
     }
 }

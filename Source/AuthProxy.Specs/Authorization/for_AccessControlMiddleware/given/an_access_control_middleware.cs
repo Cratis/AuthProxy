@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.given;
+
 namespace Cratis.AuthProxy.Authorization.for_AccessControlMiddleware.given;
 
 /// <summary>
@@ -14,6 +16,8 @@ namespace Cratis.AuthProxy.Authorization.for_AccessControlMiddleware.given;
 public class an_access_control_middleware : Specification
 {
     protected const string AnonymousPath = "/api/webhooks/payments";
+
+    protected readonly RecordingLogger<AccessControlMiddleware> _logger = new();
 
     protected AccessControlMiddleware _middleware;
     protected DefaultHttpContext _context;
@@ -65,7 +69,7 @@ public class an_access_control_middleware : Specification
             config,
             new AccessPolicy(),
             _errorPageProvider,
-            Substitute.For<ILogger<AccessControlMiddleware>>());
+            _logger);
     }
 
     /// <summary>
