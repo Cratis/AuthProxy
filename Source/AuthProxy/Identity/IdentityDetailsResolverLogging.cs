@@ -28,4 +28,10 @@ internal static partial class IdentityDetailsResolverLogging
 
     [LoggerMessage(LogLevel.Warning, "Could not parse identity response from '{Service}'")]
     internal static partial void CouldNotParseIdentityResponse(this ILogger logger, Exception exception, string service);
+
+    // The reason is an enumeration value rather than anything the service said. A denial has to be
+    // diagnosable, and the tempting way to make it so is to log the answer that produced it — which is a
+    // response body from a system that knows exactly who the caller is.
+    [LoggerMessage(LogLevel.Warning, "Identity verification for service '{Service}' denied the request: {Reason}")]
+    internal static partial void IdentityVerificationDenied(this ILogger logger, string service, IdentityVerificationReason reason);
 }

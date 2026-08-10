@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
-using System.Net;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
@@ -24,6 +23,13 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="memoryCache">The memory cache used to deduplicate concurrent identity resolutions.</param>
 /// <param name="authorizationCache">The tamper-proof record of a previously resolved authorization.</param>
 /// <param name="logger">The logger.</param>
+/// <remarks>
+/// What each service's answer is worth is a per-service setting — see
+/// <see cref="C.IdentityVerificationMode"/>. Under <see cref="C.IdentityVerificationMode.BestEffort"/> only
+/// an explicit refusal denies, which is the released behavior. Under
+/// <see cref="C.IdentityVerificationMode.Required"/> only an explicit positive admits, and every other
+/// outcome denies and erases what an earlier positive left behind.
+/// </remarks>
 public class IdentityDetailsResolver(
     IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
@@ -34,7 +40,6 @@ public class IdentityDetailsResolver(
 {
     const string CacheKeyPurpose = "IdentityDetails";
 
-    static readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(30);
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -43,6 +48,7 @@ public class IdentityDetailsResolver(
     };
 
     readonly ConcurrentDictionary<IdentityAccountTenantKey, SemaphoreSlim> _resolverLocks = new();
+    readonly IdentityEndpointCaller _endpointCaller = new(httpClientFactory, logger);
 
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
@@ -51,9 +57,20 @@ public class IdentityDetailsResolver(
         // the enriched principal (which carries the invite claims jti/invite_type) is always sent to
         // the identity endpoint. A stale .cratis-identity cookie from a previous session would
         // otherwise shadow the invite claims and cause the Lobby to return the wrong flow type.
+        var current = config.CurrentValue;
+        var session = current.Session;
         var hasPendingInvite = context.HasPendingInvitation();
         var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, out var account);
         var logIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account";
+
+        // Every short-circuit below is a remembered answer standing in for asking again, so where the answer
+        // is an authorization decision a deployment must be able to switch the memory off and have it
+        // actually be off. A zero re-validation interval is documented as "no bound", and honoring that
+        // literally means nothing may be sealed — so nothing may be believed either.
+        var verificationRequired = current.RequiresIdentityVerification;
+        var mayReuseRecord = !hasPendingInvite
+            && (!verificationRequired || session.IdentityRevalidationInterval > TimeSpan.Zero);
+        var mayReuseResult = !hasPendingInvite && session.IdentityResultCacheDuration > TimeSpan.Zero;
 
         // Skipping the identity endpoints means skipping the authorization answer they carry, so what
         // permits the skip has to be something the caller could not have written. The readable
@@ -61,14 +78,14 @@ public class IdentityDetailsResolver(
         // examined here, so sending any value for it used to be enough to be treated as authorized, for as
         // long as the caller chose to keep sending it. The sealed record is checked instead, and it is
         // checked against this principal and this tenant.
-        if (!hasPendingInvite && authorizationCache.IsAuthorized(context, principal, tenantId))
+        if (mayReuseRecord && authorizationCache.IsAuthorized(context, principal, tenantId))
         {
             return BuildAuthorizedResult(principal, details: null);
         }
 
         var cacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(CacheKeyPurpose, account, tenantId) : null;
 
-        if (!hasPendingInvite && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
+        if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
             WriteIdentityState(context, cached, principal, tenantId);
             logger.IdentityDetailsCacheHit(logIdentifier);
@@ -83,7 +100,7 @@ public class IdentityDetailsResolver(
         try
         {
             // Double-check inside the lock — another request may have populated the cache while we waited.
-            if (!hasPendingInvite && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
+            if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
             {
                 WriteIdentityState(context, cached, principal, tenantId);
                 logger.IdentityDetailsCacheHit(logIdentifier);
@@ -92,32 +109,26 @@ public class IdentityDetailsResolver(
 
             var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
             var mergedDetails = new JsonObject();
-            var services = config.CurrentValue.Services;
 
-            foreach (var (name, service) in services)
+            foreach (var (name, service) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution))
             {
-                var shouldResolve = service.ResolveIdentityDetails ?? (service.Backend is not null);
-                if (!shouldResolve || service.Backend is null)
-                {
-                    continue;
-                }
-
                 logger.CallingIdentityEndpointWithPrincipal(name, logIdentifier);
 
-                var result = await CallIdentityEndpoint(
+                var outcome = await _endpointCaller.Call(
                     name,
-                    service.Backend.BaseUrl,
+                    service.Backend!.BaseUrl,
                     enrichedPrincipal,
                     tenantId,
                     logIdentifier,
-                    context.Response);
+                    service.IdentityVerificationTimeout,
+                    context.RequestAborted);
 
-                if (result is null)
+                if (!Admits(outcome, service.IdentityVerification))
                 {
-                    return IdentityProviderResult.Unauthorized;
+                    return Deny(context, cacheKey, name, outcome.Reason);
                 }
 
-                foreach (var property in result)
+                foreach (var property in outcome.Details)
                 {
                     mergedDetails[property.Key] = property.Value?.DeepClone();
                 }
@@ -126,9 +137,9 @@ public class IdentityDetailsResolver(
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
             WriteIdentityState(context, identityResult, principal, tenantId);
             logger.IdentityDetailsCookieWritten(logIdentifier);
-            if (cacheKey is not null)
+            if (cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero)
             {
-                memoryCache.Set(cacheKey, identityResult, _cacheTtl);
+                memoryCache.Set(cacheKey, identityResult, session.IdentityResultCacheDuration);
             }
 
             return identityResult;
@@ -140,6 +151,29 @@ public class IdentityDetailsResolver(
         }
     }
 
+    /// <summary>
+    /// Determines whether an outcome lets the request continue under a service's configured mode.
+    /// </summary>
+    /// <param name="outcome">What the service established.</param>
+    /// <param name="mode">What the service's answer is worth.</param>
+    /// <returns><see langword="true"/> when the request may continue; otherwise <see langword="false"/>.</returns>
+    static bool Admits(IdentityVerificationOutcome outcome, C.IdentityVerificationMode mode) =>
+        mode == C.IdentityVerificationMode.Required
+            ? outcome.Status == IdentityVerificationStatus.Positive
+            : outcome.Status != IdentityVerificationStatus.Denied;
+
+    /// <summary>
+    /// Expires the readable identity cookie so a refused caller stops carrying an authorized-looking one.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    static void ExpireIdentityCookie(HttpContext context) =>
+        context.Response.Cookies.Delete(Cookies.Identity, new CookieOptions
+        {
+            HttpOnly = false,
+            SameSite = SameSiteMode.Lax,
+            Secure = context.Request.IsHttps,
+        });
+
     IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>
         new(
             principal.UserId,
@@ -148,6 +182,36 @@ public class IdentityDetailsResolver(
             IsAuthorized: true,
             principal.UserRoles,
             details!);
+
+    /// <summary>
+    /// Refuses the request and erases every trace of an earlier positive.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="cacheKey">The in-memory result key for this caller, when there is one.</param>
+    /// <param name="serviceName">The service that refused, or that could not be verified.</param>
+    /// <param name="reason">The bounded code explaining the refusal.</param>
+    /// <returns>The unauthorized result.</returns>
+    /// <remarks>
+    /// Refusing without erasing would be nearly useless: an earlier success leaves a sealed record, a
+    /// readable cookie and an in-memory result behind, and any one of them lets the very next request skip
+    /// the question that was just answered no. All three go together, and they go on every refusal — the
+    /// released code cleared none of them, and <c>Clear</c> had no caller at all.
+    /// </remarks>
+    IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason)
+    {
+        logger.IdentityVerificationDenied(serviceName, reason);
+
+        authorizationCache.Clear(context);
+        ExpireIdentityCookie(context);
+        if (cacheKey is not null)
+        {
+            memoryCache.Remove(cacheKey);
+        }
+
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+        return IdentityProviderResult.Unauthorized;
+    }
 
     void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId)
     {
@@ -172,63 +236,5 @@ public class IdentityDetailsResolver(
             Secure = context.Request.IsHttps,
             MaxAge = revalidationInterval > TimeSpan.Zero ? revalidationInterval : null,
         });
-    }
-
-    async Task<JsonObject?> CallIdentityEndpoint(
-        string serviceName,
-        string baseUrl,
-        ClientPrincipal principal,
-        string tenantId,
-        string logIdentifier,
-        HttpResponse response)
-    {
-        var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
-        logger.CallingIdentityEndpoint(url, serviceName);
-
-        using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.SetMicrosoftIdentityHeaders(principal);
-        request.Headers.Add(Headers.TenantId, tenantId);
-
-        HttpResponseMessage httpResponse;
-        try
-        {
-            httpResponse = await client.SendAsync(request);
-        }
-        catch (Exception ex)
-        {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName);
-            return new JsonObject();    // Non-fatal – continue without details.
-        }
-
-        if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
-        {
-            logger.IdentityEndpointForbidden(serviceName, logIdentifier);
-            response.StatusCode = StatusCodes.Status403Forbidden;
-            return null;
-        }
-
-        if (!httpResponse.IsSuccessStatusCode)
-        {
-            logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode);
-            return new JsonObject();
-        }
-
-        var body = await httpResponse.Content.ReadAsStringAsync();
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return new JsonObject();
-        }
-
-        try
-        {
-            var parsed = JsonNode.Parse(body)?.AsObject() ?? new JsonObject();
-            return parsed["details"]?.AsObject() ?? parsed;
-        }
-        catch (Exception ex)
-        {
-            logger.CouldNotParseIdentityResponse(ex, serviceName);
-            return new JsonObject();
-        }
     }
 }

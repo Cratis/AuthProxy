@@ -9,6 +9,15 @@ namespace Cratis.AuthProxy.Configuration;
 public class Service
 {
     /// <summary>
+    /// The default time AuthProxy waits for a service's identity endpoint before giving up on it.
+    /// </summary>
+    /// <remarks>
+    /// Matched to the back-channel client-credentials verifier, which is the same shape of call — a
+    /// synchronous request to a backing service standing between a caller and a decision.
+    /// </remarks>
+    public static readonly TimeSpan DefaultIdentityVerificationTimeout = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Gets or sets the backend (API) endpoint for this service.
     /// </summary>
     public ServiceEndpoint? Backend { get; set; }
@@ -74,6 +83,55 @@ public class Service
     /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
     public bool? ResolveIdentityDetails { get; set; }
+
+    /// <summary>
+    /// Gets or sets what this service's <c>/.cratis/me</c> answer means. Defaults to
+    /// <see cref="IdentityVerificationMode.BestEffort"/>, the released behavior.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ResolveIdentityDetails"/> decides whether the endpoint is called; this decides what the
+    /// answer is worth. They are deliberately separate settings because they are separate questions — a
+    /// service can be asked for details it is allowed to fail to supply, or asked for a decision it is not.
+    /// <para>
+    /// Set this to <see cref="IdentityVerificationMode.Required"/> only for a service that genuinely answers
+    /// <c>/.cratis/me</c> with an authorization verdict. Every failure to obtain that verdict then denies
+    /// the request, which is the point — but it also means an outage of that one service takes the whole
+    /// proxied surface down with it, deliberately, rather than serving callers whose access nobody could
+    /// confirm.
+    /// </para>
+    /// <para>
+    /// When several services take part, every one of them declaring
+    /// <see cref="IdentityVerificationMode.Required"/> has to answer with an explicit positive. Requirements
+    /// are added together and never widened, the same way service authorization requirements compose.
+    /// </para>
+    /// </remarks>
+    public IdentityVerificationMode IdentityVerification { get; set; } = IdentityVerificationMode.BestEffort;
+
+    /// <summary>
+    /// Gets or sets how long AuthProxy waits for this service's <c>/.cratis/me</c> answer before treating
+    /// the call as failed. Defaults to <see cref="DefaultIdentityVerificationTimeout"/> (10 seconds).
+    /// Set to zero or a negative value to leave the wait unbounded.
+    /// </summary>
+    /// <remarks>
+    /// The call used to inherit the ambient 100-second client default and carried no cancellation at all, so
+    /// a service that accepted connections and then stopped answering held every authenticated request open
+    /// for a minute and a half each. That is a denial-of-service surface on its own; under
+    /// <see cref="IdentityVerificationMode.Required"/> it is also the difference between a bounded refusal
+    /// and an unbounded hang. The wait is additionally bound to the caller's own request lifetime, so a
+    /// client that goes away stops occupying the proxy.
+    /// </remarks>
+    public TimeSpan IdentityVerificationTimeout { get; set; } = DefaultIdentityVerificationTimeout;
+
+    /// <summary>
+    /// Gets a value indicating whether this service's identity endpoint is called at all.
+    /// </summary>
+    /// <remarks>
+    /// The rule is the one the resolver has always applied — a service takes part when it declares a backend
+    /// and has not opted out — and it is stated here because two places now depend on the same answer: the
+    /// resolver, deciding whom to ask, and the authorization cache, deciding whether a positive may be
+    /// sealed into a cookie at all. They must never disagree about it.
+    /// </remarks>
+    public bool ParticipatesInIdentityResolution => Backend is not null && (ResolveIdentityDetails ?? true);
 
     /// <summary>
     /// Gets or sets the back-channel client-credentials configuration for this service.

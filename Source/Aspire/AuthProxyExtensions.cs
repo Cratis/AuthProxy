@@ -69,6 +69,64 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Declares what a named service's <c>/.cratis/me</c> answer means to AuthProxy.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">
+    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// </param>
+    /// <param name="mode">
+    /// What the answer is worth. <see cref="IdentityVerificationMode.BestEffort"/> — the default when this
+    /// is never called — treats the endpoint as enrichment, so only an explicit <c>403</c> denies.
+    /// <see cref="IdentityVerificationMode.Required"/> treats it as an authorization decision, so only an
+    /// explicit positive admits and every failure to obtain one denies.
+    /// </param>
+    /// <param name="timeout">
+    /// How long to wait for the answer. Defaults to <see langword="null"/> (AuthProxy's own default of ten
+    /// seconds). Pass a non-positive value to leave the wait unbounded.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="WithBackend{T}(IResourceBuilder{T}, string, IResourceBuilder{IResourceWithEndpoints}, string, bool?)"/>.
+    /// An optional argument is baked into the call site when the app host is compiled, so adding one changes
+    /// the method's signature and every already-built app host would fail to bind against the new package
+    /// until it is rebuilt.
+    /// <para>
+    /// This is orthogonal to <c>resolveIdentityDetails</c> on <c>WithBackend</c>, which decides whether the
+    /// endpoint is called at all. Opting a service out of identity resolution and then requiring
+    /// verification of it asks for a decision from a service that is never consulted, so the service simply
+    /// does not take part.
+    /// </para>
+    /// <para>
+    /// Requiring verification means an outage of that service refuses every proxied request rather than
+    /// serving callers whose access nobody could confirm. That is the point of the setting, and it is worth
+    /// stating plainly before turning it on.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithIdentityVerification<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        IdentityVerificationMode mode,
+        TimeSpan? timeout = null)
+        where T : IResourceWithEnvironment
+    {
+        builder.WithEnvironment(
+            $"{ConfigPrefix}__Services__{serviceName}__IdentityVerification",
+            mode.ToString());
+
+        if (timeout.HasValue)
+        {
+            builder.WithEnvironment(
+                $"{ConfigPrefix}__Services__{serviceName}__IdentityVerificationTimeout",
+                timeout.Value.ToString("c", CultureInfo.InvariantCulture));
+        }
+
+        return builder;
+    }
+
+    /// <summary>
     /// Registers a frontend (SPA / static-assets) endpoint for a named service in AuthProxy.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>

@@ -31,10 +31,12 @@ namespace Cratis.AuthProxy.Security.given;
 public sealed class RecordingBackend : IAsyncDisposable
 {
     readonly WebApplication _app;
+    readonly IdentityResponder _identityResponder;
 
-    RecordingBackend(WebApplication app, string baseUrl)
+    RecordingBackend(WebApplication app, string baseUrl, IdentityResponder identityResponder)
     {
         _app = app;
+        _identityResponder = identityResponder;
         BaseUrl = baseUrl;
     }
 
@@ -42,6 +44,21 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// Gets the origin's base URL, on an ephemeral loopback port.
     /// </summary>
     public string BaseUrl { get; }
+
+    /// <summary>
+    /// Gets or sets what the origin answers on the identity endpoint.
+    /// </summary>
+    /// <remarks>
+    /// Settable because a deployment that treats <c>/.cratis/me</c> as an authorization decision has to be
+    /// shown failing and then recovering, and the whole point of asserting end to end is that the failure
+    /// arrives the way a real one would — over a socket, from an origin that genuinely answered that way.
+    /// The default answers an empty object, which is what every other security spec's deployment expects.
+    /// </remarks>
+    public Func<IResult> IdentityResponse
+    {
+        get => _identityResponder.Respond;
+        set => _identityResponder.Respond = value;
+    }
 
     /// <summary>
     /// Gets every request the proxy has forwarded, most recent last.
@@ -58,9 +75,11 @@ public sealed class RecordingBackend : IAsyncDisposable
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton<RecordingState>();
+        builder.Services.AddSingleton<IdentityResponder>();
 
         var app = builder.Build();
         var state = app.Services.GetRequiredService<RecordingState>();
+        var identityResponder = app.Services.GetRequiredService<IdentityResponder>();
 
         app.Use(async (context, next) =>
         {
@@ -69,9 +88,9 @@ public sealed class RecordingBackend : IAsyncDisposable
         });
 
         // AuthProxy calls this on every authenticated request to resolve identity details. Answering an
-        // empty object means "authorized, nothing to add", which keeps a spec's 403 attributable to the
-        // behavior under test rather than to the origin refusing.
-        app.MapGet(WellKnownPaths.IdentityDetails, () => Results.Json(new { }));
+        // empty object means "authorized, nothing to add" to a best-effort deployment, which keeps a spec's
+        // 403 attributable to the behavior under test rather than to the origin refusing.
+        app.MapGet(WellKnownPaths.IdentityDetails, (IdentityResponder responder) => responder.Respond());
 
         app.MapFallback(() => Results.Text("origin", "text/plain"));
 
@@ -82,7 +101,7 @@ public sealed class RecordingBackend : IAsyncDisposable
             .Addresses
             .First();
 
-        var backend = new RecordingBackend(app, address);
+        var backend = new RecordingBackend(app, address, identityResponder);
         state.Attach(backend.Received);
 
         return backend;
@@ -124,6 +143,14 @@ public sealed class RecordingBackend : IAsyncDisposable
     {
         await _app.StopAsync();
         await _app.DisposeAsync();
+    }
+
+    /// <summary>
+    /// Holds what the origin currently answers on the identity endpoint.
+    /// </summary>
+    sealed class IdentityResponder
+    {
+        public Func<IResult> Respond { get; set; } = () => Results.Json(new { });
     }
 
     /// <summary>

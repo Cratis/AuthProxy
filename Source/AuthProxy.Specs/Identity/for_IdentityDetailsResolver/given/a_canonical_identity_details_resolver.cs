@@ -15,6 +15,7 @@ public class a_canonical_identity_details_resolver : Specification
     protected const string Subject = "shared-subject";
 
     protected CountingIdentityHandler _handler;
+    protected C.AuthProxy _configuration;
     protected IdentityDetailsResolver _resolver;
 
     void Establish()
@@ -22,16 +23,17 @@ public class a_canonical_identity_details_resolver : Specification
         _handler = new CountingIdentityHandler();
         var clients = Substitute.For<IHttpClientFactory>();
         clients.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(_handler, disposeHandler: false));
-        var configuration = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        configuration.CurrentValue.Returns(new C.AuthProxy
+        _configuration = new C.AuthProxy
         {
             Services = new Dictionary<string, C.Service>
             {
                 ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" } }
             }
-        });
+        };
+        var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        options.CurrentValue.Returns(_ => _configuration);
         _resolver = new IdentityDetailsResolver(
-            configuration,
+            options,
             clients,
             [],
             new MemoryCache(new MemoryCacheOptions()),

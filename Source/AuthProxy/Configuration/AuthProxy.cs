@@ -98,4 +98,17 @@ public class AuthProxy
     /// Services are keyed by a friendly name (e.g. "portal", "catalog").
     /// </summary>
     public IDictionary<string, Service> Services { get; set; } = new Dictionary<string, Service>();
+
+    /// <summary>
+    /// Gets a value indicating whether any participating service treats its identity answer as an
+    /// authorization decision.
+    /// </summary>
+    /// <remarks>
+    /// One service asking to be believed is enough to change how the whole request is treated, because a
+    /// remembered authorization is remembered per request rather than per service. Requirements add together
+    /// and are never widened, the same way service claim requirements compose.
+    /// </remarks>
+    public bool RequiresIdentityVerification =>
+        Services.Values.Any(service =>
+            service.ParticipatesInIdentityResolution && service.IdentityVerification == IdentityVerificationMode.Required);
 }

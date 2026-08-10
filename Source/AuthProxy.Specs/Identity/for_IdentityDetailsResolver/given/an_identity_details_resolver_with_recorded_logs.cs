@@ -20,7 +20,10 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
 
     protected RecordingLogger<IdentityDetailsResolver> _logger;
 
-    protected IdentityDetailsResolver CreateResolver(HttpStatusCode statusCode = HttpStatusCode.OK, string body = "{}")
+    protected IdentityDetailsResolver CreateResolver(
+        HttpStatusCode statusCode = HttpStatusCode.OK,
+        string body = "{}",
+        C.IdentityVerificationMode mode = C.IdentityVerificationMode.BestEffort)
     {
         _logger = new RecordingLogger<IdentityDetailsResolver>();
         var clients = Substitute.For<IHttpClientFactory>();
@@ -30,7 +33,11 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
         {
             Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" } }
+                ["main"] = new()
+                {
+                    Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" },
+                    IdentityVerification = mode
+                }
             }
         });
         return new IdentityDetailsResolver(
