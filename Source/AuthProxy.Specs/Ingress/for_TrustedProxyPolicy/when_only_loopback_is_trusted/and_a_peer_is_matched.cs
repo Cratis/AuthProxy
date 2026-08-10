@@ -4,9 +4,9 @@
 using System.Net;
 using Cratis.AuthProxy.Ingress.for_TrustedProxyPolicy.given;
 
-namespace Cratis.AuthProxy.Ingress.for_TrustedProxyPolicy;
+namespace Cratis.AuthProxy.Ingress.for_TrustedProxyPolicy.when_only_loopback_is_trusted;
 
-public class when_only_loopback_is_trusted : a_trusted_proxy_policy
+public class and_a_peer_is_matched : a_trusted_proxy_policy
 {
     protected override C.Ingress Ingress => new() { Mode = C.TrustedProxyMode.LoopbackOnly };
 

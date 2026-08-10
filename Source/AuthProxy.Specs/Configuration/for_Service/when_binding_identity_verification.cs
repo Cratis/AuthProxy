@@ -38,6 +38,6 @@ public class when_binding_identity_verification : Specification
     [Fact] void should_bind_the_best_effort_mode() => _config.Services["relaxed"].IdentityVerification.ShouldEqual(IdentityVerificationMode.BestEffort);
     [Fact] void should_leave_an_unstated_mode_permissive() => _config.Services["unstated"].IdentityVerification.ShouldEqual(IdentityVerificationMode.BestEffort);
     [Fact] void should_bind_the_verification_timeout() => _config.Services["required"].IdentityVerificationTimeout.ShouldEqual(TimeSpan.FromSeconds(3));
-    [Fact] void should_leave_an_unstated_timeout_at_ten_seconds() => _config.Services["unstated"].IdentityVerificationTimeout.ShouldEqual(TimeSpan.FromSeconds(10));
+    [Fact] void should_leave_an_unstated_timeout_unstated() => _config.Services["unstated"].IdentityVerificationTimeout.ShouldBeNull();
     [Fact] void should_treat_the_deployment_as_requiring_verification() => _config.RequiresIdentityVerification.ShouldBeTrue();
 }

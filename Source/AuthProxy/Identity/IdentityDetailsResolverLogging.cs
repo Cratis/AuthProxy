@@ -34,4 +34,7 @@ internal static partial class IdentityDetailsResolverLogging
     // response body from a system that knows exactly who the caller is.
     [LoggerMessage(LogLevel.Warning, "Identity verification for service '{Service}' denied the request: {Reason}")]
     internal static partial void IdentityVerificationDenied(this ILogger logger, string service, IdentityVerificationReason reason);
+
+    [LoggerMessage(LogLevel.Warning, "Identity resolution for user {UserId} did not get its turn within the configured verification budget")]
+    internal static partial void IdentityResolutionQueueExhausted(this ILogger logger, string userId);
 }

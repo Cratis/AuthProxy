@@ -38,14 +38,20 @@ public class TrustedProxyPolicy(IOptions<C.Ingress> ingress) : ITrustedProxyPoli
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         options.ForwardLimit = _ingress.ForwardLimit;
 
-        // Loopback-only is the framework's own default, expressed by leaving the options as they came.
-        if (_ingress.Mode == C.TrustedProxyMode.LoopbackOnly)
-        {
-            return;
-        }
-
         options.KnownProxies.Clear();
         options.KnownIPNetworks.Clear();
+
+        // Loopback-only matches the framework's own default, but is stated rather than inherited. Leaving
+        // the options as they came relied on the defaults still being there, and they are not always:
+        // ASPNETCORE_FORWARDEDHEADERS_ENABLED — the standard switch for containerized ASP.NET images — has
+        // ConfigureWebDefaults clear both lists, and empty lists mean "believe every caller", which is the
+        // exact opposite of what this mode asks for. A mode that names a boundary has to write it down.
+        if (_ingress.Mode == C.TrustedProxyMode.LoopbackOnly)
+        {
+            options.KnownIPNetworks.Add(new System.Net.IPNetwork(IPAddress.Loopback, 8));
+            options.KnownProxies.Add(IPAddress.IPv6Loopback);
+            return;
+        }
 
         // The middleware runs a peer check only when at least one proxy or network is known, so leaving both
         // empty is what "believe every caller" means to it. That is the legacy posture, and it is also what

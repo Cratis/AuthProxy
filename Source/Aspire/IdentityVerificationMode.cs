@@ -14,8 +14,9 @@ public enum IdentityVerificationMode
 {
     /// <summary>
     /// The endpoint enriches identity details. Any answer that is not an explicit <c>403</c> lets the
-    /// request through, including an unreachable service, a timeout, another non-success status, an empty
-    /// body and an unparseable body. This is the released behavior and the default.
+    /// request through and merges whatever details came with it, including an unreachable service, a
+    /// timeout, another non-success status, an empty body, an unparseable body, and a body whose own
+    /// verdict is negative. This is the released behavior and the default.
     /// </summary>
     BestEffort = 0,
 

@@ -25,13 +25,14 @@ namespace Cratis.AuthProxy.Identity;
 /// <para>
 /// It is applied <em>conditionally</em>. A value that a header field can already carry travels byte for
 /// byte exactly as it always has, so an ASCII-only deployment sees no difference on the wire whatsoever.
-/// Only a value that could not have been sent at all is encoded — this defines behavior where there was a
-/// hard failure, it does not reinterpret a value that used to work.
+/// Only a value that could not have been sent at all — or one that could be mistaken for an already-encoded
+/// one, see <see cref="RequiresExtendedValue"/> — is encoded.
 /// </para>
 /// <para>
 /// Percent-encoding is deliberately conservative: only RFC 8187 <c>attr-char</c> octets survive verbatim,
-/// which makes CR, LF and NUL structurally impossible to emit and header injection therefore impossible to
-/// express through an identity value.
+/// so an encoded value can never contain CR, LF or NUL. Combined with the rule that anything already
+/// carrying the <c>UTF-8''</c> prefix is itself encoded, a consumer that decodes exactly the values the
+/// sibling header announces can never obtain a header separator out of an identity value.
 /// </para>
 /// </remarks>
 public static class HeaderValue
@@ -60,15 +61,31 @@ public static class HeaderValue
     /// <remarks>
     /// This is what decides whether the starred sibling header is emitted alongside the plain one, the same
     /// way <c>Content-Disposition</c> pairs <c>filename</c> with <c>filename*</c> (RFC 6266 §4.3).
+    /// <para>
+    /// A value that merely <em>looks</em> encoded counts too, and that half is a security boundary rather
+    /// than a nicety. Every character of <c>UTF-8''victim%0D%0AX-Admin:%20true</c> is printable US-ASCII, so
+    /// a rule that asked only "is this ASCII?" forwarded it byte for byte with no sibling — and any consumer
+    /// deciding to decode on the <em>prefix</em>, which is what the published guidance used to show, got a
+    /// carriage return and a line feed back out of a display name the person chose for themselves. Encoding
+    /// such a value instead means the sibling's presence is the single unambiguous statement that the plain
+    /// header carries an <c>ext-value</c>, and decoding it yields the literal name rather than a header
+    /// separator. No realistic name begins with <c>UTF-8''</c>, so byte-for-byte transit is untouched.
+    /// </para>
     /// </remarks>
-    public static bool RequiresExtendedValue(string value) => !IsSafeAscii(value);
+    public static bool RequiresExtendedValue(string value) =>
+        !IsSafeAscii(value) || value.StartsWith(ExtendedValuePrefix, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Converts a value to the form that goes on the wire.
     /// </summary>
     /// <param name="value">The value to convert.</param>
-    /// <returns>The value itself when it is already safe; otherwise its RFC 8187 <c>ext-value</c> form.</returns>
-    public static string ToTransportValue(string value) => IsSafeAscii(value) ? value : Encode(value);
+    /// <returns>The value itself when it can travel verbatim; otherwise its RFC 8187 <c>ext-value</c> form.</returns>
+    /// <remarks>
+    /// Expressed through <see cref="RequiresExtendedValue"/> so the wire form and the sibling header can
+    /// never disagree about whether a value is encoded — a disagreement is exactly what makes a decoded
+    /// value mean something its author did not write.
+    /// </remarks>
+    public static string ToTransportValue(string value) => RequiresExtendedValue(value) ? Encode(value) : value;
 
     /// <summary>
     /// Converts a transport value back to the value it was produced from.
@@ -77,10 +94,13 @@ public static class HeaderValue
     /// <param name="decoded">The original value, or <paramref name="value"/> unchanged when it could not be decoded.</param>
     /// <returns><see langword="true"/> when <paramref name="decoded"/> holds the original; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// A value without the <c>UTF-8''</c> prefix was never encoded, so it decodes to itself — which makes
-    /// this the exact inverse of <see cref="ToTransportValue"/> for every value that does not itself begin
-    /// with that prefix. A consumer that wants an unambiguous answer reads the starred sibling header
-    /// instead: its presence is what states that the plain header carries an <c>ext-value</c>.
+    /// A value without the <c>UTF-8''</c> prefix was never encoded, so it decodes to itself. Because
+    /// <see cref="ToTransportValue"/> encodes anything that carries that prefix, this is the exact inverse
+    /// of it for <em>every</em> value — including one whose author wrote the prefix themselves.
+    /// <para>
+    /// The prefix is nonetheless not what a consumer should branch on: it says what a value looks like, and
+    /// the starred sibling header says what AuthProxy did. Read the sibling's presence.
+    /// </para>
     /// </remarks>
     public static bool TryDecode(string value, out string decoded)
     {

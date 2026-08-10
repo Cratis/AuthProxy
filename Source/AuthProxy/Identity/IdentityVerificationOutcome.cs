@@ -34,9 +34,17 @@ public record IdentityVerificationOutcome(
     /// Creates an outcome for a service that explicitly refused the caller.
     /// </summary>
     /// <param name="reason">The bounded code explaining the refusal.</param>
+    /// <param name="details">The identity details the service supplied, if any.</param>
     /// <returns>The denied outcome.</returns>
-    public static IdentityVerificationOutcome Denied(IdentityVerificationReason reason) =>
-        new(IdentityVerificationStatus.Denied, reason, new JsonObject());
+    /// <remarks>
+    /// A refusal can arrive carrying details: a service answering the full envelope states its verdict and
+    /// its details in the same body. They are kept rather than discarded because
+    /// <see cref="Configuration.IdentityVerificationMode.BestEffort"/> merges whatever a service returned no
+    /// matter which verdict accompanied it — which is what the released proxy did, since it read no verdict
+    /// out of the body at all.
+    /// </remarks>
+    public static IdentityVerificationOutcome Denied(IdentityVerificationReason reason, JsonObject? details = null) =>
+        new(IdentityVerificationStatus.Denied, reason, details ?? new JsonObject());
 
     /// <summary>
     /// Creates an outcome for a service that established nothing.

@@ -26,6 +26,18 @@ namespace Cratis.AuthProxy;
 public static class IngressExtensions
 {
     /// <summary>
+    /// The host-level switch that inserts a forwarded-headers middleware of the host's own, ahead of
+    /// everything this pipeline places.
+    /// </summary>
+    /// <remarks>
+    /// Standard guidance for containerized ASP.NET images, and incompatible with declaring the boundary
+    /// here: setting it has <c>ConfigureWebDefaults</c> clear the known-proxy and known-network lists and
+    /// call <c>UseForwardedHeaders</c> before any application middleware — so the peer
+    /// <see cref="Ingress.TrustedProxyMiddleware"/> records is already the one the header replaced.
+    /// </remarks>
+    public const string ForwardedHeadersEnvironmentVariable = "ASPNETCORE_FORWARDEDHEADERS_ENABLED";
+
+    /// <summary>
     /// Registers all <see cref="IOptions{T}"/> bindings for the ingress configuration sections
     /// and configures forwarded-headers handling.
     /// </summary>
@@ -52,6 +64,7 @@ public static class IngressExtensions
             .ValidateOnStart();
 
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
         builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
 
         // The forwarded-headers middleware and everything downstream that asks whether a request came through
@@ -91,6 +104,15 @@ public static class IngressExtensions
                 nameof(C.TrustedProxyMode.Configured),
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}",
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}");
+        }
+
+        if (bool.TryParse(Environment.GetEnvironmentVariable(ForwardedHeadersEnvironmentVariable), out var hostHandlesForwardedHeaders)
+            && hostHandlesForwardedHeaders)
+        {
+            app.Logger.ForwardedHeadersEnvironmentSwitchIsOn(
+                ForwardedHeadersEnvironmentVariable,
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}",
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}");
         }
 
         // Who actually connected has to be recorded before the forwarded headers are applied, because

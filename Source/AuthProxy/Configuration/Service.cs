@@ -9,7 +9,8 @@ namespace Cratis.AuthProxy.Configuration;
 public class Service
 {
     /// <summary>
-    /// The default time AuthProxy waits for a service's identity endpoint before giving up on it.
+    /// The time AuthProxy waits for the identity endpoint of a service that states no timeout of its own and
+    /// treats its answer as an authorization decision.
     /// </summary>
     /// <remarks>
     /// Matched to the back-channel client-credentials verifier, which is the same shape of call — a
@@ -109,18 +110,45 @@ public class Service
 
     /// <summary>
     /// Gets or sets how long AuthProxy waits for this service's <c>/.cratis/me</c> answer before treating
-    /// the call as failed. Defaults to <see cref="DefaultIdentityVerificationTimeout"/> (10 seconds).
-    /// Set to zero or a negative value to leave the wait unbounded.
+    /// the call as failed. Leave unset to let the mode decide — see
+    /// <see cref="EffectiveIdentityVerificationTimeout"/>. Set to zero or a negative value to leave the wait
+    /// unbounded.
     /// </summary>
     /// <remarks>
-    /// The call used to inherit the ambient 100-second client default and carried no cancellation at all, so
-    /// a service that accepted connections and then stopped answering held every authenticated request open
-    /// for a minute and a half each. That is a denial-of-service surface on its own; under
-    /// <see cref="IdentityVerificationMode.Required"/> it is also the difference between a bounded refusal
-    /// and an unbounded hang. The wait is additionally bound to the caller's own request lifetime, so a
-    /// client that goes away stops occupying the proxy.
+    /// A stated value is honored in both modes. It is deliberately nullable rather than defaulted, because
+    /// "the deployment asked for ten seconds" and "the deployment said nothing" are different facts and only
+    /// the second one may be answered differently per mode.
     /// </remarks>
-    public TimeSpan IdentityVerificationTimeout { get; set; } = DefaultIdentityVerificationTimeout;
+    public TimeSpan? IdentityVerificationTimeout { get; set; }
+
+    /// <summary>
+    /// Gets how long AuthProxy actually waits for this service's <c>/.cratis/me</c> answer.
+    /// </summary>
+    /// <remarks>
+    /// A bound on the wait is a property of fail-closed verification, not of enrichment, so an unstated
+    /// timeout resolves per mode.
+    /// <para>
+    /// Under <see cref="IdentityVerificationMode.Required"/> the call stands between a caller and a
+    /// decision. Without a bound it inherits the ambient 100-second client default, so a service that
+    /// accepts connections and then stops answering holds every authenticated request open for a minute and
+    /// a half each — a denial-of-service surface on its own, and the difference between a bounded refusal
+    /// and an unbounded hang. <see cref="DefaultIdentityVerificationTimeout"/> applies.
+    /// </para>
+    /// <para>
+    /// Under <see cref="IdentityVerificationMode.BestEffort"/> the call only enriches, and the released
+    /// proxy waited on the ambient client default. Imposing a shorter bound nobody asked for would not
+    /// refuse anything — it would admit the caller with that service's details silently missing, which is a
+    /// worse failure than the slow answer it replaces because nothing downstream can tell the difference.
+    /// The released wait is kept until a deployment states otherwise.
+    /// </para>
+    /// <para>
+    /// The wait is bound to the caller's own request lifetime in both modes, so a client that goes away
+    /// stops occupying the proxy whatever this resolves to.
+    /// </para>
+    /// </remarks>
+    public TimeSpan EffectiveIdentityVerificationTimeout =>
+        IdentityVerificationTimeout
+        ?? (IdentityVerification == IdentityVerificationMode.Required ? DefaultIdentityVerificationTimeout : TimeSpan.Zero);
 
     /// <summary>
     /// Gets a value indicating whether this service's identity endpoint is called at all.

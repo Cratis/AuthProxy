@@ -144,7 +144,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
 
         return (authorized, authenticated) switch
         {
-            (false, _) => IdentityVerificationOutcome.Denied(IdentityVerificationReason.NotAuthorized),
+            (false, _) => IdentityVerificationOutcome.Denied(IdentityVerificationReason.NotAuthorized, details),
             (true, false) => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ConflictingVerdict, details),
             (true, _) => IdentityVerificationOutcome.Positive(details),
             _ => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.NoVerdict, details)

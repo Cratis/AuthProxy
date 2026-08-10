@@ -26,7 +26,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <remarks>
 /// What each service's answer is worth is a per-service setting — see
 /// <see cref="C.IdentityVerificationMode"/>. Under <see cref="C.IdentityVerificationMode.BestEffort"/> only
-/// an explicit refusal denies, which is the released behavior. Under
+/// an HTTP <c>403</c> denies, which is exactly what the released proxy denied on and nothing more. Under
 /// <see cref="C.IdentityVerificationMode.Required"/> only an explicit positive admits, and every other
 /// outcome denies and erases what an earlier positive left behind.
 /// </remarks>
@@ -39,6 +39,11 @@ public class IdentityDetailsResolver(
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
     const string CacheKeyPurpose = "IdentityDetails";
+
+    /// <summary>
+    /// The label a denial is logged under when the request never reached a service to be refused by one.
+    /// </summary>
+    const string ResolutionQueueLabel = "identity-resolution";
 
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {
@@ -96,7 +101,45 @@ public class IdentityDetailsResolver(
         var semaphore = cacheKey is not null
             ? _resolverLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1))
             : ownedSemaphore = new SemaphoreSlim(1, 1);
-        await semaphore.WaitAsync();
+
+        // The wait for a turn has to be bounded by the same two things the call itself is bounded by: the
+        // caller's own request lifetime, and the budget the deployment stated for an answer. An unbounded
+        // wait in front of a bounded call is still an unbounded call — every request for one account lines
+        // up on this semaphore behind a verifier that accepts connections and stops answering, each turn
+        // costs up to the verification timeout, and a client that gave up long ago keeps its place in the
+        // queue. One page load's worth of assets is minutes of proxy work on that arithmetic.
+        bool tookItsTurn;
+        IdentityVerificationReason missedTurn;
+        try
+        {
+            tookItsTurn = await semaphore.WaitAsync(QueueBudget(current), context.RequestAborted);
+            missedTurn = IdentityVerificationReason.TimedOut;
+        }
+        catch (OperationCanceledException)
+        {
+            tookItsTurn = false;
+            missedTurn = IdentityVerificationReason.Canceled;
+        }
+
+        if (!tookItsTurn)
+        {
+            ownedSemaphore?.Dispose();
+
+            // A caller that went away is an ordinary event and says nothing about the deployment. Running out
+            // of budget while waiting is the operator's signal that the identity endpoints are the queue.
+            if (missedTurn == IdentityVerificationReason.TimedOut)
+            {
+                logger.IdentityResolutionQueueExhausted(logIdentifier);
+            }
+
+            // Never reaching the call establishes precisely what a call that never answers establishes, so
+            // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
+            // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
+            return verificationRequired
+                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn)
+                : BuildAuthorizedResult(principal, details: null);
+        }
+
         try
         {
             // Double-check inside the lock — another request may have populated the cache while we waited.
@@ -120,7 +163,7 @@ public class IdentityDetailsResolver(
                     enrichedPrincipal,
                     tenantId,
                     logIdentifier,
-                    service.IdentityVerificationTimeout,
+                    service.EffectiveIdentityVerificationTimeout,
                     context.RequestAborted);
 
                 if (!Admits(outcome, service.IdentityVerification))
@@ -157,10 +200,44 @@ public class IdentityDetailsResolver(
     /// <param name="outcome">What the service established.</param>
     /// <param name="mode">What the service's answer is worth.</param>
     /// <returns><see langword="true"/> when the request may continue; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// <see cref="C.IdentityVerificationMode.BestEffort"/> denies on the one trigger the released proxy
+    /// denied on — an HTTP <c>403</c> — and on nothing else. The released call never read a verdict out of
+    /// the body at all: it returned <c>details</c> and forwarded the caller whatever the body said about
+    /// <c>isAuthorized</c>. Promoting a body-level negative to a denial here would change what the
+    /// <em>default</em> mode does to services that never opted in, and would do it silently, to the exact
+    /// response shape the documented envelope tells them to write.
+    /// <see cref="C.IdentityVerificationMode.Required"/> is where a body-level verdict becomes a decision.
+    /// </remarks>
     static bool Admits(IdentityVerificationOutcome outcome, C.IdentityVerificationMode mode) =>
         mode == C.IdentityVerificationMode.Required
             ? outcome.Status == IdentityVerificationStatus.Positive
-            : outcome.Status != IdentityVerificationStatus.Denied;
+            : outcome.Reason != IdentityVerificationReason.Forbidden;
+
+    /// <summary>
+    /// Computes how long a request may wait for its turn at the identity endpoints.
+    /// </summary>
+    /// <param name="config">The configuration the request is being resolved against.</param>
+    /// <returns>The bound, or <see cref="Timeout.InfiniteTimeSpan"/> when any participating service states none.</returns>
+    /// <remarks>
+    /// One resolution asks every participating service in turn, so the longest a turn can legitimately take
+    /// is the sum of what each service is allowed. Waiting longer than that is waiting for a queue rather
+    /// than for an answer. A single participating service that states no bound makes the whole sum
+    /// unbounded — cutting the wait short there would refuse a request whose predecessor is still doing
+    /// exactly what it was configured to be allowed to do. The caller's own request lifetime bounds the wait
+    /// either way.
+    /// </remarks>
+    static TimeSpan QueueBudget(C.AuthProxy config)
+    {
+        var budgets = config.Services.Values
+            .Where(service => service.ParticipatesInIdentityResolution)
+            .Select(service => service.EffectiveIdentityVerificationTimeout)
+            .ToList();
+
+        return budgets.Count > 0 && budgets.TrueForAll(budget => budget > TimeSpan.Zero)
+            ? budgets.Aggregate(TimeSpan.Zero, (total, budget) => total + budget)
+            : Timeout.InfiniteTimeSpan;
+    }
 
     /// <summary>
     /// Expires the readable identity cookie so a refused caller stops carrying an authorized-looking one.

@@ -25,11 +25,18 @@ namespace Cratis.AuthProxy.Configuration;
 public enum IdentityVerificationMode
 {
     /// <summary>
-    /// The endpoint enriches identity details, and any answer that is not an explicit refusal lets the
-    /// request through. An unreachable service, a timeout, a non-success status other than <c>403</c>, an
-    /// empty body and an unparseable body all resolve to "no extra details" rather than to a refusal. This
-    /// is the released behavior and remains the default.
+    /// The endpoint enriches identity details, and only an HTTP <c>403</c> refuses the caller. Every other
+    /// answer lets the request through and merges whatever details came with it — an unreachable service, a
+    /// timeout, a non-success status other than <c>403</c>, an empty body, an unparseable body, and a
+    /// well-formed body whose own <c>isAuthorized</c> or <c>isAuthenticated</c> verdict is negative or
+    /// self-contradicting. This is the released behavior, exactly, and remains the default.
     /// </summary>
+    /// <remarks>
+    /// The released call read no verdict out of the body at all, so a body-level negative is admitted here
+    /// on purpose rather than by omission. A deployment whose service answers with a verdict it wants
+    /// enforced says so with <see cref="Required"/>; promoting the verdict in this mode would change what an
+    /// unchanged configuration does to an unchanged service.
+    /// </remarks>
     BestEffort = 0,
 
     /// <summary>
@@ -38,5 +45,16 @@ public enum IdentityVerificationMode
     /// or unparseable body, or a well-formed body carrying no unambiguous positive — denies the request,
     /// clears any remembered authorization, and serves the forbidden page.
     /// </summary>
+    /// <remarks>
+    /// A denial expires the readable identity cookie and the sealed authorization record by asking the
+    /// browser to delete them, and evicts the in-memory result. Two of those three are requests rather than
+    /// guarantees: a non-browser caller that ignores <c>Set-Cookie</c> keeps presenting the sealed record it
+    /// was issued and is short-circuited on it until it expires. So what this mode bounds is revocation
+    /// <em>latency</em> — a positive can be reused for at most
+    /// <see cref="Session.IdentityRevalidationInterval"/> (the sealed record) or
+    /// <see cref="Session.IdentityResultCacheDuration"/> (the proxy's own cache), and no longer. Set the
+    /// re-validation interval to zero to have no record sealed at all, which is what makes every request
+    /// verified.
+    /// </remarks>
     Required = 1
 }

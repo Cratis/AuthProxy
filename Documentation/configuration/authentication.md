@@ -414,10 +414,10 @@ first, so a backend can treat them as proof rather than as a claim.
 | Header | Carries | Encoding |
 |--------|---------|----------|
 | `x-ms-client-principal` | The full client principal as base64-encoded JSON | Always base64, so always US-ASCII |
-| `x-ms-client-principal-id` | The provider-local subject | Verbatim, or RFC 8187 when it is not US-ASCII |
-| `x-ms-client-principal-name` | The display name (`userDetails`) | Verbatim, or RFC 8187 when it is not US-ASCII |
-| `x-ms-client-principal-name*` | The RFC 8187 form of the display name | Present **only** when the name is not US-ASCII |
-| `Tenant-ID` | The resolved tenant | Verbatim, or RFC 8187 when it is not US-ASCII |
+| `x-ms-client-principal-id` | The provider-local subject | Verbatim, or RFC 8187 — no sibling announces which |
+| `x-ms-client-principal-name` | The display name (`userDetails`) | Verbatim, or RFC 8187 when it cannot travel verbatim |
+| `x-ms-client-principal-name*` | The RFC 8187 form of the display name | Present **exactly** when the plain header carries an encoded value |
+| `Tenant-ID` | The resolved tenant | Verbatim, or RFC 8187 — no sibling announces which |
 
 ### Every header value is US-ASCII
 
@@ -427,11 +427,11 @@ character above `U+007F` to one — it throws before a byte reaches the socket. 
 did not arrive garbled at the backend; the proxied request failed at the gateway and the identity-endpoint
 call failed silently, and the person could not use the application at all.
 
-AuthProxy now guarantees that every value it writes is printable US-ASCII. A value that already is one is
-sent **byte for byte unchanged** — if your users' names are ASCII, nothing about the wire format changes
-and no extra header appears. A value that is not is sent as an
-[RFC 8187](https://www.rfc-editor.org/rfc/rfc8187) `ext-value`: percent-encoded UTF-8 behind a
-self-describing `UTF-8''` prefix.
+AuthProxy now guarantees that every value it writes is printable US-ASCII. A value that already is one —
+and that could not be mistaken for an encoded one, see below — is sent **byte for byte unchanged**, so if
+your users' names are ASCII nothing about the wire format changes and no extra header appears. Anything
+else is sent as an [RFC 8187](https://www.rfc-editor.org/rfc/rfc8187) `ext-value`: percent-encoded UTF-8
+behind a self-describing `UTF-8''` prefix.
 
 ```http
 x-ms-client-principal-name: UTF-8''S%C3%B8ren%20W%C3%A6rstad
@@ -444,9 +444,30 @@ header carries an encoded value; when it is absent, the plain header is the name
 header is always populated either way, so a backend that gates on the three headers being present keeps
 working untouched.
 
-Because the encoder emits only RFC 8187 `attr-char` octets, a name can never introduce `CR`, `LF` or
-`NUL` into a header — header injection through a display name is structurally impossible rather than
-merely checked for.
+Because the encoder emits only RFC 8187 `attr-char` octets, an encoded value can never contain `CR`, `LF`
+or `NUL`. That alone is not the whole guarantee, though, because a consumer that *decodes* can reconstruct
+whatever the encoding hid. A name a person chose to write as `UTF-8''victim%0D%0AX-Admin:%20true` is
+printable US-ASCII from end to end, so it would travel verbatim — and a backend that decided to decode
+because the value *looked* encoded would get a carriage return, a line feed and a header of the caller's
+choosing back out of it.
+
+So the rule is not "encode what ASCII cannot carry", it is **encode anything that could be mistaken for an
+encoded value**. A value beginning with `UTF-8''` is itself encoded, however ordinary the rest of it is,
+and the sibling header is emitted for it. Decoding it returns the literal name the person typed. The
+guarantee that follows is precise:
+
+> Decode exactly the values the sibling header announces, exactly once, and no identity value can put `CR`,
+> `LF` or `NUL` into a header on your side.
+
+No realistic display name begins with `UTF-8''`, so nothing about ordinary traffic changes.
+
+> [!IMPORTANT]
+> The sibling header exists only for `x-ms-client-principal-name`. `x-ms-client-principal-id` and
+> `Tenant-ID` go through the same encoder — a value outside US-ASCII on either is sent as an `ext-value` —
+> but nothing announces it, so for those two headers the `UTF-8''` prefix is the only signal there is. That
+> is deliberate: a subject and a tenant identifier are values your identity provider and your configuration
+> issue, not values a person types, so treat them as opaque and forward them rather than decoding them. If
+> you do decode one, decode it once and treat the result as data, never as a header.
 
 ### `x-ms-client-principal` is the canonical value
 
@@ -461,12 +482,18 @@ Arc backend behind AuthProxy sees exact Unicode names with no changes on its sid
 
 ```csharp
 // Decoding the header form yourself, when you are not on Arc.
+// Gate on the sibling header, never on the prefix: the sibling is what AuthProxy states, and the
+// prefix is only what the value looks like. A name a person typed as "UTF-8''..." looks encoded
+// and is not, and decoding it because it looked encoded is how a display name becomes a header.
 var name = request.Headers["x-ms-client-principal-name"].ToString();
-if (name.StartsWith("UTF-8''", StringComparison.Ordinal))
+if (request.Headers.ContainsKey("x-ms-client-principal-name*"))
 {
     name = Uri.UnescapeDataString(name["UTF-8''".Length..]);
 }
 ```
+
+Decode once, and once only. The result is the person's name, and a name is data — put it in a model, a
+log field or a response body, never back into a header.
 
 ---
 

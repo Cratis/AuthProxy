@@ -92,6 +92,47 @@ So set it to the number of hops your deployment actually has:
 Every hop counted must itself be a trusted peer. AuthProxy re-checks at each step, so raising `ForwardLimit`
 without also declaring the intermediate addresses in `TrustedProxies` changes nothing.
 
+> [!IMPORTANT]
+> **If you have more than one hop and have never set `ForwardLimit`, the address recorded against a sign-in
+> changes with this release.** Read this even if you are not planning to configure anything.
+>
+> AuthProxy used to record the **left-most** entry of `X-Forwarded-For` for the sign-in notification, while
+> everything else in the proxy used the address the forwarded-headers middleware had settled on. Those are
+> two different answers to one question, and the left-most one is the entry furthest from you — the one the
+> outermost caller wrote, which nothing verified. Both now come from the same place, the address the
+> middleware settled on after consuming `ForwardLimit` hops.
+>
+> With `X-Forwarded-For: 198.51.100.7, 203.0.113.9` and the default `ForwardLimit` of `1`:
+>
+> | | Recorded `ipAddress` | What it is |
+> |---|---|---|
+> | Before | `198.51.100.7` | the browser — but taken on trust from the header |
+> | Now | `203.0.113.9` | your own inner load balancer — one hop consumed |
+>
+> Nothing is broken and nothing is less safe; the new value is the honest one for a `ForwardLimit` of `1`.
+> But every sign-in notification and audit record silently changes meaning, and if two hops really do sit in
+> front of you the recorded address becomes identical for every user, which is useless as an audit trail.
+>
+> **To restore the browser's address, count the hops you actually have.** For the chain above that is
+> `ForwardLimit: 2`, with the inner balancer's address declared in `TrustedProxies` so the second hop is
+> allowed to be consumed:
+>
+> ```json
+> {
+>   "Cratis": {
+>     "AuthProxy": {
+>       "Ingress": {
+>         "TrustedProxies": [ "203.0.113.9", "10.0.0.0/8" ],
+>         "ForwardLimit": 2
+>       }
+>     }
+>   }
+> }
+> ```
+>
+> Verify it the way [Checking your work](#checking-your-work) describes: sign in and look at the
+> `ipAddress` your `SignIn:NotifyUrl` endpoint received.
+
 ---
 
 ## Modes
@@ -115,7 +156,28 @@ deployment wants.
 |------|--------|-------------|
 | `Configured` | Exactly the peers in `TrustedProxies` | Normal deployments. This is the default. |
 | `LoopbackOnly` | Only a caller on the loopback interface | A sidecar, or local development. A deployment behind an ingress never sees loopback as the peer, so this refuses every forwarded header it receives. |
-| `TrustAny` | Every caller | Nothing but your own ingress can reach AuthProxy at all — a private network with no other route in. |
+| `TrustAny` | Every caller | Nothing but your own ingress can reach AuthProxy at all — a private network with no other route in, or a listener with no peer address at all (see below). |
+
+> [!WARNING]
+> **Do not set `ASPNETCORE_FORWARDEDHEADERS_ENABLED`.** It is standard advice for containerized ASP.NET
+> images, and it is the wrong thing here: it makes the host insert a forwarded-headers middleware of its
+> own, ahead of every AuthProxy middleware, and clear the known-proxy lists while doing it. The peer
+> AuthProxy records as the caller is then the one the header has already replaced, so the boundary you
+> declared is applied to a request that was rewritten before AuthProxy saw it. AuthProxy consumes forwarded
+> headers itself, from the configuration on this page — leave the variable unset. It logs a warning at
+> startup if it finds it set.
+
+### A listener with no peer address
+
+`Configured` and `LoopbackOnly` both decide by looking at the peer's IP address. A Unix domain socket does
+not have one — `RemoteIpAddress` is null — so every request over such a listener is treated as coming from
+an untrusted peer. Sessions keep working, which is what makes this quiet: the visible symptom is that
+`X-Forwarded-Proto` stops being honored, so cookies lose `Secure` and the public origin reverts to the
+transport scheme.
+
+If AuthProxy listens on a Unix socket, and the only thing that can write to that socket is your own
+ingress, say `TrustAny`. That is what "the peer is trustworthy and cannot be identified by address" looks
+like when it is stated rather than stumbled into.
 
 ---
 
