@@ -13,11 +13,13 @@
         .provider-btn { display: block; padding: .75rem 1.5rem; border-radius: 6px; background: #0078d4; color: #fff; text-decoration: none; font-size: 1rem; font-weight: 600; transition: background .15s; }
         .provider-btn:hover { background: #005a9e; }
         .error { color: #c00; font-size: .9rem; margin-top: 1rem; }
+        .reason { background: #fdf3e7; border: 1px solid #f0c893; border-radius: 6px; color: #8a5a00; font-size: .9rem; padding: .75rem 1rem; margin: 0 0 1.25rem; }
     </style>
 </head>
 <body>
     <div class="card">
         <h1>Sign In</h1>
+        <p id="reason" class="reason" style="display:none"></p>
         <p>Choose how you want to sign in:</p>
         <div id="providers" class="providers"></div>
         <p id="error" class="error" style="display:none">
@@ -29,6 +31,22 @@
             function getCookie(name) {
                 var match = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.*+?^=!:${}()|[\]\/\\])/g, '\\$1') + '=([^;]*)'));
                 return match ? decodeURIComponent(match[1]) : null;
+            }
+
+            var query = new URLSearchParams(window.location.search);
+
+            // A failed, denied, or terminated sign-in redirects back here with a reason. Show the person
+            // what happened; the buttons below are the way forward.
+            var reasonMessages = {
+                'remote-failure': 'Signing in did not complete. Please try again.',
+                'access-denied': 'The sign-in was cancelled or not approved at the identity provider. Please try again.',
+                'invalid-session': 'Your session is no longer valid. Please sign in again.'
+            };
+            var reason = query.get('reason');
+            if (reason && reasonMessages[reason]) {
+                var reasonEl = document.getElementById('reason');
+                reasonEl.textContent = reasonMessages[reason];
+                reasonEl.style.display = '';
             }
 
             var providersJson = getCookie('.cratis-providers');
@@ -55,8 +73,18 @@
 
             // This page is served in place of the resource that was requested, so the current location is
             // where the user was heading. Carrying it as returnUrl is what brings them back after sign-in
-            // instead of dropping them at the site root.
-            var returnUrl = window.location.pathname + window.location.search;
+            // instead of dropping them at the site root. The exception is landing on the page's own path —
+            // a failed sign-in or an explicit redirect sends people here with the real destination in the
+            // returnUrl parameter, and carrying the page's own URL would loop back into it after sign-in.
+            var returnUrl;
+            if (window.location.pathname.indexOf('/.cratis/select-provider') === 0) {
+                var explicitReturnUrl = query.get('returnUrl');
+                returnUrl = explicitReturnUrl && explicitReturnUrl.charAt(0) === '/' && explicitReturnUrl.charAt(1) !== '/'
+                    ? explicitReturnUrl
+                    : '/';
+            } else {
+                returnUrl = window.location.pathname + window.location.search;
+            }
 
             providers.forEach(function (provider) {
                 var a = document.createElement('a');

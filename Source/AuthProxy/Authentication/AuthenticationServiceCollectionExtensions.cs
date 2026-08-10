@@ -235,6 +235,8 @@ public static class AuthenticationServiceCollectionExtensions
                         context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
                         return Task.CompletedTask;
                     },
+                    OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
+                    OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
                     OnTicketReceived = context => HandleTicketReceived(
                         context,
                         () => CanonicalSessionRegistrationFingerprint.Create(
@@ -311,6 +313,8 @@ public static class AuthenticationServiceCollectionExtensions
                             await AddVerifiedOAuthEmail(ctx, capturedProvider);
                         }
                     },
+                    OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
+                    OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
                     OnTicketReceived = context => HandleTicketReceived(
                         context,
                         () => CanonicalSessionRegistrationFingerprint.Create(
@@ -381,6 +385,12 @@ public static class AuthenticationServiceCollectionExtensions
         C.CanonicalIdentity? canonicalIdentity,
         string protocolAssurance)
     {
+        // A completed handshake is the one moment every leftover transient sign-in cookie is both visible
+        // (this is the callback path, where legacy path-scoped stragglers still flow) and safe to remove —
+        // the handshake they belonged to is either this one, already consumed, or abandoned. Clearing them
+        // here means one successful sign-in heals a browser poisoned by earlier half-cleared sessions.
+        TransientAuthenticationCookies.Clear(context.HttpContext);
+
         var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
         string? validatedIssuer = null;
         context.Properties?.Items.TryGetValue(ValidatedIssuerStateKey, out validatedIssuer);
