@@ -16,6 +16,7 @@ public class when_notifying_a_completed_sign_in : a_sign_in_notifier
     [Fact] void should_post() => _handler.LastRequest!.Method.ShouldEqual(HttpMethod.Post);
     [Fact] void should_send_the_subject() => _handler.LastRequestBody!.ShouldContain("subject-123");
     [Fact] void should_send_the_identity_provider() => _handler.LastRequestBody!.ShouldContain("https://github.com");
+    [Fact] void should_not_add_a_canonical_provider_key() => _handler.LastRequestBody!.ShouldNotContain("providerKey");
     [Fact] void should_send_the_client_ip_from_the_forwarded_header() => _handler.LastRequestBody!.ShouldContain("203.0.113.7");
     [Fact] void should_send_the_approximate_location() => _handler.LastRequestBody!.ShouldContain("Oslo");
     [Fact] void should_send_the_parsed_browser() => _handler.LastRequestBody!.ShouldContain("Chrome");

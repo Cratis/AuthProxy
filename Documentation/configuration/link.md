@@ -42,13 +42,33 @@ popup avoids both problems.
 4. **AuthProxy returns to the application.** The browser is redirected to the supplied `returnUrl`, where the
    application correlates the token back to the signed-in user, records the association, and closes the popup.
 
-The request body posted to `ExchangeUrl` matches the invite exchange shape:
+The request body posted to `ExchangeUrl` depends on whether the selected provider opts into
+[canonical federated identity](authentication.md#canonical-federated-identity).
+
+Legacy providers keep the existing body:
 
 ```json
 { "subject": "<provider subject>", "identityProvider": "<issuer / provider>" }
 ```
 
+Canonical providers add the stable provider-aware identity fields:
+
+```json
+{
+  "subject": "<configured canonical subject>",
+  "providerKey": "<configured stable provider key>",
+  "issuer": "<normalized validated or configured issuer>",
+  "identityProvider": "<same value as providerKey>"
+}
+```
+
 with `Authorization: Bearer <one-time-link-token>`.
+
+Canonical identity is opt-in per provider. During migration, the application endpoint must accept both
+bodies. For a canonical body, bind the account with the complete `(providerKey, issuer, subject)` tuple;
+never treat `subject` alone or the compatibility `identityProvider` field as the stable account key.
+The tuple records provider authentication metadata only. The application still decides whether that identity
+may link a credential to the current account.
 
 ---
 
@@ -86,7 +106,8 @@ Cratis__AuthProxy__Link__ExchangeUrl=https://studio.example.com/api/internal/ide
 When `ExchangeUrl` is empty or the `Link` section is absent, the link callback is skipped (the subject is not
 posted anywhere) and the flow is effectively disabled.
 
-> **Security.** The exchange endpoint is a service-to-service back-channel: it is reachable by AuthProxy, not by
-> browsers, and it trusts the subject AuthProxy delivers from a real provider authentication together with the
-> one-time link token — never a client-supplied subject. Point `ExchangeUrl` at an internal application address
-> and keep the token short-lived and single-use, exactly as for the invite exchange.
+> **Security.** The JSON callback body is not signed. The one-time bearer token binds the operation to the
+> signed-in application user, but it does not by itself prove that AuthProxy sent the HTTP request. Keep
+> `ExchangeUrl` network-isolated from public traffic or authenticate AuthProxy separately at the application
+> endpoint. Keep the token short-lived and single-use, and never turn successful provider authentication into
+> application authorization without applying the application's own linking policy.

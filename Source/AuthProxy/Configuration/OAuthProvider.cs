@@ -42,6 +42,17 @@ public class OAuthProvider
     public string UserInformationEndpoint { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets an optional endpoint that returns the authenticated account's email addresses with explicit
+    /// primary and verification flags.
+    /// </summary>
+    /// <remarks>
+    /// This supports providers such as GitHub whose regular user-information endpoint can omit a private email and
+    /// does not establish verification. The endpoint must return a JSON array with <c>email</c>, <c>verified</c>,
+    /// and <c>primary</c> properties. AuthProxy selects exactly one primary, verified address.
+    /// </remarks>
+    public string VerifiedEmailEndpoint { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the OAuth client ID registered with the provider.
     /// </summary>
     [Required]
@@ -63,4 +74,11 @@ public class OAuthProvider
     /// value is the JSON field name in the user-info response (e.g. <c>login</c>).
     /// </summary>
     public IDictionary<string, string> ClaimMappings { get; set; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// Gets or sets the optional canonical federated identity contract for this provider.
+    /// OAuth providers must configure an explicit issuer because OAuth user-info does not establish one.
+    /// When absent, the provider retains the legacy claim-selection and forwarding behavior.
+    /// </summary>
+    public CanonicalIdentity? CanonicalIdentity { get; set; }
 }

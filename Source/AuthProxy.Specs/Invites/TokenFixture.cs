@@ -51,8 +51,16 @@ static class TokenFixture
             Expires = expires ?? DateTime.UtcNow.AddHours(1),
             NotBefore = notBefore ?? DateTime.UtcNow.AddMinutes(-1),
             SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256),
-            Claims = additionalClaims?.ToDictionary(c => c.Type, c => (object)c.Value),
+            Claims = additionalClaims?
+                .GroupBy(_ => _.Type, StringComparer.Ordinal)
+                .ToDictionary(_ => _.Key, ClaimValue, StringComparer.Ordinal),
         };
         return handler.CreateToken(descriptor);
+    }
+
+    static object ClaimValue(IGrouping<string, Claim> claims)
+    {
+        var values = claims.Select(_ => _.Value).ToArray();
+        return values.Length == 1 ? values[0] : values;
     }
 }

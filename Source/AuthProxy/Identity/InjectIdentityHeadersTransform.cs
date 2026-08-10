@@ -18,12 +18,13 @@ public class InjectIdentityHeadersTransform : RequestTransform
     {
         var httpContext = context.HttpContext;
 
+        context.ProxyRequest.Headers.Remove(Headers.Principal);
+        context.ProxyRequest.Headers.Remove(Headers.PrincipalId);
+        context.ProxyRequest.Headers.Remove(Headers.PrincipalName);
+
         var principal = httpContext.BuildClientPrincipal();
         if (principal is not null)
         {
-            context.ProxyRequest.Headers.Remove(Headers.Principal);
-            context.ProxyRequest.Headers.Remove(Headers.PrincipalId);
-            context.ProxyRequest.Headers.Remove(Headers.PrincipalName);
             context.ProxyRequest.Headers.Add(Headers.Principal, principal.ToBase64());
             context.ProxyRequest.Headers.Add(Headers.PrincipalId, principal.UserId);
             context.ProxyRequest.Headers.Add(Headers.PrincipalName, principal.UserDetails);

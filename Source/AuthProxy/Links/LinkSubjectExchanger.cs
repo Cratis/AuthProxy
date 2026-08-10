@@ -3,6 +3,7 @@
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -19,11 +20,27 @@ namespace Cratis.AuthProxy.Links;
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="canonicalIdentityResolver">The shared canonical identity resolver, or <see langword="null"/> for legacy-compatible direct construction.</param>
 public class LinkSubjectExchanger(
     IOptionsMonitor<C.AuthProxy> config,
     IHttpClientFactory httpClientFactory,
-    ILogger<LinkSubjectExchanger> logger) : ILinkSubjectExchanger
+    ILogger<LinkSubjectExchanger> logger,
+    ICanonicalIdentityResolver? canonicalIdentityResolver) : ILinkSubjectExchanger
 {
+    /// <summary>
+    /// Initializes a legacy-compatible exchanger that sanitizes reserved canonical claims without resolving canonical providers.
+    /// </summary>
+    /// <param name="config">The auth proxy configuration monitor.</param>
+    /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
+    /// <param name="logger">The logger.</param>
+    public LinkSubjectExchanger(
+        IOptionsMonitor<C.AuthProxy> config,
+        IHttpClientFactory httpClientFactory,
+        ILogger<LinkSubjectExchanger> logger)
+        : this(config, httpClientFactory, logger, null)
+    {
+    }
+
     /// <inheritdoc/>
     public async Task<LinkExchangeResult> Exchange(ClaimsPrincipal? principal, AuthenticationProperties properties)
     {
@@ -41,13 +58,22 @@ public class LinkSubjectExchanger(
             return LinkExchangeResult.Failed;
         }
 
-        var subject = principal?.FindFirst("sub")?.Value
+        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, principal?.Identity?.AuthenticationType)
+            ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
+        if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
+        {
+            return LinkExchangeResult.Failed;
+        }
+
+        var subject = canonicalResolution.Identity?.Subject
+            ?? principal?.FindFirst("sub")?.Value
             ?? principal?.FindFirst("oid")?.Value
             ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? principal?.FindFirst("id")?.Value
             ?? string.Empty;
 
-        var identityProvider = principal?.FindFirst("iss")?.Value
+        var identityProvider = canonicalResolution.Identity?.ProviderKey
+            ?? principal?.FindFirst("iss")?.Value
             ?? principal?.FindFirst("identity_provider")?.Value
             ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
             ?? principal?.Identity?.AuthenticationType
@@ -62,7 +88,15 @@ public class LinkSubjectExchanger(
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, exchangeUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", linkToken);
-        request.Content = JsonContent.Create(new { subject, identityProvider });
+        request.Content = canonicalResolution.Identity is { } canonicalIdentity
+            ? JsonContent.Create(new
+            {
+                subject,
+                providerKey = canonicalIdentity.ProviderKey,
+                issuer = canonicalIdentity.NormalizedIssuer,
+                identityProvider
+            })
+            : JsonContent.Create(new { subject, identityProvider });
 
         HttpResponseMessage response;
         try

@@ -21,6 +21,13 @@ public class a_link_subject_exchanger : Specification
 
     protected virtual HttpStatusCode ExchangeStatusCode => HttpStatusCode.OK;
 
+    protected virtual ClaimsPrincipal CreatePrincipal() => new(new ClaimsIdentity(
+    [
+        new Claim("sub", "linked-subject-123"),
+        new Claim("iss", "https://github.com"),
+    ],
+    "github"));
+
     protected virtual AuthenticationProperties CreateProperties()
     {
         var properties = new AuthenticationProperties();
@@ -28,24 +35,26 @@ public class a_link_subject_exchanger : Specification
         return properties;
     }
 
+    protected virtual LinkSubjectExchanger CreateExchanger(
+        C.AuthProxy configuration,
+        IOptionsMonitor<C.AuthProxy> optionsMonitor,
+        IHttpClientFactory httpClientFactory) =>
+        new(optionsMonitor, httpClientFactory, Substitute.For<ILogger<LinkSubjectExchanger>>());
+
     void Establish()
     {
+        var configuration = CreateConfig();
         _config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        _config.CurrentValue.Returns(CreateConfig());
+        _config.CurrentValue.Returns(configuration);
 
         _handler = new RecordingHttpMessageHandler(ExchangeStatusCode);
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(_handler));
 
-        _principal = new ClaimsPrincipal(new ClaimsIdentity(
-        [
-            new Claim("sub", "linked-subject-123"),
-            new Claim("iss", "https://github.com"),
-        ],
-        "github"));
+        _principal = CreatePrincipal();
 
         _properties = CreateProperties();
 
-        _exchanger = new LinkSubjectExchanger(_config, httpClientFactory, Substitute.For<ILogger<LinkSubjectExchanger>>());
+        _exchanger = CreateExchanger(configuration, _config, httpClientFactory);
     }
 }

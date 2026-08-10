@@ -64,6 +64,12 @@ public static class WellKnownPageNames
     public const string InvitationEmailMismatch = "invitation-email-mismatch.html";
 
     /// <summary>
+    /// The page returned when an authenticated user attempts to accept an invitation that is bound to an
+    /// email address, but the identity provider supplied no address for the account at all.
+    /// </summary>
+    public const string InvitationEmailUnavailable = "invitation-email-unavailable.html";
+
+    /// <summary>
     /// The page served when a valid invitation token is presented and multiple identity providers
     /// are configured.  The page reads the <c>.cratis-providers</c> cookie injected by the proxy
     /// and renders a sign-in button for each available provider.

@@ -10,6 +10,7 @@ public class when_user_is_authenticated_and_tenant_is_resolved : Specification
     const string TenantId = "22222222-2222-2222-2222-222222222222";
 
     InjectIdentityHeadersTransform _transform;
+    string _expectedPrincipal;
     RequestTransformContext _transformContext;
 
     void Establish()
@@ -25,18 +26,25 @@ public class when_user_is_authenticated_and_tenant_is_resolved : Specification
         "aad");
         httpContext.User = new ClaimsPrincipal(identity);
         httpContext.Items[TenancyMiddleware.TenantIdItemKey] = TenantId;
+        _expectedPrincipal = httpContext.BuildClientPrincipal()!.ToBase64();
 
         _transformContext = new RequestTransformContext
         {
             HttpContext = httpContext,
             ProxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://service.local/api/test")
         };
+        _transformContext.ProxyRequest.Headers.Add(Headers.Principal, "hostile-principal");
+        _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalId, "hostile-id");
+        _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalName, "hostile-name");
     }
 
     Task Because() => _transform.ApplyAsync(_transformContext).AsTask();
 
     [Fact] void should_set_client_principal_header() =>
         _transformContext.ProxyRequest.Headers.Contains(Headers.Principal).ShouldBeTrue();
+
+    [Fact] void should_replace_client_principal_header_with_the_exact_trusted_value() =>
+        _transformContext.ProxyRequest.Headers.GetValues(Headers.Principal).Single().ShouldEqual(_expectedPrincipal);
 
     [Fact] void should_set_client_principal_id_header() =>
         _transformContext.ProxyRequest.Headers.GetValues(Headers.PrincipalId).Single().ShouldEqual("user-42");

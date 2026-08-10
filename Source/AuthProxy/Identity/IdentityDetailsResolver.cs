@@ -32,6 +32,8 @@ public class IdentityDetailsResolver(
     IIdentityAuthorizationCache authorizationCache,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
+    const string CacheKeyPurpose = "IdentityDetails";
+
     static readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(30);
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {
@@ -40,7 +42,7 @@ public class IdentityDetailsResolver(
         Converters = { new ConceptAsJsonConverterFactory() }
     };
 
-    readonly ConcurrentDictionary<string, SemaphoreSlim> _resolverLocks = new();
+    readonly ConcurrentDictionary<IdentityAccountTenantKey, SemaphoreSlim> _resolverLocks = new();
 
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
@@ -50,6 +52,8 @@ public class IdentityDetailsResolver(
         // the identity endpoint. A stale .cratis-identity cookie from a previous session would
         // otherwise shadow the invite claims and cause the Lobby to return the wrong flow type.
         var hasPendingInvite = context.HasPendingInvitation();
+        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, out var account);
+        var logIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account";
 
         // Skipping the identity endpoints means skipping the authorization answer they carry, so what
         // permits the skip has to be something the caller could not have written. The readable
@@ -62,24 +66,27 @@ public class IdentityDetailsResolver(
             return BuildAuthorizedResult(principal, details: null);
         }
 
-        var cacheKey = $"{tenantId}:{principal.UserId}";
+        var cacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(CacheKeyPurpose, account, tenantId) : null;
 
-        if (!hasPendingInvite && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
+        if (!hasPendingInvite && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
             WriteIdentityState(context, cached, principal, tenantId);
-            logger.IdentityDetailsCacheHit(principal.UserId);
+            logger.IdentityDetailsCacheHit(logIdentifier);
             return cached;
         }
 
-        var semaphore = _resolverLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1));
+        SemaphoreSlim? ownedSemaphore = null;
+        var semaphore = cacheKey is not null
+            ? _resolverLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1))
+            : ownedSemaphore = new SemaphoreSlim(1, 1);
         await semaphore.WaitAsync();
         try
         {
             // Double-check inside the lock — another request may have populated the cache while we waited.
-            if (!hasPendingInvite && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
+            if (!hasPendingInvite && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
             {
                 WriteIdentityState(context, cached, principal, tenantId);
-                logger.IdentityDetailsCacheHit(principal.UserId);
+                logger.IdentityDetailsCacheHit(logIdentifier);
                 return cached;
             }
 
@@ -95,13 +102,14 @@ public class IdentityDetailsResolver(
                     continue;
                 }
 
-                logger.CallingIdentityEndpointWithPrincipal(name, enrichedPrincipal.UserId);
+                logger.CallingIdentityEndpointWithPrincipal(name, logIdentifier);
 
                 var result = await CallIdentityEndpoint(
                     name,
                     service.Backend.BaseUrl,
                     enrichedPrincipal,
                     tenantId,
+                    logIdentifier,
                     context.Response);
 
                 if (result is null)
@@ -117,13 +125,18 @@ public class IdentityDetailsResolver(
 
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
             WriteIdentityState(context, identityResult, principal, tenantId);
-            logger.IdentityDetailsCookieWritten(principal.UserId);
-            memoryCache.Set(cacheKey, identityResult, _cacheTtl);
+            logger.IdentityDetailsCookieWritten(logIdentifier);
+            if (cacheKey is not null)
+            {
+                memoryCache.Set(cacheKey, identityResult, _cacheTtl);
+            }
+
             return identityResult;
         }
         finally
         {
             semaphore.Release();
+            ownedSemaphore?.Dispose();
         }
     }
 
@@ -166,6 +179,7 @@ public class IdentityDetailsResolver(
         string baseUrl,
         ClientPrincipal principal,
         string tenantId,
+        string logIdentifier,
         HttpResponse response)
     {
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
@@ -189,7 +203,7 @@ public class IdentityDetailsResolver(
 
         if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
         {
-            logger.IdentityEndpointForbidden(serviceName, principal.UserId);
+            logger.IdentityEndpointForbidden(serviceName, logIdentifier);
             response.StatusCode = StatusCodes.Status403Forbidden;
             return null;
         }

@@ -25,7 +25,10 @@ public class ClientPrincipal
     [JsonPropertyName("identityProvider")]
     public string IdentityProvider { get; set; } = string.Empty;
 
-    /// <summary>Gets or sets the unique user identifier from the identity provider.</summary>
+    /// <summary>
+    /// Gets or sets the provider-local raw subject. For canonical identities, this is only one component of the
+    /// provider key, normalized issuer, and subject tuple and is not a globally unique account, storage, or authorization key.
+    /// </summary>
     [JsonPropertyName("userId")]
     public string UserId { get; set; } = string.Empty;
 
