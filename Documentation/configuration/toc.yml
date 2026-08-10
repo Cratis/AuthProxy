@@ -6,6 +6,8 @@
   href: authorization.md
 - name: Unauthenticated Responses
   href: unauthenticated-responses.md
+- name: Failed Sign-ins
+  href: failed-sign-ins.md
 - name: Tenancy
   href: tenancy.md
 - name: Tenant Selection Page

@@ -56,13 +56,22 @@ Both the local logout and the post-logout callback:
 1. Sign the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2`), including any chunked variants.
 2. Delete every AuthProxy session cookie:
    - `.cratis-identity`
+   - `.cratis-identity-authorization`
    - `.cratis-tenant`
    - `.cratis-tenants`
    - `.cratis-invite`
+   - `.cratis-invite-state`
    - `.cratis-registration`
    - `.cratis-providers`
+3. Delete every transient sign-in handshake cookie the browser sent (`.AspNetCore.Correlation.*`,
+   `.AspNetCore.OpenIdConnect.Nonce.*`) — the leftovers of abandoned handshakes that would otherwise
+   poison the next sign-in. See [Failed Sign-ins](failed-sign-ins.md#handshake-cookie-hygiene).
 
 The `.cratis-logout` carry cookie is deleted by the callback once the final target has been read from it.
+
+After logout nothing of the session survives, so the next visit to a protected resource lands on the
+provider-selection page (or the single provider's login) rather than silently reusing anything local.
+Whether the *identity provider* still remembers the user is governed by the full-chain behavior above.
 
 ---
 

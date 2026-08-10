@@ -17,7 +17,7 @@ condition is detected:
 | `403.html` | The identity resolver denied access. | 403 |
 | `not-authorized.html` | The caller is signed in but does not satisfy the claim requirements declared in [`Cratis:AuthProxy:Authorization`](authorization.md). | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
-| `select-provider.html` | A protected resource was requested and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
+| `select-provider.html` | A protected resource was requested and multiple identity providers are configured, or a sign-in failed (see [Failed Sign-ins](failed-sign-ins.md)). The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider, and shows a message when a `reason` query parameter is present. | 200 |
 | `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
 | `invitation-expired.html` | The JWT token on an invite link has passed its expiry time. Served in either phase — when the link is followed (Phase 1) and when the token is re-validated at the exchange (Phase 2). | 401 |
 | `invitation-invalid.html` | The JWT token on an invite link is malformed or has an invalid signature. Served in either phase — when the link is followed (Phase 1) and when the token is re-validated at the exchange (Phase 2). | 401 |
