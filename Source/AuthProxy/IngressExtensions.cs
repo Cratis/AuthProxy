@@ -101,6 +101,7 @@ public static class IngressExtensions
         app.UseMiddleware<RegistrationMiddleware>();
         app.UseMiddleware<IdentityMiddleware>();
         app.UseMiddleware<InviteRedirectMiddleware>();
+        app.UseMiddleware<IdentityForwardingGuardMiddleware>();
 
         app.MapIngressEndpoints();
         app.UseReverseProxy();
