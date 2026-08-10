@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -30,8 +31,17 @@ public static class ClientPrincipalExtensions
             return null;
         }
 
+        // Resolve against the scheme that actually authenticated this request — the framework records it in
+        // the authenticate-result feature. The identity's AuthenticationType is NOT that scheme: an OIDC
+        // token-validated identity carries "AuthenticationTypes.Federation", which no provider is registered
+        // under, so resolving with it made every canonical OIDC session fail closed here — and the request
+        // was then proxied without identity headers while the cookie session itself stayed perfectly valid.
+        var authenticationScheme = context.Features.Get<IAuthenticateResultFeature>()?
+                .AuthenticateResult?.Ticket?.AuthenticationScheme
+            ?? user.Identity.AuthenticationType;
+
         var canonicalResolution = context.RequestServices is { } requestServices
-            ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, user.Identity.AuthenticationType)
+            ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)
             : null;
         if (canonicalResolution?.IsConfigured == true)
         {
