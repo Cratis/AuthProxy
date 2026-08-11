@@ -37,8 +37,12 @@ namespace Cratis.AuthProxy.Invites;
 ///     respectively.
 ///   </item>
 /// </list>
-/// The exchange itself lives in <see cref="IInviteCompletion"/>, so every caller completes an invitation
-/// identically.
+/// The exchange itself lives in <see cref="IInviteCompletion"/>, shared with
+/// <see cref="InviteCallbackCompletion"/> — which completes an invitation on the provider callback itself
+/// whenever the challenge's capability binding survives the round trip. Phase 2 here remains fully intact as
+/// the fallback for every callback that binding does not come back on, and both phases additionally
+/// recognize a session that already completed its invitation on the callback so a stale pending cookie or a
+/// return visit to the invitation URL never re-runs the exchange or re-offers provider selection.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
@@ -72,6 +76,11 @@ public class InviteMiddleware(
     /// Set by Phase 2 when exchange succeeds and the invite is not tenant-issued.
     /// Read by <see cref="InviteRedirectMiddleware"/> to perform the actual redirect.
     /// </summary>
+    /// <remarks>
+    /// This mechanism belongs to the middleware pipeline alone. When an invitation completes on the provider
+    /// callback instead, <see cref="InviteCallbackCompletion"/> owns the response directly and places the
+    /// lobby target on the remote handler's return URI — no item key is involved there.
+    /// </remarks>
     public const string LobbyRedirectUrlItemKey = "Cratis.InviteLobbyRedirectUrl";
 
     static readonly JsonSerializerOptions _providerSerializerOptions = new()
@@ -163,6 +172,15 @@ public class InviteMiddleware(
                 return;
             }
 
+            // A session that already completed this exact invitation on its own provider callback is never
+            // exchanged again - the cookie arriving here is a stale copy the browser had not yet dropped.
+            // Clear it and take the caller where the completed invitation leads.
+            if (WasInvitationCompletedByThisSession(context, inviteToken))
+            {
+                await ContinueCompletedInvitation(context, inviteToken);
+                return;
+            }
+
             // "Authenticated" and "authenticated for this invitation" are different facts, and only the
             // second one may complete it. An invitation binds an organization to an identity permanently,
             // and the pre-existing session is the one that arrives first: a person already signed in with
@@ -205,6 +223,16 @@ public class InviteMiddleware(
                     context,
                     pageName,
                     StatusCodes.Status401Unauthorized);
+                return;
+            }
+
+            // A signed-in caller returning to an invitation URL their own session has already completed -
+            // the provider callback completed it before redirecting here - is never re-staged and never
+            // offered provider selection again; they continue to where the completed invitation leads.
+            if (context.User.Identity?.IsAuthenticated == true
+                && WasInvitationCompletedByThisSession(context, token))
+            {
+                await ContinueCompletedInvitation(context, token);
                 return;
             }
 
@@ -455,6 +483,19 @@ public class InviteMiddleware(
     }
 
     /// <summary>
+    /// Determines whether the session authenticating this request has already completed the exchange for
+    /// this exact invitation — on its own provider callback.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The invitation capability being presented.</param>
+    /// <returns><see langword="true"/> when this session already completed that capability; otherwise <see langword="false"/>.</returns>
+    static bool WasInvitationCompletedByThisSession(HttpContext context, string inviteToken)
+    {
+        var properties = context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties;
+        return InvitationAuthenticationState.WasCompletedFor(properties, inviteToken);
+    }
+
+    /// <summary>
     /// Aggregates all configured OIDC and OAuth providers into a single enumerable of <see cref="OidcProviderInfo"/>.
     /// </summary>
     /// <param name="config">The authentication configuration containing the provider lists.</param>
@@ -540,6 +581,26 @@ public class InviteMiddleware(
             context,
             invalidPageName,
             StatusCodes.Status401Unauthorized);
+    }
+
+    /// <summary>
+    /// Continues a request whose session has already completed the invitation it presents: the stale pending
+    /// state is cleared and the caller is taken where the completed invitation leads — the lobby for a
+    /// non-tenant-issued invitation, the pipeline's own course otherwise.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The already-completed invitation capability.</param>
+    /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
+    async Task ContinueCompletedInvitation(HttpContext context, string inviteToken)
+    {
+        PendingInvitationCookies.Delete(context);
+
+        if (_completion.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
+        {
+            context.Items[LobbyRedirectUrlItemKey] = lobbyRedirectUrl;
+        }
+
+        await next(context);
     }
 
     /// <summary>

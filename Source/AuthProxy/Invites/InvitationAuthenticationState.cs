@@ -29,6 +29,12 @@ public static class InvitationAuthenticationState
     public const string CapabilityHashStateKey = "Cratis.AuthProxy.InvitationCapabilityHash";
 
     /// <summary>
+    /// The authentication-properties key recording the exact invitation capability a session has already
+    /// completed the exchange for.
+    /// </summary>
+    public const string CompletedCapabilityHashStateKey = "Cratis.AuthProxy.InvitationCompletedCapabilityHash";
+
+    /// <summary>
     /// Adds protected pending-invitation values to provider challenge properties when an invitation is in progress.
     /// </summary>
     /// <param name="context">The current HTTP context.</param>
@@ -103,6 +109,38 @@ public static class InvitationAuthenticationState
         && properties.Items.TryGetValue(CapabilityHashStateKey, out var boundCapabilityHash)
         && !string.IsNullOrEmpty(boundCapabilityHash)
         && FixedTimeEquals(ComputeCapabilityHash(invitationToken), boundCapabilityHash);
+
+    /// <summary>
+    /// Records on a session's authentication properties that its invitation exchange has completed, so no
+    /// later request can run the exchange for the same capability again.
+    /// </summary>
+    /// <param name="properties">The properties of the session that completed the invitation.</param>
+    /// <param name="invitationToken">The invitation capability that was completed.</param>
+    /// <remarks>
+    /// The pending binding is replaced rather than kept alongside the completion record: a capability that
+    /// has been exchanged is no longer pending, and a session still claiming to have been established
+    /// <em>for</em> it would re-run the exchange the moment a stale pending-invitation cookie replays — the
+    /// application answers that with a duplicate-subject conflict for an invitation that actually succeeded.
+    /// </remarks>
+    internal static void MarkCompleted(AuthenticationProperties properties, string invitationToken)
+    {
+        properties.Items.Remove(TransactionStateKey);
+        properties.Items.Remove(ChallengeStateKey);
+        properties.Items.Remove(CapabilityHashStateKey);
+        properties.Items[CompletedCapabilityHashStateKey] = ComputeCapabilityHash(invitationToken);
+    }
+
+    /// <summary>
+    /// Determines whether a session has already completed the exchange for one exact invitation capability.
+    /// </summary>
+    /// <param name="properties">The properties of the session authenticating the request.</param>
+    /// <param name="invitationToken">The invitation capability being offered.</param>
+    /// <returns><see langword="true"/> when the session already completed that exact capability; otherwise <see langword="false"/>.</returns>
+    internal static bool WasCompletedFor(AuthenticationProperties? properties, string invitationToken) =>
+        properties is not null
+        && properties.Items.TryGetValue(CompletedCapabilityHashStateKey, out var completedCapabilityHash)
+        && !string.IsNullOrEmpty(completedCapabilityHash)
+        && FixedTimeEquals(ComputeCapabilityHash(invitationToken), completedCapabilityHash);
 
     /// <summary>
     /// Computes the hash that identifies one exact invitation capability.
