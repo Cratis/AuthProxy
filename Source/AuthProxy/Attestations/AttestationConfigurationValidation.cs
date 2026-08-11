@@ -66,7 +66,8 @@ static class AttestationConfigurationValidation
     internal static void ValidateSigningKey(string keyId, string privateKeyPem, string path, List<string> failures)
     {
         ValidateBoundedValue(keyId, $"{path}.KeyId", failures);
-        if (keyId.Length > 128
+        if (string.IsNullOrEmpty(keyId)
+            || keyId.Length > 128
             || keyId.Any(_ => !(char.IsAsciiLetterOrDigit(_) || _ is '.' or '_' or '-')))
         {
             failures.Add($"{path}.KeyId must be a bounded ASCII identifier using letters, digits, periods, underscores, or hyphens.");
@@ -82,9 +83,9 @@ static class AttestationConfigurationValidation
             using var rsa = RSA.Create();
             rsa.ImportFromPem(privateKeyPem);
             _ = rsa.ExportParameters(true);
-            if (rsa.KeySize < 2048)
+            if (rsa.KeySize < AttestationSigner.MinimumKeySize)
             {
-                failures.Add($"{path}.PrivateKeyPem must contain an RSA key of at least 2048 bits.");
+                failures.Add($"{path}.PrivateKeyPem must contain an RSA key of at least {AttestationSigner.MinimumKeySize} bits.");
             }
         }
         catch (Exception exception) when (exception is CryptographicException or ArgumentException)

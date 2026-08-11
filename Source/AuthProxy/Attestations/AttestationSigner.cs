@@ -20,6 +20,16 @@ namespace Cratis.AuthProxy.Attestations;
 public static class AttestationSigner
 {
     /// <summary>
+    /// The smallest RSA key AuthProxy signs with.
+    /// </summary>
+    /// <remarks>
+    /// Microsoft.IdentityModel signs happily with a 1024-bit key, and this method is public, so the floor is
+    /// enforced here as well as where key material is configured — the configuration validator is not the only
+    /// door into signing.
+    /// </remarks>
+    public const int MinimumKeySize = 2048;
+
+    /// <summary>
     /// Creates a cryptographically random 256-bit opaque value.
     /// </summary>
     /// <returns>A base64url-encoded opaque value.</returns>
@@ -78,6 +88,11 @@ public static class AttestationSigner
         {
             using var rsa = RSA.Create();
             rsa.ImportFromPem(contract.PrivateKeyPem);
+            if (rsa.KeySize < MinimumKeySize)
+            {
+                return false;
+            }
+
             var securityKey = new RsaSecurityKey(rsa.ExportParameters(true)) { KeyId = contract.KeyId };
             credentials = new SigningCredentials(securityKey, SecurityAlgorithms.RsaSha256);
             return true;

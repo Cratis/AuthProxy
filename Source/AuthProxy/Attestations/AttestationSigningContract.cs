@@ -21,4 +21,16 @@ public sealed record AttestationSigningContract(
     string Audience,
     string KeyId,
     string PrivateKeyPem,
-    TimeSpan Lifetime);
+    TimeSpan Lifetime)
+{
+    /// <summary>
+    /// Renders the contract without its key material.
+    /// </summary>
+    /// <returns>The contract's nonsecret values.</returns>
+    /// <remarks>
+    /// A record's generated <see cref="object.ToString"/> prints every property, so one
+    /// <c>LogDebug("{Contract}", contract)</c> would write the signing key to the log. This override exists so
+    /// that no logging statement anyone adds later can disclose it.
+    /// </remarks>
+    public override string ToString() => $"{nameof(AttestationSigningContract)} {{ {nameof(Issuer)} = {Issuer}, {nameof(Audience)} = {Audience}, {nameof(KeyId)} = {KeyId}, {nameof(Lifetime)} = {Lifetime} }}";
+}

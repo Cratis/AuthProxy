@@ -159,7 +159,9 @@ so an invitation attestation can never be presented in its place.
 Two details a verifier must implement exactly:
 
 - **`htu` follows RFC 9449** — the target URI *without* query and fragment. Compare it against the
-  query-stripped request URI, not the raw target.
+  query-stripped request URI, not the raw target. Because the query is deliberately outside the binding, a
+  `NotifyUrl` that carries one would be signed without it — so AuthProxy refuses to start with a query on
+  `NotifyUrl` once `Attestation` is configured. Put anything the application needs in the body instead.
 - **`body_hash` is an AuthProxy extension** — RFC 9449 defines no body digest. It uses the identical
   construction to that specification's `ath` claim: unpadded base64url of the SHA-256 of the raw request body.
 
@@ -208,7 +210,7 @@ Two details a verifier must implement exactly:
 | `Cratis:AuthProxy:SignIn:Attestation:Issuer` | written to `iss`; required, and required to match at the verifier |
 | `Cratis:AuthProxy:SignIn:Attestation:Audience` | written to `aud`; names the one application entitled to the notification |
 | `Cratis:AuthProxy:SignIn:Attestation:ActiveKeyId` | the key new envelopes are signed with; must name exactly one configured key |
-| `Cratis:AuthProxy:SignIn:Attestation:SigningKeys` | the available keys, each a `KeyId` and a PEM-encoded RSA `PrivateKeyPem` of at least 2048 bits |
+| `Cratis:AuthProxy:SignIn:Attestation:SigningKeys` | the available keys, each a `KeyId` and a PEM-encoded RSA `PrivateKeyPem` of at least 2048 bits; every `KeyId` must be unique |
 | `Cratis:AuthProxy:SignIn:Attestation:Lifetime` | the envelope lifetime; between 10 and 60 seconds, defaulting to 60 |
 
 Supply `PrivateKeyPem` through a secret provider. AuthProxy never returns or logs it — publish only the

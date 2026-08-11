@@ -60,7 +60,9 @@ public sealed class InvitationAttestationIssuer(IOptionsMonitor<C.AuthProxy> con
             return false;
         }
 
-        var key = settings.SigningKeys.SingleOrDefault(_ =>
+        // FirstOrDefault, not SingleOrDefault: a configuration that slipped a duplicate key identifier past
+        // startup validation must degrade to a refusal to issue, never to an exception thrown out of a request.
+        var key = settings.SigningKeys.FirstOrDefault(_ =>
             string.Equals(_.KeyId, settings.ActiveKeyId, StringComparison.Ordinal));
         if (key is null)
         {

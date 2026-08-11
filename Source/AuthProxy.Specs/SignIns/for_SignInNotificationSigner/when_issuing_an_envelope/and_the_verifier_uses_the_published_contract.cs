@@ -29,6 +29,7 @@ public class and_the_verifier_uses_the_published_contract : a_sign_in_notificati
     [Fact] void should_report_signing_as_enabled() => _signer.IsEnabled.ShouldBeTrue();
     [Fact] void should_verify_against_the_pinned_public_key() => _validation.IsValid.ShouldBeTrue();
     [Fact] void should_name_the_signing_key() => _token.Kid.ShouldEqual(KeyId);
+    [Fact] void should_name_the_published_signing_algorithm() => _token.Alg.ShouldEqual("RS256");
     [Fact] void should_bind_provenance_to_the_configured_issuer() => _token.Issuer.ShouldEqual(Issuer);
     [Fact] void should_bind_the_audience_to_the_configured_application() => _token.Audiences.ShouldContain(Audience);
     [Fact] void should_bind_the_request_method() => Claim(_token, SignInAttestationClaims.HttpMethod).ShouldEqual("POST");

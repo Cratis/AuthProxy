@@ -33,6 +33,11 @@ sealed class SignInAttestationConfigurationValidator : IValidateOptions<C.AuthPr
 
         var failures = new List<string>();
         AttestationConfigurationValidation.ValidateAbsoluteEndpoint(signIn!.NotifyUrl, "SignIn.NotifyUrl", failures);
+        if (Uri.TryCreate(signIn.NotifyUrl, UriKind.Absolute, out var notifyUrl) && !string.IsNullOrEmpty(notifyUrl.Query))
+        {
+            failures.Add("SignIn.NotifyUrl must carry no query, because the signed route binding covers the path only.");
+        }
+
         AttestationConfigurationValidation.ValidateBoundedValue(attestation.Issuer, "SignIn.Attestation.Issuer", failures);
         AttestationConfigurationValidation.ValidateBoundedValue(attestation.Audience, "SignIn.Attestation.Audience", failures);
         AttestationConfigurationValidation.ValidateBoundedValue(attestation.ActiveKeyId, "SignIn.Attestation.ActiveKeyId", failures);
