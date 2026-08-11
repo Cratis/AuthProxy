@@ -97,7 +97,9 @@ public static class WellKnownPageNames
 
     /// <summary>
     /// The page returned when a credential-link callback completes without the application having recorded
-    /// the link — the exchange could not be performed, or the application refused it.
+    /// the link — the exchange could not be performed, or the application refused it — and when the
+    /// provider round-trip of a link challenge fails. It broadcasts the failure on the link flow's
+    /// <c>BroadcastChannel</c> so an embedding selection page can offer a retry.
     /// </summary>
     /// <remarks>
     /// Deliberately generic: the same page answers every cause, so a caller cannot tell "the provider
@@ -105,4 +107,19 @@ public static class WellKnownPageNames
     /// is logged for the operator instead.
     /// </remarks>
     public const string LinkFailed = "link-failed.html";
+
+    /// <summary>
+    /// The provider-selection page of the credential-link flow, served at <c>/.cratis/link</c> for the
+    /// product to embed in a modal <c>iframe</c>. It lists the configured providers, opens the chosen
+    /// provider's link challenge in a separate top-level window — external identity providers refuse to
+    /// render framed — and reports the outcome to its parent once the flow's <c>BroadcastChannel</c>
+    /// delivers it.
+    /// </summary>
+    public const string LinkSelectProvider = "link-select-provider.html";
+
+    /// <summary>
+    /// The page a completed credential link ends on, served at <c>/.cratis/link/complete</c>. It
+    /// broadcasts the completion on the link flow's <c>BroadcastChannel</c> and closes its window.
+    /// </summary>
+    public const string LinkComplete = "link-complete.html";
 }

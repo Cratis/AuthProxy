@@ -259,11 +259,13 @@ public static class IngressExtensions
         })
         .AllowAnonymous();
 
-        // Serves the bundled React login-selection SPA.
+        // Serves the bundled React login-selection SPA. Like every sign-in selection surface it refuses
+        // to render framed — a framed login is clickjacking bait.
         var webRootPath = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
         var indexHtmlPath = Path.Combine(webRootPath, "index.html");
         app.MapGet($"{WellKnownPaths.LoginPage}/{{**path}}", async context =>
         {
+            FrameEmbedding.Deny(context);
             context.Response.ContentType = "text/html";
             await context.Response.SendFileAsync(indexHtmlPath);
         })

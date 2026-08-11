@@ -74,8 +74,16 @@ public static class WellKnownPaths
     /// Append the scheme name to complete the URL (e.g. <c>/.cratis/link/github</c>).
     /// Unlike <see cref="LoginPrefix"/>, the link flow authenticates a second provider identity for the
     /// already signed-in user <em>without</em> replacing the primary authentication cookie/session.
+    /// The bare path (no scheme) serves the flow's embeddable provider-selection page.
     /// </summary>
     public const string Link = "/.cratis/link";
+
+    /// <summary>
+    /// The well-known path a completed credential link lands on. It serves the flow's completion page,
+    /// which broadcasts the outcome to the embedding selection page and closes its window. The segment is
+    /// reserved — a provider scheme can never be named <c>complete</c>.
+    /// </summary>
+    public const string LinkComplete = "/.cratis/link/complete";
 
     /// <summary>
     /// The well-known path prefix that triggers invite-token handling.

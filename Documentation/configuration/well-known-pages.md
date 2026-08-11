@@ -25,6 +25,9 @@ condition is detected:
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
 | `invitation-email-unavailable.html` | Gateway email binding is enabled (`Invite.EmailClaim`), but the identity provider supplied no authenticated-session email address (Phase 2). | 403 |
 | `invitation-email-mismatch.html` | Gateway email binding is enabled (`Invite.EmailClaim`), and the identity provider supplied another address or explicitly reported `email_verified=false` (Phase 2). | 403 |
+| `link-select-provider.html` | The embeddable provider-selection page of the [credential-link flow](link.md), served at `/.cratis/link`. Lists providers, opens the chosen provider's link challenge in a top-level window, and reports the outcome to its embedding parent. | 200 |
+| `link-complete.html` | A credential link completed, at `/.cratis/link/complete`. Broadcasts the completion on the link flow's `BroadcastChannel` and closes its window. | 200 |
+| `link-failed.html` | A credential link did not complete — the provider round-trip failed or the exchange was refused (see [Credential Linking](link.md)). Broadcasts the failure so an embedding selection page can offer a retry. | 403 |
 
 ---
 

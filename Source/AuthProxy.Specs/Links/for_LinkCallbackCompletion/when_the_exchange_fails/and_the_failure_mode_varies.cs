@@ -176,6 +176,7 @@ public class and_the_failure_mode_varies : Specification
         services.GetService(typeof(ILoggerFactory)).Returns(loggerFactory);
         services.GetService(typeof(IErrorPageProvider)).Returns(errorPageProvider);
         services.GetService(typeof(ILinkSubjectExchanger)).Returns(exchanger);
+        services.GetService(typeof(IOptionsMonitor<C.AuthProxy>)).Returns(config);
 
         return services;
     }

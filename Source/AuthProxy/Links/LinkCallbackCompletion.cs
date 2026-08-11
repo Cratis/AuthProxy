@@ -1,7 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.Links;
@@ -45,15 +44,16 @@ public static class LinkCallbackCompletion
         if (result == LinkExchangeResult.Success)
         {
             // The return URL comes from protected authentication state, but it is validated as same-site
-            // relative all the same — the link callback must never become an open redirect.
-            context.Response.Redirect(RelativeRedirect.Resolve(properties.RedirectUri));
+            // relative all the same — the link callback must never become an open redirect. When no target
+            // was recorded (or it did not survive validation) the flow ends on its own completion page
+            // rather than booting the whole application into the link window.
+            var target = RelativeRedirect.Resolve(properties.RedirectUri);
+            context.Response.Redirect(target == RelativeRedirect.ApplicationRoot ? WellKnownPaths.LinkComplete : target);
         }
         else
         {
             GetLogger(context.HttpContext).LinkCallbackFailed(context.Scheme.Name);
-            await context.HttpContext.RequestServices
-                .GetRequiredService<IErrorPageProvider>()
-                .WriteErrorPageAsync(context.HttpContext, WellKnownPageNames.LinkFailed, StatusCodes.Status403Forbidden);
+            await LinkFlowPages.WriteFailed(context.HttpContext);
         }
 
         // Short-circuit before the RemoteAuthenticationHandler signs the ticket into the cookie scheme:

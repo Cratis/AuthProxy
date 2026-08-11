@@ -9,7 +9,7 @@ using C = Cratis.AuthProxy.Configuration;
 namespace Cratis.AuthProxy.Links;
 
 /// <summary>
-/// Middleware that initiates the session-preserving credential-linking flow.
+/// Middleware that serves the session-preserving credential-linking flow.
 /// <para>
 /// A request to <c>/.cratis/link/{scheme}?returnUrl=…&amp;token=…</c> triggers an OAuth/OIDC challenge for
 /// the requested provider — but, unlike the login flow, the resulting authentication does <em>not</em>
@@ -18,6 +18,12 @@ namespace Cratis.AuthProxy.Links;
 /// <see cref="AuthenticationServiceCollectionExtensions"/> <c>OnTicketReceived</c> and
 /// <see cref="ILinkSubjectExchanger"/>). The link mode marker and the one-time link token travel through
 /// the challenge's <see cref="AuthenticationProperties"/> so the callback can recognize the flow.
+/// </para>
+/// <para>
+/// The bare <c>/.cratis/link?token=…</c> path serves the flow's embeddable provider-selection page, and
+/// <c>/.cratis/link/complete</c> the completion page a successful link ends on — see
+/// <see cref="LinkFlowPages"/> for how the pages, the embedding product, and the provider window talk to
+/// each other.
 /// </para>
 /// <para>
 /// Linking only makes sense for an already signed-in user, so an unauthenticated request is rejected
@@ -43,6 +49,10 @@ public class LinkMiddleware(
     /// </summary>
     public const string LinkTokenPropertyKey = "Cratis.AuthProxy.LinkToken";
 
+    const string CompleteSegment = "complete";
+
+    static readonly HashSet<string> _framedDestinations = new(StringComparer.Ordinal) { "iframe", "frame", "embed", "object" };
+
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
@@ -52,10 +62,20 @@ public class LinkMiddleware(
             return;
         }
 
-        var scheme = remaining.Value?.TrimStart('/') ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(scheme) || !SchemeExists(scheme))
+        var segment = remaining.Value?.Trim('/') ?? string.Empty;
+
+        // The completion page ends the provider window: it broadcasts the outcome to the embedding
+        // selection page and closes. It carries no state and grants nothing, so whoever the callback
+        // redirects here simply gets the page.
+        if (string.Equals(segment, CompleteSegment, StringComparison.OrdinalIgnoreCase))
         {
-            logger.LinkProviderNotConfigured(scheme);
+            await LinkFlowPages.WriteComplete(context);
+            return;
+        }
+
+        if (segment.Length > 0 && !SchemeExists(segment))
+        {
+            logger.LinkProviderNotConfigured(segment);
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
         }
@@ -75,6 +95,17 @@ public class LinkMiddleware(
             return;
         }
 
+        // The bare link path is the flow's embeddable front door: the provider-selection page, which opens
+        // the chosen provider's challenge in its own top-level window. A *framed* navigation to a specific
+        // provider gets the same page instead of a challenge — the challenge redirects to the external
+        // identity provider, whose pages refuse to render inside a frame, so honoring it would leave the
+        // frame dead. Serving the selection page keeps the provider leg top-level by construction.
+        if (segment.Length == 0 || IsFramedNavigation(context.Request))
+        {
+            await LinkFlowPages.WriteSelection(context);
+            return;
+        }
+
         var properties = new AuthenticationProperties
         {
             RedirectUri = ResolveReturnUrl(context.Request.Query["returnUrl"].FirstOrDefault()),
@@ -82,19 +113,41 @@ public class LinkMiddleware(
         properties.Items[LinkModePropertyKey] = "true";
         properties.Items[LinkTokenPropertyKey] = token;
 
-        logger.InitiatingLink(scheme);
-        await context.ChallengeAsync(scheme, properties);
+        logger.InitiatingLink(segment);
+        await context.ChallengeAsync(segment, properties);
     }
 
     /// <summary>
-    /// Resolves the return URL echoed back to the browser once the link completes.
+    /// Resolves the return URL echoed back to the browser once the link completes — the flow's own
+    /// completion page unless the caller asked for somewhere else.
     /// </summary>
     /// <param name="returnUrl">The caller-supplied return URL.</param>
-    /// <returns>The requested target when it is same-site relative; otherwise the application root.</returns>
+    /// <returns>The requested target when it is same-site relative; otherwise the completion page.</returns>
     /// <remarks>
     /// See <see cref="RelativeRedirect"/> for why a single leading slash is not the whole test.
     /// </remarks>
-    static string ResolveReturnUrl(string? returnUrl) => RelativeRedirect.Resolve(returnUrl);
+    static string ResolveReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+        {
+            return WellKnownPaths.LinkComplete;
+        }
+
+        var resolved = RelativeRedirect.Resolve(returnUrl);
+        return resolved == RelativeRedirect.ApplicationRoot ? WellKnownPaths.LinkComplete : resolved;
+    }
+
+    /// <summary>
+    /// Determines whether the request is a navigation inside a frame, going by the browser-set
+    /// <c>Sec-Fetch-Dest</c> fetch metadata header.
+    /// </summary>
+    /// <param name="request">The current <see cref="HttpRequest"/>.</param>
+    /// <returns><see langword="true"/> when the navigation targets a frame; otherwise <see langword="false"/>.</returns>
+    static bool IsFramedNavigation(HttpRequest request)
+    {
+        var destination = request.Headers["Sec-Fetch-Dest"].FirstOrDefault();
+        return destination is not null && _framedDestinations.Contains(destination);
+    }
 
     bool SchemeExists(string scheme)
     {

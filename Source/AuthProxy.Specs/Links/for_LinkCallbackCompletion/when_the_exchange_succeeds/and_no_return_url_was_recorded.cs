@@ -12,6 +12,6 @@ public class and_no_return_url_was_recorded : a_link_callback_context
     async Task Because() => await LinkCallbackCompletion.Complete(_ticketContext, _properties);
 
     [Fact] void should_redirect() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status302Found);
-    [Fact] void should_redirect_to_the_application_root() =>
-        _context.Response.Headers.Location.ToString().ShouldEqual(RelativeRedirect.ApplicationRoot);
+    [Fact] void should_redirect_to_the_completion_page() =>
+        _context.Response.Headers.Location.ToString().ShouldEqual(WellKnownPaths.LinkComplete);
 }

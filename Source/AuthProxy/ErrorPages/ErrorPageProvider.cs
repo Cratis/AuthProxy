@@ -22,7 +22,7 @@ namespace Cratis.AuthProxy.ErrorPages;
 public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<C.AuthProxy> config) : IErrorPageProvider
 {
     /// <inheritdoc/>
-    public async Task WriteErrorPageAsync(HttpContext context, string pageName, int statusCode)
+    public async Task WriteErrorPageAsync(HttpContext context, string pageName, int statusCode, IReadOnlyDictionary<string, string>? substitutions = null)
     {
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "text/html; charset=utf-8";
@@ -31,6 +31,11 @@ public class ErrorPageProvider(IWebHostEnvironment environment, IOptionsMonitor<
         if (pagePath is not null)
         {
             var html = await File.ReadAllTextAsync(pagePath);
+            foreach (var (token, value) in substitutions ?? new Dictionary<string, string>())
+            {
+                html = html.Replace(token, value, StringComparison.Ordinal);
+            }
+
             await context.Response.WriteAsync(InjectBaseHref(html, WellKnownPaths.Pages + "/"));
             return;
         }
