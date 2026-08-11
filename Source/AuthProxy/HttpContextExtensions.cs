@@ -60,6 +60,24 @@ public static class HttpContextExtensions
     public static bool IsRegistration(this HttpContext context) => context.Request.Path.StartsWithSegments(WellKnownPaths.Registration);
 
     /// <summary>
+    /// Determines whether the request targets one of the flows AuthProxy answers itself, from its own
+    /// middleware, rather than proxying to a service.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
+    /// <returns><see langword="true"/> if the request belongs to a proxy-owned flow; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// These two prefixes are reserved (<see cref="AnonymousPathPolicy"/>) precisely because they are never
+    /// routed to a backend — the invitation and registration middlewares answer them in full, validating
+    /// their own capabilities as they go. Both middlewares run after <c>UseAuthorization</c>, so the
+    /// reverse proxy's catch-all route would otherwise select an endpoint carrying the default
+    /// <c>RequireAuthenticatedUser</c> policy and the request would be challenged before either of them
+    /// ever saw it: an invitation link would redirect to provider selection instead of staging the
+    /// invitation, and the flow could only complete on a second pass once a cookie it never planted
+    /// happened to exist.
+    /// </remarks>
+    public static bool IsProxyOwnedFlow(this HttpContext context) => context.IsInvitation() || context.IsRegistration();
+
+    /// <summary>
     /// Determines whether the request targets one of the login endpoints.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
