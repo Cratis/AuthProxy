@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -194,7 +195,16 @@ public static class AuthenticationServiceCollectionExtensions
                 options.ClientId = capturedProvider.ClientId;
                 options.ClientSecret = capturedProvider.ClientSecret;
                 options.ResponseType = "code";
-                options.SaveTokens = true;
+
+                // The handler's default response mode is form_post, which has the provider hand the
+                // authorization code back in a cross-site POST — and browsers do not attach SameSite=Lax
+                // cookies to a cross-site POST, so the callback arrived without its correlation cookie and
+                // every OIDC handshake died with "Correlation failed" (the #104 sign-in loop). The code
+                // flow's standard query response mode returns the code in a top-level GET redirect, which
+                // Lax cookies do accompany — the handshake completes without weakening the cookies to
+                // SameSite=None. Providers that mandate form_post (e.g. Apple with name/email scopes) opt
+                // back in per provider, which also switches their handshake cookies to None+Secure below.
+                options.ResponseMode = OpenIdConnectResponseMode.Query;
                 options.GetClaimsFromUserInfoEndpoint = true;
                 if (capturedProvider.CanonicalIdentity is not null)
                 {
@@ -227,6 +237,18 @@ public static class AuthenticationServiceCollectionExtensions
                 // there instead of accumulating from abandoned sign-in attempts.
                 options.CorrelationCookie.Path = "/";
                 options.NonceCookie.Path = "/";
+
+                if (capturedProvider.ResponseMode == C.OidcResponseMode.FormPost)
+                {
+                    // A form_post callback is a cross-site POST, and only SameSite=None cookies travel with
+                    // one — which in turn requires Secure. A provider configured for form_post therefore
+                    // trades the Lax hardening for a working handshake; the default query mode keeps Lax.
+                    options.ResponseMode = OpenIdConnectResponseMode.FormPost;
+                    options.CorrelationCookie.SameSite = SameSiteMode.None;
+                    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.NonceCookie.SameSite = SameSiteMode.None;
+                    options.NonceCookie.SecurePolicy = CookieSecurePolicy.Always;
+                }
 
                 options.Events = new OpenIdConnectEvents
                 {
