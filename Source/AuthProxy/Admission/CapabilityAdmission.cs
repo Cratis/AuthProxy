@@ -44,7 +44,7 @@ public class CapabilityAdmission(
             return false;
         }
 
-        Issue(context, config, presentation, verification);
+        Issue(context, config, presentation);
 
         return true;
     }
@@ -61,19 +61,23 @@ public class CapabilityAdmission(
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <param name="presentation">The presentation that was admitted.</param>
-    /// <param name="verification">The verifier's answer about it.</param>
     /// <remarks>
     /// The answer carries no body at all. What the browser needs is the cookie, and a body would be one
     /// more thing that could differ between deployments and describe them.
+    /// <para>
+    /// Nothing the verifier said is sealed in beyond the yes itself. What goes into the browser is three
+    /// values AuthProxy authored, so the cookie has a size no verifier can influence — a cookie the
+    /// verifier could grow would eventually cross the browser's 4096-byte limit, be dropped without a word,
+    /// and leave an admitted caller receiving the uniform refusal with nothing anywhere to say why.
+    /// </para>
     /// </remarks>
-    void Issue(HttpContext context, C.AuthProxy config, CapabilityPresentation presentation, CapabilityVerification verification)
+    void Issue(HttpContext context, C.AuthProxy config, CapabilityPresentation presentation)
     {
         var lifetime = config.Admission.EntryLifetime;
         var transaction = new EntryTransaction(
             presentation.Transaction,
             presentation.Challenge,
-            timeProvider.GetUtcNow().Add(lifetime),
-            verification.Context);
+            timeProvider.GetUtcNow().Add(lifetime));
 
         context.Response.Cookies.Append(Cookies.EntryTransaction, protector.Protect(transaction), new CookieOptions
         {

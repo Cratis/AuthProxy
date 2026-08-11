@@ -40,7 +40,16 @@ public static class AdmissionServiceCollectionExtensions
         builder.Services.AddSingleton<ICapabilityVerifier, CapabilityVerifier>();
         builder.Services.AddSingleton<ICapabilityAdmission, CapabilityAdmission>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, AdmissionConfigurationValidator>();
-        builder.Services.AddHttpClient(CapabilityVerifier.HttpClientName, client => client.Timeout = VerifierTimeout);
+
+        // The primary handler is replaced rather than left at its default, because the default follows up to
+        // fifty redirects. The configuration validator constrains the verifier to one absolute http or https
+        // URL, and a handler that follows a redirect discards that constraint on the first 3xx: an anonymous
+        // POST to the presentation path becomes an AuthProxy-originated POST to any host the verifier names,
+        // carrying the caller's capability in the body. Refusing to follow keeps the only address this ever
+        // calls the one the deployment declared.
+        builder.Services
+            .AddHttpClient(CapabilityVerifier.HttpClientName, client => client.Timeout = VerifierTimeout)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
 
         return builder;
     }

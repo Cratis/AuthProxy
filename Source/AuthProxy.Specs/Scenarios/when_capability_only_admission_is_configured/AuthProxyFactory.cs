@@ -130,8 +130,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
             Content = JsonContent.Create(new CapabilityVerificationResponse(
                 admits,
                 presentation.Transaction,
-                presentation.Challenge,
-                new Dictionary<string, string>(StringComparer.Ordinal))),
+                presentation.Challenge)),
         };
     }
 

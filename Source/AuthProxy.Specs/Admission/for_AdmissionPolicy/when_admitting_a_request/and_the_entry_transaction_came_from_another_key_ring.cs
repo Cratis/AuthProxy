@@ -20,8 +20,7 @@ public class and_the_entry_transaction_came_from_another_key_ring : given.an_adm
         var transaction = new EntryTransaction(
             Transaction,
             Challenge,
-            _time.GetUtcNow().AddMinutes(10),
-            new Dictionary<string, string>(StringComparer.Ordinal));
+            _time.GetUtcNow().AddMinutes(10));
 
         Presenting($"{Cookies.EntryTransaction}={foreign.Protect(transaction)}");
     }

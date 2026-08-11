@@ -221,8 +221,9 @@ public static class AuthProxyExtensions
     /// The largest capability, in bytes, AuthProxy will read. Defaults to <c>4096</c>.
     /// </param>
     /// <param name="entryLifetime">
-    /// How long an admitted browser stays admitted. Defaults to ten minutes — it bounds an interactive
-    /// entry, not a session.
+    /// How long an admitted browser stays admitted. Defaults to twenty minutes — it bounds an interactive
+    /// entry, not a session, and has to outlast the fifteen minutes ASP.NET Core itself allows a caller at
+    /// the identity provider.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <remarks>
@@ -235,6 +236,12 @@ public static class AuthProxyExtensions
     /// Cannot be combined with <c>WithInvite</c>: two capability mechanisms in one deployment is
     /// a misconfiguration, and AuthProxy refuses the combination at startup rather than silently ordering
     /// them.
+    /// </para>
+    /// <para>
+    /// Shortening <paramref name="entryLifetime"/> below fifteen minutes re-creates the failure the default
+    /// avoids: ASP.NET Core allows that long at the identity provider, so an entry that expires first sends
+    /// a caller who took their time over MFA or a password reset back to the uniform refusal, with nothing
+    /// anywhere to diagnose it from.
     /// </para>
     /// <para>
     /// Deliberately its own method rather than another optional parameter on
@@ -259,7 +266,7 @@ public static class AuthProxyExtensions
             .WithEnvironment($"{prefix}__Capability__VerifierUrl", verifierUrl)
             .WithEnvironment($"{prefix}__Capability__Path", path)
             .WithEnvironment($"{prefix}__Capability__MaximumLength", maximumLength.ToString(CultureInfo.InvariantCulture))
-            .WithEnvironment($"{prefix}__EntryLifetime", (entryLifetime ?? TimeSpan.FromMinutes(10)).ToString("c", CultureInfo.InvariantCulture));
+            .WithEnvironment($"{prefix}__EntryLifetime", (entryLifetime ?? TimeSpan.FromMinutes(20)).ToString("c", CultureInfo.InvariantCulture));
     }
 
     /// <summary>

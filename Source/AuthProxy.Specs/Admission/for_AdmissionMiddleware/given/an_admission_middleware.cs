@@ -82,8 +82,7 @@ public class an_admission_middleware : Specification
         var transaction = new EntryTransaction(
             "3f9c0a1b7e2d4c6f",
             "8b1d5e7a0c3f2941",
-            _time.GetUtcNow().AddMinutes(10),
-            new Dictionary<string, string>(StringComparer.Ordinal));
+            _time.GetUtcNow().AddMinutes(10));
 
         _context.Request.Headers.Cookie = $"{Cookies.EntryTransaction}={_protector.Protect(transaction)}";
     }

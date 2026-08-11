@@ -37,7 +37,15 @@ public class Admission
     /// Gets or sets how long an admitted browser stays admitted. It bounds the whole interactive entry —
     /// choosing a provider, completing the round-trip and coming back — so it is measured in minutes rather
     /// than in the hours a session lasts.
-    /// Defaults to ten minutes.
+    /// Defaults to twenty minutes.
     /// </summary>
-    public TimeSpan EntryLifetime { get; set; } = TimeSpan.FromMinutes(10);
+    /// <remarks>
+    /// Twenty rather than ten because of what sits inside the round-trip it has to outlast: ASP.NET Core's
+    /// own <c>RemoteAuthenticationOptions.RemoteAuthenticationTimeout</c> allows fifteen minutes at the
+    /// provider, and enrolling in MFA, resetting a password or working through a consent screen routinely
+    /// uses them. An entry shorter than that expires while the framework still considers the handshake
+    /// live, and the caller comes back to the uniform refusal — with no recovery, and by design nothing in
+    /// any response or log to diagnose it from. Shortening this below the remote timeout re-creates that.
+    /// </remarks>
+    public TimeSpan EntryLifetime { get; set; } = TimeSpan.FromMinutes(20);
 }

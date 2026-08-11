@@ -12,7 +12,15 @@ namespace Cratis.AuthProxy.Invites;
 /// <param name="dataProtectionProvider">The data-protection provider.</param>
 public sealed class InvitationEntryStateProtector(IDataProtectionProvider dataProtectionProvider) : IInvitationEntryStateProtector
 {
-    const string Purpose = "Cratis.AuthProxy.InvitationEntryState.v1";
+    /// <summary>
+    /// The data-protection purpose the invitation entry state is sealed under.
+    /// </summary>
+    /// <remarks>
+    /// Public for the same reason the entry transaction's is: the two cookies share one key ring and are
+    /// kept apart by nothing but these two strings, so a spec pins that they differ.
+    /// </remarks>
+    public const string Purpose = "Cratis.AuthProxy.InvitationEntryState.v1";
+
     readonly IDataProtector _protector = dataProtectionProvider.CreateProtector(Purpose);
 
     /// <inheritdoc />

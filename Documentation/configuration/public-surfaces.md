@@ -7,6 +7,12 @@ has no session to check.
 
 Declaring those paths is what [`AnonymousPaths`](services.md#anonymous-paths) is for.
 
+> **Not on a closed deployment.** Everything on this page describes a deployment in the default
+> `Public` admission mode. Under [`CapabilityOnly`](admission.md) a declared anonymous path answers the
+> uniform `404` like everything else, because admission runs before authentication and decides whether
+> there is anything here to reach at all. A deployment that needs both a genuinely public surface and a
+> closed one needs two deployments.
+
 ---
 
 ## Declaring the surface
@@ -87,6 +93,9 @@ An unauthenticated request to a declared path should reach the application. If i
 sign-in chooser, the declaration was not accepted — an entry that is not a rooted path of literal segments
 is discarded silently, so check its spelling first. See
 [Anonymous paths](services.md#anonymous-paths) for the exact rule.
+
+If it comes back as a bare `404 Not Found` and so does every other path — including `/.cratis/providers` —
+the deployment is in [`CapabilityOnly`](admission.md) admission mode, and no declaration will open it.
 
 If the request comes back as `401` rather than the application's response, the caller was not treated as a
 browser navigating to a page. That is expected for a `fetch()` or a command-line client against an

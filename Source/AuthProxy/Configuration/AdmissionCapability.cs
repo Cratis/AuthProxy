@@ -24,9 +24,14 @@ public class AdmissionCapability
 
     /// <summary>
     /// Gets or sets the one path a capability may be presented on. Every other path — and this path with
-    /// anything below it — answers the same refusal as everything else, so the endpoint is not a probe for
-    /// whether the mode is on.
+    /// anything below it — answers the same refusal as everything else, so nothing this path <em>says</em>
+    /// distinguishes it.
     /// </summary>
+    /// <remarks>
+    /// It is still distinguishable by how long it takes: a presentation here costs a verifier round-trip
+    /// that no other path costs. Choosing an unguessable path is therefore worth something and proves
+    /// nothing — treat it as one less thing to notice, never as the control.
+    /// </remarks>
     public string Path { get; set; } = "/.cratis/admission";
 
     /// <summary>

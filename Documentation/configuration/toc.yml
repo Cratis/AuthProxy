@@ -4,6 +4,8 @@
   href: authentication.md
 - name: Authorization
   href: authorization.md
+- name: Admission
+  href: admission.md
 - name: Unauthenticated Responses
   href: unauthenticated-responses.md
 - name: Failed Sign-ins

@@ -46,9 +46,15 @@ internal sealed class ManagementEndpoints(IReadinessCheck readiness)
             return;
         }
 
+        // Refused with the deployment's one refusal rather than an answer of this middleware's own. The
+        // management middleware runs ahead of the admission gate, so a management path offered to the
+        // *public* listener is refused before admission ever sees it — and a refusal that differs from the
+        // one every other unadmitted request gets tells an unadmitted caller that an AuthProxy is here, that
+        // it has a management listener, and what its paths are called. The same answer is used on the
+        // management listener too, so the two cannot drift apart.
         if (disposition != ManagementDisposition.Ready)
         {
-            await Write(context, StatusCodes.Status404NotFound, string.Empty);
+            await UniformDenial.Write(context);
             return;
         }
 

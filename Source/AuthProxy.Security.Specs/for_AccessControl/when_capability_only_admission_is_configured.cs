@@ -27,18 +27,29 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 [Collection(CapabilityOnlySpecCollection.Name)]
 public class when_capability_only_admission_is_configured(CapabilityOnlyHarness harness) : IAsyncLifetime
 {
+    /// <summary>
+    /// Every route this deployment could answer, ordered so the first probe is one the pipeline can answer
+    /// without an authentication handler.
+    /// </summary>
+    /// <remarks>
+    /// All of them are meant to be refused before they reach anything. But if the gate ever stops refusing,
+    /// <c>/.cratis/login/provider-one</c> reaches <c>ChallengeAsync</c> for a scheme this harness deliberately
+    /// replaced and throws — which errors the whole class with "No authentication handler is registered", a
+    /// message about the harness rather than about the gate. Leading with the provider list makes the first
+    /// thing that goes wrong a recorded answer that differs, which is the actual finding.
+    /// </remarks>
     static readonly string[] _routes =
     [
+        WellKnownPaths.Providers,
         CapabilityOnlyHarness.ProtectedPath,
         CapabilityOnlyHarness.AnonymousPath,
-        WellKnownPaths.Providers,
         WellKnownPaths.Token,
-        $"{WellKnownPaths.LoginPrefix}/provider-one",
         WellKnownPaths.LoginPage,
         WellKnownPaths.Logout,
         "/signin-github",
         WellKnownPaths.Registration,
         "/invite/eyJhbGciOiJSUzI1NiJ9.eyJqdGkiOiIxIn0.c2ln",
+        $"{WellKnownPaths.LoginPrefix}/provider-one",
     ];
 
     readonly List<string> _shapes = [];
@@ -55,12 +66,10 @@ public class when_capability_only_admission_is_configured(CapabilityOnlyHarness 
         {
             harness.Origin.Clear();
 
-            using var anonymous = await client.SendAsync(SecurityHarness.Anonymous(HttpMethod.Get, route));
-            _shapes.Add($"{(int)anonymous.StatusCode}|{await anonymous.Content.ReadAsStringAsync()}");
-
-            using var authenticated = await client.SendAsync(
-                SecurityHarness.Authenticated(HttpMethod.Get, route, SecurityHarness.UniqueUser("capability-only")));
-            _shapes.Add($"{(int)authenticated.StatusCode}|{await authenticated.Content.ReadAsStringAsync()}");
+            _shapes.Add(await ShapeOf(client, SecurityHarness.Anonymous(HttpMethod.Get, route)));
+            _shapes.Add(await ShapeOf(
+                client,
+                SecurityHarness.Authenticated(HttpMethod.Get, route, SecurityHarness.UniqueUser("capability-only"))));
 
             if (!harness.Origin.Received.IsEmpty)
             {
@@ -83,6 +92,34 @@ public class when_capability_only_admission_is_configured(CapabilityOnlyHarness 
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
+
+    /// <summary>
+    /// Records what one probe answered, treating a request the pipeline threw on as a shape of its own.
+    /// </summary>
+    /// <param name="client">The client to probe with.</param>
+    /// <param name="request">The request to send.</param>
+    /// <returns>The observed shape.</returns>
+    /// <remarks>
+    /// A refused request never reaches anything that can throw. One that does reach it is already the
+    /// finding, so it is recorded as a shape that differs from every refusal rather than allowed to abort
+    /// the class with an exception about whatever it happened to reach first.
+    /// </remarks>
+    static async Task<string> ShapeOf(HttpClient client, HttpRequestMessage request)
+    {
+        using (request)
+        {
+            try
+            {
+                using var response = await client.SendAsync(request);
+
+                return $"{(int)response.StatusCode}|{await response.Content.ReadAsStringAsync()}";
+            }
+            catch (Exception exception)
+            {
+                return $"threw|{exception.GetType().Name}: {exception.Message}";
+            }
+        }
+    }
 
     [Fact]
     public void should_answer_every_route_the_same_way_whether_or_not_the_caller_has_a_session() =>

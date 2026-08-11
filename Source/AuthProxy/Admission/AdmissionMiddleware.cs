@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Admission;
@@ -56,6 +57,13 @@ public class AdmissionMiddleware(
 
         if (policy.IsAdmitted(context, current))
         {
+            // Everything downstream is served *because* of the entry cookie, and a shared cache that did not
+            // know that would store one admitted caller's answer under a key that has no cookie in it and
+            // hand it to callers who presented none — serving the provider list this mode exists to hide.
+            // Declared before the request is handed on, so it applies to whatever answers it, including the
+            // reverse proxy.
+            context.Response.Headers.Append(HeaderNames.Vary, HeaderNames.Cookie);
+
             await next(context);
             return;
         }

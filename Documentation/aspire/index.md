@@ -131,6 +131,47 @@ caller can do while it is unset.
 
 ---
 
+## Admission
+
+Close the interactive contract, so AuthProxy answers nothing at all until a caller presents a
+capability the deployment's own verifier admits:
+
+```csharp
+authproxy.WithCapabilityOnlyAdmission("https://members.example.com/admit");
+```
+
+That is the whole minimum — the verifier URL has no default, because the verifier is your service and
+inventing an address for it would mean a misconfigured deployment silently calling something else.
+Everything else does:
+
+```csharp
+authproxy.WithCapabilityOnlyAdmission(
+    verifierUrl: "https://members.example.com/admit",
+    path: "/enter",                            // default "/.cratis/admission"
+    maximumLength: 512,                        // default 4096 bytes
+    entryLifetime: TimeSpan.FromMinutes(30));  // default 20 minutes
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `verifierUrl` | ✓ | Absolute `http`/`https` URL that decides whether a presented capability admits. |
+| `path` | – | The one path a capability may be presented on. |
+| `maximumLength` | – | The largest capability, in bytes, AuthProxy will read. |
+| `entryLifetime` | – | How long an admitted browser stays admitted. |
+
+Do not shorten `entryLifetime` below fifteen minutes: ASP.NET Core allows that long at the identity
+provider, so a shorter entry expires while the handshake is still live and the caller comes back to a
+`404` with nothing anywhere to diagnose it from.
+
+It cannot be combined with `WithInvite` — AuthProxy refuses the combination at startup rather than
+silently ordering two capability mechanisms. Without this call nothing changes: the default mode is
+`Public`, which is how every release before it behaved.
+
+See [Admission](../configuration/admission.md) for the verifier request/response contract, what an
+operator should expect to observe, and the `/.cratis/token` caveat for machine clients.
+
+---
+
 ## Authentication
 
 ### OIDC providers

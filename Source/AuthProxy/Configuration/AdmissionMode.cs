@@ -27,13 +27,21 @@ public enum AdmissionMode
 
     /// <summary>
     /// Nothing at all is answered until a caller presents a capability the deployment's own verifier
-    /// admits. Every request that has not been admitted receives one indistinguishable refusal, so the
-    /// deployment discloses neither which paths exist, nor which providers are configured, nor whether a
-    /// given capability was ever valid.
+    /// admits. Every request that has not been admitted receives the same refusal, byte for byte, so no
+    /// answer discloses which paths exist, which providers are configured, or whether a given capability
+    /// was ever valid.
     /// </summary>
     /// <remarks>
     /// This is an opt-in posture, not a hardening of the default: turning it on closes a contract that
     /// other deployments depend on being open.
+    /// <para>
+    /// What is indistinguishable is the <em>content</em> of the answers, not every observable of them.
+    /// A presentation on the capability path costs a verifier round-trip that no other path costs, and an
+    /// over-length body is refused before that round-trip starts — so the presentation path is
+    /// distinguishable by timing, and the configured bound is discoverable by binary search against it.
+    /// Closing that would mean padding every refusal to the slowest one, which trades a real availability
+    /// cost for an attacker learning where a path is that already answers nothing.
+    /// </para>
     /// </remarks>
     CapabilityOnly = 1
 }

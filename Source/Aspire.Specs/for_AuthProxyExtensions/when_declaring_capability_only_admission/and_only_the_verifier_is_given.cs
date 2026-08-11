@@ -25,7 +25,7 @@ public class and_only_the_verifier_is_given : given.an_auth_proxy_resource
     [Fact] void should_declare_the_verifier() => _environment["Cratis__AuthProxy__Admission__Capability__VerifierUrl"].ShouldEqual("https://members.example.com/admit");
     [Fact] void should_default_the_presentation_path() => _environment["Cratis__AuthProxy__Admission__Capability__Path"].ShouldEqual("/.cratis/admission");
     [Fact] void should_default_the_capability_bound() => _environment["Cratis__AuthProxy__Admission__Capability__MaximumLength"].ShouldEqual("4096");
-    [Fact] void should_default_the_entry_lifetime_to_ten_minutes() => _environment["Cratis__AuthProxy__Admission__EntryLifetime"].ShouldEqual("00:10:00");
+    [Fact] void should_default_the_entry_lifetime_past_the_time_the_framework_allows_at_the_provider() => _environment["Cratis__AuthProxy__Admission__EntryLifetime"].ShouldEqual("00:20:00");
     [Fact] void should_leave_the_invite_section_alone() => _environment.Keys.Any(_ => _.Contains("__Invite", StringComparison.Ordinal)).ShouldBeFalse();
     [Fact] void should_leave_the_services_alone() => _environment.Keys.Any(_ => _.Contains("__Services__", StringComparison.Ordinal)).ShouldBeFalse();
 }

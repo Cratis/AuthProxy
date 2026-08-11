@@ -108,6 +108,6 @@ public class CapabilityVerifier(
             return CapabilityVerification.Denied;
         }
 
-        return CapabilityVerification.Admitted(answer.Context);
+        return CapabilityVerification.Admitted;
     }
 }

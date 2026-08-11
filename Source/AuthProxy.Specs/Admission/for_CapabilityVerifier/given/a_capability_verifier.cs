@@ -59,15 +59,13 @@ public class a_capability_verifier : Specification
     /// <param name="admitted">Whether the capability admits.</param>
     /// <param name="transaction">The transaction the answer names.</param>
     /// <param name="challenge">The challenge the answer names.</param>
-    /// <param name="context">The opaque values to carry with the entry.</param>
     /// <returns>A successful HTTP answer carrying it.</returns>
     protected static HttpResponseMessage Answer(
         bool admitted,
         string? transaction,
-        string? challenge,
-        IReadOnlyDictionary<string, string>? context = null) =>
+        string? challenge) =>
         new(HttpStatusCode.OK)
         {
-            Content = JsonContent.Create(new CapabilityVerificationResponse(admitted, transaction, challenge, context)),
+            Content = JsonContent.Create(new CapabilityVerificationResponse(admitted, transaction, challenge)),
         };
 }

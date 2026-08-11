@@ -66,8 +66,7 @@ public class a_capability_admission : Specification
     protected void VerifierAdmitting() =>
         _verifier
             .Verify(Arg.Any<CapabilityPresentation>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo => CapabilityVerification.Admitted(
-                new Dictionary<string, string>(StringComparer.Ordinal) { ["scope"] = "opaque" }));
+            .Returns(CapabilityVerification.Admitted);
 
     /// <summary>
     /// Gets the raw value of the entry-transaction cookie the response carries.

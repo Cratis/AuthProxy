@@ -161,13 +161,18 @@ The one exception is the two exact management paths themselves. If your applicat
 Very little, on purpose. A management endpoint is reachable without a credential by design, so everything
 it says is said to whoever can reach the port.
 
-Every answer is a short fixed body — `live`, `ready`, `not ready`, or nothing at all for the `404` — and
-names no provider, tenant, backend address, filesystem path, key identifier, version or assembly. A failing
-readiness answer discloses no more than a succeeding one: the reason is written to the log, where an
-operator reads it and a caller does not.
+Every answer is a short fixed body — `live`, `ready`, `not ready`, or the deployment's uniform `Not Found`
+for the `404` — and names no provider, tenant, backend address, filesystem path, key identifier, version or
+assembly. A failing readiness answer discloses no more than a succeeding one: the reason is written to the
+log, where an operator reads it and a caller does not.
 
-No answer carries `Set-Cookie` or `WWW-Authenticate`, and enabling the listener also stops Kestrel naming
-itself in the `Server` header of every response AuthProxy writes.
+No answer carries `Set-Cookie` or `WWW-Authenticate`, and AuthProxy never names Kestrel in a `Server`
+header on any response, whether or not this listener is open.
+
+The `404` is deliberately the *same* refusal the rest of the proxy writes, down to the byte. This
+middleware runs ahead of the [admission](admission.md) gate, so a management path offered to the **public**
+listener is refused here and never reaches it — and a refusal of its own shape would tell an unadmitted
+caller that an AuthProxy is here, that it has a management listener, and what its paths are called.
 
 ---
 
@@ -218,3 +223,7 @@ probe at a declared anonymous path or downgraded it to TCP, this is the better a
 Keep an application-path probe if you have one — it tests the proxy *and* the application end to end, which
 is a question worth asking — but point the *proxy's own* liveness and readiness here, where they mean what
 their names say.
+
+On a deployment in [`CapabilityOnly`](admission.md) admission mode this listener is the **only** probe
+available: every path on the public listener answers `404` until a capability has been presented, including
+one a service declared anonymous.

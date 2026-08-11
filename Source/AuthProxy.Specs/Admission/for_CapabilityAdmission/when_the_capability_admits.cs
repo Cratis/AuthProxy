@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
+
 namespace Cratis.AuthProxy.Admission.for_CapabilityAdmission;
 
 /// <summary>
@@ -48,10 +50,17 @@ public class when_the_capability_admits : given.a_capability_admission
         transaction.ExpiresAt.ShouldEqual(_time.GetUtcNow().AddMinutes(10));
     }
 
+    /// <summary>
+    /// A browser silently drops a <c>Set-Cookie</c> past 4096 bytes, and in this mode a dropped entry cookie
+    /// means a caller who was admitted receives the uniform refusal for the rest of the entry's life — with
+    /// nothing in any response and nothing in any log to say why, because that is the whole design.
+    /// </summary>
+    /// <remarks>
+    /// Asserted rather than assumed because the seal is only as small as what goes into it. Every value in
+    /// the transaction is authored here and fixed in size today; anything added later that a verifier or a
+    /// deployment can influence would cross this bound long before anybody noticed.
+    /// </remarks>
     [Fact]
-    void should_carry_the_context_the_verifier_asked_for()
-    {
-        _protector.TryUnprotect(IssuedCookieValue(), out var transaction).ShouldBeTrue();
-        transaction.Context["scope"].ShouldEqual("opaque");
-    }
+    void should_issue_a_cookie_the_browser_will_keep() =>
+        Encoding.UTF8.GetByteCount(IssuedCookieHeader()).ShouldBeLessThan(4096);
 }

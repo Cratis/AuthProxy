@@ -79,6 +79,15 @@ public static class IngressExtensions
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
         builder.Services.AddSingleton<IErrorPageProvider, ErrorPageProvider>();
 
+        // Kestrel names itself in a Server header on every response it writes, including ones this proxy
+        // wrote to say nothing at all. It is a per-server setting rather than a per-listener or per-response
+        // one, so it cannot be cleared where a response is composed — the header is added at serialization
+        // time, after every middleware has stopped touching it. Turned off here, unconditionally, because a
+        // deployment closed to callers that present nothing must not answer the first question a scanner
+        // asks; leaving it to some other feature's opt-in made it a property of whether a health port
+        // happened to be configured.
+        builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
         // The admission gate is a middleware UseIngress always places, so its services belong to the same
         // registration the pipeline itself is paired with. Registering them changes nothing for a deployment
         // that never opts in.

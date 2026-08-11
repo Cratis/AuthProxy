@@ -158,7 +158,7 @@ public class CapabilityOnlyHarness : WebApplicationFactory<Program>
     {
         public Task<CapabilityVerification> Verify(CapabilityPresentation presentation, CancellationToken cancellationToken) =>
             Task.FromResult(presentation.Capability.StartsWith(AdmittedPrefix, StringComparison.Ordinal)
-                ? CapabilityVerification.Admitted()
+                ? CapabilityVerification.Admitted
                 : CapabilityVerification.Denied);
     }
 }

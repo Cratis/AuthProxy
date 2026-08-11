@@ -29,7 +29,12 @@ public class AdmissionConfigurationValidator : IValidateOptions<C.AuthProxy>
                 $"A mode it cannot recognize is treated as closed rather than as public, so the value has to name one of: {string.Join(", ", Enum.GetNames<C.AdmissionMode>())}.");
         }
 
-        if (options.Admission.Mode != C.AdmissionMode.CapabilityOnly)
+        // Asked as "is this deployment public", never as "is this not capability-only" — the same way the
+        // gate asks it, and for the same reason. The two forms agree only while the enum has exactly two
+        // members: a third mode added later would return success with nothing checked here while
+        // IAdmissionPolicy.IsConfigured turned the gate on for it, which is a deployment that starts clean
+        // and then refuses every caller alive with a 404 that says nothing.
+        if (options.Admission.Mode == C.AdmissionMode.Public)
         {
             return ValidateOptionsResult.Success;
         }

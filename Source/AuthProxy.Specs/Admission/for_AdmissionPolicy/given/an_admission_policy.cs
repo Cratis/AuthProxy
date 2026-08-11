@@ -54,8 +54,7 @@ public class an_admission_policy : Specification
         _protector.Protect(new EntryTransaction(
             Transaction,
             Challenge,
-            _time.GetUtcNow().Add(expiresIn),
-            new Dictionary<string, string>(StringComparer.Ordinal)));
+            _time.GetUtcNow().Add(expiresIn)));
 
     /// <summary>
     /// Puts the given cookies on the request.

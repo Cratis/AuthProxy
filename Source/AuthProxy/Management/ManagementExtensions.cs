@@ -48,12 +48,6 @@ public static class ManagementExtensions
 
         builder.Services.AddSingleton<IReadinessCheck, DataProtectionReadiness>();
 
-        // Kestrel names itself on every response it writes, and whether it does is a per-server setting
-        // rather than a per-listener one. A management endpoint must describe nothing about what is
-        // running it, so enabling the listener also stops AuthProxy advertising its server on the public
-        // one. This touches no ListenOptions and is therefore not the trap described above.
-        builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
-
         builder.WebHost.UseUrls([.. listeners.Including(UrlFor(management))]);
 
         return builder;

@@ -12,8 +12,8 @@ namespace Cratis.AuthProxy.Admission;
 /// <param name="timeProvider">The source of the current time.</param>
 /// <remarks>
 /// Every question this answers is closed by default. An entry transaction that is absent, unreadable,
-/// altered, truncated, issued under another key ring or expired all resolve to the same answer, and so does
-/// a provider callback arriving without the framework's own handshake proof.
+/// altered, truncated, issued under another key ring, missing its own values or expired all resolve to the
+/// same answer, and so does a provider callback arriving without an in-flight handshake cookie.
 /// <para>
 /// The mode is read the same way: only <see cref="C.AdmissionMode.Public"/> opens the contract, so a value
 /// the proxy cannot recognize closes it rather than opening it.
@@ -59,16 +59,22 @@ public class AdmissionPolicy(IEntryTransactionProtector protector, TimeProvider 
         context.Request.Path.Value?.StartsWith(WellKnownPaths.SignInPrefix, StringComparison.OrdinalIgnoreCase) ?? false;
 
     /// <summary>
-    /// Determines whether a callback carries the framework's own proof that it belongs to a handshake this
-    /// browser started.
+    /// Determines whether a callback carries a cookie shaped like the per-attempt state the OAuth and
+    /// OpenID Connect middleware write while a handshake is in flight.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <returns><see langword="true"/> when the handshake proof is present; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when such a cookie is present; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// The entry transaction says the browser was admitted; it says nothing about a handshake being in
-    /// flight. The correlation and nonce cookies the OAuth and OpenID Connect middleware write per attempt
-    /// say the opposite — they prove a handshake without saying anything about admission. A callback needs
-    /// both, so neither one alone is a way in.
+    /// It is a shape check and not a proof, and the difference matters: a caller writes their own cookie
+    /// names, so anything named <c>.AspNetCore.Correlation.</c>-something satisfies this. What it buys is
+    /// that an entry transaction alone does not carry a callback — a caller replaying a provider callback
+    /// path has to have been through a handshake this proxy started, or invent a cookie that says they
+    /// were. The value of that cookie is never read here.
+    /// <para>
+    /// The authoritative check is downstream and unchanged: the authentication handler unprotects its own
+    /// correlation cookie and refuses a callback whose state does not match, and that is what actually
+    /// rejects a forged one. This is a cheap narrowing in front of it, not a second gate.
+    /// </para>
     /// </remarks>
     static bool CarriesHandshakeProof(HttpContext context) =>
         context.Request.Cookies.Keys.Any(name =>
