@@ -66,6 +66,9 @@ Both the local logout and the post-logout callback:
 3. Delete every transient sign-in handshake cookie the browser sent (`.AspNetCore.Correlation.*`,
    `.AspNetCore.OpenIdConnect.Nonce.*`) — the leftovers of abandoned handshakes that would otherwise
    poison the next sign-in. See [Failed Sign-ins](failed-sign-ins.md#handshake-cookie-hygiene).
+4. Delete any **additional cookies** the deployment configured under
+   `Cratis:AuthProxy:Logout:AdditionalCookies` — cookies AuthProxy does not issue itself but that must
+   not survive a logout. See [Clearing additional cookies](#clearing-additional-cookies).
 
 The `.cratis-logout` carry cookie is deleted by the callback once the final target has been read from it.
 
@@ -131,6 +134,64 @@ Cratis__AuthProxy__Logout__AllowedRedirectOrigins__0=https://cratis.studio
 
 With the example above, `GET /.cratis/logout?redirect=https://cratis.studio` is permitted even when the
 app itself is served from a different host such as `https://app.cratis.studio`.
+
+---
+
+## Clearing additional cookies
+
+Logout clears every cookie *AuthProxy* issues — but a deployment often runs sibling authentication
+infrastructure whose cookies AuthProxy knows nothing about. The classic case is a separate
+[oauth2-proxy](https://oauth2-proxy.github.io/oauth2-proxy/) guarding an admin app whose session cookie
+was scoped to the **parent domain** (e.g. `_oauth2_proxy_admin` on `.cratis.studio`): every browser that
+ever signed in there sends it on every `*.cratis.studio` request, and it survives AuthProxy's logout —
+leaving the user half-signed-in from the application's point of view.
+
+List such cookies under `Cratis:AuthProxy:Logout:AdditionalCookies` and the session-termination sweep
+deletes them too. Each entry has:
+
+- **`Name`** *(required)* — the exact cookie name. Matching is by exact name only; there is no prefix or
+  wildcard support.
+- **`Domain`** *(optional)* — the domain the cookie was scoped to, e.g. `.cratis.studio`. When set, the
+  deletion is issued **for that domain as well as the request host** — necessary because a host-scoped
+  deletion cannot touch a parent-domain cookie. Deleting for a parent domain of the current host is legal,
+  which is exactly what makes this work. Leave it out for a cookie scoped to the request host itself.
+
+Deletions are issued at the root path (`Path=/`) with the `Secure` attribute mirroring the request scheme,
+so they reliably match how such cookies are typically written.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Logout": {
+        "AdditionalCookies": [
+          {
+            "Name": "_oauth2_proxy_admin",
+            "Domain": ".cratis.studio"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Equivalent environment variables (one indexed entry per cookie):
+
+```
+Cratis__AuthProxy__Logout__AdditionalCookies__0__Name=_oauth2_proxy_admin
+Cratis__AuthProxy__Logout__AdditionalCookies__0__Domain=.cratis.studio
+```
+
+The configured cookies are cleared everywhere the session is terminated:
+
+- the logout endpoint (both legs of a full-chain logout), and
+- the sign-in sweep that runs when a provider callback completes — so a **fresh sign-in also heals** a
+  browser still carrying the stale cookie, without requiring the user to log out first.
+
+This is a cleanup mechanism for cookies that linger after the owning deployment has been fixed (for
+example, until an old parent-domain cookie expires) — it does not log the user out of the system that
+issued the cookie.
 
 ---
 
