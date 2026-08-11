@@ -22,12 +22,16 @@ public class a_proxied_request : Specification
 
     void Establish()
     {
+        var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        config.CurrentValue.Returns(new C.AuthProxy());
+
         _middleware = new IdentityForwardingGuardMiddleware(
             _ =>
             {
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
+            config,
             _logger);
 
         _context = new DefaultHttpContext();

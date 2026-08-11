@@ -76,7 +76,7 @@ public class LogoutMiddleware(
 
         // Always clear the local session immediately. Even when the identity provider cannot be reached the
         // user must end up logged out locally.
-        await SessionTermination.SignOutAndClearCookies(context);
+        await SessionTermination.SignOutAndClearCookies(context, authProxyConfig.Logout);
 
         context.Response.StatusCode = StatusCodes.Status302Found;
 
@@ -100,7 +100,7 @@ public class LogoutMiddleware(
     {
         // The identity provider has redirected back after ending its own session. Clear every AuthProxy cookie
         // (idempotent with the initiation leg) and redirect to the validated final destination.
-        await SessionTermination.SignOutAndClearCookies(context);
+        await SessionTermination.SignOutAndClearCookies(context, authProxyConfig.Logout);
 
         var target = PostLogoutRedirectPolicy.ApplicationRoot;
         if (context.Request.Cookies.TryGetValue(Cookies.LogoutRedirect, out var carried))

@@ -21,6 +21,7 @@ public class configured_canonical_provider_callbacks : Specification
     protected OpenIdConnectOptions _oidcOptions;
     protected OAuthOptions _oauthOptions;
     protected IServiceProvider _services;
+    protected C.AuthProxy _rootConfiguration;
 
     void Establish()
     {
@@ -48,7 +49,7 @@ public class configured_canonical_provider_callbacks : Specification
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:Issuer"] = "https://github.example.com"
         });
 
-        var rootConfiguration = new C.AuthProxy
+        _rootConfiguration = new C.AuthProxy
         {
             Authentication = new C.Authentication
             {
@@ -84,7 +85,7 @@ public class configured_canonical_provider_callbacks : Specification
             }
         };
         var rootOptions = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        rootOptions.CurrentValue.Returns(rootConfiguration);
+        rootOptions.CurrentValue.Returns(_ => _rootConfiguration);
         builder.Services.AddSingleton(rootOptions);
         builder.Services.AddSingleton<ISignInNotifier>(Substitute.For<ISignInNotifier>());
         builder.AddIngressConfiguration();

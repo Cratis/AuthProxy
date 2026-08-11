@@ -3,7 +3,9 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ReverseProxy;
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Model;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -24,8 +26,12 @@ namespace Cratis.AuthProxy.Identity;
 /// declared anonymous are exempt — they are proxied without identity by design.
 /// </remarks>
 /// <param name="next">The next middleware in the pipeline.</param>
+/// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="logger">The logger.</param>
-public class IdentityForwardingGuardMiddleware(RequestDelegate next, ILogger<IdentityForwardingGuardMiddleware> logger)
+public class IdentityForwardingGuardMiddleware(
+    RequestDelegate next,
+    IOptionsMonitor<C.AuthProxy> config,
+    ILogger<IdentityForwardingGuardMiddleware> logger)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -40,7 +46,7 @@ public class IdentityForwardingGuardMiddleware(RequestDelegate next, ILogger<Ide
         }
 
         logger.TerminatingUnforwardableSession(RequestPathRedaction.Redact(context.Request.Path));
-        await SessionTermination.SignOutAndClearCookies(context);
+        await SessionTermination.SignOutAndClearCookies(context, config.CurrentValue.Logout);
 
         // A person navigating gets the provider-selection page with a reason and their destination
         // preserved; every other caller gets a status it can act on — never a silently forwarded,

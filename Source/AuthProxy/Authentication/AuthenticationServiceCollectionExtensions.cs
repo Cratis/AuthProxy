@@ -389,7 +389,12 @@ public static class AuthenticationServiceCollectionExtensions
         // (this is the callback path, where legacy path-scoped stragglers still flow) and safe to remove —
         // the handshake they belonged to is either this one, already consumed, or abandoned. Clearing them
         // here means one successful sign-in heals a browser poisoned by earlier half-cleared sessions.
+        // The deployment-configured additional cookies ride the same sweep: a stale foreign session cookie
+        // (say, one another proxy scoped to the parent domain) is just as poisonous as a leftover handshake
+        // cookie, so a successful sign-in heals the browser of those too.
         TransientAuthenticationCookies.Clear(context.HttpContext);
+        var logout = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Logout;
+        AdditionalLogoutCookies.Clear(context.HttpContext, logout.AdditionalCookies);
 
         var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
         string? validatedIssuer = null;
