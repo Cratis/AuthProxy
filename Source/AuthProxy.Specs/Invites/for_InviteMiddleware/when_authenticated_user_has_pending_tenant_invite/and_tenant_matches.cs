@@ -66,6 +66,7 @@ public class and_tenant_matches : Specification
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, "pending-invite-token");
         _context.Items[TenancyMiddleware.TenantIdItemKey] = TenantId;
     }
 

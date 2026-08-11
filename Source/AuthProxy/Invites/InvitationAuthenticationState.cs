@@ -4,6 +4,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Cratis.AuthProxy.Invites;
 
@@ -33,10 +34,22 @@ public static class InvitationAuthenticationState
     /// <param name="context">The current HTTP context.</param>
     /// <param name="properties">The provider challenge properties.</param>
     /// <returns><see langword="true"/> when no invitation is pending or valid invitation state was bound; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// A pending invitation always binds its capability, staged or not. That binding is the only thing that
+    /// later tells the post-login exchange that the session coming back was established by <em>this</em>
+    /// invitation's own challenge — a deployment that has not enabled the attested protocol stages nothing,
+    /// and without it the exchange cannot tell the identity the person just authenticated with apart from
+    /// whatever session the browser was already carrying.
+    /// </remarks>
     public static bool TryBindPendingInvitation(HttpContext context, AuthenticationProperties properties)
     {
         if (!context.Request.Cookies.TryGetValue(Cookies.InvitationEntryState, out var protectedState))
         {
+            if (context.TryGetPendingInvitationToken(out var pendingInvitation))
+            {
+                BindCapability(properties, pendingInvitation);
+            }
+
             return true;
         }
 
@@ -63,6 +76,41 @@ public static class InvitationAuthenticationState
         properties.Items[ChallengeStateKey] = state.InvitationChallenge;
         properties.Items[CapabilityHashStateKey] = state.CapabilityHash;
     }
+
+    /// <summary>
+    /// Binds the exact invitation capability a provider challenge is being started for.
+    /// </summary>
+    /// <param name="properties">The provider challenge properties.</param>
+    /// <param name="invitationToken">The invitation capability the challenge answers.</param>
+    internal static void BindCapability(AuthenticationProperties properties, string invitationToken) =>
+        properties.Items[CapabilityHashStateKey] = ComputeCapabilityHash(invitationToken);
+
+    /// <summary>
+    /// Determines whether an authenticated session was established by the challenge started for one exact
+    /// invitation capability.
+    /// </summary>
+    /// <param name="properties">The properties of the session authenticating the request.</param>
+    /// <param name="invitationToken">The pending invitation capability.</param>
+    /// <returns><see langword="true"/> when the session answers that exact capability; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// Properties travel inside the protected authentication ticket, so a value found here was put there by
+    /// AuthProxy when it started the challenge and returned by the provider with the session that challenge
+    /// established. A session that predates the invitation carries nothing, which is the answer that matters:
+    /// it is not evidence of anything about this invitation.
+    /// </remarks>
+    internal static bool WasEstablishedFor(AuthenticationProperties? properties, string invitationToken) =>
+        properties is not null
+        && properties.Items.TryGetValue(CapabilityHashStateKey, out var boundCapabilityHash)
+        && !string.IsNullOrEmpty(boundCapabilityHash)
+        && FixedTimeEquals(ComputeCapabilityHash(invitationToken), boundCapabilityHash);
+
+    /// <summary>
+    /// Computes the hash that identifies one exact invitation capability.
+    /// </summary>
+    /// <param name="invitationToken">The invitation capability.</param>
+    /// <returns>The capability hash.</returns>
+    internal static string ComputeCapabilityHash(string invitationToken) =>
+        Base64UrlEncoder.Encode(SHA256.HashData(Encoding.UTF8.GetBytes(invitationToken)));
 
     /// <summary>
     /// Determines whether authentication properties carry a complete protected invitation binding.

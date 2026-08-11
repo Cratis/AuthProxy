@@ -125,6 +125,7 @@ public class an_attested_invite_completion : Specification
             ]);
         properties.Items[InvitationAuthenticationState.CapabilityHashStateKey] = ComputeHash(token);
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}; {Cookies.InvitationEntryState}=protected-state";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, token);
 
         var protector = Substitute.For<IInvitationEntryStateProtector>();
         protector.TryUnprotect("protected-state", out Arg.Any<InvitationEntryState>())

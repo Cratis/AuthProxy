@@ -49,6 +49,7 @@ public class when_authenticated_user_has_pending_invite_with_fallback_claims : S
                 [new Claim(ClaimTypes.NameIdentifier, "user-123")],
                 "aad"));
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, "pending-invite-token");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

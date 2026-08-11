@@ -55,6 +55,7 @@ public class and_exchange_returns_duplicate_subject_status_with_configured_url :
         var identity = new ClaimsIdentity([new Claim("sub", "user-123")], "aad");
         _context.User = new ClaimsPrincipal(identity);
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, "pending-invite-token");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

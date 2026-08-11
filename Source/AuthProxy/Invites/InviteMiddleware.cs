@@ -13,7 +13,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Invites;
@@ -24,13 +23,15 @@ namespace Cratis.AuthProxy.Invites;
 ///   <item>
 ///     Handles <c>/invite/{token}</c> – validates the token, stores it in a short-lived
 ///     HTTP-only cookie and redirects the user to the OIDC login.
-///     If multiple identity providers are configured the invitation provider-selection page
-///     is served so the user can choose which provider to use.
+///     If multiple identity providers are configured — or the caller already carries a session, whose
+///     identity is not the one this invitation may bind — the invitation provider-selection page is served
+///     so the user chooses which provider to complete the invitation with.
 ///     If the token is expired the <c>invitation-expired.html</c> error page is returned.
 ///     If the token is malformed or has an invalid signature the <c>invitation-invalid.html</c> page is returned.
 ///   </item>
 ///   <item>
-///     After a successful OIDC login – detects the pending invite cookie, calls the Lobby invitation authority's
+///     After a successful OIDC login – detects the pending invite cookie, confirms the session was
+///     established by this invitation's own challenge, calls the Lobby invitation authority's
 ///     completion endpoint, deletes the cookie, and signals any required lobby redirect via
 ///     <see cref="LobbyRedirectUrlItemKey"/> in <see cref="HttpContext.Items"/> before
 ///     continuing the pipeline. Identity resolution and the actual redirect are handled by
@@ -149,88 +150,28 @@ public class InviteMiddleware(
             if (validationResult != InviteTokenValidationResult.Valid)
             {
                 logger.InviteExchangeTokenValidationFailed(validationResult);
-                context.Response.Cookies.Delete(Cookies.InviteToken);
-                context.Response.Cookies.Delete(Cookies.InvitationEntryState);
-                context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
-                context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
-
-                var invalidPageName = validationResult == InviteTokenValidationResult.Expired
-                    ? WellKnownPageNames.InvitationExpired
-                    : WellKnownPageNames.InvitationInvalid;
-
-                await errorPageProvider.WriteErrorPageAsync(
-                    context,
-                    invalidPageName,
-                    StatusCodes.Status401Unauthorized);
+                await RejectPendingInvitation(context, validationResult);
                 return;
             }
 
-            var exchangeResult = IsAttestedProtocolEnabled()
-                ? await CompleteAttestedInvitation(context, inviteToken)
-                : await ExchangeInvite(context, inviteToken);
-            context.Response.Cookies.Delete(Cookies.InviteToken);
-            context.Response.Cookies.Delete(Cookies.InvitationEntryState);
-            context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
-            context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
-
-            if (exchangeResult == InviteExchangeResult.EmailMismatch)
+            // "Authenticated" and "authenticated for this invitation" are different facts, and only the
+            // second one may complete it. An invitation binds an organization to an identity permanently,
+            // and the pre-existing session is the one that arrives first: a person already signed in with
+            // one provider who opens an invitation and picks another was otherwise bound to the provider
+            // they did not choose - silently, and with no way back. The session that answers the
+            // invitation's own challenge carries AuthProxy's capability binding; nothing else does, so
+            // nothing else is exchanged.
+            if (WasAuthenticatedForInvitation(context, inviteToken))
             {
-                await errorPageProvider.WriteErrorPageAsync(
-                    context,
-                    WellKnownPageNames.InvitationEmailMismatch,
-                    StatusCodes.Status403Forbidden);
-
+                await CompleteInvitation(context, inviteToken);
                 return;
             }
 
-            if (exchangeResult == InviteExchangeResult.EmailUnavailable)
-            {
-                await errorPageProvider.WriteErrorPageAsync(
-                    context,
-                    WellKnownPageNames.InvitationEmailUnavailable,
-                    StatusCodes.Status403Forbidden);
-
-                return;
-            }
-
-            if (exchangeResult == InviteExchangeResult.DuplicateSubject)
-            {
-                var subjectAlreadyExistsUrl = config.CurrentValue.Invite?.SubjectAlreadyExistsUrl;
-                if (!string.IsNullOrWhiteSpace(subjectAlreadyExistsUrl))
-                {
-                    context.Response.Redirect(subjectAlreadyExistsUrl);
-                }
-                else
-                {
-                    await errorPageProvider.WriteErrorPageAsync(
-                        context,
-                        WellKnownPageNames.InvitationSubjectAlreadyExists,
-                        StatusCodes.Status409Conflict);
-                }
-
-                return;
-            }
-
-            if (exchangeResult == InviteExchangeResult.Failed && IsAttestedProtocolEnabled())
-            {
-                await errorPageProvider.WriteErrorPageAsync(
-                    context,
-                    WellKnownPageNames.InvitationInvalid,
-                    StatusCodes.Status403Forbidden);
-                return;
-            }
-
-            if (exchangeResult == InviteExchangeResult.Success && !IsTenantIssuedInvite(inviteToken, context))
-            {
-                var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
-                if (!string.IsNullOrWhiteSpace(lobbyUrl))
-                {
-                    context.Items[LobbyRedirectUrlItemKey] = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
-                }
-            }
-
-            await next(context);
-            return;
+            // Not a failure - the invitation is still pending and still valid, it just has no identity to
+            // bind yet. Falling through leaves the capability cookie in place and takes the caller to the
+            // invitation's own provider selection (Phase 1), or lets the pipeline reach the challenge
+            // endpoint the caller is already on their way to.
+            logger.InviteSessionWasNotEstablishedByTheInvitation();
         }
 
         // ── Phase 1: incoming invite URL ──────────────────────────────────────
@@ -322,7 +263,15 @@ public class InviteMiddleware(
                 });
             }
 
-            if (providers.Count > 1)
+            // A caller that already carries a session is never challenged straight through, however few
+            // providers are configured. The session it arrived with is not the identity this invitation may
+            // bind — that one is established by the challenge — and going straight to a provider gives the
+            // person no chance to see, let alone change, which account the organization ends up bound to.
+            // The click costs a moment; the wrong binding is permanent. A page is also terminal, so a
+            // deployment where the invitation binding fails to survive the provider round-trip stops here
+            // rather than bouncing the browser between the invitation and the provider forever.
+            var isAlreadyAuthenticated = context.User.Identity?.IsAuthenticated == true;
+            if (providers.Count > 1 || (providers.Count == 1 && isAlreadyAuthenticated))
             {
                 // Multiple providers: inject the providers cookie and serve the selection page.
                 var providersJson = JsonSerializer.Serialize(providers, _providerSerializerOptions);
@@ -355,7 +304,15 @@ public class InviteMiddleware(
                 {
                     InvitationAuthenticationState.Bind(properties, entryState);
                 }
-                else if (!InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
+                else if (InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
+                {
+                    // Nothing was staged, so bind the capability this challenge is being started for. It is
+                    // what proves, on the way back, that the session completing the invitation is the one
+                    // this invitation challenged for. The request's own cookie cannot say so — it is being
+                    // written by this very response.
+                    InvitationAuthenticationState.BindCapability(properties, token);
+                }
+                else
                 {
                     await errorPageProvider.WriteErrorPageAsync(
                         context,
@@ -363,6 +320,7 @@ public class InviteMiddleware(
                         StatusCodes.Status401Unauthorized);
                     return;
                 }
+
                 await context.ChallengeAsync(scheme, properties);
                 return;
             }
@@ -434,6 +392,36 @@ public class InviteMiddleware(
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// Determines whether the session authenticating this request was established by this invitation's own challenge.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The pending invitation capability.</param>
+    /// <returns><see langword="true"/> when the session answers this invitation; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// The evidence read is the authentication result that produced <see cref="HttpContext.User"/> — the
+    /// ticket the provider handshake signed in — rather than a second authentication call naming a scheme,
+    /// so the question asked is exactly "what established the identity this request is running as". A
+    /// deployment authenticating by any other means carries no invitation binding and is therefore refused,
+    /// which is the intended direction: the invite flow is a browser flow AuthProxy challenges for itself.
+    /// </remarks>
+    static bool WasAuthenticatedForInvitation(HttpContext context, string inviteToken) =>
+        InvitationAuthenticationState.WasEstablishedFor(
+            context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties,
+            inviteToken);
+
+    /// <summary>
+    /// Removes every cookie belonging to a pending invitation, at both the default and the root path.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    static void DeleteInvitationCookies(HttpContext context)
+    {
+        context.Response.Cookies.Delete(Cookies.InviteToken);
+        context.Response.Cookies.Delete(Cookies.InvitationEntryState);
+        context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
+        context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
     }
 
     /// <summary>
@@ -579,9 +567,6 @@ public class InviteMiddleware(
         }
     }
 
-    static string ComputeCapabilityHash(string inviteToken) =>
-        Base64UrlEncoder.Encode(SHA256.HashData(Encoding.UTF8.GetBytes(inviteToken)));
-
     static bool ResolvedTenantMatchesWhenPresent(HttpContext context, string tenantId) =>
         !context.Items.TryGetValue(TenancyMiddleware.TenantIdItemKey, out var resolved)
         || resolved is not string resolvedTenantId
@@ -592,6 +577,99 @@ public class InviteMiddleware(
         CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(actual));
 
     bool IsAttestedProtocolEnabled() => config.CurrentValue.Invite?.Attestation is not null;
+
+    /// <summary>
+    /// Answers a pending invitation whose capability no longer validates, and clears it from the browser.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="validationResult">The reason re-validation refused the capability.</param>
+    /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
+    async Task RejectPendingInvitation(HttpContext context, InviteTokenValidationResult validationResult)
+    {
+        DeleteInvitationCookies(context);
+
+        var invalidPageName = validationResult == InviteTokenValidationResult.Expired
+            ? WellKnownPageNames.InvitationExpired
+            : WellKnownPageNames.InvitationInvalid;
+
+        await errorPageProvider.WriteErrorPageAsync(
+            context,
+            invalidPageName,
+            StatusCodes.Status401Unauthorized);
+    }
+
+    /// <summary>
+    /// Completes a pending invitation with the identity that answered its challenge, and answers whatever
+    /// the completion produced.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The re-validated invitation capability.</param>
+    /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
+    async Task CompleteInvitation(HttpContext context, string inviteToken)
+    {
+        var exchangeResult = IsAttestedProtocolEnabled()
+            ? await CompleteAttestedInvitation(context, inviteToken)
+            : await ExchangeInvite(context, inviteToken);
+        DeleteInvitationCookies(context);
+
+        if (exchangeResult == InviteExchangeResult.EmailMismatch)
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.InvitationEmailMismatch,
+                StatusCodes.Status403Forbidden);
+
+            return;
+        }
+
+        if (exchangeResult == InviteExchangeResult.EmailUnavailable)
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.InvitationEmailUnavailable,
+                StatusCodes.Status403Forbidden);
+
+            return;
+        }
+
+        if (exchangeResult == InviteExchangeResult.DuplicateSubject)
+        {
+            var subjectAlreadyExistsUrl = config.CurrentValue.Invite?.SubjectAlreadyExistsUrl;
+            if (!string.IsNullOrWhiteSpace(subjectAlreadyExistsUrl))
+            {
+                context.Response.Redirect(subjectAlreadyExistsUrl);
+            }
+            else
+            {
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    WellKnownPageNames.InvitationSubjectAlreadyExists,
+                    StatusCodes.Status409Conflict);
+            }
+
+            return;
+        }
+
+        if (exchangeResult == InviteExchangeResult.Failed && IsAttestedProtocolEnabled())
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.InvitationInvalid,
+                StatusCodes.Status403Forbidden);
+            return;
+        }
+
+        if (exchangeResult == InviteExchangeResult.Success && !IsTenantIssuedInvite(inviteToken, context))
+        {
+            var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+            if (!string.IsNullOrWhiteSpace(lobbyUrl))
+            {
+                context.Items[LobbyRedirectUrlItemKey] = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
+            }
+        }
+
+        await next(context);
+    }
 
     async Task<(bool Succeeded, InvitationEntryState? State)> StageInvitation(HttpContext context, string inviteToken)
     {
@@ -614,7 +692,7 @@ public class InviteMiddleware(
             invitationId,
             InvitationAttestationIssuer.CreateOpaqueValue(),
             InvitationAttestationIssuer.CreateOpaqueValue(),
-            ComputeCapabilityHash(inviteToken),
+            InvitationAuthenticationState.ComputeCapabilityHash(inviteToken),
             DateTimeOffset.UtcNow.AddMinutes(15));
         if (!attestationIssuer.TryIssueStage(entryState, out var attestation))
         {
@@ -658,7 +736,7 @@ public class InviteMiddleware(
             || !context.Request.Cookies.TryGetValue(Cookies.InvitationEntryState, out var protectedState)
             || !entryStateProtector.TryUnprotect(protectedState, out var entryState)
             || entryState.ExpiresAt <= DateTimeOffset.UtcNow
-            || !FixedTimeEquals(entryState.CapabilityHash, ComputeCapabilityHash(inviteToken))
+            || !FixedTimeEquals(entryState.CapabilityHash, InvitationAuthenticationState.ComputeCapabilityHash(inviteToken))
             || !TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
             || !FixedTimeEquals(entryState.InvitationId, invitationId)
             || string.IsNullOrWhiteSpace(invite.TenantClaim)

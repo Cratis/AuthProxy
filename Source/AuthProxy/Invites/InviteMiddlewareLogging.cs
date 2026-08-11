@@ -31,4 +31,7 @@ internal static partial class InviteMiddlewareLogging
 
     [LoggerMessage(LogLevel.Warning, "Invite exchange rejected because the authenticated subject is already associated with an existing user")]
     internal static partial void InviteSubjectAlreadyExists(this ILogger logger);
+
+    [LoggerMessage(LogLevel.Information, "Invitation not completed because the authenticated session was not established by this invitation's own challenge - taking the caller through provider selection instead")]
+    internal static partial void InviteSessionWasNotEstablishedByTheInvitation(this ILogger logger);
 }

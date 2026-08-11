@@ -134,8 +134,16 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     /// </summary>
     /// <param name="authenticated">Whether the client should appear authenticated.</param>
     /// <param name="inviteTokenCookie">Optional invite token to send as a cookie.</param>
+    /// <param name="sessionEstablishedByTheInvitation">
+    /// Whether the session was established by the invitation's own challenge. Set this to
+    /// <see langword="false"/> to model the browser that was already signed in when the invitation
+    /// was opened — the session AuthProxy must refuse to complete an invitation with.
+    /// </param>
     /// <returns>A configured <see cref="HttpClient"/> that does not follow redirects.</returns>
-    public HttpClient CreateTestClient(bool authenticated = false, string? inviteTokenCookie = null)
+    public HttpClient CreateTestClient(
+        bool authenticated = false,
+        string? inviteTokenCookie = null,
+        bool sessionEstablishedByTheInvitation = true)
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -145,6 +153,11 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
         if (authenticated)
         {
             client.DefaultRequestHeaders.Add(TestAuthHandler.AuthHeader, "true");
+        }
+
+        if (!sessionEstablishedByTheInvitation)
+        {
+            client.DefaultRequestHeaders.Add(TestAuthHandler.PreExistingSessionHeader, "true");
         }
 
         if (!string.IsNullOrEmpty(inviteTokenCookie))
@@ -159,6 +172,12 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     /// <param name="options">The options monitor for authentication scheme options.</param>
     /// <param name="logger">The logger factory.</param>
     /// <param name="encoder">The URL encoder.</param>
+    /// <remarks>
+    /// A real provider handshake returns the challenge properties AuthProxy started it with, so a session
+    /// established for a pending invitation carries that invitation's capability binding. This stands in for
+    /// that, and <see cref="PreExistingSessionHeader"/> turns it off to model the opposite case: a browser
+    /// already signed in before the invitation was ever opened.
+    /// </remarks>
     public class TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -167,6 +186,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     {
         public const string Scheme = "TestScheme";
         public const string AuthHeader = "X-Test-Auth";
+        public const string PreExistingSessionHeader = "X-Test-Pre-Existing-Session";
 
         /// <inheritdoc/>
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -181,7 +201,16 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
                 new Claim("oid", "test-user-id"),
             };
             var identity = new ClaimsIdentity(claims, Scheme);
-            var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme);
+            var properties = new AuthenticationProperties();
+
+            if (!Request.Headers.ContainsKey(PreExistingSessionHeader)
+                && Request.Cookies.TryGetValue(Cookies.InviteToken, out var invitation)
+                && !string.IsNullOrEmpty(invitation))
+            {
+                InvitationAuthenticationState.BindCapability(properties, invitation);
+            }
+
+            var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), properties, Scheme);
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
     }
