@@ -18,10 +18,11 @@ public interface ISignInNotifier
     /// </summary>
     /// <param name="context">The provider-callback request, used to derive the client's location and browser.</param>
     /// <param name="principal">The principal established by the identity-provider authentication.</param>
+    /// <param name="scheme">The authentication scheme that produced the principal, naming the provider that was challenged.</param>
     /// <returns>The <see cref="SignInNotificationResult"/> describing the outcome.</returns>
     /// <remarks>
     /// Recording a sign-in must never break the sign-in itself, so an implementation is expected to be fully
     /// resilient — it reports failures through the returned result rather than throwing.
     /// </remarks>
-    Task<SignInNotificationResult> Notify(HttpContext context, ClaimsPrincipal? principal);
+    Task<SignInNotificationResult> Notify(HttpContext context, ClaimsPrincipal? principal, string? scheme = null);
 }

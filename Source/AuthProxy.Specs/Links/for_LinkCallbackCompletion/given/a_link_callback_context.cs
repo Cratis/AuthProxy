@@ -37,7 +37,7 @@ public class a_link_callback_context : Specification
 
         _exchanger = Substitute.For<ILinkSubjectExchanger>();
         _exchanger
-            .Exchange(Arg.Any<ClaimsPrincipal>(), Arg.Any<AuthenticationProperties>())
+            .Exchange(Arg.Any<ClaimsPrincipal>(), Arg.Any<AuthenticationProperties>(), Arg.Any<string?>())
             .Returns(ExchangeResult);
         _signInNotifier = Substitute.For<ISignInNotifier>();
 

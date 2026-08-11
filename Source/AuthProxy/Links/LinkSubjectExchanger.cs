@@ -42,7 +42,7 @@ public class LinkSubjectExchanger(
     }
 
     /// <inheritdoc/>
-    public async Task<LinkExchangeResult> Exchange(ClaimsPrincipal? principal, AuthenticationProperties properties)
+    public async Task<LinkExchangeResult> Exchange(ClaimsPrincipal? principal, AuthenticationProperties properties, string? scheme = null)
     {
         var exchangeUrl = config.CurrentValue.Link?.ExchangeUrl;
         if (string.IsNullOrWhiteSpace(exchangeUrl))
@@ -72,7 +72,10 @@ public class LinkSubjectExchanger(
             ?? principal?.FindFirst("id")?.Value
             ?? string.Empty;
 
+        // The scheme names the provider that was actually challenged — authoritative over anything sniffed
+        // from claims, which for some providers bottoms out in the meaningless "AuthenticationTypes.Federation".
         var identityProvider = canonicalResolution.Identity?.ProviderKey
+            ?? OidcProviderScheme.NameFromScheme(config.CurrentValue.Authentication, scheme)
             ?? principal?.FindFirst("iss")?.Value
             ?? principal?.FindFirst("identity_provider")?.Value
             ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value

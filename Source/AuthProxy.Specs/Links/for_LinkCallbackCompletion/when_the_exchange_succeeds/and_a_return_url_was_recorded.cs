@@ -18,5 +18,5 @@ public class and_a_return_url_was_recorded : a_link_callback_context
     [Fact] void should_not_write_a_body() => ResponseBody().ShouldEqual(string.Empty);
     [Fact] void should_handle_the_response() => _ticketContext.Result.Handled.ShouldBeTrue();
     [Fact] async Task should_exchange_the_subject_with_the_application() =>
-        await _exchanger.Received(1).Exchange(Arg.Any<ClaimsPrincipal>(), _properties);
+        await _exchanger.Received(1).Exchange(Arg.Any<ClaimsPrincipal>(), _properties, Arg.Any<string?>());
 }
