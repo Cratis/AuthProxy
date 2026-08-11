@@ -201,14 +201,17 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
                 new Claim("oid", "test-user-id"),
             };
             var identity = new ClaimsIdentity(claims, Scheme);
-            var properties = new AuthenticationProperties();
 
-            if (!Request.Headers.ContainsKey(PreExistingSessionHeader)
-                && Request.Cookies.TryGetValue(Cookies.InviteToken, out var invitation)
-                && !string.IsNullOrEmpty(invitation))
+            // A pre-existing session predates any invitation; a fresh one was signed in just now. The
+            // issue instant is the framework-persisted fact the gate reads, so the handler models exactly
+            // that - and deliberately does NOT fabricate the capability binding the real provider round
+            // trip may or may not deliver, which once made these scenarios pass while production looped.
+            var properties = new AuthenticationProperties
             {
-                InvitationAuthenticationState.BindCapability(properties, invitation);
-            }
+                IssuedUtc = Request.Headers.ContainsKey(PreExistingSessionHeader)
+                    ? DateTimeOffset.UtcNow.AddDays(-7)
+                    : DateTimeOffset.UtcNow.AddSeconds(5),
+            };
 
             var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), properties, Scheme);
             return Task.FromResult(AuthenticateResult.Success(ticket));

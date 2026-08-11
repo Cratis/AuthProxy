@@ -161,7 +161,7 @@ public class InviteMiddleware(
             // they did not choose - silently, and with no way back. The session that answers the
             // invitation's own challenge carries AuthProxy's capability binding; nothing else does, so
             // nothing else is exchanged.
-            if (WasAuthenticatedForInvitation(context, inviteToken))
+            if (WasAuthenticatedForInvitation(context, inviteToken, tokenValidator))
             {
                 await CompleteInvitation(context, inviteToken);
                 return;
@@ -395,24 +395,6 @@ public class InviteMiddleware(
     }
 
     /// <summary>
-    /// Determines whether the session authenticating this request was established by this invitation's own challenge.
-    /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <param name="inviteToken">The pending invitation capability.</param>
-    /// <returns><see langword="true"/> when the session answers this invitation; otherwise <see langword="false"/>.</returns>
-    /// <remarks>
-    /// The evidence read is the authentication result that produced <see cref="HttpContext.User"/> — the
-    /// ticket the provider handshake signed in — rather than a second authentication call naming a scheme,
-    /// so the question asked is exactly "what established the identity this request is running as". A
-    /// deployment authenticating by any other means carries no invitation binding and is therefore refused,
-    /// which is the intended direction: the invite flow is a browser flow AuthProxy challenges for itself.
-    /// </remarks>
-    static bool WasAuthenticatedForInvitation(HttpContext context, string inviteToken) =>
-        InvitationAuthenticationState.WasEstablishedFor(
-            context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties,
-            inviteToken);
-
-    /// <summary>
     /// Removes every cookie belonging to a pending invitation, at both the default and the root path.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
@@ -422,6 +404,46 @@ public class InviteMiddleware(
         context.Response.Cookies.Delete(Cookies.InvitationEntryState);
         context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
         context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
+    }
+
+    /// <summary>
+    /// Determines whether the session authenticating this request was established by this invitation's own challenge.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The pending invitation capability.</param>
+    /// <param name="tokenValidator">The validator used to read the invitation's issue instant.</param>
+    /// <returns><see langword="true"/> when the session answers this invitation; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// The evidence read is the authentication result that produced <see cref="HttpContext.User"/> — the
+    /// ticket the provider handshake signed in — rather than a second authentication call naming a scheme,
+    /// so the question asked is exactly "what established the identity this request is running as". A
+    /// deployment authenticating by any other means carries no invitation binding and is therefore refused,
+    /// which is the intended direction: the invite flow is a browser flow AuthProxy challenges for itself.
+    /// </remarks>
+    static bool WasAuthenticatedForInvitation(HttpContext context, string inviteToken, IInviteTokenValidator tokenValidator)
+    {
+        var properties = context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties;
+        if (InvitationAuthenticationState.WasEstablishedFor(properties, inviteToken))
+        {
+            return true;
+        }
+
+        // The capability binding is the strongest evidence, but it rides in custom challenge properties
+        // whose survival depends on every handler in the round trip. The session's issue instant does not:
+        // the framework stamps and persists it itself. A session issued AFTER the invitation came into
+        // existence was signed in by a person already holding the invitation — their deliberate choice for
+        // it — while the session the original defect wrongly consumed was, by definition, one that already
+        // existed before the invitation did. Gating on the order of those two instants can neither rebind
+        // an old session nor strand a fresh sign-in in an endless provider-selection loop.
+        var issuedAt = properties?.IssuedUtc;
+        if (issuedAt is null
+            || !tokenValidator.TryGetClaim(inviteToken, JwtRegisteredClaimNames.Iat, out var invitationIssuedAt)
+            || !long.TryParse(invitationIssuedAt, out var invitationIssuedAtSeconds))
+        {
+            return false;
+        }
+
+        return issuedAt.Value >= DateTimeOffset.FromUnixTimeSeconds(invitationIssuedAtSeconds);
     }
 
     /// <summary>

@@ -43,15 +43,17 @@ public static class AadMultiTenantIssuer
     /// </summary>
     /// <param name="issuer">The issuer from the token being validated.</param>
     /// <param name="token">The token being validated.</param>
-    /// <param name="_">Unused; the parameter is part of the <see cref="IssuerValidator"/> delegate contract.</param>
+    /// <param name="validationParameters">The validation parameters in effect; required by the <see cref="IssuerValidator"/> delegate contract.</param>
     /// <returns>The validated issuer.</returns>
     /// <exception cref="SecurityTokenInvalidIssuerException">
     /// Thrown when the token carries no tenant or the issuer is not that tenant's Microsoft issuer. The
     /// built-in exception type is required here — it is the contract
     /// <see cref="TokenValidationParameters.IssuerValidator"/> expects for a rejected issuer.
     /// </exception>
-    public static string Validate(string issuer, SecurityToken token, TokenValidationParameters _)
+    public static string Validate(string issuer, SecurityToken token, TokenValidationParameters validationParameters)
     {
+        ArgumentNullException.ThrowIfNull(validationParameters);
+
         var tenantId = token is JsonWebToken jsonWebToken && jsonWebToken.TryGetPayloadValue<string>("tid", out var tid)
             ? tid
             : null;

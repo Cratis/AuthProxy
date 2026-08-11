@@ -22,19 +22,24 @@ static class InvitationSessionFixture
     /// <param name="context">The context to establish the session on.</param>
     /// <param name="invitationToken">The invitation capability the challenge was started for.</param>
     public static void GivenSessionEstablishedByTheInvitation(HttpContext context, string invitationToken) =>
-        GivenSession(context, properties => InvitationAuthenticationState.BindCapability(properties, invitationToken));
+        GivenSession(context, properties => InvitationAuthenticationState.BindCapability(properties, invitationToken), DateTimeOffset.UtcNow.AddSeconds(5));
 
     /// <summary>
     /// Establishes a session that predates the invitation — signed in earlier, for something else, and
     /// therefore carrying no invitation binding at all.
     /// </summary>
     /// <param name="context">The context to establish the session on.</param>
+    /// <remarks>
+    /// The issue instant is part of the fact being modeled: the completion gate falls back to comparing it
+    /// against the invitation's own issue instant when the capability binding is absent, so a session from
+    /// before the invitation existed must genuinely carry an older one.
+    /// </remarks>
     public static void GivenSessionEstablishedBeforeTheInvitation(HttpContext context) =>
-        GivenSession(context, _ => { });
+        GivenSession(context, _ => { }, DateTimeOffset.UtcNow.AddDays(-7));
 
-    static void GivenSession(HttpContext context, Action<AuthenticationProperties> bind)
+    static void GivenSession(HttpContext context, Action<AuthenticationProperties> bind, DateTimeOffset issuedUtc)
     {
-        var properties = new AuthenticationProperties { IssuedUtc = DateTimeOffset.UtcNow };
+        var properties = new AuthenticationProperties { IssuedUtc = issuedUtc };
         bind(properties);
 
         var scheme = context.User.Identity?.AuthenticationType ?? "test-scheme";
