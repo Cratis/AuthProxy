@@ -45,7 +45,7 @@ public class SignInNotifier(
     }
 
     /// <inheritdoc/>
-    public async Task<SignInNotificationResult> Notify(HttpContext context, ClaimsPrincipal? principal)
+    public async Task<SignInNotificationResult> Notify(HttpContext context, ClaimsPrincipal? principal, string? scheme = null)
     {
         var notifyUrl = config.CurrentValue.SignIn?.NotifyUrl;
         if (string.IsNullOrWhiteSpace(notifyUrl))
@@ -73,7 +73,10 @@ public class SignInNotifier(
             return SignInNotificationResult.Failed;
         }
 
+        // The scheme names the provider that was actually challenged — authoritative over anything sniffed
+        // from claims, which for some providers bottoms out in the meaningless "AuthenticationTypes.Federation".
         var identityProvider = canonicalResolution.Identity?.ProviderKey
+            ?? OidcProviderScheme.NameFromScheme(config.CurrentValue.Authentication, scheme)
             ?? principal?.FindFirst("iss")?.Value
             ?? principal?.FindFirst("identity_provider")?.Value
             ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value

@@ -39,7 +39,7 @@ public static class LinkCallbackCompletion
     public static async Task Complete(TicketReceivedContext context, AuthenticationProperties properties)
     {
         var exchanger = context.HttpContext.RequestServices.GetRequiredService<ILinkSubjectExchanger>();
-        var result = await exchanger.Exchange(context.Principal, properties);
+        var result = await exchanger.Exchange(context.Principal, properties, context.Scheme.Name);
 
         if (result == LinkExchangeResult.Success)
         {

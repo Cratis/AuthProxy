@@ -18,6 +18,7 @@ public interface ILinkSubjectExchanger
     /// </summary>
     /// <param name="principal">The principal produced by the second provider authentication.</param>
     /// <param name="properties">The round-tripped challenge properties holding the link token.</param>
+    /// <param name="scheme">The authentication scheme that produced the principal, naming the provider that was challenged.</param>
     /// <returns>The <see cref="LinkExchangeResult"/> describing the outcome.</returns>
-    Task<LinkExchangeResult> Exchange(ClaimsPrincipal? principal, AuthenticationProperties properties);
+    Task<LinkExchangeResult> Exchange(ClaimsPrincipal? principal, AuthenticationProperties properties, string? scheme = null);
 }
