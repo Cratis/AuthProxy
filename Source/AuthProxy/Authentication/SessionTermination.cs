@@ -3,6 +3,7 @@
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authentication;
 
@@ -20,11 +21,13 @@ namespace Cratis.AuthProxy.Authentication;
 public static class SessionTermination
 {
     /// <summary>
-    /// Signs the current caller out of the cookie scheme and deletes every AuthProxy-issued cookie.
+    /// Signs the current caller out of the cookie scheme and deletes every AuthProxy-issued cookie, plus
+    /// any additional cookies the deployment configured (<see cref="C.Logout.AdditionalCookies"/>).
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> whose session to terminate.</param>
+    /// <param name="logout">The logout configuration naming the additional cookies to delete.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    public static async Task SignOutAndClearCookies(HttpContext context)
+    public static async Task SignOutAndClearCookies(HttpContext context, C.Logout logout)
     {
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         context.Response.Cookies.Delete(Cookies.Identity);
@@ -38,5 +41,6 @@ public static class SessionTermination
         context.Response.Cookies.Delete(Cookies.Registration);
         context.Response.Cookies.Delete(Cookies.Providers);
         TransientAuthenticationCookies.Clear(context);
+        AdditionalLogoutCookies.Clear(context, logout.AdditionalCookies);
     }
 }

@@ -15,4 +15,11 @@ public class Logout
     /// service frontends and lobby frontend. Malformed or non-HTTP(S) entries are ignored.
     /// </summary>
     public IList<string> AllowedRedirectOrigins { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets additional cookies to delete whenever the session is terminated — cookies AuthProxy
+    /// does not issue itself but that must not survive a logout, such as a session cookie written by
+    /// sibling authentication infrastructure on a parent domain. See <see cref="LogoutCookie"/>.
+    /// </summary>
+    public IList<LogoutCookie> AdditionalCookies { get; set; } = [];
 }
