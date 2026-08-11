@@ -44,9 +44,9 @@ public class when_the_return_url_is_not_relative : Specification
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_fall_back_to_the_application_root() =>
+    [Fact] void should_fall_back_to_the_completion_page() =>
         _authenticationService.Received(1).ChallengeAsync(
             _context,
             "github",
-            Arg.Is<AuthenticationProperties>(properties => properties.RedirectUri == "/"));
+            Arg.Is<AuthenticationProperties>(properties => properties.RedirectUri == WellKnownPaths.LinkComplete));
 }

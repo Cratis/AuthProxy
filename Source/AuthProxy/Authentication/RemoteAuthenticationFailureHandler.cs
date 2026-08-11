@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Links;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -30,8 +31,7 @@ public static class RemoteAuthenticationFailureHandler
     public static Task HandleRemoteFailure(RemoteFailureContext context)
     {
         GetLogger(context.HttpContext).RemoteSignInFailed(context.Scheme.Name, context.Failure?.Message ?? "(unknown)");
-        Handle(context, context.Properties, SignInFailureReason.RemoteFailure);
-        return Task.CompletedTask;
+        return Handle(context, context.Properties, SignInFailureReason.RemoteFailure);
     }
 
     /// <summary>
@@ -44,11 +44,10 @@ public static class RemoteAuthenticationFailureHandler
     public static Task HandleAccessDenied(AccessDeniedContext context)
     {
         GetLogger(context.HttpContext).RemoteSignInAccessDenied(context.Scheme.Name);
-        Handle(context, context.Properties, SignInFailureReason.AccessDenied);
-        return Task.CompletedTask;
+        return Handle(context, context.Properties, SignInFailureReason.AccessDenied);
     }
 
-    static void Handle(
+    static async Task Handle(
         HandleRequestContext<RemoteAuthenticationOptions> context,
         AuthenticationProperties? properties,
         string reason)
@@ -56,6 +55,20 @@ public static class RemoteAuthenticationFailureHandler
         // The transient correlation/state cookies are what a retry trips over, and the provider callback is
         // the one request where even legacy path-scoped stragglers are visible — clear them all here.
         TransientAuthenticationCookies.Clear(context.HttpContext);
+
+        // A failed link challenge is not a failed sign-in. The person still holds their primary session,
+        // and the provider-selection page would answer with full sign-ins — offering to *replace* the very
+        // session the link was preserving, and looping straight back into whatever failed. The link flow
+        // ends here instead, on its failure page, which also tells an embedding selection page the attempt
+        // is over so it can offer a retry.
+        if (properties?.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode) == true
+            && linkMode == "true")
+        {
+            GetLogger(context.HttpContext).LinkChallengeFailed(context.Scheme.Name);
+            await LinkFlowPages.WriteFailed(context.HttpContext);
+            context.HandleResponse();
+            return;
+        }
 
         var location = $"{WellKnownPaths.LoginPage}?{SignInFailureReason.QueryKey}={reason}";
 

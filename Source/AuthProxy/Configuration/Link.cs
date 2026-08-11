@@ -23,4 +23,12 @@ public class Link
     /// Leave empty to disable the link callback.
     /// </summary>
     public string ExchangeUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the origins allowed to embed the link-flow pages in an <c>iframe</c>. The literal
+    /// <c>"self"</c> names the proxy's own origin — the common case, where the product is served through
+    /// the proxy. Empty by default, which forbids framing the link pages entirely; nothing else the proxy
+    /// serves is ever opened to framing by this setting.
+    /// </summary>
+    public IList<string> EmbedAncestors { get; set; } = [];
 }

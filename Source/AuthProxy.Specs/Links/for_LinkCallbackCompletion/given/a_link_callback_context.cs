@@ -49,11 +49,15 @@ public class a_link_callback_context : Specification
         // the call NSubstitute is waiting to configure.
         var errorPageProvider = CreateErrorPageProvider();
 
+        var proxyConfig = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        proxyConfig.CurrentValue.Returns(new C.AuthProxy());
+
         var serviceProvider = Substitute.For<IServiceProvider>();
         serviceProvider.GetService(typeof(ILoggerFactory)).Returns(loggerFactory);
         serviceProvider.GetService(typeof(ILinkSubjectExchanger)).Returns(_exchanger);
         serviceProvider.GetService(typeof(IErrorPageProvider)).Returns(errorPageProvider);
         serviceProvider.GetService(typeof(ISignInNotifier)).Returns(_signInNotifier);
+        serviceProvider.GetService(typeof(IOptionsMonitor<C.AuthProxy>)).Returns(proxyConfig);
         _context.RequestServices = serviceProvider;
 
         _properties = new AuthenticationProperties { RedirectUri = RecordedReturnUrl };

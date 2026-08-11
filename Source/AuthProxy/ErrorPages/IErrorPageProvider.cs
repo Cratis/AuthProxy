@@ -16,6 +16,11 @@ public interface IErrorPageProvider
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="pageName">The file name of the page, e.g. <c>"404.html"</c> or <c>"invitation-expired.html"</c>.</param>
     /// <param name="statusCode">The HTTP status code to set on the response.</param>
+    /// <param name="substitutions">
+    /// Optional literal tokens to replace in the page content before it is written — how a page that must
+    /// know something only the server knows (e.g. the origins a framed page may post to) receives it while
+    /// remaining a static, deployment-replaceable file.
+    /// </param>
     /// <returns>A <see cref="Task"/> representing the asynchronous write operation.</returns>
-    Task WriteErrorPageAsync(HttpContext context, string pageName, int statusCode);
+    Task WriteErrorPageAsync(HttpContext context, string pageName, int statusCode, IReadOnlyDictionary<string, string>? substitutions = null);
 }

@@ -45,6 +45,13 @@ public class OidcProvider
     public IList<string> Scopes { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets how the provider returns the authorization code to the callback endpoint.
+    /// Defaults to <see cref="OidcResponseMode.Query"/>, which keeps the handshake cookies SameSite=Lax;
+    /// see <see cref="OidcResponseMode.FormPost"/> for providers that mandate a form POST callback.
+    /// </summary>
+    public OidcResponseMode ResponseMode { get; set; } = OidcResponseMode.Query;
+
+    /// <summary>
     /// Gets or sets the optional canonical federated identity contract for this provider.
     /// When absent, the provider retains the legacy claim-selection and forwarding behavior.
     /// </summary>

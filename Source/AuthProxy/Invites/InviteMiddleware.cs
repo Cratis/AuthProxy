@@ -334,6 +334,9 @@ public class InviteMiddleware(
                     MaxAge = TimeSpan.FromMinutes(15),
                 });
 
+                // A sign-in page rendered inside somebody's frame is clickjacking bait — selection pages
+                // are never embeddable.
+                FrameEmbedding.Deny(context);
                 await errorPageProvider.WriteErrorPageAsync(
                     context,
                     WellKnownPageNames.InvitationSelectProvider,

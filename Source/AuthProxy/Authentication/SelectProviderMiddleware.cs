@@ -113,6 +113,9 @@ public class SelectProviderMiddleware(
                 MaxAge = TimeSpan.FromMinutes(15),
             });
 
+            // A sign-in page rendered inside somebody's frame is clickjacking bait — selection pages are
+            // never embeddable, unlike the credential-link pages whose embedding is configured explicitly.
+            FrameEmbedding.Deny(context);
             await errorPageProvider.WriteErrorPageAsync(
                 context,
                 WellKnownPageNames.SelectProvider,

@@ -105,6 +105,20 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | `ClientId` | `string` | OAuth 2.0 client ID. |
 | `ClientSecret` | `string` | OAuth 2.0 client secret. |
 | `Scopes` | `string[]` | Additional scopes to request (beyond `openid`, `profile`, `email`). |
+| `ResponseMode` | `string` | How the provider returns the authorization code: `Query` (default) or `FormPost`. See below. |
+
+#### Response mode and the handshake cookies
+
+The handshake only completes when the provider callback carries the correlation cookie, and that cookie is
+`SameSite=Lax` — which a browser attaches to a top-level GET and withholds from a cross-site POST. The
+default `Query` response mode therefore has the provider return the authorization code in a top-level GET
+redirect, and the handshake cookies stay `Lax`.
+
+Some providers mandate a form POST callback — Apple whenever the `name` or `email` scopes are requested.
+Setting `ResponseMode` to `FormPost` opts that provider into it, which also switches that provider's
+correlation and nonce cookies to `SameSite=None; Secure` — a cross-site POST only ever carries `None`
+cookies, and `None` requires HTTPS. Do not choose `FormPost` for providers that support `Query`; it trades
+away the `Lax` hardening for nothing.
 
 ### Canonical federated identity
 
