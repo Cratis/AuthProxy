@@ -23,5 +23,18 @@ public class SignIn
     /// AuthProxy posts <c>{ subject, identityProvider, ipAddress, location, browser, operatingSystem, userAgent }</c>
     /// to it. Leave empty to disable sign-in notifications.
     /// </summary>
+    /// <remarks>
+    /// With <see cref="Attestation"/> configured this URL must carry no query. The signed route binding is the
+    /// RFC 9449 <c>htu</c>, which covers the path only, so a query would travel unsigned — a captured
+    /// notification could then be replayed against a different query and still verify.
+    /// </remarks>
     public string NotifyUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the signed-envelope configuration for sign-in notifications.
+    /// Set this section to have AuthProxy authenticate every notification with a short-lived RS256 JWS bound
+    /// to the exact request it accompanies.
+    /// Leave it unset — the default — and notifications are posted unsigned, exactly as they always have been.
+    /// </summary>
+    public SignInAttestation? Attestation { get; set; }
 }

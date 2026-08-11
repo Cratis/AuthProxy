@@ -1,6 +1,10 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
+
 namespace Cratis.AuthProxy.SignIns;
 
 /// <summary>
@@ -10,14 +14,30 @@ public static class SignInsServiceCollectionExtensions
 {
     /// <summary>
     /// Registers the <see cref="ISignInNotifier"/> and its <see cref="IClientLocationResolver"/> used to
-    /// notify the application of completed sign-ins.
+    /// notify the application of completed sign-ins, together with the <see cref="ISignInNotificationSigner"/>
+    /// that authenticates each notification when signing is configured.
     /// </summary>
     /// <param name="builder">The <see cref="WebApplicationBuilder"/> to configure.</param>
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddSignIns(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<IClientLocationResolver, ClientLocationResolver>();
-        builder.Services.AddSingleton<ISignInNotifier, SignInNotifier>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<ISignInNotificationSigner, SignInNotificationSigner>();
+        builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, SignInAttestationConfigurationValidator>();
+
+        // Constructed explicitly rather than by convention. The notifier's optional collaborators are
+        // constructor overloads, so convention-based selection quietly falls back to the released
+        // four-argument constructor whenever any one of them is unregistered — and a notifier without its
+        // signer refuses every notification a signing deployment asks for. Naming them makes the signer a
+        // hard requirement and the canonical resolver a genuinely optional one.
+        builder.Services.AddSingleton<ISignInNotifier>(sp => new SignInNotifier(
+            sp.GetRequiredService<IOptionsMonitor<Configuration.AuthProxy>>(),
+            sp.GetRequiredService<IClientLocationResolver>(),
+            sp.GetRequiredService<IHttpClientFactory>(),
+            sp.GetRequiredService<ILogger<SignInNotifier>>(),
+            sp.GetService<ICanonicalIdentityResolver>(),
+            sp.GetRequiredService<ISignInNotificationSigner>()));
 
         return builder;
     }

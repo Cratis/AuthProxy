@@ -1,10 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Security.Cryptography;
+using Cratis.AuthProxy.Attestations;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Invites;
@@ -51,29 +49,7 @@ public sealed class InvitationAttestationIssuer(IOptionsMonitor<C.AuthProxy> con
     /// Creates a cryptographically random 256-bit opaque value.
     /// </summary>
     /// <returns>A base64url-encoded opaque value.</returns>
-    internal static string CreateOpaqueValue()
-    {
-        Span<byte> value = stackalloc byte[32];
-        RandomNumberGenerator.Fill(value);
-        return Base64UrlEncoder.Encode(value.ToArray());
-    }
-
-    static bool TryCreateSigningCredentials(C.InvitationAttestationSigningKey key, out SigningCredentials credentials)
-    {
-        credentials = default!;
-        try
-        {
-            using var rsa = RSA.Create();
-            rsa.ImportFromPem(key.PrivateKeyPem);
-            var securityKey = new RsaSecurityKey(rsa.ExportParameters(true)) { KeyId = key.KeyId };
-            credentials = new SigningCredentials(securityKey, SecurityAlgorithms.RsaSha256);
-            return true;
-        }
-        catch (Exception exception) when (exception is CryptographicException or ArgumentException)
-        {
-            return false;
-        }
-    }
+    internal static string CreateOpaqueValue() => AttestationSigner.CreateOpaqueValue();
 
     bool TryIssue(InvitationEntryState state, Dictionary<string, object> claims, out string attestation)
     {
@@ -84,33 +60,30 @@ public sealed class InvitationAttestationIssuer(IOptionsMonitor<C.AuthProxy> con
             return false;
         }
 
-        var key = settings.SigningKeys.SingleOrDefault(_ =>
+        // FirstOrDefault, not SingleOrDefault: a configuration that slipped a duplicate key identifier past
+        // startup validation must degrade to a refusal to issue, never to an exception thrown out of a request.
+        var key = settings.SigningKeys.FirstOrDefault(_ =>
             string.Equals(_.KeyId, settings.ActiveKeyId, StringComparison.Ordinal));
-        if (key is null || !TryCreateSigningCredentials(key, out var credentials))
+        if (key is null)
         {
             return false;
         }
 
-        claims[JwtRegisteredClaimNames.Jti] = CreateOpaqueValue();
         claims[InvitationAttestationClaims.TenantId] = state.TenantId;
         claims[InvitationAttestationClaims.InvitationId] = state.InvitationId;
         claims[InvitationAttestationClaims.InvitationTransaction] = state.InvitationTransaction;
         claims[InvitationAttestationClaims.InvitationChallenge] = state.InvitationChallenge;
         claims[InvitationAttestationClaims.CapabilityHash] = state.CapabilityHash;
 
-        var now = timeProvider.GetUtcNow();
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Issuer = settings.Issuer,
-            Audience = settings.Audience,
-            IssuedAt = now.UtcDateTime,
-            NotBefore = now.UtcDateTime,
-            Expires = now.Add(settings.Lifetime).UtcDateTime,
-            Claims = claims,
-            SigningCredentials = credentials,
-        };
-
-        attestation = new JsonWebTokenHandler().CreateToken(descriptor);
-        return true;
+        return AttestationSigner.TryIssue(
+            new AttestationSigningContract(
+                settings.Issuer,
+                settings.Audience,
+                key.KeyId,
+                key.PrivateKeyPem,
+                settings.Lifetime),
+            timeProvider.GetUtcNow(),
+            claims,
+            out attestation);
     }
 }

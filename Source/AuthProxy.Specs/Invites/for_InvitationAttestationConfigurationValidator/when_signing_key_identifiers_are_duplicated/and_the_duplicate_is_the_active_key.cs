@@ -3,9 +3,9 @@
 
 using Cratis.AuthProxy.Invites.for_InvitationAttestationConfigurationValidator.given;
 
-namespace Cratis.AuthProxy.Invites.for_InvitationAttestationConfigurationValidator;
+namespace Cratis.AuthProxy.Invites.for_InvitationAttestationConfigurationValidator.when_signing_key_identifiers_are_duplicated;
 
-public class when_signing_key_identifiers_are_duplicated : an_attestation_configuration
+public class and_the_duplicate_is_the_active_key : an_attestation_configuration
 {
     ValidateOptionsResult _result;
 

@@ -5,12 +5,16 @@ using Cratis.AuthProxy.Attestations;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
-namespace Cratis.AuthProxy.Invites;
+namespace Cratis.AuthProxy.SignIns;
 
 /// <summary>
-/// Validates the cryptographic and endpoint configuration for signed invitation attestations.
+/// Validates the cryptographic and endpoint configuration for signed sign-in notifications.
 /// </summary>
-sealed class InvitationAttestationConfigurationValidator : IValidateOptions<C.AuthProxy>
+/// <remarks>
+/// A signing deployment fails closed at run time — an unusable key means no notification is posted at all — so
+/// the failure a deployer must never discover from missing sign-in records is caught here, at startup.
+/// </remarks>
+sealed class SignInAttestationConfigurationValidator : IValidateOptions<C.AuthProxy>
 {
     /// <summary>
     /// Validates one AuthProxy configuration instance.
@@ -20,23 +24,27 @@ sealed class InvitationAttestationConfigurationValidator : IValidateOptions<C.Au
     /// <returns>All configuration failures, or a successful validation result.</returns>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var invite = options.Invite;
-        var attestation = invite?.Attestation;
+        var signIn = options.SignIn;
+        var attestation = signIn?.Attestation;
         if (attestation is null)
         {
             return ValidateOptionsResult.Success;
         }
 
         var failures = new List<string>();
-        AttestationConfigurationValidation.ValidateAbsoluteEndpoint(invite!.StageUrl, "Invite.StageUrl", failures);
-        AttestationConfigurationValidation.ValidateAbsoluteEndpoint(invite.ExchangeUrl, "Invite.ExchangeUrl", failures);
-        AttestationConfigurationValidation.ValidateBoundedValue(attestation.Issuer, "Invite.Attestation.Issuer", failures);
-        AttestationConfigurationValidation.ValidateBoundedValue(attestation.Audience, "Invite.Attestation.Audience", failures);
-        AttestationConfigurationValidation.ValidateBoundedValue(attestation.ActiveKeyId, "Invite.Attestation.ActiveKeyId", failures);
+        AttestationConfigurationValidation.ValidateAbsoluteEndpoint(signIn!.NotifyUrl, "SignIn.NotifyUrl", failures);
+        if (Uri.TryCreate(signIn.NotifyUrl, UriKind.Absolute, out var notifyUrl) && !string.IsNullOrEmpty(notifyUrl.Query))
+        {
+            failures.Add("SignIn.NotifyUrl must carry no query, because the signed route binding covers the path only.");
+        }
+
+        AttestationConfigurationValidation.ValidateBoundedValue(attestation.Issuer, "SignIn.Attestation.Issuer", failures);
+        AttestationConfigurationValidation.ValidateBoundedValue(attestation.Audience, "SignIn.Attestation.Audience", failures);
+        AttestationConfigurationValidation.ValidateBoundedValue(attestation.ActiveKeyId, "SignIn.Attestation.ActiveKeyId", failures);
 
         if (attestation.Lifetime < TimeSpan.FromSeconds(10) || attestation.Lifetime > TimeSpan.FromSeconds(60))
         {
-            failures.Add("Invite.Attestation.Lifetime must be between 10 and 60 seconds.");
+            failures.Add("SignIn.Attestation.Lifetime must be between 10 and 60 seconds.");
         }
 
         var duplicateKeyIds = attestation.SigningKeys
@@ -46,7 +54,7 @@ sealed class InvitationAttestationConfigurationValidator : IValidateOptions<C.Au
             .ToArray();
         if (duplicateKeyIds.Length > 0)
         {
-            failures.Add("Invite.Attestation.SigningKeys must use unique, case-sensitive key identifiers.");
+            failures.Add("SignIn.Attestation.SigningKeys must use unique, case-sensitive key identifiers.");
         }
 
         foreach (var key in attestation.SigningKeys)
@@ -54,23 +62,13 @@ sealed class InvitationAttestationConfigurationValidator : IValidateOptions<C.Au
             AttestationConfigurationValidation.ValidateSigningKey(
                 key.KeyId,
                 key.PrivateKeyPem,
-                "Invite.Attestation.SigningKeys",
+                "SignIn.Attestation.SigningKeys",
                 failures);
         }
 
         if (attestation.SigningKeys.Count(_ => string.Equals(_.KeyId, attestation.ActiveKeyId, StringComparison.Ordinal)) != 1)
         {
-            failures.Add("Invite.Attestation.ActiveKeyId must identify exactly one configured signing key.");
-        }
-
-        if (string.IsNullOrWhiteSpace(invite.TenantClaim))
-        {
-            failures.Add("Invite.TenantClaim is required when signed invitation attestations are enabled.");
-        }
-
-        if (string.IsNullOrWhiteSpace(invite.EmailClaim))
-        {
-            failures.Add("Invite.EmailClaim is required when signed invitation attestations are enabled.");
+            failures.Add("SignIn.Attestation.ActiveKeyId must identify exactly one configured signing key.");
         }
 
         return failures.Count == 0

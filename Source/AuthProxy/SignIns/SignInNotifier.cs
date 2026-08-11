@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
 using Microsoft.Extensions.Options;
@@ -21,12 +22,14 @@ namespace Cratis.AuthProxy.SignIns;
 /// <param name="httpClientFactory">The HTTP client factory used for the notification call.</param>
 /// <param name="logger">The logger.</param>
 /// <param name="canonicalIdentityResolver">The shared canonical identity resolver, or <see langword="null"/> for legacy-compatible direct construction.</param>
+/// <param name="signer">The sign-in notification envelope signer, or <see langword="null"/> for legacy-compatible direct construction.</param>
 public class SignInNotifier(
     IOptionsMonitor<C.AuthProxy> config,
     IClientLocationResolver locationResolver,
     IHttpClientFactory httpClientFactory,
     ILogger<SignInNotifier> logger,
-    ICanonicalIdentityResolver? canonicalIdentityResolver) : ISignInNotifier
+    ICanonicalIdentityResolver? canonicalIdentityResolver,
+    ISignInNotificationSigner? signer) : ISignInNotifier
 {
     /// <summary>
     /// Initializes a legacy-compatible notifier that sanitizes reserved canonical claims without resolving canonical providers.
@@ -40,7 +43,25 @@ public class SignInNotifier(
         IClientLocationResolver locationResolver,
         IHttpClientFactory httpClientFactory,
         ILogger<SignInNotifier> logger)
-        : this(config, locationResolver, httpClientFactory, logger, null)
+        : this(config, locationResolver, httpClientFactory, logger, null, null)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a resolver-aware notifier that posts notifications unsigned.
+    /// </summary>
+    /// <param name="config">The auth proxy configuration monitor.</param>
+    /// <param name="locationResolver">The resolver for the request's approximate location.</param>
+    /// <param name="httpClientFactory">The HTTP client factory used for the notification call.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="canonicalIdentityResolver">The shared canonical identity resolver.</param>
+    public SignInNotifier(
+        IOptionsMonitor<C.AuthProxy> config,
+        IClientLocationResolver locationResolver,
+        IHttpClientFactory httpClientFactory,
+        ILogger<SignInNotifier> logger,
+        ICanonicalIdentityResolver? canonicalIdentityResolver)
+        : this(config, locationResolver, httpClientFactory, logger, canonicalIdentityResolver, null)
     {
     }
 
@@ -115,6 +136,23 @@ public class SignInNotifier(
         {
             Content = content,
         };
+
+        // Signing is opt-in, and the gate is the presence of the configuration section alone. Without it the
+        // request leaves exactly as it always has: the same body, and no header of any kind added here. With
+        // it, the envelope is bound to the serialized bytes this request will actually carry — which is why
+        // the digest is taken from the content, not from the object it was built out of — and an envelope
+        // that cannot be signed means nothing is posted, never a silent downgrade to an unsigned call.
+        if (config.CurrentValue.SignIn?.Attestation is not null)
+        {
+            var body = await content.ReadAsByteArrayAsync();
+            if (signer is null || !signer.TryIssue(request.Method, request.RequestUri!, body, out var envelope))
+            {
+                logger.SignInNotificationCouldNotBeSigned();
+                return SignInNotificationResult.Failed;
+            }
+
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", envelope);
+        }
 
         HttpResponseMessage response;
         try

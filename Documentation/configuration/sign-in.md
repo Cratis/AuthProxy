@@ -73,8 +73,8 @@ subject and `identityProvider` becomes the same compatibility value as `provider
   guessed.
 - **`userAgent`** — the raw header, so the application can do its own richer parsing if it wants to.
 
-Unlike the invite and link exchanges, the sign-in notification carries **no bearer token** — there is no
-user-supplied token in this flow. It relies on the endpoint being network-isolated (see [Security](#security)).
+By default the notification carries **no credential** and relies on the endpoint being network-isolated (see
+[Security](#security)). Configure [the signed envelope](#the-signed-envelope) to authenticate it instead.
 
 Canonical identity is opt-in per provider, so an application migrating provider registrations must accept
 both body shapes. A notification says that a provider authenticated the tuple; it does not grant application
@@ -129,9 +129,119 @@ posted).
 
 ---
 
+## The signed envelope
+
+Without further configuration the notification body is the *only* evidence the application has, so anything
+that can reach the endpoint chooses which user gets recorded as signed in — including the `subject`,
+`providerKey` and `issuer`. Set `Cratis:AuthProxy:SignIn:Attestation` and AuthProxy signs a short-lived RS256
+JWS over each notification and sends it as `Authorization: Bearer`.
+
+**The body is unchanged.** The envelope travels in a header, so an application already consuming
+notifications keeps parsing exactly the same JSON.
+
+### What the envelope binds
+
+The envelope is a profile of [RFC 9449 (DPoP)](https://www.rfc-editor.org/rfc/rfc9449) rather than a scheme of
+its own. Six facts are bound:
+
+| Fact | Carried by | Meaning |
+|---|---|---|
+| Provenance | `iss` + the `kid` JWS header | which AuthProxy deployment signed it, and under which key |
+| Audience | `aud` | the single application entitled to consume it |
+| Route | `htm`, `htu` | the method and target URI of the request it accompanies |
+| Body | `body_hash` | base64url SHA-256 of the exact bytes posted |
+| Time | `iat`, `nbf`, `exp` | the window it is valid in |
+| Replay | `jti` | a random 256-bit identifier, unique per notification |
+
+A `purpose` claim of `sign-in-notification` separates the envelope from every other assertion AuthProxy signs,
+so an invitation attestation can never be presented in its place.
+
+Two details a verifier must implement exactly:
+
+- **`htu` follows RFC 9449** — the target URI *without* query and fragment. Compare it against the
+  query-stripped request URI, not the raw target. Because the query is deliberately outside the binding, a
+  `NotifyUrl` that carries one would be signed without it — so AuthProxy refuses to start with a query on
+  `NotifyUrl` once `Attestation` is configured. Put anything the application needs in the body instead.
+- **`body_hash` is an AuthProxy extension** — RFC 9449 defines no body digest. It uses the identical
+  construction to that specification's `ath` claim: unpadded base64url of the SHA-256 of the raw request body.
+
+### Verifying a notification
+
+1. Reject the request outright if the `Authorization: Bearer` header is missing.
+2. Select the public key by the JWS `kid` header from your pinned key set, and require RS256.
+3. Validate `iss`, `aud`, `exp` and `nbf` with no clock skew allowance beyond your own tolerance.
+4. Require `purpose` to be `sign-in-notification`.
+5. Compare `htm` to the request method and `htu` to the request URI with query and fragment removed.
+6. Read the raw request body **before** deserializing it, and compare `body_hash` to its SHA-256 digest.
+7. Reject a `jti` already seen inside the envelope lifetime.
+
+> **AuthProxy publishes no JWKS document.** The verifying application pins the public keys by its own
+> configuration and selects one by `kid` — the same way the invitation authority consumes invitation
+> attestations. Key rotation is therefore a coordinated configuration change on both sides.
+
+### Configuring it
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "SignIn": {
+        "NotifyUrl": "https://studio.example.com/api/internal/sign-ins",
+        "Attestation": {
+          "Issuer": "https://auth.example.com",
+          "Audience": "studio",
+          "ActiveKeyId": "sign-in-2026-08",
+          "Lifetime": "00:00:60",
+          "SigningKeys": [
+            {
+              "KeyId": "sign-in-2026-08",
+              "PrivateKeyPem": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+| Setting | Meaning |
+|---|---|
+| `Cratis:AuthProxy:SignIn:Attestation:Issuer` | written to `iss`; required, and required to match at the verifier |
+| `Cratis:AuthProxy:SignIn:Attestation:Audience` | written to `aud`; names the one application entitled to the notification |
+| `Cratis:AuthProxy:SignIn:Attestation:ActiveKeyId` | the key new envelopes are signed with; must name exactly one configured key |
+| `Cratis:AuthProxy:SignIn:Attestation:SigningKeys` | the available keys, each a `KeyId` and a PEM-encoded RSA `PrivateKeyPem` of at least 2048 bits; every `KeyId` must be unique |
+| `Cratis:AuthProxy:SignIn:Attestation:Lifetime` | the envelope lifetime; between 10 and 60 seconds, defaulting to 60 |
+
+Supply `PrivateKeyPem` through a secret provider. AuthProxy never returns or logs it — publish only the
+matching public key to the application.
+
+**Key rotation.** Add the new key to `SigningKeys`, publish its public half to the application, then move
+`ActiveKeyId` to it. Keep the previous key configured until every envelope it signed has expired.
+
+### Compatibility and failure behavior
+
+- **Leaving the section unset changes nothing.** No `Authorization` header is added and the body is byte-for-byte
+  what it has always been.
+- **Once configured, AuthProxy never downgrades.** If an envelope cannot be signed — unusable key material,
+  an `ActiveKeyId` naming no key — the notification is *not posted at all* and the failure is logged. A
+  sign-in is never recorded on unauthenticated evidence.
+- **Configuration is validated at startup**, so an unusable key fails the process rather than silently
+  suppressing every sign-in notification. When attestation is configured, `NotifyUrl` must also be an absolute
+  HTTPS URL (HTTP is accepted only for loopback development).
+
+---
+
 ## Security
 
-The notification JSON is not signed and carries no bearer credential. Point `NotifyUrl` at an internal
-application address that is **network-isolated** from public traffic, or authenticate AuthProxy separately at
-the application endpoint. Treat the identity tuple as authenticated provider metadata, then apply the
-application's own authorization policy before changing any access or membership.
+**Unsigned by default.** With no [`Attestation`](#the-signed-envelope) section the notification JSON is not
+signed and carries no credential. Point `NotifyUrl` at an internal application address that is
+**network-isolated** from public traffic, or authenticate AuthProxy separately at the application endpoint.
+
+**Signed when configured.** The envelope establishes that AuthProxy produced this exact notification, for this
+application, over this exact body, recently, and only once. Network isolation and an authenticated envelope
+are complementary — enabling one is not a reason to relax the other.
+
+Either way, treat the identity tuple as authenticated provider metadata, then apply the application's own
+authorization policy before changing any access or membership. A verified envelope proves the notification's
+origin and integrity; it grants no membership, role, or scope.
