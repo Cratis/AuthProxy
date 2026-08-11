@@ -168,6 +168,12 @@ public static class IngressExtensions
         app.UseMiddleware<LogoutMiddleware>();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseMiddleware<LinkMiddleware>();
+
+        // The invitation and registration flows are answered by their own middleware further down, and both
+        // sit after this authorization step. Without releasing them from the catch-all route that matched
+        // them, the default RequireAuthenticatedUser policy refuses them here and neither middleware ever
+        // runs — the defect that made an invitation link answer with provider selection twice.
+        app.UseMiddleware<ProxyOwnedFlowMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<AccessControlMiddleware>();
         app.UseMiddleware<TenantSelectionMiddleware>();
