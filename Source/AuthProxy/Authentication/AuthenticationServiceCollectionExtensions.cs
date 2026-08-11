@@ -196,6 +196,14 @@ public static class AuthenticationServiceCollectionExtensions
                 options.ClientSecret = capturedProvider.ClientSecret;
                 options.ResponseType = "code";
 
+                if (AadMultiTenantIssuer.IsMultiTenantAuthority(capturedProvider.Authority))
+                {
+                    // A multi-tenant Microsoft authority publishes the literal issuer template
+                    // "{tenantid}/v2.0" in its metadata, so the default issuer comparison rejects every
+                    // token. Validate against the tenant the token itself names instead.
+                    options.TokenValidationParameters.IssuerValidator = AadMultiTenantIssuer.Validate;
+                }
+
                 // The handler's default response mode is form_post, which has the provider hand the
                 // authorization code back in a cross-site POST — and browsers do not attach SameSite=Lax
                 // cookies to a cross-site POST, so the callback arrived without its correlation cookie and
@@ -465,7 +473,7 @@ public static class AuthenticationServiceCollectionExtensions
         // proxied request. The notification never throws, so a notification failure can never break the sign-in.
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
-        await notifier.Notify(context.HttpContext, context.Principal);
+        await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);
 
         if (context.Properties is not null
             && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
