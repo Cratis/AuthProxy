@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Admission;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.ErrorPages;
@@ -78,6 +79,11 @@ public static class IngressExtensions
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
         builder.Services.AddSingleton<IErrorPageProvider, ErrorPageProvider>();
 
+        // The admission gate is a middleware UseIngress always places, so its services belong to the same
+        // registration the pipeline itself is paired with. Registering them changes nothing for a deployment
+        // that never opts in.
+        builder.AddAdmission();
+
         var dataProtectionBuilder = builder.Services.AddDataProtection().SetApplicationName("Cratis.AuthProxy");
         var dataProtectionKeysPath = builder.Configuration[$"{C.AuthProxy.SectionKey}:DataProtectionKeysPath"];
         if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
@@ -119,6 +125,12 @@ public static class IngressExtensions
         // applying them replaces the answer with whatever the header claimed.
         app.UseMiddleware<TrustedProxyMiddleware>();
         app.UseForwardedHeaders();
+
+        // Ahead of the pages map and the static files, because both are served before authentication by
+        // design — a gate placed anywhere later would leave them public whatever it decided. It short-
+        // circuits on its first line for every deployment that has not opted in.
+        app.UseMiddleware<AdmissionMiddleware>();
+
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
 
@@ -169,39 +181,15 @@ public static class IngressExtensions
         app.MapMethods(WellKnownPaths.Providers, [HttpMethods.Head], () => Results.Ok())
             .AllowAnonymous();
 
-        app.MapPost(WellKnownPaths.Token, async (HttpContext context, ClientCredentialsGrantService grantService) =>
+        // Mapped for every deployment that could ever use it, and for no other. A closed deployment where no
+        // service declares client credentials would otherwise carry an endpoint that can only refuse — and a
+        // refusal from it is still an answer, naming what is running. Removing it outright is not an option:
+        // every other deployment's clients call it.
+        if (app.Services.GetRequiredService<IAdmissionPolicy>()
+            .DeclaresTokenEndpoint(app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue))
         {
-            var form = await context.Request.ReadFormAsync(context.RequestAborted);
-            var result = await grantService.GrantAsync(
-                form["grant_type"].FirstOrDefault(),
-                form["service"].FirstOrDefault(),
-                form["client_id"].FirstOrDefault(),
-                form["client_secret"].FirstOrDefault(),
-                form["refresh_token"].FirstOrDefault(),
-                context.RequestAborted);
-
-            context.Response.Headers.CacheControl = "no-store";
-            context.Response.Headers.Pragma = "no-cache";
-
-            return result.Succeeded
-                ? Results.Json(
-                    new
-                    {
-                        access_token = result.AccessToken,
-                        token_type = result.TokenType,
-                        expires_in = result.ExpiresIn,
-                        refresh_token = result.RefreshToken,
-                    },
-                    statusCode: result.StatusCode)
-                : Results.Json(
-                    new
-                    {
-                        error = result.Error,
-                        error_description = result.ErrorDescription,
-                    },
-                    statusCode: result.StatusCode);
-        })
-        .AllowAnonymous();
+            app.MapTokenEndpoint();
+        }
 
         // Initiates the challenge for the requested provider scheme.
         app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
@@ -258,6 +246,43 @@ public static class IngressExtensions
         {
             context.Response.ContentType = "text/html";
             await context.Response.SendFileAsync(indexHtmlPath);
+        })
+        .AllowAnonymous();
+    }
+
+    static void MapTokenEndpoint(this WebApplication app)
+    {
+        app.MapPost(WellKnownPaths.Token, async (HttpContext context, ClientCredentialsGrantService grantService) =>
+        {
+            var form = await context.Request.ReadFormAsync(context.RequestAborted);
+            var result = await grantService.GrantAsync(
+                form["grant_type"].FirstOrDefault(),
+                form["service"].FirstOrDefault(),
+                form["client_id"].FirstOrDefault(),
+                form["client_secret"].FirstOrDefault(),
+                form["refresh_token"].FirstOrDefault(),
+                context.RequestAborted);
+
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.Pragma = "no-cache";
+
+            return result.Succeeded
+                ? Results.Json(
+                    new
+                    {
+                        access_token = result.AccessToken,
+                        token_type = result.TokenType,
+                        expires_in = result.ExpiresIn,
+                        refresh_token = result.RefreshToken,
+                    },
+                    statusCode: result.StatusCode)
+                : Results.Json(
+                    new
+                    {
+                        error = result.Error,
+                        error_description = result.ErrorDescription,
+                    },
+                    statusCode: result.StatusCode);
         })
         .AllowAnonymous();
     }

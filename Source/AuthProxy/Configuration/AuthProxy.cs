@@ -26,6 +26,14 @@ public class AuthProxy
     public Authorization Authorization { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the admission configuration deciding whether AuthProxy answers anything at all to a
+    /// caller who has presented nothing.
+    /// Leave it at its default — <see cref="AdmissionMode.Public"/> — and the interactive contract stays
+    /// exactly as public as it has always been.
+    /// </summary>
+    public Admission Admission { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the browser-session hardening configuration: the bounded authentication session
     /// lifetime and the identity/tenant re-validation intervals.
     /// </summary>

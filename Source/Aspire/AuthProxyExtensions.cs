@@ -203,6 +203,66 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Closes AuthProxy's interactive contract, so nothing at all is answered until a caller presents a
+    /// capability the deployment's own verifier admits.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="verifierUrl">
+    /// The absolute URL of the endpoint that decides whether a presented capability admits. There is no
+    /// default, because the verifier is the deployment's own service and AuthProxy is deliberately not the
+    /// authority on what a capability means.
+    /// </param>
+    /// <param name="path">
+    /// The one path a capability may be presented on. Defaults to <c>/.cratis/admission</c>. Every other
+    /// path — and this path with anything below it — answers the same refusal as everything else.
+    /// </param>
+    /// <param name="maximumLength">
+    /// The largest capability, in bytes, AuthProxy will read. Defaults to <c>4096</c>.
+    /// </param>
+    /// <param name="entryLifetime">
+    /// How long an admitted browser stays admitted. Defaults to ten minutes — it bounds an interactive
+    /// entry, not a session.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Without this, AuthProxy's interactive surface is public by design: the provider list, the
+    /// per-provider challenge endpoints, the selection page and its assets all answer a caller who has
+    /// never signed in, because a person who has never signed in has to reach them to sign in at all. That
+    /// is right for a deployment meant to be found and wrong for one whose existence is not meant to be
+    /// discoverable, and this is the switch between the two.
+    /// <para>
+    /// Cannot be combined with <c>WithInvite</c>: two capability mechanisms in one deployment is
+    /// a misconfiguration, and AuthProxy refuses the combination at startup rather than silently ordering
+    /// them.
+    /// </para>
+    /// <para>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="AddAuthProxy(IDistributedApplicationBuilder, string, string)"/>. An optional argument is
+    /// baked into the call site when the app host is compiled, so adding one changes that method's
+    /// signature and every already-built app host would fail to bind against the new package until it is
+    /// rebuilt.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithCapabilityOnlyAdmission<T>(
+        this IResourceBuilder<T> builder,
+        string verifierUrl,
+        string path = "/.cratis/admission",
+        int maximumLength = 4096,
+        TimeSpan? entryLifetime = null)
+        where T : IResourceWithEnvironment
+    {
+        const string prefix = $"{ConfigPrefix}__Admission";
+
+        return builder
+            .WithEnvironment($"{prefix}__Mode", "CapabilityOnly")
+            .WithEnvironment($"{prefix}__Capability__VerifierUrl", verifierUrl)
+            .WithEnvironment($"{prefix}__Capability__Path", path)
+            .WithEnvironment($"{prefix}__Capability__MaximumLength", maximumLength.ToString(CultureInfo.InvariantCulture))
+            .WithEnvironment($"{prefix}__EntryLifetime", (entryLifetime ?? TimeSpan.FromMinutes(10)).ToString("c", CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
     /// Opens a private management listener carrying AuthProxy's liveness and readiness endpoints.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
