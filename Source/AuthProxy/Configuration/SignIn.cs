@@ -24,4 +24,12 @@ public class SignIn
     /// to it. Leave empty to disable sign-in notifications.
     /// </summary>
     public string NotifyUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the signed-envelope configuration for sign-in notifications.
+    /// Set this section to have AuthProxy authenticate every notification with a short-lived RS256 JWS bound
+    /// to the exact request it accompanies.
+    /// Leave it unset — the default — and notifications are posted unsigned, exactly as they always have been.
+    /// </summary>
+    public SignInAttestation? Attestation { get; set; }
 }

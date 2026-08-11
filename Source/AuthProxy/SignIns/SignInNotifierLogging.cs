@@ -11,6 +11,9 @@ internal static partial class SignInNotifierLogging
     [LoggerMessage(LogLevel.Error, "Failed to call sign-in notification endpoint at {Url}")]
     internal static partial void FailedToCallSignInNotifyEndpoint(this ILogger logger, Exception exception, string url);
 
+    [LoggerMessage(LogLevel.Error, "Sign-in notification could not be signed; nothing was posted")]
+    internal static partial void SignInNotificationCouldNotBeSigned(this ILogger logger);
+
     [LoggerMessage(LogLevel.Warning, "Sign-in notification endpoint returned {StatusCode}")]
     internal static partial void SignInNotifyEndpointFailed(this ILogger logger, int statusCode);
 

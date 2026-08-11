@@ -26,4 +26,7 @@ public class when_adding_sign_ins : Specification
 
     [Fact] void should_register_the_client_location_resolver() =>
         _serviceProvider.GetRequiredService<IClientLocationResolver>().ShouldBeOfExactType<ClientLocationResolver>();
+
+    [Fact] void should_register_the_notification_signer() =>
+        _serviceProvider.GetRequiredService<ISignInNotificationSigner>().ShouldBeOfExactType<SignInNotificationSigner>();
 }
