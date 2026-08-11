@@ -75,6 +75,17 @@ public static class IngressExtensions
             .AddOptions<ForwardedHeadersOptions>()
             .Configure<ITrustedProxyPolicy>((options, policy) => policy.ApplyTo(options));
 
+        // Stated once, for every client the factory will ever hand out, because the default primary handler
+        // follows up to fifty redirects and every outbound call this proxy makes carries something a caller
+        // supplied: a plaintext client secret, an invitation token, a forwarded client principal, a subject.
+        // A 307 or 308 re-sends the method and the body to whatever address the answering service names, and
+        // while SocketsHttpHandler drops Authorization across origins it never drops the body and never drops
+        // a custom header — so the whole X-MS-CLIENT-PRINCIPAL set and every posted payload would travel with
+        // it, to any host reachable from inside. Declared here, ahead of every AddHttpClient in the pipeline,
+        // so a client that genuinely needs to follow a redirect can still say so with a primary handler of
+        // its own and be the only one that does.
+        builder.Services.ConfigureHttpClientDefaults(defaults => defaults.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false }));
+
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
         builder.Services.AddSingleton<IErrorPageProvider, ErrorPageProvider>();

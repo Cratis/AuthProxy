@@ -52,8 +52,8 @@ public sealed class EntryTransactionProtector(IDataProtectionProvider dataProtec
             // here as one whose values are simply absent — and absent values are what the admission check
             // would otherwise never look at.
             if (deserialized is null
-                || string.IsNullOrEmpty(deserialized.Transaction)
-                || string.IsNullOrEmpty(deserialized.Challenge))
+                || string.IsNullOrWhiteSpace(deserialized.Transaction)
+                || string.IsNullOrWhiteSpace(deserialized.Challenge))
             {
                 return false;
             }
