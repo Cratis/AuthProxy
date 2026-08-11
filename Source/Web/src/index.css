@@ -1,8 +1,75 @@
-@import "tailwindcss";
+/*
+ * The one styling source for the selection SPA, mirroring the static selection pages
+ * (Pages/select-provider.html and friends) so every AuthProxy-served selection surface
+ * shares one design.
+ */
 
 body {
+    font-family: system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
     margin: 0;
-    background-color: var(--surface-ground);
-    color: var(--text-color);
-    font-family: var(--font-family);
+    background: #f5f5f5;
+}
+
+.card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+    padding: 2.5rem 3rem;
+    text-align: center;
+    max-width: 480px;
+    width: 100%;
+}
+
+.card h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 .75rem;
+    color: #333;
+}
+
+.card p {
+    color: #666;
+    margin: 0 0 1.5rem;
+}
+
+.providers {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+}
+
+.provider-btn {
+    display: block;
+    padding: .75rem 1.5rem;
+    border-radius: 6px;
+    background: #0078d4;
+    color: #fff;
+    text-decoration: none;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: background .15s;
+}
+
+.provider-btn:hover {
+    background: #005a9e;
+}
+
+.error {
+    color: #c00;
+    font-size: .9rem;
+    margin-top: 1rem;
+}
+
+.reason {
+    background: #fdf3e7;
+    border: 1px solid #f0c893;
+    border-radius: 6px;
+    color: #8a5a00;
+    font-size: .9rem;
+    padding: .75rem 1rem;
+    margin: 0 0 1.25rem;
 }
