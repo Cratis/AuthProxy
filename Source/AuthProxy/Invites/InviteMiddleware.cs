@@ -3,13 +3,11 @@
 
 using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -39,6 +37,12 @@ namespace Cratis.AuthProxy.Invites;
 ///     respectively.
 ///   </item>
 /// </list>
+/// The exchange itself lives in <see cref="IInviteCompletion"/>, shared with
+/// <see cref="InviteCallbackCompletion"/> — which completes an invitation on the provider callback itself
+/// whenever the challenge's capability binding survives the round trip. Phase 2 here remains fully intact as
+/// the fallback for every callback that binding does not come back on, and both phases additionally
+/// recognize a session that already completed its invitation on the callback so a stale pending cookie or a
+/// return visit to the invitation URL never re-runs the exchange or re-offers provider selection.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
@@ -72,15 +76,29 @@ public class InviteMiddleware(
     /// Set by Phase 2 when exchange succeeds and the invite is not tenant-issued.
     /// Read by <see cref="InviteRedirectMiddleware"/> to perform the actual redirect.
     /// </summary>
+    /// <remarks>
+    /// This mechanism belongs to the middleware pipeline alone. When an invitation completes on the provider
+    /// callback instead, <see cref="InviteCallbackCompletion"/> owns the response directly and places the
+    /// lobby target on the remote handler's return URI — no item key is involved there.
+    /// </remarks>
     public const string LobbyRedirectUrlItemKey = "Cratis.InviteLobbyRedirectUrl";
-
-    const int MaximumAttestedInvitationTokenLength = 4096;
 
     static readonly JsonSerializerOptions _providerSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter() }
     };
+
+    readonly InviteCompletion _completion = new(
+        tokenValidator,
+        config,
+        authConfig,
+        tenantResolver,
+        httpClientFactory,
+        logger,
+        canonicalIdentityResolver,
+        attestationIssuer,
+        entryStateProtector);
 
     /// <summary>
     /// Initializes a legacy-compatible instance that sanitizes reserved canonical claims without resolving canonical providers.
@@ -154,6 +172,15 @@ public class InviteMiddleware(
                 return;
             }
 
+            // A session that already completed this exact invitation on its own provider callback is never
+            // exchanged again - the cookie arriving here is a stale copy the browser had not yet dropped.
+            // Clear it and take the caller where the completed invitation leads.
+            if (WasInvitationCompletedByThisSession(context, inviteToken))
+            {
+                await ContinueCompletedInvitation(context, inviteToken);
+                return;
+            }
+
             // "Authenticated" and "authenticated for this invitation" are different facts, and only the
             // second one may complete it. An invitation binds an organization to an identity permanently,
             // and the pre-existing session is the one that arrives first: a person already signed in with
@@ -196,6 +223,16 @@ public class InviteMiddleware(
                     context,
                     pageName,
                     StatusCodes.Status401Unauthorized);
+                return;
+            }
+
+            // A signed-in caller returning to an invitation URL their own session has already completed -
+            // the provider callback completed it before redirecting here - is never re-staged and never
+            // offered provider selection again; they continue to where the completed invitation leads.
+            if (context.User.Identity?.IsAuthenticated == true
+                && WasInvitationCompletedByThisSession(context, token))
+            {
+                await ContinueCompletedInvitation(context, token);
                 return;
             }
 
@@ -395,15 +432,14 @@ public class InviteMiddleware(
     }
 
     /// <summary>
-    /// Removes every cookie belonging to a pending invitation, at both the default and the root path.
+    /// Determines whether a claim value is an email address rather than a username.
     /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    static void DeleteInvitationCookies(HttpContext context)
+    /// <param name="value">The claim value to check.</param>
+    /// <returns><see langword="true"/> when the value carries a local part and a domain; otherwise <see langword="false"/>.</returns>
+    internal static bool IsAnEmailAddress([NotNullWhen(true)] string? value)
     {
-        context.Response.Cookies.Delete(Cookies.InviteToken);
-        context.Response.Cookies.Delete(Cookies.InvitationEntryState);
-        context.Response.Cookies.Delete(Cookies.InviteToken, new CookieOptions { Path = "/" });
-        context.Response.Cookies.Delete(Cookies.InvitationEntryState, new CookieOptions { Path = "/" });
+        var at = value?.IndexOf('@', StringComparison.Ordinal) ?? -1;
+        return at > 0 && at < value!.Length - 1;
     }
 
     /// <summary>
@@ -447,6 +483,19 @@ public class InviteMiddleware(
     }
 
     /// <summary>
+    /// Determines whether the session authenticating this request has already completed the exchange for
+    /// this exact invitation — on its own provider callback.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The invitation capability being presented.</param>
+    /// <returns><see langword="true"/> when this session already completed that capability; otherwise <see langword="false"/>.</returns>
+    static bool WasInvitationCompletedByThisSession(HttpContext context, string inviteToken)
+    {
+        var properties = context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties;
+        return InvitationAuthenticationState.WasCompletedFor(properties, inviteToken);
+    }
+
+    /// <summary>
     /// Aggregates all configured OIDC and OAuth providers into a single enumerable of <see cref="OidcProviderInfo"/>.
     /// </summary>
     /// <param name="config">The authentication configuration containing the provider lists.</param>
@@ -485,45 +534,6 @@ public class InviteMiddleware(
               && string.Equals(identity.ProviderKey, recipientProviderKey, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Resolves the authenticating account's email and its provider-supplied verification status.
-    /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <param name="emailVerified">
-    /// The value of the provider's <c>email_verified</c> claim when present; otherwise <see langword="null"/>.
-    /// </param>
-    /// <returns>The authenticated email, or an empty string when none is available.</returns>
-    /// <remarks>
-    /// <c>preferred_username</c> is a username, not an address — for a GitHub OAuth provider it is conventionally
-    /// mapped from <c>login</c>. It is read only when it actually holds an address, which several OIDC providers
-    /// put there (Entra's is the user principal name). Returning a login name here would make a provider that
-    /// supplied no address at all indistinguishable from one that supplied somebody else's.
-    /// </remarks>
-    static string ResolveAuthenticatedEmail(HttpContext context, out bool? emailVerified)
-    {
-        emailVerified = bool.TryParse(context.User.FindFirst("email_verified")?.Value, out var verified)
-            ? verified
-            : null;
-
-        var preferredUsername = context.User.FindFirst("preferred_username")?.Value;
-
-        return context.User.FindFirst("email")?.Value
-            ?? context.User.FindFirst(ClaimTypes.Email)?.Value
-            ?? (IsAnEmailAddress(preferredUsername) ? preferredUsername : null)
-            ?? string.Empty;
-    }
-
-    /// <summary>
-    /// Determines whether a claim value is an email address rather than a username.
-    /// </summary>
-    /// <param name="value">The claim value to check.</param>
-    /// <returns><see langword="true"/> when the value carries a local part and a domain; otherwise <see langword="false"/>.</returns>
-    static bool IsAnEmailAddress([NotNullWhen(true)] string? value)
-    {
-        var at = value?.IndexOf('@', StringComparison.Ordinal) ?? -1;
-        return at > 0 && at < value!.Length - 1;
-    }
-
     static bool IsCanonicalProviderKey(string value) =>
         value.Length is >= 1 and <= 64
         && value[0] is (>= 'a' and <= 'z') or (>= '0' and <= '9')
@@ -548,53 +558,6 @@ public class InviteMiddleware(
         }
     }
 
-    static bool TryGetSingleExactClaim(ClaimsPrincipal principal, string claimType, out string value)
-    {
-        var claims = principal.Claims.Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal)).ToArray();
-        if (claims.Length != 1
-            || string.IsNullOrWhiteSpace(claims[0].Value)
-            || claims[0].Value.Length > 2048
-            || !string.Equals(claims[0].Value, claims[0].Value.Trim(), StringComparison.Ordinal))
-        {
-            value = string.Empty;
-            return false;
-        }
-
-        value = claims[0].Value;
-        return true;
-    }
-
-    static bool TryGetSingleTokenClaim(string token, string claimType, out string value)
-    {
-        value = string.Empty;
-        try
-        {
-            var claims = new JsonWebTokenHandler().ReadJsonWebToken(token).Claims
-                .Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal))
-                .ToArray();
-            if (claims.Length != 1
-                || string.IsNullOrWhiteSpace(claims[0].Value)
-                || claims[0].Value.Length > 2048
-                || !string.Equals(claims[0].Value, claims[0].Value.Trim(), StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            value = claims[0].Value;
-            return true;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    static bool ResolvedTenantMatchesWhenPresent(HttpContext context, string tenantId) =>
-        !context.Items.TryGetValue(TenancyMiddleware.TenantIdItemKey, out var resolved)
-        || resolved is not string resolvedTenantId
-        || string.IsNullOrWhiteSpace(resolvedTenantId)
-        || FixedTimeEquals(tenantId, resolvedTenantId);
-
     static bool FixedTimeEquals(string expected, string actual) =>
         CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(actual));
 
@@ -608,7 +571,7 @@ public class InviteMiddleware(
     /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
     async Task RejectPendingInvitation(HttpContext context, InviteTokenValidationResult validationResult)
     {
-        DeleteInvitationCookies(context);
+        PendingInvitationCookies.Delete(context);
 
         var invalidPageName = validationResult == InviteTokenValidationResult.Expired
             ? WellKnownPageNames.InvitationExpired
@@ -621,6 +584,26 @@ public class InviteMiddleware(
     }
 
     /// <summary>
+    /// Continues a request whose session has already completed the invitation it presents: the stale pending
+    /// state is cleared and the caller is taken where the completed invitation leads — the lobby for a
+    /// non-tenant-issued invitation, the pipeline's own course otherwise.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The already-completed invitation capability.</param>
+    /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
+    async Task ContinueCompletedInvitation(HttpContext context, string inviteToken)
+    {
+        PendingInvitationCookies.Delete(context);
+
+        if (_completion.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
+        {
+            context.Items[LobbyRedirectUrlItemKey] = lobbyRedirectUrl;
+        }
+
+        await next(context);
+    }
+
+    /// <summary>
     /// Completes a pending invitation with the identity that answered its challenge, and answers whatever
     /// the completion produced.
     /// </summary>
@@ -629,10 +612,8 @@ public class InviteMiddleware(
     /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
     async Task CompleteInvitation(HttpContext context, string inviteToken)
     {
-        var exchangeResult = IsAttestedProtocolEnabled()
-            ? await CompleteAttestedInvitation(context, inviteToken)
-            : await ExchangeInvite(context, inviteToken);
-        DeleteInvitationCookies(context);
+        var exchangeResult = await _completion.ExchangeForRequest(context, inviteToken);
+        PendingInvitationCookies.Delete(context);
 
         if (exchangeResult == InviteExchangeResult.EmailMismatch)
         {
@@ -681,13 +662,10 @@ public class InviteMiddleware(
             return;
         }
 
-        if (exchangeResult == InviteExchangeResult.Success && !IsTenantIssuedInvite(inviteToken, context))
+        if (exchangeResult == InviteExchangeResult.Success
+            && _completion.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
         {
-            var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
-            if (!string.IsNullOrWhiteSpace(lobbyUrl))
-            {
-                context.Items[LobbyRedirectUrlItemKey] = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
-            }
+            context.Items[LobbyRedirectUrlItemKey] = lobbyRedirectUrl;
         }
 
         await next(context);
@@ -699,12 +677,12 @@ public class InviteMiddleware(
         if (invite is null
             || attestationIssuer is null
             || entryStateProtector is null
-            || inviteToken.Length > MaximumAttestedInvitationTokenLength
+            || inviteToken.Length > InviteCompletion.MaximumAttestedInvitationTokenLength
             || string.IsNullOrWhiteSpace(invite.StageUrl)
             || string.IsNullOrWhiteSpace(invite.TenantClaim)
-            || !TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
-            || !ResolvedTenantMatchesWhenPresent(context, tenantId))
+            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
+            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
+            || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
         {
             return (false, null);
         }
@@ -745,322 +723,5 @@ public class InviteMiddleware(
         }
 
         return (false, null);
-    }
-
-    async Task<InviteExchangeResult> CompleteAttestedInvitation(HttpContext context, string inviteToken)
-    {
-        var invite = config.CurrentValue.Invite;
-        if (invite is null
-            || canonicalIdentityResolver is null
-            || attestationIssuer is null
-            || entryStateProtector is null
-            || inviteToken.Length > MaximumAttestedInvitationTokenLength
-            || !context.Request.Cookies.TryGetValue(Cookies.InvitationEntryState, out var protectedState)
-            || !entryStateProtector.TryUnprotect(protectedState, out var entryState)
-            || entryState.ExpiresAt <= DateTimeOffset.UtcNow
-            || !FixedTimeEquals(entryState.CapabilityHash, InvitationAuthenticationState.ComputeCapabilityHash(inviteToken))
-            || !TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !FixedTimeEquals(entryState.InvitationId, invitationId)
-            || string.IsNullOrWhiteSpace(invite.TenantClaim)
-            || !TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
-            || !FixedTimeEquals(entryState.TenantId, tenantId)
-            || !TryResolveRecipientMode(inviteToken, invite.EmailClaim, out var recipientProviderKey)
-            || !ResolvedTenantMatchesWhenPresent(context, tenantId))
-        {
-            return InviteExchangeResult.Failed;
-        }
-
-        var authentication = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        if (!authentication.Succeeded
-            || !InvitationAuthenticationState.Matches(entryState, authentication.Properties)
-            || !TryResolveVerifiedIdentity(authentication, recipientProviderKey, out var identity)
-            || (string.IsNullOrEmpty(recipientProviderKey)
-                && EvaluateInvitedEmailBinding(inviteToken, identity.Email!, true) != InviteExchangeResult.Success)
-            || !attestationIssuer.TryIssueComplete(entryState, identity, out var attestation))
-        {
-            return InviteExchangeResult.Failed;
-        }
-
-        using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, invite.ExchangeUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
-        request.Content = JsonContent.Create(new InvitationCompleteRequest(entryState.InvitationTransaction));
-
-        try
-        {
-            using var response = await client.SendAsync(request, context.RequestAborted);
-            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-            {
-                return InviteExchangeResult.DuplicateSubject;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.InviteExchangeEndpointFailed((int)response.StatusCode);
-                return InviteExchangeResult.Failed;
-            }
-
-            logger.InviteExchangedSuccessfully();
-            return InviteExchangeResult.Success;
-        }
-        catch (Exception exception)
-        {
-            logger.FailedToCallInviteExchangeEndpoint(exception, invite.ExchangeUrl);
-            return InviteExchangeResult.Failed;
-        }
-    }
-
-    bool TryResolveVerifiedIdentity(
-        AuthenticateResult authentication,
-        string recipientProviderKey,
-        out InvitationVerifiedIdentity identity)
-    {
-        identity = default!;
-        var principal = authentication.Principal;
-        if (principal is null)
-        {
-            return false;
-        }
-
-        var resolution = canonicalIdentityResolver!.Resolve(principal, principal.Identity?.AuthenticationType);
-        if (!resolution.IsConfigured || !resolution.Succeeded || resolution.Identity is null)
-        {
-            return false;
-        }
-
-        var canonical = resolution.Identity;
-        var providers = authConfig.CurrentValue.OidcProviders
-            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
-            .Select(_ => _.CanonicalIdentity!)
-            .Concat(authConfig.CurrentValue.OAuthProviders
-                .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
-                .Select(_ => _.CanonicalIdentity!))
-            .ToArray();
-        if (providers.Length != 1
-            || !TryGetSingleExactClaim(principal, providers[0].AssuranceClaimType, out var assurance)
-            || authentication.Properties?.IssuedUtc is not { } authenticatedAt)
-        {
-            return false;
-        }
-
-        string? email = null;
-        if (string.IsNullOrEmpty(recipientProviderKey))
-        {
-            if (!providers[0].InvitationCompletionEnabled
-                || !TryGetSingleExactClaim(principal, providers[0].EmailClaimType, out email)
-                || !IsAnEmailAddress(email)
-                || !TryGetSingleExactClaim(principal, providers[0].EmailVerifiedClaimType, out var emailVerified)
-                || !bool.TryParse(emailVerified, out var verified)
-                || !verified)
-            {
-                return false;
-            }
-        }
-        else if (!providers[0].InvitationIdentityBindingCompletionEnabled
-                 || !FixedTimeEquals(canonical.ProviderKey, recipientProviderKey))
-        {
-            return false;
-        }
-
-        identity = new InvitationVerifiedIdentity(
-            canonical.ProviderKey,
-            canonical.NormalizedIssuer,
-            canonical.Subject,
-            email,
-            assurance,
-            authenticatedAt);
-        return true;
-    }
-
-    async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken)
-    {
-        var exchangeUrl = config.CurrentValue.Invite?.ExchangeUrl;
-        if (string.IsNullOrWhiteSpace(exchangeUrl))
-        {
-            logger.InviteExchangeUrlNotConfigured();
-            return InviteExchangeResult.Failed;
-        }
-
-        var canonicalResolution = canonicalIdentityResolver?.Resolve(context.User, context.User.Identity?.AuthenticationType)
-            ?? CanonicalIdentityResolution.SanitizedLegacy(context.User);
-        if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
-        {
-            return InviteExchangeResult.Failed;
-        }
-
-        var subject = canonicalResolution.Identity?.Subject
-            ?? context.User.FindFirst("sub")?.Value
-            ?? context.User.FindFirst("oid")?.Value
-            ?? context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? context.User.FindFirst("id")?.Value
-            ?? string.Empty;
-
-        var identityProvider = canonicalResolution.Identity?.ProviderKey
-            ?? context.User.FindFirst("iss")?.Value
-            ?? context.User.FindFirst("identity_provider")?.Value
-            ?? context.User.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
-            ?? context.User.Identity?.AuthenticationType
-            ?? string.Empty;
-
-        var email = ResolveAuthenticatedEmail(context, out var emailVerified);
-
-        // An invitation is otherwise a pure bearer link - anyone with the URL could sign in with their
-        // own account and be provisioned as the invited user. Bind the invite to its intended recipient by
-        // requiring provider-supplied authenticated-session email evidence to match the invited email.
-        var binding = EvaluateInvitedEmailBinding(inviteToken, email, emailVerified);
-        if (binding == InviteExchangeResult.EmailUnavailable)
-        {
-            logger.InviteEmailUnavailable();
-            return binding;
-        }
-
-        if (binding == InviteExchangeResult.EmailMismatch)
-        {
-            logger.InviteEmailMismatch();
-            return binding;
-        }
-
-        using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, exchangeUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", inviteToken);
-
-        // Forward the provider-supplied authenticated-session email evidence and any email_verified value so the
-        // backend can perform its own defense-in-depth check at accept time. The value can be true, false, or null;
-        // OAuth providers may not supply an independent email verification claim.
-        request.Content = canonicalResolution.Identity is { } canonicalIdentity
-            ? JsonContent.Create(new
-            {
-                subject,
-                providerKey = canonicalIdentity.ProviderKey,
-                issuer = canonicalIdentity.NormalizedIssuer,
-                identityProvider,
-                email,
-                emailVerified
-            })
-            : JsonContent.Create(new { subject, identityProvider, email, emailVerified });
-
-        HttpResponseMessage response;
-        try
-        {
-            response = await client.SendAsync(request);
-        }
-        catch (Exception ex)
-        {
-            logger.FailedToCallInviteExchangeEndpoint(ex, exchangeUrl);
-            return InviteExchangeResult.Failed;
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            logger.InviteSubjectAlreadyExists();
-            return InviteExchangeResult.DuplicateSubject;
-        }
-
-        if (!response.IsSuccessStatusCode)
-        {
-            logger.InviteExchangeEndpointFailed((int)response.StatusCode);
-            return InviteExchangeResult.Failed;
-        }
-
-        logger.InviteExchangedSuccessfully();
-        return InviteExchangeResult.Success;
-    }
-
-    /// <summary>
-    /// Evaluates the invite against the authenticated account, enforcing that the invited email (when the
-    /// token carries one) matches provider-supplied authenticated-session email evidence.
-    /// </summary>
-    /// <param name="inviteToken">The validated invite token.</param>
-    /// <param name="authenticatedEmail">The authenticating account's email.</param>
-    /// <param name="emailVerified">
-    /// The provider's <c>email_verified</c> value: <see langword="true"/>, <see langword="false"/>, or
-    /// <see langword="null"/> when the provider supplies no independent verification claim.
-    /// </param>
-    /// <returns>
-    /// <see cref="InviteExchangeResult.Success"/> when the invite is not bound to a specific email or the
-    /// authenticated email matches it; <see cref="InviteExchangeResult.EmailUnavailable"/> when the provider
-    /// supplied no address to bind against; otherwise <see cref="InviteExchangeResult.EmailMismatch"/>.
-    /// </returns>
-    /// <remarks>
-    /// The two failures are kept apart deliberately. A provider that cannot tell us who this is and a provider
-    /// that told us it is somebody else are different facts, and collapsing them reports a specific, wrong cause
-    /// to an invitee whose account and address are both correct — leaving them no action that could work.
-    /// </remarks>
-    InviteExchangeResult EvaluateInvitedEmailBinding(string inviteToken, string authenticatedEmail, bool? emailVerified)
-    {
-        var emailClaim = config.CurrentValue.Invite?.EmailClaim;
-        if (string.IsNullOrWhiteSpace(emailClaim)
-            || !tokenValidator.TryGetClaim(inviteToken, emailClaim, out var invitedEmail)
-            || string.IsNullOrWhiteSpace(invitedEmail))
-        {
-            // The invite does not target a specific email - there is nothing to bind against.
-            return InviteExchangeResult.Success;
-        }
-
-        if (string.IsNullOrWhiteSpace(authenticatedEmail))
-        {
-            return InviteExchangeResult.EmailUnavailable;
-        }
-
-        // The invite is bound to a specific email, so the account must own that email and the provider
-        // must not have flagged it as unverified.
-        if (emailVerified == false)
-        {
-            return InviteExchangeResult.EmailMismatch;
-        }
-
-        return string.Equals(invitedEmail, authenticatedEmail, StringComparison.OrdinalIgnoreCase)
-            ? InviteExchangeResult.Success
-            : InviteExchangeResult.EmailMismatch;
-    }
-
-    bool IsTenantIssuedInvite(string inviteToken, HttpContext context)
-    {
-        var tenantClaim = config.CurrentValue.Invite?.TenantClaim;
-        if (string.IsNullOrEmpty(tenantClaim))
-        {
-            return false;
-        }
-
-        if (!tokenValidator.TryGetClaim(inviteToken, tenantClaim, out var tokenTenantIdStr))
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(tokenTenantIdStr))
-        {
-            return false;
-        }
-
-        if (!context.Items.TryGetValue(TenancyMiddleware.TenantIdItemKey, out var resolvedTenantObj)
-            || resolvedTenantObj is not string resolvedTenantId
-            || string.IsNullOrWhiteSpace(resolvedTenantId))
-        {
-            return false;
-        }
-
-        return string.Equals(tokenTenantIdStr, resolvedTenantId, StringComparison.OrdinalIgnoreCase);
-    }
-
-    string BuildLobbyRedirectUrlWithInvitationId(string lobbyUrl, string inviteToken)
-    {
-        var inviteConfig = config.CurrentValue.Invite;
-        if (inviteConfig?.AppendInvitationIdToQueryString != true)
-        {
-            return lobbyUrl;
-        }
-
-        var queryKey = string.IsNullOrWhiteSpace(inviteConfig.InvitationIdQueryStringKey)
-            ? "invitationId"
-            : inviteConfig.InvitationIdQueryStringKey;
-
-        if (!tokenValidator.TryGetClaim(inviteToken, "jti", out var invitationId)
-            || string.IsNullOrWhiteSpace(invitationId))
-        {
-            return lobbyUrl;
-        }
-
-        var separator = lobbyUrl.Contains('?') ? '&' : '?';
-        return $"{lobbyUrl}{separator}{Uri.EscapeDataString(queryKey)}={Uri.EscapeDataString(invitationId)}";
     }
 }

@@ -475,7 +475,18 @@ public static class AuthenticationServiceCollectionExtensions
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);
 
-        if (context.Properties is not null
+        // A callback answering a pending invitation's own challenge completes the invitation here, on the
+        // callback itself, so no follow-up request — and no cookie round-trip — stands between the sign-in
+        // and the completed invitation. Every other callback, including one whose invitation binding did not
+        // survive the provider round-trip, is untouched and remains the invite middleware's to answer.
+        var inviteCompletion = await InviteCallbackCompletion.TryComplete(context);
+        if (inviteCompletion == InviteCallbackCompletionResult.ResponseHandled)
+        {
+            return;
+        }
+
+        if (inviteCompletion != InviteCallbackCompletionResult.CompletedWithRedirect
+            && context.Properties is not null
             && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
                 context.HttpContext,
                 context.Properties,
