@@ -50,6 +50,7 @@ public class TenancyMiddleware(
         context.Request.Headers.Remove(Headers.Principal);
         context.Request.Headers.Remove(Headers.PrincipalId);
         context.Request.Headers.Remove(Headers.PrincipalName);
+        context.Request.Headers.Remove(Headers.PrincipalNameExtended);
         context.Request.Headers.Remove(Headers.TenantId);
 
         // 2. Resolve tenant.
@@ -120,7 +121,7 @@ public class TenancyMiddleware(
 
         if (!string.IsNullOrWhiteSpace(tenantId) && !await tenantVerifier.VerifyAsync(tenantId, verificationUrlTemplate))
         {
-            logger.TenantDoesNotExist(tenantId, SanitizePath(context.Request.Path));
+            logger.TenantDoesNotExist(tenantId, RequestPathRedaction.Redact(context.Request.Path));
             await errorPageProvider.WriteErrorPageAsync(
                 context,
                 WellKnownPageNames.TenantNotFound,
@@ -132,7 +133,4 @@ public class TenancyMiddleware(
 
         await next(context);
     }
-
-    static string SanitizePath(PathString path) =>
-        (path.Value ?? string.Empty).Replace('\r', '_').Replace('\n', '_');
 }

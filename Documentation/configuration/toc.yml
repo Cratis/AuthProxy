@@ -4,6 +4,8 @@
   href: authentication.md
 - name: Authorization
   href: authorization.md
+- name: Admission
+  href: admission.md
 - name: Unauthenticated Responses
   href: unauthenticated-responses.md
 - name: Failed Sign-ins
@@ -18,6 +20,10 @@
   href: link.md
 - name: Sign-in Notifications
   href: sign-in.md
+- name: Trusted Proxies
+  href: trusted-proxies.md
+- name: Management Listener
+  href: management-listener.md
 - name: Services
   href: services.md
 - name: Public Application Surfaces

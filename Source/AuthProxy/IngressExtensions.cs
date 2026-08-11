@@ -1,10 +1,12 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Admission;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
+using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Registrations;
@@ -12,7 +14,6 @@ using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -25,6 +26,18 @@ namespace Cratis.AuthProxy;
 /// </summary>
 public static class IngressExtensions
 {
+    /// <summary>
+    /// The host-level switch that inserts a forwarded-headers middleware of the host's own, ahead of
+    /// everything this pipeline places.
+    /// </summary>
+    /// <remarks>
+    /// Standard guidance for containerized ASP.NET images, and incompatible with declaring the boundary
+    /// here: setting it has <c>ConfigureWebDefaults</c> clear the known-proxy and known-network lists and
+    /// call <c>UseForwardedHeaders</c> before any application middleware — so the peer
+    /// <see cref="Ingress.TrustedProxyMiddleware"/> records is already the one the header replaced.
+    /// </remarks>
+    public const string ForwardedHeadersEnvironmentVariable = "ASPNETCORE_FORWARDEDHEADERS_ENABLED";
+
     /// <summary>
     /// Registers all <see cref="IOptions{T}"/> bindings for the ingress configuration sections
     /// and configures forwarded-headers handling.
@@ -45,16 +58,51 @@ public static class IngressExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        builder.Services.Configure<ForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownIPNetworks.Clear();
-            options.KnownProxies.Clear();
-        });
+        builder.Services
+            .AddOptions<C.Ingress>()
+            .BindConfiguration(C.Ingress.SectionKey)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
+        builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
+
+        // The forwarded-headers middleware and everything downstream that asks whether a request came through
+        // the deployment's own infrastructure are configured from the one policy, so the boundary is stated
+        // once and cannot be two different boundaries in two places.
+        builder.Services
+            .AddOptions<ForwardedHeadersOptions>()
+            .Configure<ITrustedProxyPolicy>((options, policy) => policy.ApplyTo(options));
+
+        // Stated once, for every client the factory will ever hand out, because the default primary handler
+        // follows up to fifty redirects and every outbound call this proxy makes carries something a caller
+        // supplied: a plaintext client secret, an invitation token, a forwarded client principal, a subject.
+        // A 307 or 308 re-sends the method and the body to whatever address the answering service names, and
+        // while SocketsHttpHandler drops Authorization across origins it never drops the body and never drops
+        // a custom header — so the whole X-MS-CLIENT-PRINCIPAL set and every posted payload would travel with
+        // it, to any host reachable from inside. Declared here, ahead of every AddHttpClient in the pipeline,
+        // so a client that genuinely needs to follow a redirect can still say so with a primary handler of
+        // its own and be the only one that does.
+        builder.Services.ConfigureHttpClientDefaults(defaults => defaults.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false }));
 
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();
         builder.Services.AddSingleton<IErrorPageProvider, ErrorPageProvider>();
+
+        // Kestrel names itself in a Server header on every response it writes, including ones this proxy
+        // wrote to say nothing at all. It is a per-server setting rather than a per-listener or per-response
+        // one, so it cannot be cleared where a response is composed — the header is added at serialization
+        // time, after every middleware has stopped touching it. Turned off here, unconditionally, because a
+        // deployment closed to callers that present nothing must not answer the first question a scanner
+        // asks; leaving it to some other feature's opt-in made it a property of whether a health port
+        // happened to be configured.
+        builder.WebHost.ConfigureKestrel(options => options.AddServerHeader = false);
+
+        // The admission gate is a middleware UseIngress always places, so its services belong to the same
+        // registration the pipeline itself is paired with. Registering them changes nothing for a deployment
+        // that never opts in.
+        builder.AddAdmission();
 
         var dataProtectionBuilder = builder.Services.AddDataProtection().SetApplicationName("Cratis.AuthProxy");
         var dataProtectionKeysPath = builder.Configuration[$"{C.AuthProxy.SectionKey}:DataProtectionKeysPath"];
@@ -75,7 +123,34 @@ public static class IngressExtensions
     /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>
     public static WebApplication UseIngress(this WebApplication app)
     {
+        var trustedProxyPolicy = app.Services.GetRequiredService<ITrustedProxyPolicy>();
+        if (trustedProxyPolicy.IsLegacyAllowAll)
+        {
+            app.Logger.TrustedProxyBoundaryNotConfigured(
+                nameof(C.TrustedProxyMode.Configured),
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}",
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}");
+        }
+
+        if (bool.TryParse(Environment.GetEnvironmentVariable(ForwardedHeadersEnvironmentVariable), out var hostHandlesForwardedHeaders)
+            && hostHandlesForwardedHeaders)
+        {
+            app.Logger.ForwardedHeadersEnvironmentSwitchIsOn(
+                ForwardedHeadersEnvironmentVariable,
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}",
+                $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}");
+        }
+
+        // Who actually connected has to be recorded before the forwarded headers are applied, because
+        // applying them replaces the answer with whatever the header claimed.
+        app.UseMiddleware<TrustedProxyMiddleware>();
         app.UseForwardedHeaders();
+
+        // Ahead of the pages map and the static files, because both are served before authentication by
+        // design — a gate placed anywhere later would leave them public whatever it decided. It short-
+        // circuits on its first line for every deployment that has not opted in.
+        app.UseMiddleware<AdmissionMiddleware>();
+
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
 
@@ -126,39 +201,15 @@ public static class IngressExtensions
         app.MapMethods(WellKnownPaths.Providers, [HttpMethods.Head], () => Results.Ok())
             .AllowAnonymous();
 
-        app.MapPost(WellKnownPaths.Token, async (HttpContext context, ClientCredentialsGrantService grantService) =>
+        // Mapped for every deployment that could ever use it, and for no other. A closed deployment where no
+        // service declares client credentials would otherwise carry an endpoint that can only refuse — and a
+        // refusal from it is still an answer, naming what is running. Removing it outright is not an option:
+        // every other deployment's clients call it.
+        if (app.Services.GetRequiredService<IAdmissionPolicy>()
+            .DeclaresTokenEndpoint(app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue))
         {
-            var form = await context.Request.ReadFormAsync(context.RequestAborted);
-            var result = await grantService.GrantAsync(
-                form["grant_type"].FirstOrDefault(),
-                form["service"].FirstOrDefault(),
-                form["client_id"].FirstOrDefault(),
-                form["client_secret"].FirstOrDefault(),
-                form["refresh_token"].FirstOrDefault(),
-                context.RequestAborted);
-
-            context.Response.Headers.CacheControl = "no-store";
-            context.Response.Headers.Pragma = "no-cache";
-
-            return result.Succeeded
-                ? Results.Json(
-                    new
-                    {
-                        access_token = result.AccessToken,
-                        token_type = result.TokenType,
-                        expires_in = result.ExpiresIn,
-                        refresh_token = result.RefreshToken,
-                    },
-                    statusCode: result.StatusCode)
-                : Results.Json(
-                    new
-                    {
-                        error = result.Error,
-                        error_description = result.ErrorDescription,
-                    },
-                    statusCode: result.StatusCode);
-        })
-        .AllowAnonymous();
+            app.MapTokenEndpoint();
+        }
 
         // Initiates the challenge for the requested provider scheme.
         app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
@@ -215,6 +266,43 @@ public static class IngressExtensions
         {
             context.Response.ContentType = "text/html";
             await context.Response.SendFileAsync(indexHtmlPath);
+        })
+        .AllowAnonymous();
+    }
+
+    static void MapTokenEndpoint(this WebApplication app)
+    {
+        app.MapPost(WellKnownPaths.Token, async (HttpContext context, ClientCredentialsGrantService grantService) =>
+        {
+            var form = await context.Request.ReadFormAsync(context.RequestAborted);
+            var result = await grantService.GrantAsync(
+                form["grant_type"].FirstOrDefault(),
+                form["service"].FirstOrDefault(),
+                form["client_id"].FirstOrDefault(),
+                form["client_secret"].FirstOrDefault(),
+                form["refresh_token"].FirstOrDefault(),
+                context.RequestAborted);
+
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.Pragma = "no-cache";
+
+            return result.Succeeded
+                ? Results.Json(
+                    new
+                    {
+                        access_token = result.AccessToken,
+                        token_type = result.TokenType,
+                        expires_in = result.ExpiresIn,
+                        refresh_token = result.RefreshToken,
+                    },
+                    statusCode: result.StatusCode)
+                : Results.Json(
+                    new
+                    {
+                        error = result.Error,
+                        error_description = result.ErrorDescription,
+                    },
+                    statusCode: result.StatusCode);
         })
         .AllowAnonymous();
     }

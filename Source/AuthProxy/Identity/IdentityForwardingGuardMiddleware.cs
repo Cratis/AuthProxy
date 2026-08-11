@@ -39,7 +39,7 @@ public class IdentityForwardingGuardMiddleware(RequestDelegate next, ILogger<Ide
             return;
         }
 
-        logger.TerminatingUnforwardableSession(context.Request.Path);
+        logger.TerminatingUnforwardableSession(RequestPathRedaction.Redact(context.Request.Path));
         await SessionTermination.SignOutAndClearCookies(context);
 
         // A person navigating gets the provider-selection page with a reason and their destination

@@ -7,10 +7,16 @@ namespace Cratis.AuthProxy.SignIns;
 /// Represents the approximate origin of a request — the resolved client IP address and a best-effort,
 /// human-readable location derived from it.
 /// </summary>
-/// <param name="IpAddress">The resolved client IP address, honoring <c>X-Forwarded-For</c>. Empty when it cannot be resolved.</param>
+/// <param name="IpAddress">
+/// The resolved client IP address — the connection's remote address as the forwarded-headers middleware left
+/// it, so <c>X-Forwarded-For</c> is honored exactly as far as the configured trusted-proxy boundary allows.
+/// Empty when it cannot be resolved.
+/// </param>
 /// <param name="Location">
 /// A best-effort, coarse location string (for example <c>"San Francisco, California, US"</c> or <c>"US"</c>),
-/// assembled from geo headers a fronting CDN/proxy may add. Empty when no geo information is available.
+/// assembled from geo headers a fronting CDN/proxy may add. Empty when no geo information is available, and
+/// empty when the request did not come from a trusted proxy — an untrusted caller's geo headers are values
+/// it chose, not facts about where it is.
 /// </param>
 public record ClientLocation(string IpAddress, string Location)
 {

@@ -12,9 +12,17 @@ namespace Cratis.AuthProxy;
 /// <remarks>
 /// The post-logout redirect target is an absolute URL and can therefore not be validated with the
 /// relative-URL check used for tenant selection. Instead it is validated against an allow-list of origins
-/// that combines the proxy's own public origin (honoring forwarded headers) with the configured service
-/// frontends, the lobby frontend, and any explicitly configured origins. A missing or disallowed target
-/// falls back to the application root (<c>/</c>).
+/// that combines the proxy's own public origin with the configured service frontends, the lobby frontend,
+/// and any explicitly configured origins. A missing or disallowed target falls back to the application root
+/// (<c>/</c>).
+/// <para>
+/// Only the <em>scheme</em> half of that self-origin is bounded by the trusted-proxy boundary, because that
+/// is the half the forwarded-headers middleware settles. The host half is <c>Request.Host</c> as it
+/// arrived, and the shipped <c>AllowedHosts</c> is <c>*</c>, so a caller that can choose the <c>Host</c>
+/// header can put its own origin on this list and be redirected back to it after logout. Bound it with
+/// <c>AllowedHosts</c> — the ASP.NET host-filtering setting — to make the self-origin mean the deployment's
+/// own name rather than whatever was asked for.
+/// </para>
 /// </remarks>
 public static class PostLogoutRedirectPolicy
 {
@@ -69,7 +77,11 @@ public static class PostLogoutRedirectPolicy
 
     static IEnumerable<string> GetAllowedOrigins(HttpContext context, C.AuthProxy authProxyConfig)
     {
-        // The proxy's own public origin as seen by the browser (X-Forwarded-Proto is honored upstream).
+        // The proxy's own public origin as seen by the browser. The scheme is whatever the forwarded-headers
+        // middleware settled on, so it reflects X-Forwarded-Proto only as far as the configured trusted-proxy
+        // boundary allows — an untrusted caller cannot add a second origin to this list by naming a scheme.
+        // The host is not bounded by that boundary at all; it is Request.Host as it arrived, which the
+        // AllowedHosts setting is what constrains. See the remarks on this type.
         if (context.Request.Host.HasValue
             && Uri.TryCreate($"{context.Request.Scheme}://{context.Request.Host.Value}", UriKind.Absolute, out var self))
         {

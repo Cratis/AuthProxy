@@ -27,6 +27,17 @@ public static class Cookies
     public const string IdentityAuthorization = ".cratis-identity-authorization";
 
     /// <summary>
+    /// Short-lived HTTP-only cookie holding the protected record that a capability was admitted, used by a
+    /// deployment that answers nothing until one has been.
+    /// </summary>
+    /// <remarks>
+    /// It carries the transaction and challenge of the presentation that was admitted, and never the
+    /// capability itself nor anything derived from it — what is in the browser is the record of an answer,
+    /// not the thing that produced it.
+    /// </remarks>
+    public const string EntryTransaction = ".cratis-entry";
+
+    /// <summary>
     /// Short-lived HTTP-only cookie used to carry the invite token across the OIDC redirect.
     /// </summary>
     public const string InviteToken = ".cratis-invite";

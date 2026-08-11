@@ -23,9 +23,18 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Warning, "Service '{Service}' returned 403 for user {UserId} - access denied")]
     internal static partial void IdentityEndpointForbidden(this ILogger logger, string service, string userId);
 
-    [LoggerMessage(LogLevel.Warning, "Identity endpoint for '{Service}' returned {StatusCode}. Identity details skipped. Response body: {Body}")]
-    internal static partial void IdentityEndpointUnsuccessful(this ILogger logger, string service, int statusCode, string body);
+    [LoggerMessage(LogLevel.Warning, "Identity endpoint for '{Service}' returned {StatusCode}. Identity details skipped.")]
+    internal static partial void IdentityEndpointUnsuccessful(this ILogger logger, string service, int statusCode);
 
     [LoggerMessage(LogLevel.Warning, "Could not parse identity response from '{Service}'")]
     internal static partial void CouldNotParseIdentityResponse(this ILogger logger, Exception exception, string service);
+
+    // The reason is an enumeration value rather than anything the service said. A denial has to be
+    // diagnosable, and the tempting way to make it so is to log the answer that produced it — which is a
+    // response body from a system that knows exactly who the caller is.
+    [LoggerMessage(LogLevel.Warning, "Identity verification for service '{Service}' denied the request: {Reason}")]
+    internal static partial void IdentityVerificationDenied(this ILogger logger, string service, IdentityVerificationReason reason);
+
+    [LoggerMessage(LogLevel.Warning, "Identity resolution for user {UserId} did not get its turn within the configured verification budget")]
+    internal static partial void IdentityResolutionQueueExhausted(this ILogger logger, string userId);
 }

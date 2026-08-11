@@ -5,6 +5,6 @@ namespace Cratis.AuthProxy.Identity;
 
 internal static partial class IdentityForwardingGuardMiddlewareLogging
 {
-    [LoggerMessage(LogLevel.Warning, "Authenticated session could not be turned into a forwardable identity for {Path}. Terminating the session instead of proxying without identity headers")]
-    internal static partial void TerminatingUnforwardableSession(this ILogger logger, PathString path);
+    [LoggerMessage(LogLevel.Warning, "Authenticated session could not be turned into a forwardable identity for route {Route}. Terminating the session instead of proxying without identity headers")]
+    internal static partial void TerminatingUnforwardableSession(this ILogger logger, string route);
 }

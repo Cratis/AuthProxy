@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Ingress;
+
 namespace Cratis.AuthProxy.SignIns;
 
 /// <summary>
@@ -13,15 +15,24 @@ namespace Cratis.AuthProxy.SignIns;
 /// pipeline of its own. Instead the location is derived from what is already on the request:
 /// </para>
 /// <list type="bullet">
-///   <item>the client IP, taken from the left-most entry of <c>X-Forwarded-For</c> (falling back to the
-///   connection's remote address), which the forwarded-headers middleware has already normalized; and</item>
+///   <item>the client IP, taken from the connection's remote address as the forwarded-headers middleware
+///   left it, which is the address of the trusted proxy's declared client when the request came through
+///   the deployment's own infrastructure and the caller's own address otherwise; and</item>
 ///   <item>coarse geo headers that popular fronting layers add — Cloudflare's <c>CF-IPCountry</c>, and the
-///   conventional <c>X-Geo-*</c> / <c>X-AppEngine-*</c> city/region/country headers.</item>
+///   conventional <c>X-Geo-*</c> / <c>X-AppEngine-*</c> city/region/country headers — read only when the
+///   request came from a trusted proxy.</item>
 /// </list>
 /// <para>
 /// When no geo headers are present the location is left empty and only the IP travels; the application can
 /// resolve a fuller location from the IP later if it chooses. This keeps AuthProxy dependency-light while
 /// still recording a genuine approximate location wherever the infrastructure provides one.
+/// </para>
+/// <para>
+/// Nothing here reads a forwarded header directly. Doing so used to produce two different attacker-chosen
+/// answers for one request — the middleware consumes the right-most entry into the connection's remote
+/// address and truncates the header, so reading the surviving left-most entry reported an address that was
+/// not the one anything else in the proxy was using. Both values are only ever as trustworthy as the caller
+/// that sent them, and only the middleware knows whether that caller was trusted.
 /// </para>
 /// </remarks>
 public class ClientLocationResolver : IClientLocationResolver
@@ -33,27 +44,12 @@ public class ClientLocationResolver : IClientLocationResolver
     /// <inheritdoc/>
     public ClientLocation Resolve(HttpContext context)
     {
-        var ipAddress = ResolveIpAddress(context);
-        var location = ResolveLocation(context.Request.Headers);
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
+        var location = context.IsFromTrustedProxy()
+            ? ResolveLocation(context.Request.Headers)
+            : string.Empty;
+
         return new ClientLocation(ipAddress, location);
-    }
-
-    static string ResolveIpAddress(HttpContext context)
-    {
-        // The forwarded-headers middleware normally rewrites the connection's remote address from
-        // X-Forwarded-For, but the header is read directly too so the left-most (original client) address is
-        // used even when the middleware is not in play or multiple proxies are chained.
-        var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(forwardedFor))
-        {
-            var firstHop = forwardedFor.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(firstHop))
-            {
-                return firstHop;
-            }
-        }
-
-        return context.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
     }
 
     static string ResolveLocation(IHeaderDictionary headers)

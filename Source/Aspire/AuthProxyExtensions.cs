@@ -69,6 +69,64 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Declares what a named service's <c>/.cratis/me</c> answer means to AuthProxy.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">
+    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// </param>
+    /// <param name="mode">
+    /// What the answer is worth. <see cref="IdentityVerificationMode.BestEffort"/> — the default when this
+    /// is never called — treats the endpoint as enrichment, so only an explicit <c>403</c> denies.
+    /// <see cref="IdentityVerificationMode.Required"/> treats it as an authorization decision, so only an
+    /// explicit positive admits and every failure to obtain one denies.
+    /// </param>
+    /// <param name="timeout">
+    /// How long to wait for the answer. Defaults to <see langword="null"/> (AuthProxy's own default of ten
+    /// seconds). Pass a non-positive value to leave the wait unbounded.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="WithBackend{T}(IResourceBuilder{T}, string, IResourceBuilder{IResourceWithEndpoints}, string, bool?)"/>.
+    /// An optional argument is baked into the call site when the app host is compiled, so adding one changes
+    /// the method's signature and every already-built app host would fail to bind against the new package
+    /// until it is rebuilt.
+    /// <para>
+    /// This is orthogonal to <c>resolveIdentityDetails</c> on <c>WithBackend</c>, which decides whether the
+    /// endpoint is called at all. Opting a service out of identity resolution and then requiring
+    /// verification of it asks for a decision from a service that is never consulted, so the service simply
+    /// does not take part.
+    /// </para>
+    /// <para>
+    /// Requiring verification means an outage of that service refuses every proxied request rather than
+    /// serving callers whose access nobody could confirm. That is the point of the setting, and it is worth
+    /// stating plainly before turning it on.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithIdentityVerification<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        IdentityVerificationMode mode,
+        TimeSpan? timeout = null)
+        where T : IResourceWithEnvironment
+    {
+        builder.WithEnvironment(
+            $"{ConfigPrefix}__Services__{serviceName}__IdentityVerification",
+            mode.ToString());
+
+        if (timeout.HasValue)
+        {
+            builder.WithEnvironment(
+                $"{ConfigPrefix}__Services__{serviceName}__IdentityVerificationTimeout",
+                timeout.Value.ToString("c", CultureInfo.InvariantCulture));
+        }
+
+        return builder;
+    }
+
+    /// <summary>
     /// Registers a frontend (SPA / static-assets) endpoint for a named service in AuthProxy.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
@@ -143,6 +201,212 @@ public static class AuthProxyExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Closes AuthProxy's interactive contract, so nothing at all is answered until a caller presents a
+    /// capability the deployment's own verifier admits.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="verifierUrl">
+    /// The absolute URL of the endpoint that decides whether a presented capability admits. There is no
+    /// default, because the verifier is the deployment's own service and AuthProxy is deliberately not the
+    /// authority on what a capability means.
+    /// </param>
+    /// <param name="path">
+    /// The one path a capability may be presented on. Defaults to <c>/.cratis/admission</c>. Every other
+    /// path — and this path with anything below it — answers the same refusal as everything else.
+    /// </param>
+    /// <param name="maximumLength">
+    /// The largest capability, in bytes, AuthProxy will read. Defaults to <c>4096</c>.
+    /// </param>
+    /// <param name="entryLifetime">
+    /// How long an admitted browser stays admitted. Defaults to twenty minutes — it bounds an interactive
+    /// entry, not a session, and has to outlast the fifteen minutes ASP.NET Core itself allows a caller at
+    /// the identity provider.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Without this, AuthProxy's interactive surface is public by design: the provider list, the
+    /// per-provider challenge endpoints, the selection page and its assets all answer a caller who has
+    /// never signed in, because a person who has never signed in has to reach them to sign in at all. That
+    /// is right for a deployment meant to be found and wrong for one whose existence is not meant to be
+    /// discoverable, and this is the switch between the two.
+    /// <para>
+    /// Cannot be combined with <c>WithInvite</c>: two capability mechanisms in one deployment is
+    /// a misconfiguration, and AuthProxy refuses the combination at startup rather than silently ordering
+    /// them.
+    /// </para>
+    /// <para>
+    /// Shortening <paramref name="entryLifetime"/> below fifteen minutes re-creates the failure the default
+    /// avoids: ASP.NET Core allows that long at the identity provider, so an entry that expires first sends
+    /// a caller who took their time over MFA or a password reset back to the uniform refusal, with nothing
+    /// anywhere to diagnose it from.
+    /// </para>
+    /// <para>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="AddAuthProxy(IDistributedApplicationBuilder, string, string)"/>. An optional argument is
+    /// baked into the call site when the app host is compiled, so adding one changes that method's
+    /// signature and every already-built app host would fail to bind against the new package until it is
+    /// rebuilt.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithCapabilityOnlyAdmission<T>(
+        this IResourceBuilder<T> builder,
+        string verifierUrl,
+        string path = "/.cratis/admission",
+        int maximumLength = 4096,
+        TimeSpan? entryLifetime = null)
+        where T : IResourceWithEnvironment
+    {
+        const string prefix = $"{ConfigPrefix}__Admission";
+
+        return builder
+            .WithEnvironment($"{prefix}__Mode", "CapabilityOnly")
+            .WithEnvironment($"{prefix}__Capability__VerifierUrl", verifierUrl)
+            .WithEnvironment($"{prefix}__Capability__Path", path)
+            .WithEnvironment($"{prefix}__Capability__MaximumLength", maximumLength.ToString(CultureInfo.InvariantCulture))
+            .WithEnvironment($"{prefix}__EntryLifetime", (entryLifetime ?? TimeSpan.FromMinutes(20)).ToString("c", CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// Opens a private management listener carrying AuthProxy's liveness and readiness endpoints.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="port">
+    /// The port the management listener binds. There is no default, because a port is the deployment's own
+    /// decision — name one nothing else in the deployment listens on, and not the port AuthProxy serves
+    /// traffic on.
+    /// </param>
+    /// <param name="bindAddress">
+    /// The address it binds. Defaults to <c>127.0.0.1</c>, which keeps it reachable from within the
+    /// container and from nowhere else. Widening it publishes the endpoints to everything that can route
+    /// to the address.
+    /// </param>
+    /// <param name="livePath">The path answering liveness. Defaults to <c>/health/live</c>.</param>
+    /// <param name="readyPath">The path answering readiness. Defaults to <c>/health/ready</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <exception cref="InvalidManagementPort">Thrown when <paramref name="port"/> is not a port number.</exception>
+    /// <remarks>
+    /// Without this, AuthProxy exposes no health surface at all and a deployment has to probe it with a TCP
+    /// socket check — which proves that a process accepted a connection, and nothing else. Liveness here
+    /// answers whenever the request loop is servicing requests, so a dependency outage never gets the
+    /// container restarted; readiness verifies local capability only, which today means the Data Protection
+    /// key ring that encrypts every session cookie and issued token.
+    /// <para>
+    /// The endpoints live only on this listener. They are answered on no other port, they are never added
+    /// to the reverse-proxy route table, and a service that serves its own <c>/health</c> keeps serving it.
+    /// </para>
+    /// <para>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="AddAuthProxy(IDistributedApplicationBuilder, string, string)"/>. An optional argument is
+    /// baked into the call site when the app host is compiled, so adding one changes that method's
+    /// signature and every already-built app host would fail to bind against the new package until it is
+    /// rebuilt.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithManagementListener<T>(
+        this IResourceBuilder<T> builder,
+        int port,
+        string bindAddress = "127.0.0.1",
+        string livePath = "/health/live",
+        string readyPath = "/health/ready")
+        where T : IResourceWithEnvironment
+    {
+        if (port is < 1 or > 65535)
+        {
+            throw new InvalidManagementPort(port);
+        }
+
+        const string prefix = $"{ConfigPrefix}__Management";
+
+        return builder
+            .WithEnvironment($"{prefix}__Port", port.ToString(CultureInfo.InvariantCulture))
+            .WithEnvironment($"{prefix}__BindAddress", bindAddress)
+            .WithEnvironment($"{prefix}__LivePath", livePath)
+            .WithEnvironment($"{prefix}__ReadyPath", readyPath);
+    }
+
+    /// <summary>
+    /// Declares the peers whose forwarded headers AuthProxy believes.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="addressesOrCidrs">
+    /// The addresses and ranges of the infrastructure directly in front of AuthProxy — an ingress
+    /// controller, load balancer, service mesh sidecar, or CDN egress range. Write a peer as <c>10.0.0.7</c>
+    /// or <c>2001:db8::1</c>, and a range as <c>10.0.0.0/8</c> or <c>2001:db8::/32</c>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <exception cref="InvalidTrustedProxy">Thrown when an entry is neither an address nor a CIDR range.</exception>
+    /// <remarks>
+    /// <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c> are ordinary request headers, so any caller that
+    /// can open a connection to AuthProxy can send them. Until this is declared, AuthProxy believes all of
+    /// them: the address recorded against every sign-in is whatever the caller wrote, and a spoofed
+    /// <c>X-Forwarded-Proto: https</c> makes an unencrypted request look encrypted, which is what decides
+    /// whether the session cookies carry <c>Secure</c>.
+    /// <para>
+    /// Declare the peers rather than the clients. AuthProxy matches the address it accepted the connection
+    /// from, which in a container deployment is the ingress, never a browser.
+    /// </para>
+    /// <para>
+    /// Calling this more than once appends, so the peers may be declared wherever each one is known.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithTrustedProxies<T>(
+        this IResourceBuilder<T> builder,
+        params string[] addressesOrCidrs)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        var index = annotation.TrustedProxyCount;
+
+        foreach (var entry in addressesOrCidrs)
+        {
+            if (!TrustedProxyEntry.IsResolvable(entry))
+            {
+                throw new InvalidTrustedProxy(entry);
+            }
+
+            builder.WithEnvironment($"{ConfigPrefix}__Ingress__TrustedProxies__{index}", entry);
+            index++;
+        }
+
+        annotation.TrustedProxyCount = index;
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Declares how many trusted proxies a request legitimately passes through.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="hops">
+    /// The number of <c>X-Forwarded-For</c> entries consumed from the right. Defaults in AuthProxy to
+    /// <c>1</c> — an ingress controller on its own. A CDN in front of a load balancer is <c>2</c>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// This is what decides which address is reported as the client. Count too few hops and the reported
+    /// address is the deployment's own inner proxy; count more hops than the deployment has and the reported
+    /// address is whatever the outermost caller chose to write. Every hop counted must itself be declared
+    /// through <see cref="WithTrustedProxies{T}"/>, so raising this alone changes nothing.
+    /// <para>
+    /// Deliberately its own method rather than another optional parameter on
+    /// <see cref="WithTrustedProxies{T}"/>. An optional argument is baked into the call site when the app
+    /// host is compiled, so adding one would change that method's signature and every already-built app host
+    /// would fail to bind against the new package until it is rebuilt.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithForwardLimit<T>(
+        this IResourceBuilder<T> builder,
+        int hops)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment(
+            $"{ConfigPrefix}__Ingress__ForwardLimit",
+            hops.ToString(CultureInfo.InvariantCulture));
 
     /// <summary>
     /// Requires every authenticated caller to carry a claim before any request is forwarded.

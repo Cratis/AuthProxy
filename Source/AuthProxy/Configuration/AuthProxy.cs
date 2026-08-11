@@ -26,6 +26,14 @@ public class AuthProxy
     public Authorization Authorization { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the admission configuration deciding whether AuthProxy answers anything at all to a
+    /// caller who has presented nothing.
+    /// Leave it at its default — <see cref="AdmissionMode.Public"/> — and the interactive contract stays
+    /// exactly as public as it has always been.
+    /// </summary>
+    public Admission Admission { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the browser-session hardening configuration: the bounded authentication session
     /// lifetime and the identity/tenant re-validation intervals.
     /// </summary>
@@ -49,6 +57,13 @@ public class AuthProxy
     /// completes an interactive sign-in.
     /// </summary>
     public SignIn? SignIn { get; set; }
+
+    /// <summary>
+    /// Gets or sets the private management listener configuration.
+    /// Set this section to open a second, private listener carrying the liveness and readiness endpoints.
+    /// Leave it unset — the default — and no additional socket is opened and no such endpoint exists.
+    /// </summary>
+    public Management? Management { get; set; }
 
     /// <summary>
     /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
@@ -98,4 +113,17 @@ public class AuthProxy
     /// Services are keyed by a friendly name (e.g. "portal", "catalog").
     /// </summary>
     public IDictionary<string, Service> Services { get; set; } = new Dictionary<string, Service>();
+
+    /// <summary>
+    /// Gets a value indicating whether any participating service treats its identity answer as an
+    /// authorization decision.
+    /// </summary>
+    /// <remarks>
+    /// One service asking to be believed is enough to change how the whole request is treated, because a
+    /// remembered authorization is remembered per request rather than per service. Requirements add together
+    /// and are never widened, the same way service claim requirements compose.
+    /// </remarks>
+    public bool RequiresIdentityVerification =>
+        Services.Values.Any(service =>
+            service.ParticipatesInIdentityResolution && service.IdentityVerification == IdentityVerificationMode.Required);
 }

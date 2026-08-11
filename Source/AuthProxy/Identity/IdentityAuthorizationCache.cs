@@ -56,15 +56,30 @@ public class IdentityAuthorizationCache(
     readonly IDataProtector _legacyProtector = dataProtectionProvider.CreateProtector(LegacyProtectorPurpose);
 
     /// <summary>
-    /// Gets how long a recorded authorization stays valid, mirroring the identity cookie's own lifetime.
+    /// Gets how long a recorded authorization stays valid, mirroring the identity cookie's own lifetime,
+    /// or <see langword="null"/> when nothing may be recorded at all.
     /// </summary>
-    TimeSpan Lifetime
+    /// <remarks>
+    /// A non-positive re-validation interval is documented as "no bound", and falling back to ten minutes
+    /// quietly turned that into the longest lifetime the setting can produce. That is a harmless
+    /// contradiction while the record only saves a round-trip, and a serious one once it carries an
+    /// authorization decision: a deployment that asked for no remembered authorization would be handed the
+    /// most permissive one. So where the identity endpoint is a verifier, "no bound" is honored by
+    /// recording nothing; everywhere else the released fallback is kept, because changing it unconditionally
+    /// would multiply identity-endpoint traffic for deployments that set zero for its documented meaning.
+    /// </remarks>
+    TimeSpan? Lifetime
     {
         get
         {
-            var configured = config.CurrentValue.Session.IdentityRevalidationInterval;
+            var current = config.CurrentValue;
+            var configured = current.Session.IdentityRevalidationInterval;
+            if (configured > TimeSpan.Zero)
+            {
+                return configured;
+            }
 
-            return configured > TimeSpan.Zero ? configured : _defaultLifetime;
+            return current.RequiresIdentityVerification ? null : _defaultLifetime;
         }
     }
 
@@ -76,7 +91,11 @@ public class IdentityAuthorizationCache(
             return;
         }
 
-        var lifetime = Lifetime;
+        if (Lifetime is not { } lifetime)
+        {
+            return;
+        }
+
         var expires = DateTimeOffset.UtcNow.Add(lifetime);
         var payload = JsonSerializer.Serialize(new IdentityAuthorizationRecord
         {

@@ -34,3 +34,6 @@ Thumbs.db
 !**/.yarn/releases
 !**/.yarn/sdks
 !**/.yarn/versions
+
+# Test run artifacts
+TestResults/

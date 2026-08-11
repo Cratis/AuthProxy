@@ -26,14 +26,24 @@ public static class HttpContextExtensions
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if a pending invitation cookie exists; otherwise <see langword="false"/>.</returns>
-    public static bool HasPendingInvitation(this HttpContext context) => context.Request.Cookies.ContainsKey(Cookies.InviteToken);
+    /// <remarks>
+    /// The value has to be usable, not merely present. Every caller of this asks it in order to <em>relax</em>
+    /// something — the tenancy refusal, the provider-selection refusal, the identity caches — on the grounds
+    /// that an invite exchange is about to run. A bare <c>Cookie: .cratis-invite=</c> answered yes to that
+    /// while <see cref="TryGetPendingInvitationToken"/> answered no to the exchange itself, so the relaxation
+    /// happened and the exchange did not, and any caller could ask for it.
+    /// </remarks>
+    public static bool HasPendingInvitation(this HttpContext context) =>
+        context.Request.Cookies.TryGetValue(Cookies.InviteToken, out var token) && !string.IsNullOrWhiteSpace(token);
 
     /// <summary>
     /// Determines whether the request has a pending registration cookie.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if a pending registration cookie exists; otherwise <see langword="false"/>.</returns>
-    public static bool HasPendingRegistration(this HttpContext context) => context.Request.Cookies.ContainsKey(Cookies.Registration);
+    /// <inheritdoc cref="HasPendingInvitation" path="/remarks"/>
+    public static bool HasPendingRegistration(this HttpContext context) =>
+        context.Request.Cookies.TryGetValue(Cookies.Registration, out var registration) && !string.IsNullOrWhiteSpace(registration);
 
     /// <summary>
     /// Determines whether the request targets an invitation URL.

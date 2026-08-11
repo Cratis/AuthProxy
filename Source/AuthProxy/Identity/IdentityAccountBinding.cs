@@ -62,8 +62,14 @@ internal sealed record IdentityAccountBinding
     /// <summary>
     /// Gets an identifier safe for identity resolver logs.
     /// </summary>
-    /// <returns>The released legacy user identifier for a legacy binding, or an opaque label for a canonical binding.</returns>
-    public string GetLogIdentifier() => IsCanonical ? "canonical-account" : Subject;
+    /// <returns>An opaque label naming the kind of binding, never the account's own identity.</returns>
+    /// <remarks>
+    /// A legacy binding's <see cref="Subject"/> is the raw provider-supplied user identifier, and legacy is
+    /// what every provider that has not opted into canonical identity resolves to — which is the default.
+    /// Returning it here put that identifier into every identity-resolution log line, so the label is opaque
+    /// for both kinds and the identifier has no way back into a log message.
+    /// </remarks>
+    public string GetLogIdentifier() => IsCanonical ? "canonical-account" : "legacy-account";
 
     /// <summary>
     /// Attempts to create a reusable account binding from a client principal.

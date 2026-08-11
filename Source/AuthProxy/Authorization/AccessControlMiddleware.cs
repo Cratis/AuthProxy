@@ -64,14 +64,11 @@ public class AccessControlMiddleware(
             return;
         }
 
-        logger.AccessDenied(decision.UnsatisfiedClaim, SanitizePath(context.Request.Path));
+        logger.AccessDenied(decision.UnsatisfiedClaim, RequestPathRedaction.Redact(context.Request.Path));
 
         await errorPageProvider.WriteErrorPageAsync(
             context,
             WellKnownPageNames.NotAuthorized,
             StatusCodes.Status403Forbidden);
     }
-
-    static string SanitizePath(PathString path) =>
-        (path.Value ?? string.Empty).Replace('\r', '_').Replace('\n', '_');
 }

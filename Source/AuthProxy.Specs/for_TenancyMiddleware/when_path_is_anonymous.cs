@@ -66,6 +66,7 @@ public class when_path_is_anonymous : Specification
         _context.Request.Headers[Headers.Principal] = "forged-principal";
         _context.Request.Headers[Headers.PrincipalId] = "forged-id";
         _context.Request.Headers[Headers.PrincipalName] = "forged-name";
+        _context.Request.Headers[Headers.PrincipalNameExtended] = "UTF-8''forged-name";
         _context.Request.Headers[Headers.TenantId] = "forged-tenant";
     }
 
@@ -74,6 +75,7 @@ public class when_path_is_anonymous : Specification
     [Fact] void should_strip_the_inbound_principal() => _context.Request.Headers.ContainsKey(Headers.Principal).ShouldBeFalse();
     [Fact] void should_strip_the_inbound_principal_id() => _context.Request.Headers.ContainsKey(Headers.PrincipalId).ShouldBeFalse();
     [Fact] void should_strip_the_inbound_principal_name() => _context.Request.Headers.ContainsKey(Headers.PrincipalName).ShouldBeFalse();
+    [Fact] void should_strip_the_inbound_extended_principal_name() => _context.Request.Headers.ContainsKey(Headers.PrincipalNameExtended).ShouldBeFalse();
     [Fact] void should_strip_the_inbound_tenant_id() => _context.Request.Headers.ContainsKey(Headers.TenantId).ShouldBeFalse();
     [Fact] void should_not_refuse_the_request_for_having_no_tenant() => _nextCalled.ShouldBeTrue();
 }

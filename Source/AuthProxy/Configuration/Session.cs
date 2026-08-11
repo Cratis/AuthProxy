@@ -33,6 +33,11 @@ public class Session
     public static readonly TimeSpan DefaultRevalidationInterval = TimeSpan.FromMinutes(10);
 
     /// <summary>
+    /// The default duration a resolved identity result is held in the proxy's own memory.
+    /// </summary>
+    public static readonly TimeSpan DefaultIdentityResultCacheDuration = TimeSpan.FromSeconds(30);
+
+    /// <summary>
     /// Gets or sets the lifetime of the authentication ticket. When it elapses the user must
     /// re-authenticate with the identity provider, even in a browser session that never closed.
     /// Non-positive values fall back to the default of 12 hours.
@@ -52,6 +57,20 @@ public class Session
     /// services. Set to zero or a negative value to disable the bound and keep a pure session cookie.
     /// </summary>
     public TimeSpan IdentityRevalidationInterval { get; set; } = DefaultRevalidationInterval;
+
+    /// <summary>
+    /// Gets or sets how long a resolved identity result stays in the proxy's in-memory cache, which
+    /// collapses the burst of requests a single page load produces into one round-trip per user and tenant.
+    /// Defaults to <see cref="DefaultIdentityResultCacheDuration"/> (30 seconds). Set to zero or a negative
+    /// value to resolve on every request.
+    /// </summary>
+    /// <remarks>
+    /// This is server-side memory rather than anything the caller holds, and it caches only positive
+    /// results — a refusal is never cached, and a refusal evicts whatever was cached before it. The duration
+    /// used to be a hard-coded constant with no way to shorten it, which matters where the identity endpoint
+    /// carries an authorization verdict: it is the window in which a revoked user still gets through.
+    /// </remarks>
+    public TimeSpan IdentityResultCacheDuration { get; set; } = DefaultIdentityResultCacheDuration;
 
     /// <summary>
     /// Gets or sets how long a selected tenant is trusted before it is re-validated against the tenant

@@ -30,11 +30,23 @@ namespace Cratis.AuthProxy.Security.given;
 /// </remarks>
 public sealed class RecordingBackend : IAsyncDisposable
 {
-    readonly WebApplication _app;
+    /// <summary>
+    /// The path AuthProxy is pointed at for sign-in notifications, so their bodies can be read back.
+    /// </summary>
+    /// <remarks>
+    /// A sign-in notification is the one thing about a request that leaves the proxy as a body rather than as
+    /// headers, and its <c>ipAddress</c> and <c>location</c> are the audit record a forged forwarded header
+    /// would poison. Reading it here means asserting on what the application would actually have been told.
+    /// </remarks>
+    public const string SignInNotificationPath = "/.security-spec/sign-ins";
 
-    RecordingBackend(WebApplication app, string baseUrl)
+    readonly WebApplication _app;
+    readonly IdentityResponder _identityResponder;
+
+    RecordingBackend(WebApplication app, string baseUrl, IdentityResponder identityResponder)
     {
         _app = app;
+        _identityResponder = identityResponder;
         BaseUrl = baseUrl;
     }
 
@@ -44,9 +56,34 @@ public sealed class RecordingBackend : IAsyncDisposable
     public string BaseUrl { get; }
 
     /// <summary>
+    /// Gets or sets what the origin answers on the identity endpoint.
+    /// </summary>
+    /// <remarks>
+    /// Settable because a deployment that treats <c>/.cratis/me</c> as an authorization decision has to be
+    /// shown failing and then recovering, and the whole point of asserting end to end is that the failure
+    /// arrives the way a real one would — over a socket, from an origin that genuinely answered that way.
+    /// The default answers an empty object, which is what every other security spec's deployment expects.
+    /// </remarks>
+    public Func<IResult> IdentityResponse
+    {
+        get => _identityResponder.Respond;
+        set => _identityResponder.Respond = value;
+    }
+
+    /// <summary>
     /// Gets every request the proxy has forwarded, most recent last.
     /// </summary>
     public ConcurrentQueue<ForwardedRequest> Received { get; } = new();
+
+    /// <summary>
+    /// Gets the body of every sign-in notification the proxy has posted, most recent last.
+    /// </summary>
+    public ConcurrentQueue<string> SignInNotifications { get; } = new();
+
+    /// <summary>
+    /// Gets the absolute URL AuthProxy should be configured to post sign-in notifications to.
+    /// </summary>
+    public string SignInNotificationUrl => $"{BaseUrl.TrimEnd('/')}{SignInNotificationPath}";
 
     /// <summary>
     /// Starts a new recording origin.
@@ -58,9 +95,11 @@ public sealed class RecordingBackend : IAsyncDisposable
         builder.Logging.ClearProviders();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton<RecordingState>();
+        builder.Services.AddSingleton<IdentityResponder>();
 
         var app = builder.Build();
         var state = app.Services.GetRequiredService<RecordingState>();
+        var identityResponder = app.Services.GetRequiredService<IdentityResponder>();
 
         app.Use(async (context, next) =>
         {
@@ -69,9 +108,17 @@ public sealed class RecordingBackend : IAsyncDisposable
         });
 
         // AuthProxy calls this on every authenticated request to resolve identity details. Answering an
-        // empty object means "authorized, nothing to add", which keeps a spec's 403 attributable to the
-        // behavior under test rather than to the origin refusing.
-        app.MapGet(WellKnownPaths.IdentityDetails, () => Results.Json(new { }));
+        // empty object means "authorized, nothing to add" to a best-effort deployment, which keeps a spec's
+        // 403 attributable to the behavior under test rather than to the origin refusing.
+        app.MapGet(WellKnownPaths.IdentityDetails, (IdentityResponder responder) => responder.Respond());
+
+        app.MapPost(SignInNotificationPath, async (HttpContext context, RecordingState recording) =>
+        {
+            using var reader = new StreamReader(context.Request.Body);
+            recording.RecordSignIn(await reader.ReadToEndAsync());
+
+            return Results.Ok();
+        });
 
         app.MapFallback(() => Results.Text("origin", "text/plain"));
 
@@ -82,8 +129,8 @@ public sealed class RecordingBackend : IAsyncDisposable
             .Addresses
             .First();
 
-        var backend = new RecordingBackend(app, address);
-        state.Attach(backend.Received);
+        var backend = new RecordingBackend(app, address, identityResponder);
+        state.Attach(backend.Received, backend.SignInNotifications);
 
         return backend;
     }
@@ -115,9 +162,19 @@ public sealed class RecordingBackend : IAsyncDisposable
     public bool ReceivedAnythingFor(string path) => LastRequestTo(path) is not null;
 
     /// <summary>
+    /// Gets the body of the most recent sign-in notification, or <see langword="null"/> when none was posted.
+    /// </summary>
+    /// <returns>The last sign-in notification body.</returns>
+    public string? LastSignInNotification() => SignInNotifications.LastOrDefault();
+
+    /// <summary>
     /// Forgets every recorded request, so one spec's traffic cannot be read as another's.
     /// </summary>
-    public void Clear() => Received.Clear();
+    public void Clear()
+    {
+        Received.Clear();
+        SignInNotifications.Clear();
+    }
 
     /// <inheritdoc/>
     public async ValueTask DisposeAsync()
@@ -127,13 +184,28 @@ public sealed class RecordingBackend : IAsyncDisposable
     }
 
     /// <summary>
+    /// Holds what the origin currently answers on the identity endpoint.
+    /// </summary>
+    sealed class IdentityResponder
+    {
+        public Func<IResult> Respond { get; set; } = () => Results.Json(new { });
+    }
+
+    /// <summary>
     /// Records requests into whichever queue the owning origin exposes.
     /// </summary>
     sealed class RecordingState
     {
         ConcurrentQueue<ForwardedRequest>? _target;
+        ConcurrentQueue<string>? _signInNotifications;
 
-        public void Attach(ConcurrentQueue<ForwardedRequest> target) => _target = target;
+        public void Attach(ConcurrentQueue<ForwardedRequest> target, ConcurrentQueue<string> signInNotifications)
+        {
+            _target = target;
+            _signInNotifications = signInNotifications;
+        }
+
+        public void RecordSignIn(string body) => _signInNotifications?.Enqueue(body);
 
         public void Record(HttpContext context) =>
             _target?.Enqueue(new ForwardedRequest(

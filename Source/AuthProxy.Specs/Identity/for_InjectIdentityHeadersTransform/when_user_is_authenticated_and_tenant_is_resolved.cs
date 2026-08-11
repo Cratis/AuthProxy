@@ -36,6 +36,7 @@ public class when_user_is_authenticated_and_tenant_is_resolved : Specification
         _transformContext.ProxyRequest.Headers.Add(Headers.Principal, "hostile-principal");
         _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalId, "hostile-id");
         _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalName, "hostile-name");
+        _transformContext.ProxyRequest.Headers.Add(Headers.PrincipalNameExtended, "hostile-extended-name");
     }
 
     Task Because() => _transform.ApplyAsync(_transformContext).AsTask();
@@ -54,4 +55,7 @@ public class when_user_is_authenticated_and_tenant_is_resolved : Specification
 
     [Fact] void should_set_tenant_id_header() =>
         _transformContext.ProxyRequest.Headers.GetValues(Headers.TenantId).Single().ShouldEqual(TenantId);
+
+    [Fact] void should_not_send_an_extended_principal_name_header() =>
+        _transformContext.ProxyRequest.Headers.Contains(Headers.PrincipalNameExtended).ShouldBeFalse();
 }
