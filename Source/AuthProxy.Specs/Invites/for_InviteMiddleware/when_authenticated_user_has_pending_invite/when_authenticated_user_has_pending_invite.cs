@@ -50,6 +50,7 @@ public class when_authenticated_user_has_pending_invite : Specification
 
         // Simulate pending invite cookie.
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, "pending-invite-token");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

@@ -61,6 +61,7 @@ public class and_lobby_query_append_is_enabled : Specification
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, "pending-invite-token");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

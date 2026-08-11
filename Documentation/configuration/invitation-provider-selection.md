@@ -235,9 +235,9 @@ GET /invite/<token>
         │
         └─ Token valid
                 │
-                ├─ Single provider ──► redirect to /.cratis/login/<scheme>
+                ├─ Single provider, not signed in ──► redirect to /.cratis/login/<scheme>
                 │
-                └─ Multiple providers
+                └─ Multiple providers, or already signed in
                         │
                         ▼
           Set .cratis-providers cookie
@@ -256,3 +256,18 @@ GET /invite/<token>
                         ▼
               Redirect to lobby / application
 ```
+
+### Callers who are already signed in
+
+An invitation is completed only with the identity that authenticated **for that invitation**. A session the
+browser was already carrying — from an earlier sign-in, possibly with a different provider — never completes
+one, even though it is a perfectly valid session: the organization would be bound permanently to an account
+the person did not choose for it.
+
+Such a caller is therefore always shown `invitation-select-provider.html`, even where only one provider is
+configured, and the invitation completes with whatever identity comes back from the provider they pick.
+Picking the provider they are already signed in with normally costs no more than a redirect, because the
+identity provider still has its own session.
+
+The pending invitation is left in place while this happens, so nothing is lost — it stays valid for the
+lifetime of the `.cratis-invite` cookie.

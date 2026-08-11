@@ -119,11 +119,27 @@ public class an_invite_exchange : Specification
         _context.User = new ClaimsPrincipal(new ClaimsIdentity(claims.Prepend(new Claim("sub", "user-123")), "aad"));
 
     /// <summary>
-    /// Places the given token in the pending invite cookie, as it would arrive on the Phase-2 request.
+    /// Places the given token in the pending invite cookie and establishes the session that answered this
+    /// invitation's own challenge, exactly as a Phase-2 request arrives once the provider has signed the
+    /// caller in for the invitation.
     /// </summary>
     /// <param name="token">The token to carry in the <c>.cratis-invite</c> cookie.</param>
-    protected void GivenPendingInviteCookie(string token) =>
+    protected void GivenPendingInviteCookie(string token)
+    {
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, token);
+    }
+
+    /// <summary>
+    /// Places the given token in the pending invite cookie while the caller is signed in from before the
+    /// invitation was ever opened — the browser that already had a session with another provider.
+    /// </summary>
+    /// <param name="token">The token to carry in the <c>.cratis-invite</c> cookie.</param>
+    protected void GivenPendingInviteCookieOnAPreExistingSession(string token)
+    {
+        _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}";
+        InvitationSessionFixture.GivenSessionEstablishedBeforeTheInvitation(_context);
+    }
 
     static IOptionsMonitor<C.Authentication> EmptyAuthConfig()
     {

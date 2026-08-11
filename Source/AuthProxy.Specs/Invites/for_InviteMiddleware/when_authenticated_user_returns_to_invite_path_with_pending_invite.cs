@@ -5,6 +5,11 @@ using System.Net;
 
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
 
+/// <summary>
+/// The provider callback lands back on the invitation path with the session it just established. That
+/// session answered this invitation's challenge, so the exchange runs here and now — re-entering the
+/// invitation entry instead would send the caller back to the provider that had just returned them.
+/// </summary>
 public class when_authenticated_user_returns_to_invite_path_with_pending_invite : Specification
 {
     InviteMiddleware _middleware;
@@ -50,10 +55,11 @@ public class when_authenticated_user_returns_to_invite_path_with_pending_invite 
         _context.User = new ClaimsPrincipal(identity);
 
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=pending-invite-token";
+        InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, "pending-invite-token");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
+    [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.InviteToken}=;");
 }
