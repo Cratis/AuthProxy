@@ -127,6 +127,27 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Terminates the local AuthProxy session whenever identity verification refuses a caller.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// This is a global session setting rather than a per-service setting. A refusal from any participating
+    /// identity-details service signs the caller out of AuthProxy's local cookie scheme and clears the
+    /// AuthProxy-owned session cookies before the existing forbidden response is served. It does not sign
+    /// the caller out of the external identity provider.
+    /// <para>
+    /// Not calling this method preserves the released behavior: the refusal is served while the local
+    /// authentication session remains active.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithSessionTerminationOnIdentityDenial<T>(
+        this IResourceBuilder<T> builder)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Session__TerminateOnIdentityDenial", bool.TrueString);
+
+    /// <summary>
     /// Registers a frontend (SPA / static-assets) endpoint for a named service in AuthProxy.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>

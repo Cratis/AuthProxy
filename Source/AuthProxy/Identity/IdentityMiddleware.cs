@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -44,7 +45,7 @@ public class IdentityMiddleware(
             {
                 if (MustBeVerified(context, current))
                 {
-                    await Refuse(context);
+                    await Refuse(context, current);
                     return;
                 }
             }
@@ -53,7 +54,7 @@ public class IdentityMiddleware(
                 var result = await identityDetailsResolver.Resolve(context, principal, tenantId);
                 if (!result.IsAuthorized)
                 {
-                    await Refuse(context);
+                    await Refuse(context, current);
                     return;
                 }
             }
@@ -94,9 +95,16 @@ public class IdentityMiddleware(
         && !context.IsInvitation()
         && !context.IsRegistration();
 
-    Task Refuse(HttpContext context) =>
-        errorPageProvider.WriteErrorPageAsync(
+    async Task Refuse(HttpContext context, C.AuthProxy config)
+    {
+        if (config.Session.TerminateOnIdentityDenial)
+        {
+            await SessionTermination.SignOutAndClearCookies(context, config.Logout);
+        }
+
+        await errorPageProvider.WriteErrorPageAsync(
             context,
             WellKnownPageNames.Forbidden,
             StatusCodes.Status403Forbidden);
+    }
 }

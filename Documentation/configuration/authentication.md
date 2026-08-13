@@ -371,6 +371,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
       "Session": {
         "Lifetime": "12:00:00",
         "SlidingExpiration": false,
+        "TerminateOnIdentityDenial": false,
         "IdentityRevalidationInterval": "00:10:00",
         "TenantRevalidationInterval": "00:10:00"
       }
@@ -383,6 +384,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 |----------|---------|-------------|
 | `Lifetime` | `12:00:00` | Absolute lifetime of the authentication ticket. When it elapses the user must re-authenticate with the identity provider, even in a browser session that never closed. |
 | `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
+| `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. |
 | `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative falls back to ten minutes. |
 | `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative disables re-validation. |
 

@@ -9,7 +9,11 @@ namespace Cratis.AuthProxy.Identity.for_IdentityMiddleware;
 /// </summary>
 public class when_a_tenant_resolves : given.an_identity_middleware
 {
-    void Establish() => ResolveTenant();
+    void Establish()
+    {
+        ResolveTenant();
+        EnableSessionTermination();
+    }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
@@ -17,6 +21,7 @@ public class when_a_tenant_resolves : given.an_identity_middleware
         _resolver.Received(1).Resolve(_context, Arg.Any<ClientPrincipal>(), TenantId);
 
     [Fact] void should_forward_the_request() => _nextCalled.ShouldBeTrue();
+    [Fact] void should_preserve_the_session() => ShouldHavePreservedSession();
     [Fact] void should_not_refuse_it() =>
         _errorPages.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
 }

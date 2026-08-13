@@ -32,6 +32,7 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
 
     HttpResponseMessage? _admittedPage;
     bool _originSawTheVerifiedCaller;
+    bool _positiveSessionWasPreserved;
 
     public async Task InitializeAsync()
     {
@@ -40,19 +41,24 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
         harness.FailEveryVerification();
 
         harness.Origin.Clear();
-        _refusedPage = await client.SendAsync(Request(RequiredVerificationHarness.ProtectedPath, "unverified-page"));
+        _refusedPage = await client.SendAsync(
+            harness.AuthenticatedRequest(RequiredVerificationHarness.ProtectedPath).Message);
         _refusedBody = await _refusedPage.Content.ReadAsStringAsync();
         _originSawTheProtectedPath = harness.Origin.ReceivedAnythingFor(RequiredVerificationHarness.ProtectedPath);
 
         harness.Origin.Clear();
-        _refusedAsset = await client.SendAsync(Request(RequiredVerificationHarness.StaticAssetPath, "unverified-asset"));
+        _refusedAsset = await client.SendAsync(
+            harness.AuthenticatedRequest(RequiredVerificationHarness.StaticAssetPath).Message);
         _originSawTheStaticAsset = harness.Origin.ReceivedAnythingFor(RequiredVerificationHarness.StaticAssetPath);
 
         harness.VerifyEveryCaller();
 
         harness.Origin.Clear();
-        _admittedPage = await client.SendAsync(Request(RequiredVerificationHarness.ProtectedPath, "verified"));
+        var admitted = harness.AuthenticatedRequest(RequiredVerificationHarness.ProtectedPath);
+        _admittedPage = await client.SendAsync(admitted.Message);
         _originSawTheVerifiedCaller = harness.Origin.ReceivedAnythingFor(RequiredVerificationHarness.ProtectedPath);
+        _positiveSessionWasPreserved = admitted.AuthenticationCookieNames.All(
+            _ => !RequiredVerificationHarness.Deletes(_admittedPage, _));
     }
 
     public Task DisposeAsync()
@@ -96,17 +102,7 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
     public void should_forward_the_verified_caller_to_the_backend() =>
         Assert.True(_originSawTheVerifiedCaller, "Restoring the verifier is the only thing that lets a caller through.");
 
-    /// <summary>
-    /// Builds an authenticated request from a caller nobody else has used.
-    /// </summary>
-    /// <param name="path">The path to request.</param>
-    /// <param name="hint">A label making the caller recognizable in a failure.</param>
-    /// <returns>The request.</returns>
-    /// <remarks>
-    /// A fresh caller each time because the proxy keeps its answer per user and tenant. A shared identity
-    /// would let one request's answer stand in for the next, and every assertion here is about the answer
-    /// this request got.
-    /// </remarks>
-    static HttpRequestMessage Request(string path, string hint) =>
-        SecurityHarness.Authenticated(HttpMethod.Get, path, SecurityHarness.UniqueUser(hint));
+    [Fact]
+    public void should_preserve_a_verified_cookie_session() =>
+        Assert.True(_positiveSessionWasPreserved);
 }

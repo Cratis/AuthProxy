@@ -52,6 +52,16 @@ public class Session
     public bool SlidingExpiration { get; set; }
 
     /// <summary>
+    /// Gets or sets whether an identity-verification denial terminates the local AuthProxy session before
+    /// serving the forbidden response. Disabled by default to preserve the existing refusal behavior.
+    /// </summary>
+    /// <remarks>
+    /// Termination signs out of the local authentication cookie and clears AuthProxy-owned session cookies;
+    /// it does not initiate logout at the external identity provider.
+    /// </remarks>
+    public bool TerminateOnIdentityDenial { get; set; }
+
+    /// <summary>
     /// Gets or sets how long the identity-details cookie is trusted before the browser drops it and the
     /// identity details (including whether the user is still authorized) are re-resolved against the
     /// services. Set to zero or a negative value to disable the bound and keep a pure session cookie.

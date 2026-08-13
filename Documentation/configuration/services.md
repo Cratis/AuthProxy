@@ -277,6 +277,14 @@ behind: the sealed `.cratis-identity-authorization` record is cleared, the reada
 cookie is expired, and the in-memory result is evicted. Without that, the next request would present one
 of them and skip the question that was just answered no.
 
+Set `Cratis:AuthProxy:Session:TerminateOnIdentityDenial` to `true` when a denial should also end the local
+AuthProxy session.
+AuthProxy signs out of its authentication cookie and clears the identity, authorization, tenant, invitation,
+registration, provider-selection, transient authentication, and configured additional logout cookies before
+serving the same `403`. It retains capability-entry and in-progress logout state, and does not initiate logout
+at the external identity provider. The default is `false`, which preserves the authenticated session exactly
+as earlier releases did.
+
 > [!IMPORTANT]
 > Two of those three erasures are *requests to the browser*, not guarantees. Clearing a cookie means
 > sending a `Set-Cookie` that expires it, and a non-browser caller is free to ignore it and keep presenting
@@ -331,6 +339,7 @@ From Aspire:
 
 ```csharp
 authProxy.WithIdentityVerification("portal", IdentityVerificationMode.Required);
+authProxy.WithSessionTerminationOnIdentityDenial();
 ```
 
 > **Requiring verification makes that service a single point of failure, on purpose.** While it is down,
