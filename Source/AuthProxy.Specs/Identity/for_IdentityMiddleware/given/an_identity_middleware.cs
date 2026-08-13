@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Arc.Identity;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Cratis.AuthProxy.Identity.for_IdentityMiddleware.given;
 
@@ -27,6 +29,7 @@ public class an_identity_middleware : Specification
     protected C.Service _service;
     protected IIdentityDetailsResolver _resolver;
     protected IErrorPageProvider _errorPages;
+    protected IAuthenticationService _authenticationService;
     protected DefaultHttpContext _context;
     protected IdentityMiddleware _middleware;
     protected bool _nextCalled;
@@ -64,6 +67,11 @@ public class an_identity_middleware : Specification
         };
         _context.Request.Path = ProtectedPath;
 
+        _authenticationService = Substitute.For<IAuthenticationService>();
+        var serviceProvider = Substitute.For<IServiceProvider>();
+        serviceProvider.GetService(typeof(IAuthenticationService)).Returns(_authenticationService);
+        _context.RequestServices = serviceProvider;
+
         _middleware = new IdentityMiddleware(
             _ =>
             {
@@ -83,8 +91,31 @@ public class an_identity_middleware : Specification
         _context.Items[TenancyMiddleware.TenantIdItemKey] = tenantId;
 
     /// <summary>
+    /// Enables local session termination when identity verification refuses the caller.
+    /// </summary>
+    protected void EnableSessionTermination() => _config.Session.TerminateOnIdentityDenial = true;
+
+    /// <summary>
     /// Asserts that the request was refused with the forbidden page.
     /// </summary>
     protected void ShouldHaveBeenRefused() =>
         _errorPages.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.Forbidden, StatusCodes.Status403Forbidden);
+
+    /// <summary>
+    /// Asserts that the local authentication session was terminated.
+    /// </summary>
+    protected void ShouldHaveTerminatedSession() =>
+        _authenticationService.Received(1).SignOutAsync(
+            _context,
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            Arg.Any<AuthenticationProperties?>());
+
+    /// <summary>
+    /// Asserts that the local authentication session was preserved.
+    /// </summary>
+    protected void ShouldHavePreservedSession() =>
+        _authenticationService.DidNotReceive().SignOutAsync(
+            Arg.Any<HttpContext>(),
+            Arg.Any<string>(),
+            Arg.Any<AuthenticationProperties?>());
 }

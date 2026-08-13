@@ -95,6 +95,25 @@ authproxy
 
 See [Services](../configuration/services.md) for the underlying configuration model.
 
+### Identity verification denials
+
+After declaring a service's identity endpoint as an authorization authority, you can make any denial end
+the caller's local AuthProxy session:
+
+```csharp
+authproxy
+    .WithIdentityVerification("main", IdentityVerificationMode.Required)
+    .WithSessionTerminationOnIdentityDenial();
+```
+
+`WithSessionTerminationOnIdentityDenial` is global and composes deterministically across services: calling
+it more than once still writes the same enabled session setting. A denial clears AuthProxy's local session
+before the existing `403` response; it does not initiate logout at the external identity provider. Omit the
+call to preserve the default behavior, where the authenticated session remains active after a denial.
+
+See [Identity verification](../configuration/services.md#identity-enrichment) for the denial matrix
+and the direct configuration equivalent.
+
 ### Anonymous paths
 
 Declare the request paths on a service that should be served without a session — a magic-link

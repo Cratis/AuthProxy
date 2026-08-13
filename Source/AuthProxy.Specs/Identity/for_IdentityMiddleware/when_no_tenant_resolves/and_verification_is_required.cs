@@ -22,6 +22,7 @@ public class and_verification_is_required : given.an_identity_middleware
 
     [Fact] void should_refuse_the_request() => ShouldHaveBeenRefused();
     [Fact] void should_not_forward_the_request() => _nextCalled.ShouldBeFalse();
+    [Fact] void should_preserve_the_session_by_default() => ShouldHavePreservedSession();
     [Fact] void should_not_pretend_to_have_asked() =>
         _resolver.DidNotReceive().Resolve(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>());
 }
