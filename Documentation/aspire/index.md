@@ -239,7 +239,10 @@ authproxy.WithSignedInvitationAttestations(
 ```
 
 Load `invitationSigningKey` from a secret provider and configure the invitation authority with only the matching
-public key. See [Invitation to Organization](../configuration/lobby/invitation-to-organization.md) for the claims,
+public key. Signed attestations also require recipient binding — call
+[`WithInviteEmailBinding`](#binding-an-invitation-to-the-invited-email) with a non-empty claim and pass a
+`tenantClaim` to `WithInvite`, or AuthProxy fails options validation at startup. See
+[Invitation to Organization](../configuration/lobby/invitation-to-organization.md) for the claims,
 two calls, verification rules, and rotation sequence.
 
 ---
@@ -343,6 +346,24 @@ authproxy.WithInvite(
 | `audience` | – | Expected `aud` claim. Omit to skip audience validation. |
 | `tenantClaim` | – | Claim that carries the tenant ID for tenant-issued invite detection. |
 | `subjectAlreadyExistsUrl` | – | Redirect URL when the exchange endpoint returns HTTP 409. Omit to serve the built-in page. |
+
+### Binding an invitation to the invited email
+
+By default an invite is a bearer token: any subject who signs in holding it can redeem it. To bind it to the
+address it was issued to, name the claim in the invite token that carries that address:
+
+```csharp
+authproxy.WithInviteEmailBinding("invited_email");
+```
+
+Compose this after either `WithInvite` overload. AuthProxy then compares that claim against the email evidence
+the identity provider supplied for the signed-in session, before the second-stage exchange runs. When the
+provider offers no usable address, the invite is rejected with `invitation-email-unavailable.html`; when the
+address differs from the invited one — or the provider explicitly reports `email_verified=false` — with
+`invitation-email-mismatch.html`.
+
+Omitting the call, or passing an empty claim, writes nothing and retains the released default of no recipient
+binding.
 
 ### Claim forwarding
 

@@ -986,6 +986,11 @@ public static class AuthProxyExtensions
     /// <remarks>
     /// Configure the invitation authority with the matching public key before activating a new key identifier.
     /// AuthProxy writes the private value to an environment variable and never logs it.
+    /// <para>
+    /// Signed attestations require recipient binding: also call
+    /// <see cref="WithInviteEmailBinding{T}(IResourceBuilder{T}, string)"/> with a non-empty claim, and pass a
+    /// <c>tenantClaim</c> to <c>WithInvite</c>. Without both, AuthProxy fails options validation at startup.
+    /// </para>
     /// </remarks>
     public static IResourceBuilder<T> WithSignedInvitationAttestations<T>(
         this IResourceBuilder<T> builder,
@@ -1082,6 +1087,41 @@ public static class AuthProxyExtensions
         if (!string.IsNullOrEmpty(subjectAlreadyExistsUrl))
         {
             builder.WithEnvironment($"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
+        }
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Binds an invitation to the address it was issued to, so only the invited recipient can redeem it.
+    /// AuthProxy reads <paramref name="emailClaim"/> from the validated invite token and compares it against the
+    /// email evidence the identity provider supplied for the signed-in session, before the second-stage exchange runs.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="emailClaim">
+    /// Claim in the invite token that carries the invited email address.
+    /// Pass an empty string to leave recipient binding off.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Compose this after either <c>WithInvite</c> overload. When the provider offers no usable address, AuthProxy
+    /// rejects the invite with <c>invitation-email-unavailable.html</c>; when the address differs from the invited
+    /// one — or the provider explicitly reports <c>email_verified=false</c> — it rejects with
+    /// <c>invitation-email-mismatch.html</c>.
+    /// <para>
+    /// Not calling this method, or passing an empty claim, writes nothing and retains the released default of no
+    /// recipient binding: any authenticated subject holding the invite token can redeem it.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithInviteEmailBinding<T>(
+        this IResourceBuilder<T> builder,
+        string emailClaim)
+        where T : IResourceWithEnvironment
+    {
+        if (!string.IsNullOrEmpty(emailClaim))
+        {
+            builder.WithEnvironment($"{ConfigPrefix}__Invite__EmailClaim", emailClaim);
         }
 
         return builder;
