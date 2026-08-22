@@ -66,7 +66,7 @@ Your responsibility is to identify performance problems in changed code before t
 ## Risk classification
 
 | Label | Meaning |
-|-------|---------|
+| ------- | --------- |
 | 🔴 High | Will cause measurable degradation at moderate load — must fix before merge |
 | 🟡 Medium | Could degrade under load or at scale — should fix soon |
 | 🟢 Low | Minor inefficiency or style issue — fix when convenient |
@@ -93,7 +93,7 @@ Group findings by category:
 End with a summary table:
 
 | Category | Status |
-|----------|--------|
+| ---------- | -------- |
 | Chronicle / Event Sourcing | ✅ / ⚠️ / ❌ |
 | MongoDB / Read Models | ✅ / ⚠️ / ❌ |
 | ASP.NET Core / Commands & Queries | ✅ / ⚠️ / ❌ |

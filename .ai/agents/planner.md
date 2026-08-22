@@ -20,6 +20,7 @@ Your responsibility is to **plan, sequence, and coordinate** the implementation 
 You do NOT write code yourself — you decompose the work and delegate it.
 
 Always read and follow:
+
 - `.ai/rules/vertical-slices.md`
 - `.ai/rules/general.md`
 
@@ -106,6 +107,7 @@ A slice is **not done** until:
 ## Session management
 
 For large features with many slices, use these techniques to keep context manageable:
+
 - **`/compact`** after completing each phase to free context space. Add focus notes: `/compact focus on remaining slices and unresolved issues`.
 - **`/fork`** before exploring an alternative design approach, so the original plan is preserved.
 - The **Explore subagent** automatically handles codebase research on a fast model — let it work rather than doing manual searches.
