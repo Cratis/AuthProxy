@@ -272,7 +272,7 @@ nothing but the details it would have supplied.
 
 ### On every denial
 
-AuthProxy serves the [forbidden page](../pages.md) at `403` and erases everything an earlier success left
+AuthProxy serves the [forbidden page](well-known-pages.md) at `403` and erases everything an earlier success left
 behind: the sealed `.cratis-identity-authorization` record is cleared, the readable `.cratis-identity`
 cookie is expired, and the in-memory result is evicted. Without that, the next request would present one
 of them and skip the question that was just answered no.
