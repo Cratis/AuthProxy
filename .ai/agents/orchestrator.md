@@ -23,8 +23,8 @@ You are the **top-level team manager** — the entry point for any complex goal 
 You do NOT write code or documentation yourself — you assemble the right team, sequence their work, and ensure nothing falls through the cracks.
 
 Always read and follow:
-- `.github/copilot-instructions.md`
-- `.github/instructions/vertical-slices.instructions.md`
+- `.ai/rules/general.md`
+- `.ai/rules/vertical-slices.md`
 
 ---
 

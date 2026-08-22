@@ -22,8 +22,8 @@ You are the **Coordinator** for Cratis-based projects.
 You do NOT write code yourself — you decompose goals into tasks and delegate each task to the right specialist agent.
 
 Always read and follow:
-- `.github/copilot-instructions.md`
-- `.github/instructions/vertical-slices.instructions.md`
+- `.ai/rules/general.md`
+- `.ai/rules/vertical-slices.md`
 
 ---
 
