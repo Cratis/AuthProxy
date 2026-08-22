@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Invites;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Cratis.AuthProxy.Scenarios.when_invitation_completes_on_the_callback;
 
@@ -39,6 +40,22 @@ public class and_the_capability_survives_the_round_trip(CallbackAuthProxyFactory
         Assert.StartsWith("http://idp.test/authorize", _signIn.Challenge.Headers.Location?.ToString());
 
     [Fact]
+    public void should_include_the_configured_authorization_parameter() =>
+        Assert.Equal("select_account", ChallengeParameter("prompt"));
+
+    [Fact]
+    public void should_preserve_the_framework_generated_state() =>
+        Assert.False(string.IsNullOrWhiteSpace(ChallengeParameter("state")));
+
+    [Fact]
+    public void should_preserve_the_framework_generated_callback() =>
+        Assert.Equal("/signin-testidp", new Uri(ChallengeParameter("redirect_uri")).AbsolutePath);
+
+    [Fact]
+    public void should_preserve_the_framework_generated_correlation_cookie() =>
+        Assert.Contains(_signIn.ChallengeCookies, cookie => cookie.StartsWith(".AspNetCore.Correlation.", StringComparison.Ordinal));
+
+    [Fact]
     public void should_call_the_exchange_endpoint_on_the_callback() =>
         Assert.Equal(1, _exchangeCallsDuringFlow);
 
@@ -64,4 +81,7 @@ public class and_the_capability_survives_the_round_trip(CallbackAuthProxyFactory
             cookies ?? [],
             cookie => cookie.StartsWith($"{Cookies.InviteToken}=;", StringComparison.Ordinal));
     }
+
+    string ChallengeParameter(string name) =>
+        QueryHelpers.ParseQuery(_signIn.Challenge.Headers.Location.Query)[name].ToString();
 }

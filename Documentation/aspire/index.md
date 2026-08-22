@@ -17,8 +17,8 @@ authProxy.WithCanonicalOidcProvider(
 ```
 
 For OAuth providers, `WithCanonicalOAuthProvider` additionally requires the explicit issuer assigned to the
-authenticated user-information flow. The existing `WithOidcProvider` and `WithOAuthProvider` helpers remain
-unchanged and retain legacy identity behavior.
+authenticated user-information flow. The `WithOidcProvider` and `WithOAuthProvider` helpers retain legacy
+identity behavior.
 
 The `Cratis.AuthProxy.Aspire` NuGet package adds first-class .NET Aspire support for AuthProxy.
 Instead of configuring environment variables by hand, you wire up authentication, tenancy, and
@@ -172,7 +172,7 @@ authproxy.WithCapabilityOnlyAdmission(
 ```
 
 | Parameter | Required | Description |
-|-----------|----------|-------------|
+| ----------- | ---------- | ------------- |
 | `verifierUrl` | ✓ | Absolute `http`/`https` URL that decides whether a presented capability admits. |
 | `path` | – | The one path a capability may be presented on. |
 | `maximumLength` | – | The largest capability, in bytes, AuthProxy will read. |
@@ -210,7 +210,7 @@ Call `WithOidcProvider` once per provider. Multiple calls produce a provider-sel
 The `OidcProviderType` enum contains well-known provider brands:
 
 | Value | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `Custom` | Generic / unknown provider. |
 | `Microsoft` | Microsoft Identity Platform (Azure AD / Entra ID). |
 | `Google` | Google Identity. |
@@ -236,8 +236,17 @@ authproxy.WithOAuthProvider(
         ["sub"] = "id",
         ["name"] = "login",
         ["email"] = "email"
+    },
+    authorizationParameters: new Dictionary<string, string>
+    {
+        ["prompt"] = "select_account"
     });
 ```
+
+`authorizationParameters` adds provider-specific, static values to every authorization request without changing
+the endpoint URL. AuthProxy rejects parameters owned by the OAuth handler, including `state`, `redirect_uri`,
+`client_id`, `scope`, `response_type`, and PKCE parameters, so configured values cannot replace correlation or
+callback data.
 
 For invitation acceptance, also configure the OAuth provider's `VerifiedEmailEndpoint` as
 `https://api.github.com/user/emails` through AuthProxy configuration. The `user:email` scope shown above lets
@@ -271,7 +280,7 @@ two calls, verification rules, and rotation sequence.
 Add one or more resolution strategies. They run in order until a tenant is matched:
 
 | Method | Strategy |
-|--------|----------|
+| -------- | ---------- |
 | `WithHostTenantResolution()` | Matches the request host against configured tenant domains. |
 | `WithSubHostTenantResolution()` | Derives the tenant from the first subdomain (e.g. `acme.example.com` → `acme`). |
 | `WithClaimTenantResolution(claimType?)` | Reads a claim from the authenticated user. |
@@ -358,7 +367,7 @@ authproxy.WithInvite(
 ```
 
 | Parameter | Required | Description |
-|-----------|----------|-------------|
+| ----------- | ---------- | ------------- |
 | `publicKeyPem` | ✓ | PEM-encoded RSA public key to verify invite token signatures. |
 | `exchangeUrl` | ✓ | Endpoint called after login to exchange the invite token. |
 | `issuer` | – | Expected `iss` claim. Omit to skip issuer validation. |

@@ -19,13 +19,8 @@
         "  command          argv array — executed directly, never through a shell (no eval)",
         "",
         "Commands are pinned to .ai/rules/general.md 'Quality Gates' and .ai/hooks/agent-stop.md.",
-        "Note the Release build passes -p:CratisProxiesOutputPath= per general.md so the proxy",
-        "generator does not re-run and touch already-correct generated files. That property is the",
-        "only gate: the generator's target is Condition=\"'$(CratisProxiesOutputPath)' != ''\", and",
-        "there is no DisableProxyGenerator property — MSBuild accepts unknown -p: names silently,",
-        "so passing one looks effective and does nothing. The Debug gate deliberately omits the",
-        "override because general.md makes Debug the canonical proxy-regeneration trigger.",
-        "This repository's CI (.github/workflows/planner-build.yml) uses the same split."
+        "This framework repository builds and tests AuthProxy.slnx in Debug, then verifies Release,",
+        "matching the split in .github/workflows/dotnet-build.yml."
     ],
     "enabled": true,
     "failFast": true,
@@ -33,10 +28,10 @@
     "gates": [
         {
             "id": "backend-build-debug",
-            "description": "dotnet build (Debug) — compiles #if DEBUG spec code and regenerates the TypeScript proxies",
+            "description": "dotnet build (Debug) — zero errors and zero warnings",
             "changed": ["**/*.cs", "**/*.csproj", "**/*.slnx", "**/*.sln", "**/*.props", "**/*.targets"],
             "excludeChanged": ["**/obj/**", "**/bin/**"],
-            "requires": { "commands": ["dotnet"], "paths": ["Planner.slnx"] },
+            "requires": { "commands": ["dotnet"], "paths": ["AuthProxy.slnx"] },
             "workingDirectory": ".",
             "command": ["dotnet", "build", "--configuration", "Debug"]
         },
@@ -45,54 +40,18 @@
             "description": "dotnet test (Debug, --no-build) — zero failures",
             "changed": ["**/*.cs", "**/*.csproj", "**/*.slnx", "**/*.sln"],
             "excludeChanged": ["**/obj/**", "**/bin/**"],
-            "requires": { "commands": ["dotnet"], "paths": ["Planner.slnx"] },
+            "requires": { "commands": ["dotnet"], "paths": ["AuthProxy.slnx"] },
             "workingDirectory": ".",
             "command": ["dotnet", "test", "--configuration", "Debug", "--no-build"]
         },
         {
             "id": "backend-build-release",
-            "description": "dotnet build (Release) — build-only check, proxy generation skipped (general.md)",
+            "description": "dotnet build (Release) — zero errors and zero warnings",
             "changed": ["**/*.cs", "**/*.csproj", "**/*.slnx", "**/*.sln", "**/*.props", "**/*.targets"],
             "excludeChanged": ["**/obj/**", "**/bin/**"],
-            "requires": { "commands": ["dotnet"], "paths": ["Planner.slnx"] },
+            "requires": { "commands": ["dotnet"], "paths": ["AuthProxy.slnx"] },
             "workingDirectory": ".",
-            "command": ["dotnet", "build", "--configuration", "Release", "-p:CratisProxiesOutputPath="]
-        },
-        {
-            "id": "frontend-lint",
-            "description": "yarn lint:ci — zero errors",
-            "changed": ["Source/**/*.ts", "Source/**/*.tsx"],
-            "excludeChanged": ["**/node_modules/**", "**/wwwroot/**", "**/dist/**"],
-            "requires": { "commands": ["yarn"], "paths": ["Source/Planner/package.json"] },
-            "workingDirectory": "Source/Planner",
-            "command": ["yarn", "lint:ci"]
-        },
-        {
-            "id": "frontend-compile",
-            "description": "yarn g:compile — zero TypeScript errors",
-            "changed": ["Source/**/*.ts", "Source/**/*.tsx"],
-            "excludeChanged": ["**/node_modules/**", "**/wwwroot/**", "**/dist/**"],
-            "requires": { "commands": ["yarn"], "paths": ["Source/Planner/package.json"] },
-            "workingDirectory": "Source/Planner",
-            "command": ["yarn", "g:compile"]
-        },
-        {
-            "id": "frontend-compile-specs",
-            "description": "yarn g:compile:specs — zero TypeScript errors in specs",
-            "changed": ["Source/**/*.ts", "Source/**/*.tsx"],
-            "excludeChanged": ["**/node_modules/**", "**/wwwroot/**", "**/dist/**"],
-            "requires": { "commands": ["yarn"], "paths": ["Source/Planner/package.json"] },
-            "workingDirectory": "Source/Planner",
-            "command": ["yarn", "g:compile:specs"]
-        },
-        {
-            "id": "frontend-specs",
-            "description": "yarn test — zero failures",
-            "changed": ["Source/**/*.ts", "Source/**/*.tsx"],
-            "excludeChanged": ["**/node_modules/**", "**/wwwroot/**", "**/dist/**"],
-            "requires": { "commands": ["yarn"], "paths": ["Source/Planner/package.json"] },
-            "workingDirectory": "Source/Planner",
-            "command": ["yarn", "test"]
+            "command": ["dotnet", "build", "--configuration", "Release"]
         },
         {
             "id": "ai-corpus",

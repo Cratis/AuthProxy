@@ -134,6 +134,7 @@ public class CallbackAuthProxyFactory : WebApplicationFactory<Program>
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:UserInformationEndpoint"] = "http://idp.test/user",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientId"] = "test-client",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientSecret"] = "test-secret",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationParameters:prompt"] = "select_account",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:sub"] = "id",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:email"] = "email",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:email_verified"] = "email_verified",

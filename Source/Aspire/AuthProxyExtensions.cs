@@ -596,6 +596,7 @@ public static class AuthProxyExtensions
     /// Optional claim mappings from the user-info JSON response.
     /// Key = claim type; value = JSON field name in the user-info response.
     /// </param>
+    /// <param name="authorizationParameters">Optional static parameters included in every provider authorization request.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithOAuthProvider<T>(
         this IResourceBuilder<T> builder,
@@ -607,7 +608,8 @@ public static class AuthProxyExtensions
         string clientId,
         string clientSecret,
         IEnumerable<string>? scopes = null,
-        IDictionary<string, string>? claimMappings = null)
+        IDictionary<string, string>? claimMappings = null,
+        IDictionary<string, string>? authorizationParameters = null)
         where T : IResourceWithEnvironment
     {
         var annotation = GetOrCreateAnnotation(builder.Resource);
@@ -634,6 +636,14 @@ public static class AuthProxyExtensions
             foreach (var (claimType, jsonField) in claimMappings)
             {
                 builder.WithEnvironment($"{prefix}__ClaimMappings__{claimType}", jsonField);
+            }
+        }
+
+        if (authorizationParameters is not null)
+        {
+            foreach (var (parameter, value) in authorizationParameters)
+            {
+                builder.WithEnvironment($"{prefix}__AuthorizationParameters__{parameter}", value);
             }
         }
 
@@ -664,6 +674,7 @@ public static class AuthProxyExtensions
     /// JSON field. For example, <c>{ ["sub"] = "id" }</c> maps a raw <c>id</c> field to the <c>sub</c> claim selected by
     /// <paramref name="subjectClaimType"/>.
     /// </param>
+    /// <param name="authorizationParameters">Optional static parameters included in every provider authorization request.</param>
     /// <returns>The same resource builder for chaining.</returns>
     public static IResourceBuilder<T> WithCanonicalOAuthProvider<T>(
         this IResourceBuilder<T> builder,
@@ -678,7 +689,8 @@ public static class AuthProxyExtensions
         string subjectClaimType,
         string issuer,
         IEnumerable<string>? scopes = null,
-        IDictionary<string, string>? claimMappings = null)
+        IDictionary<string, string>? claimMappings = null,
+        IDictionary<string, string>? authorizationParameters = null)
         where T : IResourceWithEnvironment
     {
         builder.WithOAuthProvider(
@@ -690,7 +702,8 @@ public static class AuthProxyExtensions
             clientId,
             clientSecret,
             scopes,
-            claimMappings);
+            claimMappings,
+            authorizationParameters);
         var index = GetOrCreateAnnotation(builder.Resource).OAuthProviderCount - 1;
         var prefix = $"{ConfigPrefix}__Authentication__OAuthProviders__{index}__CanonicalIdentity";
         return builder

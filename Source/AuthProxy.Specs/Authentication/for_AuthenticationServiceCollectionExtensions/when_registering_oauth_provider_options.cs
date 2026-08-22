@@ -25,7 +25,8 @@ public class when_registering_oauth_provider_options : Specification
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientSecret"] = "client-secret",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:Scopes:0"] = "read:user",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:0:Key"] = "sub",
-            [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:0:Value"] = "id"
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:0:Value"] = "id",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationParameters:prompt"] = "select_account"
         });
 
         builder.AddIngressAuthentication();
@@ -38,6 +39,7 @@ public class when_registering_oauth_provider_options : Specification
     [Fact] void should_set_oauth_endpoints() => _options.AuthorizationEndpoint.ShouldEqual("https://github.com/login/oauth/authorize");
     [Fact] void should_set_callback_path() => _options.CallbackPath.ToString().ShouldEqual("/signin-github");
     [Fact] void should_include_configured_scope() => _options.Scope.Contains("read:user").ShouldBeTrue();
+    [Fact] void should_include_configured_authorization_parameters() => _options.AdditionalAuthorizationParameters["prompt"].ShouldEqual("select_account");
     [Fact] void should_register_ticket_creation_event() => _options.Events.OnCreatingTicket.ShouldNotBeNull();
     [Fact] void should_register_ticket_received_event() => _options.Events.OnTicketReceived.ShouldNotBeNull();
 }

@@ -23,7 +23,7 @@ Your responsibility is to identify performance problems in changed code before t
 
 ### Chronicle / Event Sourcing
 
-- [ ] Projections use `.AutoMap()` — avoids manual field mapping cost
+- [ ] Projections rely on default AutoMap behavior for matching property names — avoids unnecessary manual field mapping
 - [ ] Projections do NOT perform joins on the read model (Chronicle re-hydrates from events; joining on the model forces a full re-read)
 - [ ] Reactors do NOT re-query the event log inside their `On()` handler — use event data directly
 - [ ] No eager loading of entire event logs or event sequences without paging/filtering
@@ -66,7 +66,7 @@ Your responsibility is to identify performance problems in changed code before t
 ## Risk classification
 
 | Label | Meaning |
-|-------|---------|
+| ------- | --------- |
 | 🔴 High | Will cause measurable degradation at moderate load — must fix before merge |
 | 🟡 Medium | Could degrade under load or at scale — should fix soon |
 | 🟢 Low | Minor inefficiency or style issue — fix when convenient |
@@ -93,7 +93,7 @@ Group findings by category:
 End with a summary table:
 
 | Category | Status |
-|----------|--------|
+| ---------- | -------- |
 | Chronicle / Event Sourcing | ✅ / ⚠️ / ❌ |
 | MongoDB / Read Models | ✅ / ⚠️ / ❌ |
 | ASP.NET Core / Commands & Queries | ✅ / ⚠️ / ❌ |

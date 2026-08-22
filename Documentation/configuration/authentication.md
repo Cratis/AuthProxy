@@ -98,7 +98,7 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 ### OidcProviderConfig properties
 
 | Property | Type | Description |
-|----------|------|-------------|
+| ---------- | ------ | ------------- |
 | `Name` | `string` | Display name shown on the login selection page. |
 | `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). |
 | `Authority` | `string` | OIDC authority URL. |
@@ -151,7 +151,7 @@ AuthProxy preserves its legacy claim-selection and payload behavior, except that
 ```
 
 | Property | Applies to | Contract |
-|----------|------------|----------|
+| ---------- | ------------ | ---------- |
 | `InvitationCompletionEnabled` | OIDC and OAuth | Opts this provider into signed invitation completion. Defaults to `false`; ordinary sign-in remains available. Enable only when the provider can produce the exact verified email evidence below. |
 | `InvitationIdentityBindingCompletionEnabled` | OIDC and OAuth | Opts this provider into signed invitations already bound by the invitation issuer to an immutable provider subject. Defaults to `false`. This mode does not infer email ownership; enable it only for a tenant-scoped immutable subject and framework-validated issuer. |
 | `ProviderKey` | OIDC and OAuth | Stable lowercase ASCII key, independent of display name and authentication scheme. Keys must be unique across configured providers. |
@@ -264,7 +264,8 @@ any of these registration inputs changed:
 - For OIDC, `Authority` or the effective `MetadataAddress`
 - For OAuth, the normalized configured canonical `Issuer`; both the configured provider value and the
   effective named-handler value for `AuthorizationEndpoint`, `TokenEndpoint`, and `UserInformationEndpoint`;
-  and every configured `ClaimMappings` key/value pair. Mapping order does not affect the fingerprint.
+  every configured `ClaimMappings` key/value pair; and both configured and effective authorization parameters.
+  Collection order does not affect the fingerprint.
 
 The fingerprint contains no subject, email, claims, tokens, client secret, or other PII or secret input. It is
 an internal continuity marker, not an account identifier and not a claim forwarded to downstream services.
@@ -318,6 +319,9 @@ explicitly instead of discovered from an authority:
               "name": "name",
               "preferred_username": "login",
               "email": "email"
+            },
+            "AuthorizationParameters": {
+              "prompt": "select_account"
             }
           }
         ]
@@ -335,6 +339,13 @@ together decides whether an unauthenticated browser is challenged directly or of
 create, the value is the field to read it from. The mapping above produces the claims AuthProxy reads when
 it builds the forwarded principal.
 
+`AuthorizationParameters` adds provider-specific, static values to each authorization request. The example
+asks GitHub to show account selection instead of silently reusing the active provider session. Keep request
+policy here rather than appending it to `AuthorizationEndpoint`, so the endpoint remains the provider endpoint.
+AuthProxy rejects keys owned by the OAuth handler, case-insensitively: `client_id`, `scope`, `response_type`,
+`redirect_uri`, `state`, `code_challenge`, and `code_challenge_method`. This preserves the framework-generated
+callback, correlation state, and PKCE values.
+
 > [!NOTE]
 > OAuth 2.0 has no standard end-session endpoint, so signing out of an OAuth-established session clears
 > the local session only — the user stays signed in at the provider. See [Logout](logout.md).
@@ -342,7 +353,7 @@ it builds the forwarded principal.
 ### OAuthProviderConfig properties
 
 | Property | Type | Description |
-|----------|------|-------------|
+| ---------- | ------ | ------------- |
 | `Name` | `string` | Display name shown on the login selection page, and the source of the scheme name. |
 | `Type` | `string` | Provider brand (`GitHub`, `Microsoft`, `Google`, `Apple`, or `Custom`). Picks the logo, and for GitHub also enables [organization and team claims](authorization.md#github-organizations-and-teams). |
 | `AuthorizationEndpoint` | `string` | The OAuth 2.0 authorization endpoint URL. |
@@ -352,6 +363,7 @@ it builds the forwarded principal.
 | `ClientSecret` | `string` | OAuth 2.0 client secret. |
 | `Scopes` | `string[]` | Scopes to request. Adding `read:org` to a GitHub provider also adds organization and team claims to the session. |
 | `ClaimMappings` | `object` | Claim type → user-info JSON field name. |
+| `AuthorizationParameters` | `object` | Static authorization-request parameter → value. Framework-owned OAuth parameters are rejected at startup. |
 
 Configuring a provider decides *who can sign in*, which on a public provider is everybody. To decide who
 may then get through, see [Authorization](authorization.md).
@@ -381,7 +393,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 ```
 
 | Property | Default | Description |
-|----------|---------|-------------|
+| ---------- | --------- | ------------- |
 | `Lifetime` | `12:00:00` | Absolute lifetime of the authentication ticket. When it elapses the user must re-authenticate with the identity provider, even in a browser session that never closed. |
 | `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
 | `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. |
@@ -428,7 +440,7 @@ headers, written on every proxied request and on every `/.cratis/me` call — an
 first, so a backend can treat them as proof rather than as a claim.
 
 | Header | Carries | Encoding |
-|--------|---------|----------|
+| -------- | --------- | ---------- |
 | `x-ms-client-principal` | The full client principal as base64-encoded JSON | Always base64, so always US-ASCII |
 | `x-ms-client-principal-id` | The provider-local subject | Verbatim, or RFC 8187 — no sibling announces which |
 | `x-ms-client-principal-name` | The display name (`userDetails`) | Verbatim, or RFC 8187 when it cannot travel verbatim |
@@ -556,9 +568,9 @@ client credentials over a private back channel.
 }
 ```
 
-4. Any `2xx` response mints a bearer token scoped to that service and route prefix
-5. Any `4xx` response rejects the credentials
-6. Any `5xx` response is treated as a downstream verification failure
+1. Any `2xx` response mints a bearer token scoped to that service and route prefix
+2. Any `4xx` response rejects the credentials
+3. Any `5xx` response is treated as a downstream verification failure
 
 Successful responses from `/.cratis/token` look like this:
 

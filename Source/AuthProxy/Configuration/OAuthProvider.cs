@@ -76,6 +76,14 @@ public class OAuthProvider
     public IDictionary<string, string> ClaimMappings { get; set; } = new Dictionary<string, string>();
 
     /// <summary>
+    /// Gets or sets additional static parameters included in every authorization request to this provider.
+    /// </summary>
+    /// <remarks>
+    /// Framework-owned OAuth parameters such as <c>state</c>, <c>redirect_uri</c>, and <c>client_id</c> cannot be configured here.
+    /// </remarks>
+    public IDictionary<string, string> AuthorizationParameters { get; set; } = new Dictionary<string, string>();
+
+    /// <summary>
     /// Gets or sets the optional canonical federated identity contract for this provider.
     /// OAuth providers must configure an explicit issuer because OAuth user-info does not establish one.
     /// When absent, the provider retains the legacy claim-selection and forwarding behavior.
