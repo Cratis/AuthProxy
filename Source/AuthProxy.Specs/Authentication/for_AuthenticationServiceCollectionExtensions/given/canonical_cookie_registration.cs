@@ -68,6 +68,8 @@ public class canonical_cookie_registration : Specification
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClientSecret"] = ClientSecret,
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:sub"] = "id",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:name"] = "login",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationParameters:prompt"] = "select_account",
+            [$"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationParameters:audience"] = "workforce",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:ProviderKey"] = OAuthProviderKey,
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:SubjectClaimType"] = "sub",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:Issuer"] = "https://issuer.example.com"
@@ -199,16 +201,20 @@ public class canonical_cookie_registration : Specification
     /// <param name="tokenEndpoint">The configured token endpoint.</param>
     /// <param name="userInformationEndpoint">The configured user-information endpoint.</param>
     /// <param name="subjectJsonField">The user-information JSON field mapped to the canonical subject claim.</param>
+    /// <param name="authorizationParameterValue">The configured account-selection policy.</param>
     /// <param name="reverseClaimMappingOrder">Whether to insert the unchanged claim mappings in reverse order.</param>
+    /// <param name="reverseAuthorizationParameterOrder">Whether to insert unchanged authorization parameters in reverse order.</param>
     /// <returns>The current authentication registration.</returns>
     protected static C.Authentication OAuthAuthentication(
         string authorizationEndpoint = "https://oauth.example.com/authorize",
         string tokenEndpoint = "https://oauth.example.com/token",
         string userInformationEndpoint = "https://oauth.example.com/user",
         string subjectJsonField = "id",
-        bool reverseClaimMappingOrder = false) => new()
-    {
-        OAuthProviders =
+        string authorizationParameterValue = "select_account",
+        bool reverseClaimMappingOrder = false,
+        bool reverseAuthorizationParameterOrder = false) => new()
+        {
+            OAuthProviders =
         [
             new C.OAuthProvider
             {
@@ -229,6 +235,17 @@ public class canonical_cookie_registration : Specification
                         ["sub"] = subjectJsonField,
                         ["name"] = "login"
                     },
+                AuthorizationParameters = reverseAuthorizationParameterOrder
+                    ? new Dictionary<string, string>
+                    {
+                        ["audience"] = "workforce",
+                        ["prompt"] = authorizationParameterValue
+                    }
+                    : new Dictionary<string, string>
+                    {
+                        ["prompt"] = authorizationParameterValue,
+                        ["audience"] = "workforce"
+                    },
                 CanonicalIdentity = new C.CanonicalIdentity
                 {
                     ProviderKey = OAuthProviderKey,
@@ -237,7 +254,7 @@ public class canonical_cookie_registration : Specification
                 }
             }
         ]
-    };
+        };
 
     protected static ClaimsPrincipal CanonicalPrincipal(string issuer = "https://issuer.example.com/tenant-a") =>
         new(new ClaimsIdentity(

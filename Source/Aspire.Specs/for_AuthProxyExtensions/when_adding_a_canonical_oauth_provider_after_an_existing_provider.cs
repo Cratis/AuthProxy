@@ -34,7 +34,8 @@ public class when_adding_a_canonical_oauth_provider_after_an_existing_provider :
             "id",
             "https://github.example.com",
             ["read:user", "read:org"],
-            new Dictionary<string, string> { ["oid"] = "id", ["email"] = "mail" });
+            new Dictionary<string, string> { ["oid"] = "id", ["email"] = "mail" },
+            new Dictionary<string, string> { ["prompt"] = "select_account", ["audience"] = "workforce" });
     }
 
     async Task Because() => _environment = await EnvironmentVariables();
@@ -43,4 +44,5 @@ public class when_adding_a_canonical_oauth_provider_after_an_existing_provider :
     [Fact] void should_emit_the_explicit_issuer() => _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__CanonicalIdentity__Issuer"].ShouldEqual("https://github.example.com");
     [Fact] void should_preserve_all_scopes() => new[] { _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__Scopes__0"], _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__Scopes__1"] }.ShouldContainOnly("read:user", "read:org");
     [Fact] void should_preserve_claim_mappings() => new[] { _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__ClaimMappings__oid"], _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__ClaimMappings__email"] }.ShouldContainOnly("id", "mail");
+    [Fact] void should_preserve_authorization_parameters() => new[] { _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__AuthorizationParameters__prompt"], _environment["Cratis__AuthProxy__Authentication__OAuthProviders__1__AuthorizationParameters__audience"] }.ShouldContainOnly("select_account", "workforce");
 }

@@ -77,6 +77,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
         builder.Services.AddSingleton<ICanonicalIdentityResolver, CanonicalIdentityResolver>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
         builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
@@ -316,6 +317,11 @@ public static class AuthenticationServiceCollectionExtensions
                 foreach (var mapping in capturedProvider.ClaimMappings)
                 {
                     options.ClaimActions.MapJsonKey(mapping.Key, mapping.Value);
+                }
+
+                foreach (var parameter in capturedProvider.AuthorizationParameters)
+                {
+                    options.AdditionalAuthorizationParameters.Add(parameter.Key, parameter.Value);
                 }
 
                 options.Events = new OAuthEvents

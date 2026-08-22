@@ -86,6 +86,20 @@ internal static class CanonicalSessionRegistrationFingerprint
             fields.Add(mapping.Value);
         }
 
+        foreach (var parameter in provider.AuthorizationParameters.OrderBy(_ => _.Key, StringComparer.Ordinal))
+        {
+            fields.Add("configured-authorization-parameter");
+            fields.Add(parameter.Key);
+            fields.Add(parameter.Value);
+        }
+
+        foreach (var parameter in options.AdditionalAuthorizationParameters.OrderBy(_ => _.Key, StringComparer.Ordinal))
+        {
+            fields.Add("effective-authorization-parameter");
+            fields.Add(parameter.Key);
+            fields.Add(parameter.Value);
+        }
+
         return Create([.. fields]);
     }
 
