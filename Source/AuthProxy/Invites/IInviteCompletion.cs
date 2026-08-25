@@ -39,14 +39,15 @@ interface IInviteCompletion
     Task<InviteExchangeResult> ExchangeForTicket(HttpContext context, string inviteToken, ClaimsPrincipal principal, AuthenticationProperties properties);
 
     /// <summary>
-    /// Resolves where a successfully completed, non-tenant-issued invitation should take the browser.
+    /// Resolves whether a successfully completed invitation should take the browser to the configured lobby.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="inviteToken">The completed invitation capability.</param>
     /// <param name="lobbyRedirectUrl">The lobby frontend URL, with the invitation id appended when configured.</param>
     /// <returns>
-    /// <see langword="true"/> when the invitation is not tenant-issued and a lobby frontend is configured;
-    /// otherwise <see langword="false"/>, meaning the browser stays on its current course.
+    /// <see langword="true"/> when a lobby frontend is configured and the invitation is not covered by the
+    /// enabled matching-tenant lobby-bypass policy; otherwise <see langword="false"/>, meaning the browser stays
+    /// on its current course.
     /// </returns>
     bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl);
 }

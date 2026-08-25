@@ -27,7 +27,8 @@ public class CallbackAuthProxyFactory : WebApplicationFactory<Program>
 {
     public const string ProviderName = "TestIdp";
     public const string ProviderScheme = "testidp";
-    public const string ExchangeUrl = "http://exchange.test/invites/exchange";
+    public const string StageUrl = "https://exchange.test/invites/stage";
+    public const string ExchangeUrl = "https://exchange.test/invites/exchange";
     public const string IdentityBackendBaseUrl = "http://identity.test/";
     public const string LobbyUrl = "http://lobby.test/";
     public const string SubjectAlreadyExistsUrl = "http://lobby.test/already-a-member";
@@ -154,6 +155,11 @@ public class CallbackAuthProxyFactory : WebApplicationFactory<Program>
             services.AddSingleton<IHttpClientFactory>(new TestHttpClientFactory(request =>
             {
                 var url = request.RequestUri?.ToString() ?? string.Empty;
+
+                if (url.StartsWith(StageUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new HttpResponseMessage(HttpStatusCode.OK);
+                }
 
                 if (url.StartsWith(ExchangeUrl, StringComparison.OrdinalIgnoreCase))
                 {

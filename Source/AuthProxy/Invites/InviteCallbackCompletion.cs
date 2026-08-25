@@ -110,8 +110,8 @@ static class InviteCallbackCompletion
             return InviteCallbackCompletionResult.CompletedWithRedirect;
         }
 
-        // Tenant-issued (or no lobby configured): the challenge's own return URL stands, and the handler's
-        // normal post-sign-in redirect resolution still applies to it.
+        // A matching-tenant invitation covered by the configured lobby bypass (or no configured lobby) keeps
+        // the challenge's own return URL, and the handler's normal post-sign-in redirect resolution applies.
         return InviteCallbackCompletionResult.CompletedTowardReturnUrl;
     }
 

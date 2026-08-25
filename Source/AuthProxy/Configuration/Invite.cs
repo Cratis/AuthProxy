@@ -62,11 +62,24 @@ public class Invite
     /// <summary>
     /// Gets or sets the claim name in the invite token that holds the tenant ID.
     /// When set, a tenant-issued invite is recognized when this claim's value matches
-    /// the resolved tenant. If they match the invite bypasses the lobby redirect and
-    /// the user proceeds directly to the microservice.
+    /// the resolved tenant. <see cref="TenantIssuedInvitesSkipLobby"/> controls whether
+    /// that match bypasses the lobby redirect after successful completion.
     /// Leave empty to disable tenant-issued invite detection.
     /// </summary>
     public string TenantClaim { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a successfully completed tenant-issued invitation whose
+    /// tenant matches the resolved tenant should bypass the configured lobby frontend redirect.
+    /// Defaults to <see langword="true"/> to preserve the released behavior and let the browser continue
+    /// toward the invitation challenge's return URL. Set to <see langword="false"/> to redirect matching-tenant
+    /// invitations to <see cref="Lobby"/> like other successfully completed invitations.
+    /// </summary>
+    /// <remarks>
+    /// This option changes only the post-completion redirect choice. It does not change invitation staging,
+    /// completion, tenant matching, recipient binding, attestations, transactions, cookies, or sessions.
+    /// </remarks>
+    public bool TenantIssuedInvitesSkipLobby { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the claim name in the invite token that holds the email address for which the invitation

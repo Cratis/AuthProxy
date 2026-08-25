@@ -20,7 +20,9 @@ user can continue directly into the application instead of being sent to the lob
    the opaque transaction ID; the browser and request body never supply identity authority.
 7. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
    for the request.
-8. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
+8. If the tenant IDs match and `Invite.TenantIssuedInvitesSkipLobby` is `true`, AuthProxy skips the lobby
+   redirect and continues to the target service. Set the option to `false` when matching-tenant invitations
+   must finish in the configured Lobby setup journey instead.
 
 If the tenant IDs do not match, or AuthProxy cannot resolve a tenant for the request, the invite is
 treated like lobby onboarding and falls back to the configured lobby behavior.
@@ -35,6 +37,7 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
         "StageUrl": "https://lobby.example.com/_invite/stage",
         "ExchangeUrl": "https://lobby.example.com/_invite/exchange",
         "TenantClaim": "tenant_id",
+        "TenantIssuedInvitesSkipLobby": true,
         "EmailClaim": "email",
         "Attestation": {
           "Issuer": "https://auth.example.com",
@@ -62,6 +65,7 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
 | `StageUrl` | `string` | Absolute URL of the Lobby invitation authority's pre-authentication staging endpoint. Required when `Attestation` is configured. |
 | `ExchangeUrl` | `string` | Absolute URL of the same Lobby invitation authority's completion endpoint. |
 | `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID. |
+| `TenantIssuedInvitesSkipLobby` | `bool` | Whether a matching tenant bypasses the Lobby redirect after successful completion. Defaults to `true` for compatibility; set to `false` to send matching-tenant invitations to `Lobby.Frontend.BaseUrl`. |
 | `EmailClaim` | `string` | Claim in the invite token that contains the invited email. Required by the signed protocol. |
 | `Attestation.Issuer` | `string` | Exact issuer the invitation authority validates. |
 | `Attestation.Audience` | `string` | Exact invitation-authority audience. |
@@ -130,7 +134,8 @@ identity tuple; `email` and `preferred_username` are not substitutes.
 
 > **Compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange for existing
 > deployments. That legacy mode is not sufficient authority for creating or linking an account. Enable the signed
-> protocol before an application treats invitation completion as identity proof.
+> protocol before an application treats invitation completion as identity proof. Independently,
+> `Invite.TenantIssuedInvitesSkipLobby` defaults to `true`, preserving the released matching-tenant redirect behavior.
 
 ## Rotate signing keys
 

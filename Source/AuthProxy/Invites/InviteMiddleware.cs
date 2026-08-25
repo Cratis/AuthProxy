@@ -73,8 +73,9 @@ public class InviteMiddleware(
 
     /// <summary>
     /// Key used to store the post-exchange lobby redirect URL in <see cref="HttpContext.Items"/>.
-    /// Set by Phase 2 when exchange succeeds and the invite is not tenant-issued.
-    /// Read by <see cref="InviteRedirectMiddleware"/> to perform the actual redirect.
+    /// Set after a current or prior successful invitation completion only when a Lobby is configured and the
+    /// matching-tenant lobby-bypass policy does not apply. Read by <see cref="InviteRedirectMiddleware"/> to
+    /// perform the actual redirect.
     /// </summary>
     /// <remarks>
     /// This mechanism belongs to the middleware pipeline alone. When an invitation completes on the provider
@@ -585,8 +586,8 @@ public class InviteMiddleware(
 
     /// <summary>
     /// Continues a request whose session has already completed the invitation it presents: the stale pending
-    /// state is cleared and the caller is taken where the completed invitation leads — the lobby for a
-    /// non-tenant-issued invitation, the pipeline's own course otherwise.
+    /// state is cleared, and a lobby redirect is signaled only when a Lobby is configured and the matching-tenant
+    /// lobby-bypass policy does not apply; otherwise, the pipeline continues its own course.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="inviteToken">The already-completed invitation capability.</param>

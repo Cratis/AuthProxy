@@ -1127,6 +1127,26 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Configures whether successfully completed matching-tenant invitations bypass the lobby frontend redirect.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="skipLobby">
+    /// <see langword="true"/> to preserve the default behavior and continue toward the invitation challenge's
+    /// return URL; <see langword="false"/> to redirect matching-tenant invitations to the configured lobby frontend.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// This setting changes only the redirect after successful invitation completion. It does not change tenant
+    /// matching, invitation validation, recipient binding, attestations, transactions, cookies, or sessions.
+    /// </remarks>
+    public static IResourceBuilder<T> WithTenantIssuedInvitesSkipLobby<T>(
+        this IResourceBuilder<T> builder,
+        bool skipLobby)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Invite__TenantIssuedInvitesSkipLobby", skipLobby.ToString());
+
+    /// <summary>
     /// Binds an invitation to the address it was issued to, so only the invited recipient can redeem it.
     /// AuthProxy reads <paramref name="emailClaim"/> from the validated invite token and compares it against the
     /// email evidence the identity provider supplied for the signed-in session, before the second-stage exchange runs.

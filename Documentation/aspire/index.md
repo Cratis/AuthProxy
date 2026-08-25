@@ -375,6 +375,18 @@ authproxy.WithInvite(
 | `tenantClaim` | – | Claim that carries the tenant ID for tenant-issued invite detection. |
 | `subjectAlreadyExistsUrl` | – | Redirect URL when the exchange endpoint returns HTTP 409. Omit to serve the built-in page. |
 
+Matching-tenant invitations skip the Lobby redirect by default, preserving the existing direct-to-service flow.
+For platform-level invitations that must continue through Lobby setup even when the tenant claim matches the
+resolved tenant, compose this after either `WithInvite` overload:
+
+```csharp
+authproxy.WithTenantIssuedInvitesSkipLobby(false);
+```
+
+The method writes `Cratis__AuthProxy__Invite__TenantIssuedInvitesSkipLobby`. It changes only the redirect after a
+successful completion; staging, completion, tenant matching, recipient binding, attestations, transactions, cookies,
+and sessions are unchanged.
+
 ### Binding an invitation to the invited email
 
 By default an invite is a bearer token: any subject who signs in holding it can redeem it. To bind it to the

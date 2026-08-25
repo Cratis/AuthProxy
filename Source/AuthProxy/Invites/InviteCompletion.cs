@@ -82,7 +82,8 @@ class InviteCompletion(
     public bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl)
     {
         lobbyRedirectUrl = string.Empty;
-        if (IsTenantIssuedInvite(inviteToken, context))
+        if (config.CurrentValue.Invite?.TenantIssuedInvitesSkipLobby == true
+            && IsTenantIssuedInvite(inviteToken, context))
         {
             return false;
         }
