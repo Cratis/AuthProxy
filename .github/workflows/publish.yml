@@ -44,6 +44,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     outputs:
       version: ${{ steps.release.outputs.version }}
       publish: ${{ steps.release.outputs.should-publish }}
@@ -64,6 +65,7 @@ jobs:
   frontend:
     if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [release]
 
     steps:
@@ -104,6 +106,7 @@ jobs:
   dotnet-publish:
     if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [release, frontend]
 
     steps:
@@ -136,6 +139,7 @@ jobs:
   publish-docker:
     if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [release, dotnet-publish]
 
     steps:
@@ -187,6 +191,7 @@ jobs:
   publish-nuget:
     if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [release]
     permissions:
       id-token: write
@@ -225,6 +230,7 @@ jobs:
     # and failing on those would make this job noise that everyone learns to ignore.
     if: always() && needs.release.result == 'success' && contains(fromJSON('["no-label", "error"]'), needs.release.outputs.reason)
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: [release]
 
     steps:
