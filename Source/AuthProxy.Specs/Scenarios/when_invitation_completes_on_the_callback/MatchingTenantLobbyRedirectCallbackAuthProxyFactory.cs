@@ -7,9 +7,10 @@ using Microsoft.AspNetCore.Hosting;
 namespace Cratis.AuthProxy.Scenarios.when_invitation_completes_on_the_callback;
 
 /// <summary>
-/// Configures the callback scenario with signed invitation attestations and matching-tenant lobby bypass disabled.
+/// Configures callback scenarios with signed invitation attestations and the matching-tenant destination set to
+/// Lobby.
 /// </summary>
-public sealed class TenantIssuedLobbyRedirectCallbackAuthProxyFactory : CallbackAuthProxyFactory
+public sealed class MatchingTenantLobbyRedirectCallbackAuthProxyFactory : CallbackAuthProxyFactory
 {
     const string AttestationKeyId = "callback-spec-key";
     readonly string _attestationPrivateKeyPem = CreatePrivateKeyPem();
@@ -21,7 +22,7 @@ public sealed class TenantIssuedLobbyRedirectCallbackAuthProxyFactory : Callback
 
         foreach (var (key, value) in new Dictionary<string, string?>
         {
-            [$"{C.AuthProxy.SectionKey}:Invite:TenantIssuedInvitesSkipLobby"] = bool.FalseString,
+            [$"{C.AuthProxy.SectionKey}:Invite:MatchingTenantInvitationDestination"] = nameof(C.InvitationCompletionDestination.Lobby),
             [$"{C.AuthProxy.SectionKey}:Invite:StageUrl"] = StageUrl,
             [$"{C.AuthProxy.SectionKey}:Invite:EmailClaim"] = "email",
             [$"{C.AuthProxy.SectionKey}:Invite:Attestation:Issuer"] = "https://authproxy.test",

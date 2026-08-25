@@ -7,11 +7,11 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_completes_on_the_callback;
 
 /// <summary>
 /// End-to-end scenario: a signed matching-tenant invitation completes once on the provider callback and establishes
-/// one session, while the explicit redirect policy sends the browser to Lobby instead of replaying the invite URL.
+/// one session, while the Lobby destination policy sends the browser to Lobby instead of replaying the invite URL.
 /// </summary>
-/// <param name="factory">The signed invitation callback factory with matching-tenant lobby bypass disabled.</param>
-public class and_the_matching_tenant_lobby_bypass_is_disabled(TenantIssuedLobbyRedirectCallbackAuthProxyFactory factory) :
-    IClassFixture<TenantIssuedLobbyRedirectCallbackAuthProxyFactory>, IAsyncLifetime
+/// <param name="factory">The signed invitation callback factory with matching-tenant destination set to Lobby.</param>
+public class and_the_matching_tenant_destination_is_lobby(MatchingTenantLobbyRedirectCallbackAuthProxyFactory factory) :
+    IClassFixture<MatchingTenantLobbyRedirectCallbackAuthProxyFactory>, IAsyncLifetime
 {
     string _invitationId;
     CallbackAuthProxyFactory.ProviderSignIn _signIn;

@@ -45,9 +45,8 @@ interface IInviteCompletion
     /// <param name="inviteToken">The completed invitation capability.</param>
     /// <param name="lobbyRedirectUrl">The lobby frontend URL, with the invitation id appended when configured.</param>
     /// <returns>
-    /// <see langword="true"/> when a lobby frontend is configured and the invitation is not covered by the
-    /// enabled matching-tenant lobby-bypass policy; otherwise <see langword="false"/>, meaning the browser stays
-    /// on its current course.
+    /// <see langword="true"/> when the selected destination is Lobby and a lobby frontend is configured;
+    /// otherwise <see langword="false"/>, meaning the browser continues toward its return URL.
     /// </returns>
     bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl);
 }

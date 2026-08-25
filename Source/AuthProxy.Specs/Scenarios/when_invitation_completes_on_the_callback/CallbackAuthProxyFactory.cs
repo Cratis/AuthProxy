@@ -54,6 +54,13 @@ public class CallbackAuthProxyFactory : WebApplicationFactory<Program>
 
     public int ExchangeCallCount => _exchangeCallCount;
 
+    /// <summary>
+    /// Gets the configured matching-tenant invitation destination observed by the running application.
+    /// </summary>
+    public C.InvitationCompletionDestination MatchingTenantInvitationDestination =>
+        Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Invite?.MatchingTenantInvitationDestination
+        ?? C.InvitationCompletionDestination.ReturnUrl;
+
     /// <summary>Gets or sets the status the faked invitation exchange endpoint answers with.</summary>
     public HttpStatusCode ExchangeStatusCode { get; set; } = HttpStatusCode.OK;
 

@@ -5,7 +5,7 @@ using System.Net;
 
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_tenant_invite;
 
-public class and_tenant_matches_with_lobby_bypass_disabled : Specification
+public class and_tenant_matches_with_destination_lobby : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
     const string TenantClaimType = "tenant_id";
@@ -31,7 +31,7 @@ public class and_tenant_matches_with_lobby_bypass_disabled : Specification
             {
                 ExchangeUrl = "http://studio/internal/invites/exchange",
                 TenantClaim = TenantClaimType,
-                TenantIssuedInvitesSkipLobby = false,
+                MatchingTenantInvitationDestination = C.InvitationCompletionDestination.Lobby,
                 Lobby = new C.Service
                 {
                     Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
