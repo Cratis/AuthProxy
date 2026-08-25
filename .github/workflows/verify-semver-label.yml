@@ -36,7 +36,7 @@ jobs:
         env:
           LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          count=$(printf '%s' "$LABELS" | jq '[.[] | select(. == "major" or . == "minor" or . == "patch")] | length')
+          count=$(printf '%s' "$LABELS" | jq '[.[] | select(. == "major" or . == "minor" or . == "patch" or . == "no-release")] | length')
 
           if [ "$count" -eq 1 ]; then
             echo "Found one semantic version label."
@@ -44,9 +44,9 @@ jobs:
           fi
 
           if [ "$count" -eq 0 ]; then
-            echo "::error::This pull request has no semantic version label. Add exactly one of major, minor or patch. Without one, merging produces a Publish run that succeeds while skipping every publish step, so no release is cut and nothing is published."
+            echo "::error::This pull request has no release intent label. Add exactly one of major, minor, patch, or no-release. Without one, merging produces a Publish run that succeeds while skipping every publish step, so no release is cut and nothing is published."
           else
-            echo "::error::This pull request carries $count semantic version labels. Exactly one of major, minor or patch is required, since the release version cannot be derived from more than one."
+            echo "::error::This pull request carries $count release intent labels. Exactly one of major, minor, patch, or no-release is required, since the release intent cannot be derived from more than one."
           fi
 
           exit 1
