@@ -37,3 +37,6 @@ Thumbs.db
 
 # Test run artifacts
 TestResults/
+
+# Local AI work artifacts (plans, handovers, session notes) — never tracked
+.ai-work/
