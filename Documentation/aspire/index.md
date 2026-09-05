@@ -372,8 +372,21 @@ authproxy.WithInvite(
 | `exchangeUrl` | ✓ | Endpoint called after login to exchange the invite token. |
 | `issuer` | – | Expected `iss` claim. Omit to skip issuer validation. |
 | `audience` | – | Expected `aud` claim. Omit to skip audience validation. |
-| `tenantClaim` | – | Claim that carries the tenant ID for tenant-issued invite detection. |
+| `tenantClaim` | – | Claim that carries the tenant ID used in the matching-tenant comparison. |
 | `subjectAlreadyExistsUrl` | – | Redirect URL when the exchange endpoint returns HTTP 409. Omit to serve the built-in page. |
+
+`MatchingTenantInvitationDestination` defaults to `InvitationCompletionDestination.ReturnUrl`, preserving the
+existing direct-to-service flow for matching-tenant invitations. For platform-level invitations that must continue
+through Lobby setup even when the tenant claim matches the resolved tenant, compose this after either `WithInvite`
+overload:
+
+```csharp
+authproxy.WithMatchingTenantInvitationDestination(InvitationCompletionDestination.Lobby);
+```
+
+The method writes `Cratis__AuthProxy__Invite__MatchingTenantInvitationDestination`. It changes only the redirect
+after a successful completion; staging, completion, tenant matching, recipient binding, attestations, transactions,
+cookies, and sessions are unchanged.
 
 ### Binding an invitation to the invited email
 

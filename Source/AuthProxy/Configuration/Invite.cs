@@ -61,12 +61,36 @@ public class Invite
 
     /// <summary>
     /// Gets or sets the claim name in the invite token that holds the tenant ID.
-    /// When set, a tenant-issued invite is recognized when this claim's value matches
-    /// the resolved tenant. If they match the invite bypasses the lobby redirect and
-    /// the user proceeds directly to the microservice.
-    /// Leave empty to disable tenant-issued invite detection.
+    /// When set, AuthProxy compares this claim with the tenant resolved for the request.
+    /// <see cref="MatchingTenantInvitationDestination"/> controls the destination when they match.
+    /// Leave empty when invitation routing does not observe a tenant relation.
     /// </summary>
     public string TenantClaim { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets where the browser is redirected after a successfully completed invitation whose
+    /// <see cref="TenantClaim"/> value matches the resolved tenant.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Defaults to <see cref="InvitationCompletionDestination.ReturnUrl"/> to preserve the released behavior
+    /// and let the browser continue toward the invitation challenge's return URL. Set to
+    /// <see cref="InvitationCompletionDestination.Lobby"/> to redirect matching-tenant invitations to
+    /// <see cref="Lobby"/> like other successfully completed invitations.
+    /// </para>
+    /// <para>
+    /// This setting changes only the post-completion redirect choice. It does not change invitation staging,
+    /// completion, tenant matching, recipient binding, attestations, transactions, cookies, or sessions.
+    /// </para>
+    /// <para>
+    /// Matching-tenant invitations are those where the configured <see cref="TenantClaim"/> value in the
+    /// invitation capability equals the tenant resolved for the request. The equality does not prove that
+    /// the invitation was issued by that tenant — any issuer holding the signing key can write that claim.
+    /// It proves only that the invitation names the tenant the request is being served for, which is enough
+    /// to know whether the browser should stay in the tenant's own surface or continue through Lobby.
+    /// </para>
+    /// </remarks>
+    public InvitationCompletionDestination MatchingTenantInvitationDestination { get; set; } = InvitationCompletionDestination.ReturnUrl;
 
     /// <summary>
     /// Gets or sets the claim name in the invite token that holds the email address for which the invitation
