@@ -5,13 +5,14 @@ using System.Net;
 
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_tenant_invite;
 
-public class and_tenant_matches : Specification
+public class and_tenant_matches_with_default_return_url_destination : Specification
 {
     const string LobbyUrl = "http://lobby-service/";
     const string TenantClaimType = "tenant_id";
     const string TenantId = "tenant-matched";
 
     InviteMiddleware _middleware;
+    C.Invite _invite;
     DefaultHttpContext _context;
     bool _nextCalled;
 
@@ -25,18 +26,16 @@ public class and_tenant_matches : Specification
                 return true;
             });
 
-        var config = new C.AuthProxy
+        _invite = new C.Invite
         {
-            Invite = new C.Invite
+            ExchangeUrl = "http://studio/internal/invites/exchange",
+            TenantClaim = TenantClaimType,
+            Lobby = new C.Service
             {
-                ExchangeUrl = "http://studio/internal/invites/exchange",
-                TenantClaim = TenantClaimType,
-                Lobby = new C.Service
-                {
-                    Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
-                }
+                Frontend = new C.ServiceEndpoint { BaseUrl = LobbyUrl }
             }
         };
+        var config = new C.AuthProxy { Invite = _invite };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
@@ -72,8 +71,9 @@ public class and_tenant_matches : Specification
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
+    [Fact] void should_use_return_url_as_the_enum_default() => _invite.MatchingTenantInvitationDestination.ShouldEqual(C.InvitationCompletionDestination.ReturnUrl);
     [Fact] void should_call_next() => _nextCalled.ShouldBeTrue();
-    [Fact] void should_not_redirect_to_lobby() => _context.Response.Headers.Location.ToString().ShouldNotContain(LobbyUrl);
+    [Fact] void should_not_redirect_to_lobby() => _context.Items.ContainsKey(InviteMiddleware.LobbyRedirectUrlItemKey).ShouldBeFalse();
     [Fact] void should_delete_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 
     static IOptionsMonitor<C.Authentication> CreateEmptyAuthConfig()

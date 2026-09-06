@@ -6,12 +6,12 @@ using Cratis.AuthProxy.Invites;
 namespace Cratis.AuthProxy.Scenarios.when_invitation_completes_on_the_callback;
 
 /// <summary>
-/// End-to-end scenario: the invitation was issued by the tenant the request is served for, so a completed
-/// invitation does not leave for the lobby — the exchange still runs on the callback, but the browser is
-/// redirected to the challenge's own return URL exactly as any other sign-in would be.
+/// End-to-end scenario: the invitation tenant claim matches the tenant resolved for the request and the default
+/// destination is ReturnUrl, so the exchange runs on the callback and the browser continues toward the challenge's
+/// own return URL.
 /// </summary>
 /// <param name="factory">The shared application factory.</param>
-public class and_the_invitation_is_tenant_issued(CallbackAuthProxyFactory factory) : IClassFixture<CallbackAuthProxyFactory>, IAsyncLifetime
+public class and_the_matching_tenant_destination_is_return_url(CallbackAuthProxyFactory factory) : IClassFixture<CallbackAuthProxyFactory>, IAsyncLifetime
 {
     string _token;
     CallbackAuthProxyFactory.ProviderSignIn _signIn;
@@ -34,6 +34,10 @@ public class and_the_invitation_is_tenant_issued(CallbackAuthProxyFactory factor
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public void should_use_return_url_as_the_enum_default() =>
+        Assert.Equal(C.InvitationCompletionDestination.ReturnUrl, factory.MatchingTenantInvitationDestination);
 
     [Fact]
     public void should_call_the_exchange_endpoint_on_the_callback() =>

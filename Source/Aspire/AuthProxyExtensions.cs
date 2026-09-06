@@ -957,7 +957,7 @@ public static class AuthProxyExtensions
     /// Expected <c>aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
     /// </param>
     /// <param name="tenantClaim">
-    /// Claim in the invite token that carries the tenant ID string (used for tenant-issued invite detection).
+    /// Claim in the invite token that carries the tenant ID string used for matching-tenant routing.
     /// Leave <see langword="null"/> to use the AuthProxy default.
     /// </param>
     /// <param name="subjectAlreadyExistsUrl">
@@ -1074,7 +1074,7 @@ public static class AuthProxyExtensions
     /// Expected <c>aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
     /// </param>
     /// <param name="tenantClaim">
-    /// Claim in the invite token that carries the tenant ID string (used for tenant-issued invite detection).
+    /// Claim in the invite token that carries the tenant ID string used for matching-tenant routing.
     /// Leave <see langword="null"/> to use the AuthProxy default.
     /// </param>
     /// <param name="subjectAlreadyExistsUrl">
@@ -1125,6 +1125,37 @@ public static class AuthProxyExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Configures where the browser is redirected after a successfully completed invitation whose tenant claim
+    /// matches the resolved tenant.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="destination">
+    /// The post-completion destination. <see cref="InvitationCompletionDestination.ReturnUrl"/> preserves the
+    /// released behavior; <see cref="InvitationCompletionDestination.Lobby"/> redirects matching-tenant invitations
+    /// to the configured lobby frontend.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// <para>
+    /// This setting changes only the redirect after successful invitation completion. It does not change tenant
+    /// matching, invitation validation, recipient binding, attestations, transactions, cookies, or sessions.
+    /// </para>
+    /// <para>
+    /// Matching-tenant invitations are those where the configured <c>TenantClaim</c> value in the invitation
+    /// capability equals the tenant resolved for the request. The equality does not prove that the invitation
+    /// was issued by that tenant — any issuer holding the signing key can write that claim. It proves only
+    /// that the invitation names the tenant the request is being served for, which is enough to know whether
+    /// the browser should stay in the tenant's own surface or continue through Lobby.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithMatchingTenantInvitationDestination<T>(
+        this IResourceBuilder<T> builder,
+        InvitationCompletionDestination destination)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Invite__MatchingTenantInvitationDestination", destination.ToString());
 
     /// <summary>
     /// Binds an invitation to the address it was issued to, so only the invited recipient can redeem it.

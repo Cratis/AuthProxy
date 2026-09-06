@@ -21,7 +21,9 @@ completes the staged transaction with a signed attestation, and then sends the u
 6. The same Lobby invitation authority verifies and atomically consumes the transaction and attestation ID. If it
    succeeds, AuthProxy redirects the user to `Invite.Lobby.Frontend.BaseUrl`.
 
-This flow is the right fit when the invited user is not entering an already-resolved tenant.
+This flow is the right fit when the invited user must create an organization. Configure
+`MatchingTenantInvitationDestination` as `Lobby` so the creating-organization journey still selects Lobby when the
+invitation tenant claim happens to match the tenant resolved for the request.
 
 ## Configuration
 
@@ -36,6 +38,7 @@ This flow is the right fit when the invited user is not entering an already-reso
         "StageUrl": "https://lobby.example.com/_invite/stage",
         "ExchangeUrl": "https://lobby.example.com/_invite/exchange",
         "TenantClaim": "tenant_id",
+        "MatchingTenantInvitationDestination": "Lobby",
         "EmailClaim": "email",
         "Attestation": {
           "Issuer": "https://auth.example.com",
@@ -67,13 +70,14 @@ This flow is the right fit when the invited user is not entering an already-reso
 ```
 
 | Property | Type | Description |
-|----------|------|-------------|
+| ---------- | ------ | ------------- |
 | `PublicKeyPem` | `string` | PEM-encoded RSA public key used to verify invite token signatures. |
 | `Issuer` | `string` | Expected `iss` claim. Leave empty to skip issuer validation. |
 | `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
 | `StageUrl` | `string` | Absolute URL of the Lobby invitation authority's staging endpoint. |
 | `ExchangeUrl` | `string` | Absolute URL of the same Lobby invitation authority's completion endpoint. |
-| `TenantClaim` | `string` | Claim containing the tenant that owns the invitation. Required by the signed protocol. |
+| `TenantClaim` | `string` | Claim containing the tenant observed for invitation routing. Required by the signed protocol. Equality with the resolved tenant does not identify the invitation issuer. |
+| `MatchingTenantInvitationDestination` | `InvitationCompletionDestination` | Set to `Lobby` so a matching tenant still enters the organization-creation journey. |
 | `EmailClaim` | `string` | Claim type used by the exclusive email-recipient mode. The signed capability must contain exactly one value of this claim or the immutable provider-binding pair, never both. |
 | `Attestation` | `object` | RS256 issuer, audience, active key, private signing-key set, and 10–60-second lifetime used for the two internal calls. |
 | `SubjectAlreadyExistsUrl` | `string` | Redirect target when the exchange endpoint returns HTTP 409. Leave empty to serve `invitation-subject-already-exists.html`. |
@@ -112,12 +116,12 @@ needs the matching public key to validate the signature.
 Recommended claims:
 
 | Claim | Description |
-|-------|-------------|
+| ------- | ------------- |
 | `iss` | Issuer. Must match `Invite.Issuer` when configured. |
 | `aud` | Audience. Must match `Invite.Audience` when configured. |
 | `exp` | Expiry time. Expired tokens are rejected. |
 | `jti` | Unique invitation identifier. Required by the signed protocol. |
-| `tenant_id` | Tenant that owns the invitation, using the configured `TenantClaim` name. |
+| `tenant_id` | Tenant value observed for invitation routing, using the configured `TenantClaim` name. |
 | `email` | Exactly one invited address for email-recipient mode, using the configured `EmailClaim` name. |
 | `recipient_provider_key` + `recipient_identity_binding` | Exact provider key and 43-character opaque binding for immutable identity mode. Both are required together and `email` must be absent. |
 
@@ -126,7 +130,7 @@ Recommended claims:
 AuthProxy serves dedicated pages for each invitation error:
 
 | Page file | Condition | HTTP status |
-|-----------|-----------|-------------|
+| ----------- | ----------- | ------------- |
 | `invitation-expired.html` | The token signature is valid, but the `exp` claim is in the past. | 401 |
 | `invitation-invalid.html` | The token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | The token is valid and multiple identity providers are configured. | 200 |

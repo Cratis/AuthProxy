@@ -23,6 +23,7 @@ public static class InvitesServiceCollectionExtensions
         builder.Services.AddSingleton<IInvitationAttestationIssuer, InvitationAttestationIssuer>();
         builder.Services.AddSingleton<IInvitationEntryStateProtector, InvitationEntryStateProtector>();
         builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, InvitationAttestationConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, InviteConfigurationValidator>();
         builder.Services.AddSingleton<IInviteCompletion>(sp => new InviteCompletion(
             sp.GetRequiredService<IInviteTokenValidator>(),
             sp.GetRequiredService<IOptionsMonitor<Configuration.AuthProxy>>(),

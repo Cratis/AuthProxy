@@ -12,6 +12,23 @@ Use the lobby documentation based on the onboarding outcome you need:
 - [Registration](registration.md) — let a user start a self-serve registration flow that ends in
   organization creation. If the user should join an existing organization, invite them instead.
 
+## Shared invitation routing
+
+AuthProxy compares the validated invitation's configured `TenantClaim` value with the tenant resolved for the
+request. That equality is observational routing evidence, not issuer identity: it proves only that both observed
+values are equal. It does not prove which tenant issued the invitation, because any authority holding the invitation
+signing key can write the claim.
+
+| Observed tenant relation | `MatchingTenantInvitationDestination` | Successful completion destination |
+|--------------------------|---------------------------------------|-----------------------------------|
+| Matching | `ReturnUrl` (default) | The invitation challenge's return URL. |
+| Matching | `Lobby` | `Lobby.Frontend.BaseUrl`, with the invitation ID query parameter when enabled. |
+| Nonmatching | Either value | `Lobby.Frontend.BaseUrl` when configured; otherwise the return URL. |
+| Unresolved | Either value | `Lobby.Frontend.BaseUrl` when configured; otherwise the return URL. |
+
+The destination setting changes only the matching row. It does not change validation, staging, exchange, recipient
+binding, attestations, transaction consumption, cookies, or sessions.
+
 ## Shared configuration
 
 All lobby-related settings live under `Cratis:AuthProxy:Invite:Lobby`:

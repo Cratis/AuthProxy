@@ -82,18 +82,26 @@ class InviteCompletion(
     public bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl)
     {
         lobbyRedirectUrl = string.Empty;
-        if (IsTenantIssuedInvite(inviteToken, context))
+        var invite = config.CurrentValue.Invite;
+        var tenantRelation = ResolveInvitationTenantRelation(inviteToken, context);
+        var destination = tenantRelation == InvitationTenantRelation.Matching
+            ? invite?.MatchingTenantInvitationDestination ?? C.InvitationCompletionDestination.ReturnUrl
+            : C.InvitationCompletionDestination.Lobby;
+
+        if (destination == C.InvitationCompletionDestination.ReturnUrl)
         {
+            logger.InvitationCompletionDestinationSelected(destination, tenantRelation);
             return false;
         }
 
-        var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+        var lobbyUrl = invite?.Lobby?.Frontend?.BaseUrl;
         if (string.IsNullOrWhiteSpace(lobbyUrl))
         {
             return false;
         }
 
         lobbyRedirectUrl = BuildLobbyRedirectUrlWithInvitationId(lobbyUrl, inviteToken);
+        logger.InvitationCompletionDestinationSelected(destination, tenantRelation);
         return true;
     }
 
@@ -454,30 +462,31 @@ class InviteCompletion(
             : InviteExchangeResult.EmailMismatch;
     }
 
-    bool IsTenantIssuedInvite(string inviteToken, HttpContext context)
+    /// <summary>
+    /// Resolves the observed relation between the invitation's configured tenant claim and the tenant resolved
+    /// for the request.
+    /// </summary>
+    /// <param name="inviteToken">The validated invitation capability.</param>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns>The observed tenant relation.</returns>
+    /// <remarks>
+    /// Equality is observational routing evidence, not issuer identity. Any issuer holding the signing key can
+    /// write the tenant claim. A match proves only that the invitation names the tenant serving the request.
+    /// </remarks>
+    InvitationTenantRelation ResolveInvitationTenantRelation(string inviteToken, HttpContext context)
     {
         var tenantClaim = config.CurrentValue.Invite?.TenantClaim;
-        if (string.IsNullOrEmpty(tenantClaim))
+        if (string.IsNullOrEmpty(tenantClaim)
+            || !tokenValidator.TryGetClaim(inviteToken, tenantClaim, out var tokenTenantId)
+            || string.IsNullOrWhiteSpace(tokenTenantId)
+            || !TryResolveTenant(context, out var resolvedTenantId))
         {
-            return false;
+            return InvitationTenantRelation.Unresolved;
         }
 
-        if (!tokenValidator.TryGetClaim(inviteToken, tenantClaim, out var tokenTenantIdStr))
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(tokenTenantIdStr))
-        {
-            return false;
-        }
-
-        if (!TryResolveTenant(context, out var resolvedTenantId))
-        {
-            return false;
-        }
-
-        return string.Equals(tokenTenantIdStr, resolvedTenantId, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(tokenTenantId, resolvedTenantId, StringComparison.OrdinalIgnoreCase)
+            ? InvitationTenantRelation.Matching
+            : InvitationTenantRelation.NonMatching;
     }
 
     /// <summary>

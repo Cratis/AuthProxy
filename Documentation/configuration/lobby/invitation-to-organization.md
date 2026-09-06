@@ -1,8 +1,8 @@
 # Invitation to Organization
 
 Use this flow when you invite a user into an organization that already exists. AuthProxy still uses
-the standard `/invite/<token>` bootstrap, but the invite token carries tenant information so the
-user can continue directly into the application instead of being sent to the lobby.
+the standard `/invite/<token>` bootstrap, but a matching invitation tenant claim and the `ReturnUrl`
+destination let the user continue directly into the application instead of being sent to Lobby.
 
 ## Flow
 
@@ -18,12 +18,14 @@ user can continue directly into the application instead of being sent to the lob
    of `true`, one provider-derived assurance value, and the authentication-ticket issue time.
 6. AuthProxy calls `Invite.ExchangeUrl` with a signed `invite-complete` attestation. The JSON body contains only
    the opaque transaction ID; the browser and request body never supply identity authority.
-7. AuthProxy compares the configured `Invite.TenantClaim` from the token with the resolved tenant
-   for the request.
-8. If the tenant IDs match, AuthProxy skips the lobby redirect and continues to the target service.
+7. AuthProxy compares the configured `Invite.TenantClaim` from the token with the tenant resolved for the request.
+   Equality is observational routing evidence, not issuer identity: it does not prove which tenant issued the
+   invitation.
+8. If the tenant values match, `Invite.MatchingTenantInvitationDestination` selects `ReturnUrl` or `Lobby`.
+   `ReturnUrl` is the default and continues to the target service.
 
-If the tenant IDs do not match, or AuthProxy cannot resolve a tenant for the request, the invite is
-treated like lobby onboarding and falls back to the configured lobby behavior.
+If the tenant values differ, or AuthProxy cannot observe both values, the invitation selects Lobby when its frontend
+is configured. The matching-tenant enum does not change those rows of the shared routing matrix.
 
 ## Configuration
 
@@ -35,6 +37,7 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
         "StageUrl": "https://lobby.example.com/_invite/stage",
         "ExchangeUrl": "https://lobby.example.com/_invite/exchange",
         "TenantClaim": "tenant_id",
+        "MatchingTenantInvitationDestination": "ReturnUrl",
         "EmailClaim": "email",
         "Attestation": {
           "Issuer": "https://auth.example.com",
@@ -61,7 +64,8 @@ treated like lobby onboarding and falls back to the configured lobby behavior.
 |----------|------|-------------|
 | `StageUrl` | `string` | Absolute URL of the Lobby invitation authority's pre-authentication staging endpoint. Required when `Attestation` is configured. |
 | `ExchangeUrl` | `string` | Absolute URL of the same Lobby invitation authority's completion endpoint. |
-| `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID. |
+| `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID observed for routing. Equality with the resolved tenant does not identify the invitation issuer. |
+| `MatchingTenantInvitationDestination` | `InvitationCompletionDestination` | Destination for matching tenant values. `ReturnUrl` is the default; use `Lobby` to select `Lobby.Frontend.BaseUrl`. |
 | `EmailClaim` | `string` | Claim in the invite token that contains the invited email. Required by the signed protocol. |
 | `Attestation.Issuer` | `string` | Exact issuer the invitation authority validates. |
 | `Attestation.Audience` | `string` | Exact invitation-authority audience. |
@@ -130,7 +134,9 @@ identity tuple; `email` and `preferred_username` are not substitutes.
 
 > **Compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange for existing
 > deployments. That legacy mode is not sufficient authority for creating or linking an account. Enable the signed
-> protocol before an application treats invitation completion as identity proof.
+> protocol before an application treats invitation completion as identity proof. Independently,
+> `Invite.MatchingTenantInvitationDestination` defaults to `ReturnUrl`, preserving the released matching-tenant
+> redirect behavior.
 
 ## Rotate signing keys
 
