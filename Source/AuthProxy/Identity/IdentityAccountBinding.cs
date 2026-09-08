@@ -76,7 +76,7 @@ internal sealed record IdentityAccountBinding
     /// </summary>
     /// <param name="principal">The client principal to validate.</param>
     /// <param name="binding">The validated account binding when successful.</param>
-    /// <returns><see langword="true"/> when the principal is legacy without reserved claims or carries one valid canonical tuple; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when the principal is legacy without reserved claims and carries a non-blank, trimmed user identifier, or carries one valid canonical tuple; otherwise <see langword="false"/>.</returns>
     public static bool TryCreate(ClientPrincipal principal, out IdentityAccountBinding binding)
     {
         var reservedClaims = principal.Claims
@@ -85,6 +85,21 @@ internal sealed record IdentityAccountBinding
 
         if (reservedClaims.Length == 0)
         {
+            // A legacy binding is used as a shared memory-cache and per-account lock key in
+            // IdentityDetailsResolver, so an unidentifiable user identifier must never become a reusable
+            // one: an empty, whitespace-only, or untrimmed value is not a stable identity, and two
+            // different principals that both fail to supply a real one would otherwise collide on the same
+            // key and be handed each other's cached identity result. Mirroring the canonical guard above
+            // (TryGetSingleExactClaim), this fails closed rather than silently trimming - TryCreate returns
+            // false, the resolver sees no reusable binding, and the request resolves fresh against the
+            // identity endpoints every time instead of ever reading from or writing to the shared cache.
+            if (string.IsNullOrWhiteSpace(principal.UserId)
+                || !string.Equals(principal.UserId, principal.UserId.Trim(), StringComparison.Ordinal))
+            {
+                binding = null!;
+                return false;
+            }
+
             binding = new(LegacyKind, string.Empty, string.Empty, principal.UserId);
             return true;
         }
