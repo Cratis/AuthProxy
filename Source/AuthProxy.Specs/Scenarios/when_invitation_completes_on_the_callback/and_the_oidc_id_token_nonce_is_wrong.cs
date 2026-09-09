@@ -20,6 +20,7 @@ public class and_the_oidc_id_token_nonce_is_wrong(OidcCallbackAuthProxyFactory f
 
     public async Task InitializeAsync()
     {
+        factory.Reset();
         factory.SignWithWrongNonce = true;
 
         var token = TokenFixture.CreateToken(

@@ -26,10 +26,10 @@ public class and_the_oidc_provider_supplies_no_email(OidcCallbackAuthProxyFactor
 
     public async Task InitializeAsync()
     {
-        factory.Subject = OidcCallbackAuthProxyFactory.DefaultSubject;
+        factory.Reset();
         factory.IdentityClaims = new Dictionary<string, string>
         {
-            ["acr"] = "urn:mace:incommon:iap:silver",
+            ["acr"] = OidcCallbackAuthProxyFactory.DefaultAssurance,
         };
 
         var token = TokenFixture.CreateToken(

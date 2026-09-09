@@ -19,6 +19,8 @@ public class and_the_oidc_state_is_tampered(OidcCallbackAuthProxyFactory factory
 
     public async Task InitializeAsync()
     {
+        factory.Reset();
+
         var token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
             additionalClaims:

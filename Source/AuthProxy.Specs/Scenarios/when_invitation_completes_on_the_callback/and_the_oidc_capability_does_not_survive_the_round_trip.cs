@@ -22,6 +22,8 @@ public class and_the_oidc_capability_does_not_survive_the_round_trip(OidcCallbac
 
     public async Task InitializeAsync()
     {
+        factory.Reset();
+
         _token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
             additionalClaims: [new Claim("jti", Guid.NewGuid().ToString())]);

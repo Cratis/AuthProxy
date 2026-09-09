@@ -45,13 +45,23 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
     public const string CanonicalProviderKey = "testoidc";
     public const string SessionCookieName = ".Cratis.AuthProxy.Auth.v2";
     public const string DefaultSubject = "oidc-subject-1";
+    public const string DefaultEmail = "invitee@example.com";
+    public const string DefaultAssurance = "urn:mace:incommon:iap:silver";
+    public const string AttestationIssuer = "https://authproxy.test";
+    public const string AttestationAudience = "oidc-callback-spec";
+
+    const string AttestationKeyId = "oidc-callback-spec-key";
 
     readonly string _pagesPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
     readonly RSA _idpSigningKey = RSA.Create(2048);
     readonly string _idpKeyId = Guid.NewGuid().ToString("N");
     readonly HttpClient _idpBackchannel;
+    readonly RSA _attestationSigningKey = RSA.Create(2048);
     readonly string _attestationPrivateKeyPem;
-    int _exchangeCallCount;
+    readonly RsaSecurityKey _attestationVerificationKey;
+    readonly Lock _calls = new();
+    readonly List<AttestedCall> _stageCalls = [];
+    readonly List<AttestedCall> _exchangeCalls = [];
 
     /// <summary>
     /// The nonce only ever appears in the authorize redirect's query string - never in the token request -
@@ -70,8 +80,12 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
         File.WriteAllText(Path.Combine(_pagesPath, "invitation-email-mismatch.html"), "<html><body><h1>Email Mismatch</h1></body></html>");
         File.WriteAllText(Path.Combine(_pagesPath, "invitation-email-unavailable.html"), "<html><body><h1>Email Unavailable</h1></body></html>");
 
-        using var rsa = RSA.Create(2048);
-        _attestationPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem();
+        _attestationPrivateKeyPem = _attestationSigningKey.ExportPkcs8PrivateKeyPem();
+
+        // One long-lived verification key, built from exported parameters rather than a live RSA instance:
+        // Microsoft.IdentityModel caches signature providers per security key, so a per-call key wrapping a
+        // disposed RSA makes the second validation in a specification fail against a perfectly good signature.
+        _attestationVerificationKey = new RsaSecurityKey(_attestationSigningKey.ExportParameters(false)) { KeyId = AttestationKeyId };
 
         // Owned by the factory, not by the options: nothing in the OIDC options pipeline disposes an
         // externally supplied Backchannel, and the ConfigurationManager below keeps using it for the whole
@@ -81,15 +95,43 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
 
     public (RsaSecurityKey PrivateKey, string PublicKeyPem) InviteKeyPair { get; } = TokenFixture.GenerateKeyPair();
 
-    public int ExchangeCallCount => _exchangeCallCount;
+    public int ExchangeCallCount
+    {
+        get
+        {
+            lock (_calls)
+            {
+                return _exchangeCalls.Count;
+            }
+        }
+    }
+
+    /// <summary>Gets the calls the proxy made to the staging endpoint, in order.</summary>
+    public IReadOnlyList<AttestedCall> StageCalls
+    {
+        get
+        {
+            lock (_calls)
+            {
+                return [.. _stageCalls];
+            }
+        }
+    }
+
+    /// <summary>Gets the calls the proxy made to the completion exchange endpoint, in order.</summary>
+    public IReadOnlyList<AttestedCall> ExchangeCalls
+    {
+        get
+        {
+            lock (_calls)
+            {
+                return [.. _exchangeCalls];
+            }
+        }
+    }
 
     /// <summary>Gets or sets the claims the fake identity provider's id_token and userinfo response carry, beyond <c language="text">sub</c>/<c language="text">nonce</c>/<c language="text">at_hash</c>.</summary>
-    public IReadOnlyDictionary<string, string> IdentityClaims { get; set; } = new Dictionary<string, string>
-    {
-        ["email"] = "invitee@example.com",
-        ["email_verified"] = "true",
-        ["acr"] = "urn:mace:incommon:iap:silver",
-    };
+    public IReadOnlyDictionary<string, string> IdentityClaims { get; set; } = DefaultIdentityClaims();
 
     /// <summary>Gets or sets the provider subject the fake identity provider asserts.</summary>
     public string Subject { get; set; } = DefaultSubject;
@@ -107,6 +149,59 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
     /// <returns>The cookie pairs, ready for a <c language="text">Cookie</c> request header.</returns>
     public static IReadOnlyList<string> CookiesFrom(HttpResponseMessage response) =>
         CallbackAuthProxyFactory.CookiesFrom(response);
+
+    /// <summary>
+    /// Computes the base64url-encoded SHA-256 capability hash of an invitation, independently of the proxy.
+    /// </summary>
+    /// <param name="capability">The invitation capability.</param>
+    /// <returns>The capability hash the attestation is expected to carry.</returns>
+    public static string CapabilityHashOf(string capability) =>
+        Base64UrlEncode(SHA256.HashData(Encoding.UTF8.GetBytes(capability)));
+
+    /// <summary>
+    /// Restores every mutable knob to its default and forgets the calls recorded so far, so one specification
+    /// can never inherit another's identity provider behavior.
+    /// </summary>
+    public void Reset()
+    {
+        Subject = DefaultSubject;
+        IdentityClaims = DefaultIdentityClaims();
+        SignWithWrongNonce = false;
+        lock (_calls)
+        {
+            _stageCalls.Clear();
+            _exchangeCalls.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Validates an attestation the way the receiving backend must: against the exact signing key, issuer,
+    /// audience, algorithm and lifetime the proxy is configured with, never by decoding it unverified.
+    /// </summary>
+    /// <param name="attestation">The attestation bearer token to validate.</param>
+    /// <returns>The validated claims.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the attestation does not validate.</exception>
+    public async Task<IReadOnlyDictionary<string, string>> ValidateAttestation(string attestation)
+    {
+        var result = await new JsonWebTokenHandler().ValidateTokenAsync(attestation, new TokenValidationParameters
+        {
+            ValidIssuer = AttestationIssuer,
+            ValidAudience = AttestationAudience,
+            IssuerSigningKey = _attestationVerificationKey,
+            ValidAlgorithms = [SecurityAlgorithms.RsaSha256],
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+        });
+
+        if (!result.IsValid)
+        {
+            throw new InvalidOperationException("The attestation did not validate against the configured key, issuer and audience.", result.Exception);
+        }
+
+        return result.ClaimsIdentity.Claims.ToDictionary(claim => claim.Type, claim => claim.Value, StringComparer.Ordinal);
+    }
 
     /// <summary>
     /// Creates an <see cref="HttpClient"/> that does not follow redirects, so every hop of the flow can be
@@ -174,10 +269,10 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
             [$"{C.AuthProxy.SectionKey}:Invite:Lobby:Frontend:BaseUrl"] = LobbyUrl,
             [$"{C.AuthProxy.SectionKey}:Invite:MatchingTenantInvitationDestination"] = nameof(C.InvitationCompletionDestination.Lobby),
             [$"{C.AuthProxy.SectionKey}:Invite:AppendInvitationIdToQueryString"] = "true",
-            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:Issuer"] = "https://authproxy.test",
-            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:Audience"] = "oidc-callback-spec",
-            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:ActiveKeyId"] = "oidc-callback-spec-key",
-            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:SigningKeys:0:KeyId"] = "oidc-callback-spec-key",
+            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:Issuer"] = AttestationIssuer,
+            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:Audience"] = AttestationAudience,
+            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:ActiveKeyId"] = AttestationKeyId,
+            [$"{C.AuthProxy.SectionKey}:Invite:Attestation:SigningKeys:0:KeyId"] = AttestationKeyId,
             [$"{C.AuthProxy.SectionKey}:Invite:Attestation:SigningKeys:0:PrivateKeyPem"] = _attestationPrivateKeyPem,
             [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Strategy"] = nameof(C.TenantSourceIdentifierResolverType.Specified),
             [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Options:TenantId"] = TenantId,
@@ -213,18 +308,19 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
                     new HttpDocumentRetriever(_idpBackchannel) { RequireHttps = true });
             });
 
-            services.AddSingleton<IHttpClientFactory>(new TestHttpClientFactory(request =>
+            services.AddSingleton<IHttpClientFactory>(new TestHttpClientFactory(async (request, cancellationToken) =>
             {
                 var url = request.RequestUri?.ToString() ?? string.Empty;
 
                 if (url.StartsWith(StageUrl, StringComparison.OrdinalIgnoreCase))
                 {
+                    await Record(_stageCalls, request, cancellationToken);
                     return new HttpResponseMessage(HttpStatusCode.OK);
                 }
 
                 if (url.StartsWith(ExchangeUrl, StringComparison.OrdinalIgnoreCase))
                 {
-                    Interlocked.Increment(ref _exchangeCallCount);
+                    await Record(_exchangeCalls, request, cancellationToken);
                     return new HttpResponseMessage(HttpStatusCode.OK);
                 }
 
@@ -241,6 +337,7 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
         {
             _idpBackchannel.Dispose();
             _idpSigningKey.Dispose();
+            _attestationSigningKey.Dispose();
             if (Directory.Exists(_pagesPath))
             {
                 Directory.Delete(_pagesPath, recursive: true);
@@ -263,6 +360,20 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
     }
 
     static string Base64UrlEncode(byte[] bytes) => Base64UrlEncoder.Encode(bytes);
+
+    static Dictionary<string, string> DefaultIdentityClaims() => new()
+    {
+        ["email"] = DefaultEmail,
+        ["email_verified"] = "true",
+        ["acr"] = DefaultAssurance,
+    };
+
+    /// <summary>
+    /// One call the proxy made to an invitation endpoint, as the receiving backend would have seen it.
+    /// </summary>
+    /// <param name="Bearer">The attestation presented in the <c language="text">Authorization</c> header.</param>
+    /// <param name="Body">The request body.</param>
+    public sealed record AttestedCall(string Bearer, string Body);
 
     /// <summary>One full provider round trip: the challenge, the callback, and the cookies each set.</summary>
     /// <param name="Challenge">The response that redirected the browser to the identity provider.</param>
@@ -347,6 +458,17 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
         };
     }
 
+    async Task Record(List<AttestedCall> calls, HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var call = new AttestedCall(
+            request.Headers.Authorization?.Parameter ?? string.Empty,
+            request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken));
+        lock (_calls)
+        {
+            calls.Add(call);
+        }
+    }
+
     string CreateIdToken(string accessToken, string nonce)
     {
         var claims = new Dictionary<string, object>(StringComparer.Ordinal);
@@ -380,15 +502,15 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
         return Base64UrlEncode(half);
     }
 
-    sealed class TestHttpClientFactory(Func<HttpRequestMessage, HttpResponseMessage> handler) : IHttpClientFactory
+    sealed class TestHttpClientFactory(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) =>
             new(new DispatchingHandler(handler)) { Timeout = TimeSpan.FromSeconds(10) };
 
-        sealed class DispatchingHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
+        sealed class DispatchingHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-                Task.FromResult(handler(request));
+                handler(request, cancellationToken);
         }
     }
 }

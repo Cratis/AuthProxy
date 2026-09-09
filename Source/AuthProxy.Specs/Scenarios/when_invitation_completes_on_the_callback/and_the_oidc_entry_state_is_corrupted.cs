@@ -28,6 +28,8 @@ public class and_the_oidc_entry_state_is_corrupted(OidcCallbackAuthProxyFactory 
 
     public async Task InitializeAsync()
     {
+        factory.Reset();
+
         _invitationId = Guid.NewGuid().ToString();
         var token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,

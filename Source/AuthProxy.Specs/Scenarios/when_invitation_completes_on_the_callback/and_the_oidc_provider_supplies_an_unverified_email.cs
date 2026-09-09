@@ -26,12 +26,12 @@ public class and_the_oidc_provider_supplies_an_unverified_email(OidcCallbackAuth
 
     public async Task InitializeAsync()
     {
-        factory.Subject = OidcCallbackAuthProxyFactory.DefaultSubject;
+        factory.Reset();
         factory.IdentityClaims = new Dictionary<string, string>
         {
-            ["email"] = "invitee@example.com",
+            ["email"] = OidcCallbackAuthProxyFactory.DefaultEmail,
             ["email_verified"] = "false",
-            ["acr"] = "urn:mace:incommon:iap:silver",
+            ["acr"] = OidcCallbackAuthProxyFactory.DefaultAssurance,
         };
 
         var token = TokenFixture.CreateToken(
