@@ -59,7 +59,7 @@ public class HeaderAuthenticationHandler(
     /// <summary>
     /// Encodes claim declarations so a spec can put them on <see cref="EncodedClaimsHeader"/>.
     /// </summary>
-    /// <param name="declarations">The <c>type=value</c> pairs, separated by semicolons.</param>
+    /// <param name="declarations">The <c language="text">type=value</c> pairs, separated by semicolons.</param>
     /// <returns>The declarations in the form the header carries.</returns>
     public static string EncodeClaims(string declarations) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes(declarations));

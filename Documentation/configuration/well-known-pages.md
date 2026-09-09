@@ -24,7 +24,7 @@ condition is detected:
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
 | `invitation-email-unavailable.html` | Gateway email binding is enabled (`Invite.EmailClaim`), but the identity provider supplied no authenticated-session email address (Phase 2). | 403 |
-| `invitation-email-mismatch.html` | Gateway email binding is enabled (`Invite.EmailClaim`), and the identity provider supplied another address or explicitly reported `email_verified=false` (Phase 2). | 403 |
+| `invitation-email-mismatch.html` | Gateway email binding is enabled (`Invite.EmailClaim`), and the identity provider supplied another address or did not report the address as verified (Phase 2). With `Invite.Attestation` configured, a missing, duplicated, malformed or non-`true` `email_verified` claim counts as not verified. | 403 |
 | `link-select-provider.html` | The embeddable provider-selection page of the [credential-link flow](link.md), served at `/.cratis/link`. Lists providers, opens the chosen provider's link challenge in a top-level window, and reports the outcome to its embedding parent. | 200 |
 | `link-complete.html` | A credential link completed, at `/.cratis/link/complete`. Broadcasts the completion on the link flow's `BroadcastChannel` and closes its window. | 200 |
 | `link-failed.html` | A credential link did not complete — the provider round-trip failed or the exchange was refused (see [Credential Linking](link.md)). Broadcasts the failure so an embedding selection page can offer a retry. | 403 |
@@ -122,8 +122,14 @@ indicating that the authenticated user's subject is already associated with an e
 
 Served during Phase 2 (post-login invite exchange) when gateway email binding is enabled — the
 `Invite.EmailClaim` claim is configured — the invite token was issued for a specific email address — and
-the provider supplied another address or explicitly reported `email_verified=false`. This is distinct from
+the provider supplied another address or did not report the address as verified. This is distinct from
 a provider that supplied no address at all.
+
+What counts as unverified depends on the mode. In the legacy unsigned exchange (no `Invite.Attestation`) only
+an explicit `email_verified=false` mismatches, and an absent claim is forwarded as `null` for the backend to
+judge. With `Invite.Attestation` configured, completion fails closed: only a single `email_verified` claim
+parsing to exactly `true` counts as verified, so a missing, duplicated, malformed or non-`true` claim is
+answered with this page as well.
 
 ### `invitation-email-unavailable.html`
 

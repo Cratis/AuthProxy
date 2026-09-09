@@ -4,13 +4,13 @@
 namespace Cratis.AuthProxy.Security.for_TrustedProxies;
 
 /// <summary>
-/// OWASP A05 — Security Misconfiguration. A spoofed scheme must not reach the <c>Secure</c> flag on a cookie.
+/// OWASP A05 — Security Misconfiguration. A spoofed scheme must not reach the <c language="text">Secure</c> flag on a cookie.
 /// <para>
-/// Eleven places in AuthProxy set a cookie's <c>Secure</c> flag from <c>Request.IsHttps</c>, which forwarded
+/// Eleven places in AuthProxy set a cookie's <c language="text">Secure</c> flag from <c language="text">Request.IsHttps</c>, which forwarded
 /// headers decide. The direction that matters is the one asserted here, and it is the quiet one: a caller
-/// that can spoof the scheme <em>upward</em> makes an unencrypted deployment mark its cookies <c>Secure</c>,
+/// that can spoof the scheme <em>upward</em> makes an unencrypted deployment mark its cookies <c language="text">Secure</c>,
 /// and a browser then silently withholds them — a session that stops working for reasons no log explains. The
-/// mirror image is worse and is the same defect: honoring a downward spoof would strip <c>Secure</c> from a
+/// mirror image is worse and is the same defect: honoring a downward spoof would strip <c language="text">Secure</c> from a
 /// session that genuinely is encrypted, leaving it working perfectly and unprotected.
 /// </para>
 /// <para>

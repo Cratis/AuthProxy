@@ -45,13 +45,13 @@ public class CanonicalIdentity
 
     /// <summary>
     /// Gets or sets the exact provider-derived claim type that supplies the email address for an invitation
-    /// attestation. The default is <c>email</c>.
+    /// attestation. The default is <c language="text">email</c>.
     /// </summary>
     public string EmailClaimType { get; set; } = "email";
 
     /// <summary>
     /// Gets or sets the exact provider-derived claim type that proves the email address is verified.
-    /// The claim must occur exactly once with the value <see langword="true"/>. The default is <c>email_verified</c>.
+    /// The claim must occur exactly once with the value <see langword="true"/>. The default is <c language="text">email_verified</c>.
     /// </summary>
     public string EmailVerifiedClaimType { get; set; } = "email_verified";
 
@@ -59,7 +59,7 @@ public class CanonicalIdentity
     /// Gets or sets the exact provider-derived claim type that describes authentication assurance.
     /// </summary>
     /// <remarks>
-    /// OIDC providers commonly use <c>acr</c>. OAuth providers can map a trustworthy user-information field to
+    /// OIDC providers commonly use <c language="text">acr</c>. OAuth providers can map a trustworthy user-information field to
     /// this claim. AuthProxy refuses an invitation completion when the configured claim is missing or ambiguous.
     /// </remarks>
     public string AssuranceClaimType { get; set; } = "acr";

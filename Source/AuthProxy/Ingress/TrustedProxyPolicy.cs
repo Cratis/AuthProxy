@@ -82,7 +82,7 @@ public class TrustedProxyPolicy(IOptions<C.Ingress> ingress) : ITrustedProxyPoli
     /// <returns><see langword="true"/> when the address is inside a declared network; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// A dual-stack socket reports an IPv4 peer as its IPv6-mapped form, so an operator who declared
-    /// <c>10.0.0.0/8</c> would otherwise see none of their own traffic match. The forwarded-headers
+    /// <c language="text">10.0.0.0/8</c> would otherwise see none of their own traffic match. The forwarded-headers
     /// middleware unmaps for exactly the same reason.
     /// </remarks>
     bool Matches(IPAddress peer) =>

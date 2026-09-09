@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Authentication.for_GitHubMembershipClaimsEnricher;
 /// refuses with an explanation — the fail-closed direction reached the gentle way.
 /// </para>
 /// <para>
-/// GitHub genuinely answers this way: <c>/user/teams</c> is <c>403</c> for a token without the scope, and
+/// GitHub genuinely answers this way: <c language="text">/user/teams</c> is <c language="text">403</c> for a token without the scope, and
 /// a network fault mid-handshake looks the same.
 /// </para>
 /// </summary>

@@ -153,12 +153,12 @@ class InviteCompletion(
     /// </summary>
     /// <param name="principal">The authenticated principal completing the invitation.</param>
     /// <param name="emailVerified">
-    /// The value of the provider's <c>email_verified</c> claim when present; otherwise <see langword="null"/>.
+    /// The value of the provider's <c language="text">email_verified</c> claim when present; otherwise <see langword="null"/>.
     /// </param>
     /// <returns>The authenticated email, or an empty string when none is available.</returns>
     /// <remarks>
-    /// <c>preferred_username</c> is a username, not an address — for a GitHub OAuth provider it is conventionally
-    /// mapped from <c>login</c>. It is read only when it actually holds an address, which several OIDC providers
+    /// <c language="text">preferred_username</c> is a username, not an address — for a GitHub OAuth provider it is conventionally
+    /// mapped from <c language="text">login</c>. It is read only when it actually holds an address, which several OIDC providers
     /// put there (Entra's is the user principal name). Returning a login name here would make a provider that
     /// supplied no address at all indistinguishable from one that supplied somebody else's.
     /// </remarks>
@@ -195,50 +195,48 @@ class InviteCompletion(
     static bool FixedTimeEquals(string expected, string actual) =>
         CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(actual));
 
-    async Task<InviteExchangeResult> CompleteAttestedInvitation(HttpContext context, string inviteToken, Func<Task<InvitationCompletionSession>> sessionFactory)
+    /// <summary>Logs and maps a failed verified-identity resolution to its outward exchange outcome.</summary>
+    /// <param name="logger">The logger to record the failure on.</param>
+    /// <param name="identityResolution">The failed <see cref="VerifiedIdentityResolution"/>.</param>
+    /// <returns>The <see cref="InviteExchangeResult"/> to answer the caller with.</returns>
+    static InviteExchangeResult LogAndMapIdentityFailure(ILogger logger, VerifiedIdentityResolution identityResolution)
     {
-        var invite = config.CurrentValue.Invite;
-        if (invite is null
-            || canonicalIdentityResolver is null
-            || attestationIssuer is null
-            || entryStateProtector is null
-            || inviteToken.Length > MaximumAttestedInvitationTokenLength
-            || !context.Request.Cookies.TryGetValue(Cookies.InvitationEntryState, out var protectedState)
-            || !entryStateProtector.TryUnprotect(protectedState, out var entryState)
-            || entryState.ExpiresAt <= DateTimeOffset.UtcNow
-            || !FixedTimeEquals(entryState.CapabilityHash, InvitationAuthenticationState.ComputeCapabilityHash(inviteToken))
-            || !TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !FixedTimeEquals(entryState.InvitationId, invitationId)
-            || string.IsNullOrWhiteSpace(invite.TenantClaim)
-            || !TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
-            || !FixedTimeEquals(entryState.TenantId, tenantId)
-            || !InviteMiddleware.TryResolveRecipientMode(inviteToken, invite.EmailClaim, out var recipientProviderKey)
-            || !ResolvedTenantMatchesWhenPresent(context, tenantId))
+        if (identityResolution.EmailOutcome == InviteExchangeResult.EmailMismatch)
         {
-            return InviteExchangeResult.Failed;
+            logger.InviteEmailMismatch();
+            return InviteExchangeResult.EmailMismatch;
         }
 
-        var session = await sessionFactory();
-        if (!session.Succeeded
-            || !InvitationAuthenticationState.Matches(entryState, session.Properties)
-            || !TryResolveVerifiedIdentity(session, recipientProviderKey, out var identity)
-            || (string.IsNullOrEmpty(recipientProviderKey)
-                && EvaluateInvitedEmailBinding(inviteToken, identity.Email!, true) != InviteExchangeResult.Success)
-            || !attestationIssuer.TryIssueComplete(entryState, identity, out var attestation))
+        if (identityResolution.EmailOutcome == InviteExchangeResult.EmailUnavailable)
         {
-            return InviteExchangeResult.Failed;
+            logger.InviteEmailUnavailable();
+            return InviteExchangeResult.EmailUnavailable;
         }
 
+        logger.AttestedInvitationCompletionFailed(identityResolution.Reason);
+        return InviteExchangeResult.Failed;
+    }
+
+    /// <summary>Calls the invitation exchange endpoint with a freshly issued attestation.</summary>
+    /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
+    /// <param name="logger">The logger to record the outcome on.</param>
+    /// <param name="context">The current <see cref="HttpContext"/>, consulted only for its cancellation token.</param>
+    /// <param name="entryResolution">The succeeded <see cref="EntryStateResolution"/> naming the exchange URL and transaction.</param>
+    /// <param name="attestation">The signed attestation bearer token.</param>
+    /// <returns>The outcome of the exchange call.</returns>
+    static async Task<InviteExchangeResult> SendAttestedExchangeRequest(IHttpClientFactory httpClientFactory, ILogger logger, HttpContext context, EntryStateResolution entryResolution, string attestation)
+    {
         using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, invite.ExchangeUrl);
+        using var request = new HttpRequestMessage(HttpMethod.Post, entryResolution.Invite.ExchangeUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
-        request.Content = JsonContent.Create(new InvitationCompleteRequest(entryState.InvitationTransaction));
+        request.Content = JsonContent.Create(new InvitationCompleteRequest(entryResolution.EntryState.InvitationTransaction));
 
         try
         {
             using var response = await client.SendAsync(request, context.RequestAborted);
             if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
+                logger.InviteSubjectAlreadyExists();
                 return InviteExchangeResult.DuplicateSubject;
             }
 
@@ -253,71 +251,285 @@ class InviteCompletion(
         }
         catch (Exception exception)
         {
-            logger.FailedToCallInviteExchangeEndpoint(exception, invite.ExchangeUrl);
+            logger.FailedToCallInviteExchangeEndpoint(exception, entryResolution.Invite.ExchangeUrl);
             return InviteExchangeResult.Failed;
         }
     }
 
-    bool TryResolveVerifiedIdentity(
-        InvitationCompletionSession session,
-        string recipientProviderKey,
-        out InvitationVerifiedIdentity identity)
+    /// <summary>
+    /// Resolves an email-targeted recipient's verified identity, enforcing the strict single-explicit-true
+    /// email_verified claim requirement described on <see cref="ResolveVerifiedIdentity"/>.
+    /// </summary>
+    /// <param name="principal">The authenticated principal.</param>
+    /// <param name="provider">The single configured canonical identity provider matching the resolved provider key.</param>
+    /// <param name="canonical">The resolved canonical federated identity.</param>
+    /// <param name="invitedEmail">The invited email captured with the entry state, before the session was awaited.</param>
+    /// <param name="assurance">The provider-supplied authentication assurance evidence.</param>
+    /// <param name="authenticatedAt">The session's authentication-time evidence.</param>
+    /// <returns>The resolved <see cref="VerifiedIdentityResolution"/>.</returns>
+    /// <remarks>
+    /// Every requirement here is unconditional: the recipient is the one captured at entry, the provider must
+    /// supply exactly one well-formed address, and that address must be explicitly verified. Nothing is read
+    /// from the configuration monitor at this point - the method is static so it cannot be - so a reload
+    /// between the entry stage and here can neither widen the binding into an unbound invitation nor rename
+    /// the claim a different recipient would be read from. The completion matches the captured recipient or
+    /// fails closed.
+    /// </remarks>
+    static VerifiedIdentityResolution ResolveEmailTargetedIdentity(
+        ClaimsPrincipal principal, C.CanonicalIdentity provider, CanonicalFederatedIdentity canonical, string invitedEmail, string assurance, DateTimeOffset authenticatedAt)
     {
-        identity = default!;
+        if (!provider.InvitationCompletionEnabled)
+        {
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.EmailCompletionDisabledForProvider);
+        }
+
+        if (!InviteMiddleware.IsAnEmailAddress(invitedEmail))
+        {
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.RecipientModeInvalid);
+        }
+
+        if (!TryGetSingleExactClaim(principal, provider.EmailClaimType, out var email)
+            || !InviteMiddleware.IsAnEmailAddress(email))
+        {
+            return VerifiedIdentityResolution.EmailUnavailable;
+        }
+
+        if (!TryGetSingleExactClaim(principal, provider.EmailVerifiedClaimType, out var rawEmailVerified)
+            || !bool.TryParse(rawEmailVerified, out var emailVerified)
+            || !emailVerified
+            || !string.Equals(invitedEmail, email, StringComparison.OrdinalIgnoreCase))
+        {
+            return VerifiedIdentityResolution.EmailMismatch;
+        }
+
+        return VerifiedIdentityResolution.Success(new InvitationVerifiedIdentity(
+            canonical.ProviderKey, canonical.NormalizedIssuer, canonical.Subject, email, assurance, authenticatedAt));
+    }
+
+    async Task<InviteExchangeResult> CompleteAttestedInvitation(HttpContext context, string inviteToken, Func<Task<InvitationCompletionSession>> sessionFactory)
+    {
+        var entryResolution = ResolveEntryState(context, inviteToken);
+        if (!entryResolution.Succeeded)
+        {
+            logger.AttestedInvitationCompletionFailed(entryResolution.Reason);
+            return InviteExchangeResult.Failed;
+        }
+
+        var session = await sessionFactory();
+        if (!session.Succeeded)
+        {
+            logger.AttestedInvitationCompletionFailed(InvitationCompletionFailureReason.SessionNotEstablished);
+            return InviteExchangeResult.Failed;
+        }
+
+        if (!InvitationAuthenticationState.Matches(entryResolution.EntryState, session.Properties))
+        {
+            logger.AttestedInvitationCompletionFailed(InvitationCompletionFailureReason.ChallengeBindingMismatch);
+            return InviteExchangeResult.Failed;
+        }
+
+        var identityResolution = ResolveVerifiedIdentity(session, entryResolution);
+        if (!identityResolution.Succeeded)
+        {
+            return LogAndMapIdentityFailure(logger, identityResolution);
+        }
+
+        if (!attestationIssuer!.TryIssueComplete(entryResolution.EntryState, identityResolution.Identity, out var attestation))
+        {
+            logger.AttestedInvitationCompletionFailed(InvitationCompletionFailureReason.AttestationIssuanceFailed);
+            return InviteExchangeResult.Failed;
+        }
+
+        return await SendAttestedExchangeRequest(httpClientFactory, logger, context, entryResolution, attestation);
+    }
+
+    /// <summary>
+    /// Same guard order as the original compound condition; split into named stages only so each one can
+    /// report its own bounded reason instead of a single collapsed boolean.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="inviteToken">The invitation capability presented on the request.</param>
+    /// <returns>The resolved <see cref="EntryStateResolution"/>.</returns>
+    EntryStateResolution ResolveEntryState(HttpContext context, string inviteToken)
+    {
+        var invite = config.CurrentValue.Invite;
+        if (invite is null || canonicalIdentityResolver is null || attestationIssuer is null || entryStateProtector is null)
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.ProtocolMisconfigured);
+        }
+
+        if (inviteToken.Length > MaximumAttestedInvitationTokenLength)
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.CapabilityTokenTooLong);
+        }
+
+        if (!context.Request.Cookies.TryGetValue(Cookies.InvitationEntryState, out var protectedState)
+            || !entryStateProtector.TryUnprotect(protectedState, out var entryState))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.EntryStateUnprotectFailed);
+        }
+
+        if (entryState.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.EntryStateExpired);
+        }
+
+        if (!FixedTimeEquals(entryState.CapabilityHash, InvitationAuthenticationState.ComputeCapabilityHash(inviteToken)))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.CapabilityHashMismatch);
+        }
+
+        if (!TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.InvitationIdClaimInvalid);
+        }
+
+        if (!FixedTimeEquals(entryState.InvitationId, invitationId))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.InvitationIdMismatch);
+        }
+
+        return ResolveTenantScopedEntryState(context, invite, entryState, inviteToken);
+    }
+
+    /// <summary>
+    /// Continues the entry-state guard chain once capability and invitation-id evidence have checked out,
+    /// resolving the tenant-scoped facts and the recipient mode.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="invite">The resolved invite configuration.</param>
+    /// <param name="entryState">The unprotected invitation-entry state.</param>
+    /// <param name="inviteToken">The invitation capability presented on the request.</param>
+    /// <returns>The resolved <see cref="EntryStateResolution"/>.</returns>
+    EntryStateResolution ResolveTenantScopedEntryState(HttpContext context, C.Invite invite, InvitationEntryState entryState, string inviteToken)
+    {
+        if (string.IsNullOrWhiteSpace(invite.TenantClaim))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.TenantClaimNotConfigured);
+        }
+
+        if (!TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.TenantClaimInvalid);
+        }
+
+        if (!FixedTimeEquals(entryState.TenantId, tenantId))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.TenantIdMismatch);
+        }
+
+        if (!InviteMiddleware.TryResolveRecipientMode(inviteToken, invite.EmailClaim, out var recipientProviderKey))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.RecipientModeInvalid);
+        }
+
+        var invitedEmail = string.Empty;
+        if (string.IsNullOrEmpty(recipientProviderKey)
+            && (!TryGetSingleTokenClaim(inviteToken, invite.EmailClaim, out invitedEmail)
+                || !InviteMiddleware.IsAnEmailAddress(invitedEmail)))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.RecipientModeInvalid);
+        }
+
+        if (!ResolvedTenantMatchesWhenPresent(context, tenantId))
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.RequestTenantMismatch);
+        }
+
+        return EntryStateResolution.Success(invite, entryState, recipientProviderKey, invitedEmail);
+    }
+
+    /// <summary>
+    /// Resolves the verified identity an attested completion may be issued for, against the recipient facts
+    /// captured by <see cref="ResolveEntryState"/> before the session was awaited.
+    /// </summary>
+    /// <param name="session">The completion session carrying the authenticated principal.</param>
+    /// <param name="entryResolution">The succeeded entry-state resolution carrying the captured recipient facts.</param>
+    /// <returns>The resolved <see cref="VerifiedIdentityResolution"/>.</returns>
+    /// <remarks>
+    /// Unlike the legacy protocol's <see cref="EvaluateInvitedEmailBinding"/> call below, a missing/duplicated/
+    /// unparseable email_verified claim is never treated as acceptable here - only a single claim parsing to
+    /// exactly true counts as verified; anything else is evaluated as unverified, exactly like an explicit "false".
+    /// </remarks>
+    VerifiedIdentityResolution ResolveVerifiedIdentity(InvitationCompletionSession session, EntryStateResolution entryResolution)
+    {
         var principal = session.Principal;
         if (principal is null)
         {
-            return false;
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.PrincipalMissing);
         }
 
-        var resolution = canonicalIdentityResolver!.Resolve(principal, principal.Identity?.AuthenticationType);
-        if (!resolution.IsConfigured || !resolution.Succeeded || resolution.Identity is null)
+        // The scheme is asserted, never read off the principal: by this point in both call sites - a
+        // re-authenticated cookie session, or a ticket about to be signed into that same cookie scheme -
+        // the principal is already the once-canonicalized cookie identity, not a fresh provider callback.
+        // A protocol-dependent artifact like ClaimsIdentity.AuthenticationType (OIDC's default identity
+        // carries "AuthenticationTypes.Federation", never the provider's scheme name or "Cookies") must
+        // never stand in for that server-owned fact, upstream Cratis/AuthProxy#122.
+        var resolution = canonicalIdentityResolver!.Resolve(principal, CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!resolution.IsConfigured)
         {
-            return false;
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.CanonicalIdentityNotConfigured);
         }
 
-        var canonical = resolution.Identity;
-        var providers = authConfig.CurrentValue.OidcProviders
+        if (!resolution.Succeeded || resolution.Identity is null)
+        {
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.CanonicalIdentityResolutionFailed);
+        }
+
+        return ResolveVerifiedIdentityForCanonical(principal, session, entryResolution, resolution.Identity);
+    }
+
+    /// <summary>
+    /// Continues verified-identity resolution once the canonical identity itself has resolved: locates the
+    /// single configured provider matching its provider key, then resolves the recipient-mode-specific facts.
+    /// </summary>
+    /// <param name="principal">The authenticated principal.</param>
+    /// <param name="session">The completion session carrying the authentication-time evidence.</param>
+    /// <param name="entryResolution">The succeeded entry-state resolution carrying the captured recipient facts.</param>
+    /// <param name="canonical">The resolved canonical federated identity.</param>
+    /// <returns>The resolved <see cref="VerifiedIdentityResolution"/>.</returns>
+    VerifiedIdentityResolution ResolveVerifiedIdentityForCanonical(
+        ClaimsPrincipal principal, InvitationCompletionSession session, EntryStateResolution entryResolution, CanonicalFederatedIdentity canonical)
+    {
+        // One snapshot answers both provider questions: two reads of the monitor could disagree and admit a
+        // provider that never appeared in a single configuration state.
+        var authentication = authConfig.CurrentValue;
+        var providers = authentication.OidcProviders
             .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
             .Select(_ => _.CanonicalIdentity!)
-            .Concat(authConfig.CurrentValue.OAuthProviders
+            .Concat(authentication.OAuthProviders
                 .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
                 .Select(_ => _.CanonicalIdentity!))
             .ToArray();
-        if (providers.Length != 1
-            || !TryGetSingleExactClaim(principal, providers[0].AssuranceClaimType, out var assurance)
+        if (providers.Length != 1)
+        {
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.ProviderConfigurationAmbiguous);
+        }
+
+        var provider = providers[0];
+        if (!TryGetSingleExactClaim(principal, provider.AssuranceClaimType, out var assurance)
             || session.AuthenticatedAt is not { } authenticatedAt)
         {
-            return false;
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.AssuranceEvidenceUnavailable);
         }
 
-        string? email = null;
-        if (string.IsNullOrEmpty(recipientProviderKey))
+        if (string.IsNullOrEmpty(entryResolution.RecipientProviderKey))
         {
-            if (!providers[0].InvitationCompletionEnabled
-                || !TryGetSingleExactClaim(principal, providers[0].EmailClaimType, out email)
-                || !InviteMiddleware.IsAnEmailAddress(email)
-                || !TryGetSingleExactClaim(principal, providers[0].EmailVerifiedClaimType, out var emailVerified)
-                || !bool.TryParse(emailVerified, out var verified)
-                || !verified)
-            {
-                return false;
-            }
-        }
-        else if (!providers[0].InvitationIdentityBindingCompletionEnabled
-                 || !FixedTimeEquals(canonical.ProviderKey, recipientProviderKey))
-        {
-            return false;
+            return ResolveEmailTargetedIdentity(principal, provider, canonical, entryResolution.InvitedEmail, assurance, authenticatedAt);
         }
 
-        identity = new InvitationVerifiedIdentity(
-            canonical.ProviderKey,
-            canonical.NormalizedIssuer,
-            canonical.Subject,
-            email,
-            assurance,
-            authenticatedAt);
-        return true;
+        if (!provider.InvitationIdentityBindingCompletionEnabled)
+        {
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.IdentityBindingCompletionDisabled);
+        }
+
+        if (!FixedTimeEquals(canonical.ProviderKey, entryResolution.RecipientProviderKey))
+        {
+            return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.IdentityBindingProviderMismatch);
+        }
+
+        return VerifiedIdentityResolution.Success(new InvitationVerifiedIdentity(
+            canonical.ProviderKey, canonical.NormalizedIssuer, canonical.Subject, null, assurance, authenticatedAt));
     }
 
     async Task<InviteExchangeResult> ExchangeInvite(string inviteToken, ClaimsPrincipal principal)
@@ -421,7 +633,7 @@ class InviteCompletion(
     /// <param name="inviteToken">The validated invite token.</param>
     /// <param name="authenticatedEmail">The authenticating account's email.</param>
     /// <param name="emailVerified">
-    /// The provider's <c>email_verified</c> value: <see langword="true"/>, <see langword="false"/>, or
+    /// The provider's <c language="text">email_verified</c> value: <see langword="true"/>, <see langword="false"/>, or
     /// <see langword="null"/> when the provider supplies no independent verification claim.
     /// </param>
     /// <returns>
@@ -546,4 +758,51 @@ class InviteCompletion(
     }
 
     bool IsAttestedProtocolEnabled() => config.CurrentValue.Invite?.Attestation is not null;
+
+    /// <summary>An attested invitation's pre-HTTP entry-state resolution.</summary>
+    /// <param name="Succeeded"><see langword="true"/> when the entry state resolved.</param>
+    /// <param name="Invite">The resolved invite configuration.</param>
+    /// <param name="EntryState">The unprotected invitation-entry state.</param>
+    /// <param name="RecipientProviderKey">The identity-bound recipient's provider key, or empty for email-targeted recipients.</param>
+    /// <param name="InvitedEmail">The email-targeted recipient's invited address, or empty for identity-bound recipients.</param>
+    /// <param name="Reason">The bounded failure reason, or <see cref="InvitationCompletionFailureReason.None"/> on success.</param>
+    /// <remarks>
+    /// The recipient facts are captured here, from one configuration snapshot, and carried through the rest of
+    /// the request. The stages after this one await the session, and the options monitor can publish a new
+    /// configuration while that await is outstanding.
+    /// </remarks>
+    readonly record struct EntryStateResolution(bool Succeeded, C.Invite Invite, InvitationEntryState EntryState, string RecipientProviderKey, string InvitedEmail, InvitationCompletionFailureReason Reason)
+    {
+        public static EntryStateResolution Success(C.Invite invite, InvitationEntryState entryState, string recipientProviderKey, string invitedEmail) =>
+            new(Succeeded: true, Invite: invite, EntryState: entryState, RecipientProviderKey: recipientProviderKey, InvitedEmail: invitedEmail, Reason: InvitationCompletionFailureReason.None);
+
+        public static EntryStateResolution Failure(InvitationCompletionFailureReason reason) =>
+            new(Succeeded: false, Invite: default!, EntryState: default!, RecipientProviderKey: string.Empty, InvitedEmail: string.Empty, Reason: reason);
+    }
+
+    /// <summary>
+    /// An attested invitation's verified-identity resolution. A failure carries either a bounded reason, or
+    /// - for the email-targeted recipient mode - the specific <see cref="InviteExchangeResult.EmailMismatch"/>/
+    /// <see cref="InviteExchangeResult.EmailUnavailable"/> outcome.
+    /// </summary>
+    /// <param name="Succeeded"><see langword="true"/> when a verified identity resolved.</param>
+    /// <param name="Identity">The resolved verified identity.</param>
+    /// <param name="EmailOutcome">The specific email-binding outcome for the email-targeted recipient mode.</param>
+    /// <param name="Reason">The bounded failure reason, or <see cref="InvitationCompletionFailureReason.None"/> on success.</param>
+    readonly record struct VerifiedIdentityResolution(bool Succeeded, InvitationVerifiedIdentity Identity, InviteExchangeResult EmailOutcome, InvitationCompletionFailureReason Reason)
+    {
+        /// <summary>Gets the failure for a provider that supplied no address to bind the invitation against.</summary>
+        public static VerifiedIdentityResolution EmailUnavailable =>
+            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.EmailUnavailable, Reason: InvitationCompletionFailureReason.None);
+
+        /// <summary>Gets the failure for a provider that supplied an unverified address, or somebody else's.</summary>
+        public static VerifiedIdentityResolution EmailMismatch =>
+            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.EmailMismatch, Reason: InvitationCompletionFailureReason.None);
+
+        public static VerifiedIdentityResolution Success(InvitationVerifiedIdentity identity) =>
+            new(Succeeded: true, Identity: identity, EmailOutcome: InviteExchangeResult.Success, Reason: InvitationCompletionFailureReason.None);
+
+        public static VerifiedIdentityResolution Failure(InvitationCompletionFailureReason reason) =>
+            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.Failed, Reason: reason);
+    }
 }

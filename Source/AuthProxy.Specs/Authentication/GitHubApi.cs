@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// </summary>
 /// <remarks>
 /// Responses are produced per request rather than handed over up front, because a paged read disposes each
-/// response as it goes and asks for the next page from the previous one's <c>Link</c> header — a fixed
+/// response as it goes and asks for the next page from the previous one's <c language="text">Link</c> header — a fixed
 /// response would be read once and disposed before the second page needed it.
 /// </remarks>
 /// <param name="respond">Produces the response for a requested URL.</param>

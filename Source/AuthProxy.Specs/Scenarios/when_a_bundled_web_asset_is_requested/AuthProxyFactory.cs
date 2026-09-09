@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Scenarios.when_a_bundled_web_asset_is_requested;
 
 /// <summary>
 /// A proxy with a configured backend service — so its reverse-proxy route exists, the way it always does
-/// in a real deployment — and a bundled web asset under <c>wwwroot</c>, the way the login-selection SPA's
+/// in a real deployment — and a bundled web asset under <c language="text">wwwroot</c>, the way the login-selection SPA's
 /// build output is.
 /// </summary>
 public class AuthProxyFactory : WebApplicationFactory<Program>

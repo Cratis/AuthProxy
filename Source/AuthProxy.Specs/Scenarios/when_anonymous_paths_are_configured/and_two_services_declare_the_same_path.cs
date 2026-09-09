@@ -9,9 +9,9 @@ namespace Cratis.AuthProxy.Scenarios.when_anonymous_paths_are_configured;
 /// End-to-end: two services declaring the same prefix must still serve it.
 /// <para>
 /// The declared routes carry no service-selection header or query match, so two declarations of the same
-/// prefix are two routes ASP.NET cannot choose between — <c>AmbiguousMatchException</c>, surfacing as
-/// <c>500</c> on the declared path. Nothing reports it at startup; the first anonymous caller finds it.
-/// A <c>502</c> here is the proof the request was forwarded to a real destination rather than dying in
+/// prefix are two routes ASP.NET cannot choose between — <c language="text">AmbiguousMatchException</c>, surfacing as
+/// <c language="text">500</c> on the declared path. Nothing reports it at startup; the first anonymous caller finds it.
+/// A <c language="text">502</c> here is the proof the request was forwarded to a real destination rather than dying in
 /// route selection.
 /// </para>
 /// </summary>

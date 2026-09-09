@@ -6,10 +6,10 @@ using Yarp.ReverseProxy.Transforms;
 namespace Cratis.AuthProxy.Identity.for_InjectIdentityHeadersTransform;
 
 /// <summary>
-/// A display name is whatever the provider says it is, and providers say things like <c>Søren Wærstad</c>.
+/// A display name is whatever the provider says it is, and providers say things like <c language="text">Søren Wærstad</c>.
 /// Such a value cannot be written to a header field at all, so before this the proxied request failed at
 /// the gateway and the person could not use the application. It now travels as an RFC 8187
-/// <c>ext-value</c>, announced by the starred sibling, with the exact original still in the client
+/// <c language="text">ext-value</c>, announced by the starred sibling, with the exact original still in the client
 /// principal.
 /// </summary>
 public class when_user_has_a_name_outside_ascii : Specification

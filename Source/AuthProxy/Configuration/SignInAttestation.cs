@@ -9,20 +9,20 @@ namespace Cratis.AuthProxy.Configuration;
 /// <remarks>
 /// <para>
 /// Leave this section unset — the default — and sign-in notifications are posted exactly as they always have
-/// been: an unsigned JSON body with no <c>Authorization</c> header. Nothing about an existing deployment
+/// been: an unsigned JSON body with no <c language="text">Authorization</c> header. Nothing about an existing deployment
 /// changes on upgrade.
 /// </para>
 /// <para>
 /// Set it and AuthProxy signs a short-lived RS256 JWS over each notification and sends it as
-/// <c>Authorization: Bearer</c>. The envelope binds six facts: provenance (<c>iss</c> plus the <c>kid</c>
-/// header), audience (<c>aud</c>), route (<c>htm</c> and <c>htu</c>, per RFC 9449), body (<c>body_hash</c>,
-/// over the exact bytes posted), time (<c>iat</c>, <c>nbf</c>, <c>exp</c>) and replay (a random <c>jti</c>).
+/// <c language="text">Authorization: Bearer</c>. The envelope binds six facts: provenance (<c language="text">iss</c> plus the <c language="text">kid</c>
+/// header), audience (<c language="text">aud</c>), route (<c language="text">htm</c> and <c language="text">htu</c>, per RFC 9449), body (<c language="text">body_hash</c>,
+/// over the exact bytes posted), time (<c language="text">iat</c>, <c language="text">nbf</c>, <c language="text">exp</c>) and replay (a random <c language="text">jti</c>).
 /// Once configured, AuthProxy never falls back to an unsigned notification: if the envelope cannot be signed,
 /// nothing is posted.
 /// </para>
 /// <para>
 /// AuthProxy publishes no JWKS document, so the receiving application pins the matching public key by its own
-/// configuration and selects it by the required <c>kid</c> header — the same way the invitation authority
+/// configuration and selects it by the required <c language="text">kid</c> header — the same way the invitation authority
 /// consumes <see cref="InvitationAttestation"/>.
 /// </para>
 /// </remarks>
@@ -48,7 +48,7 @@ public class SignInAttestation
     /// </summary>
     /// <remarks>
     /// Keep the previous key during a rotation until every envelope it signed has expired. The receiving
-    /// application pins the corresponding public keys and selects one by the required JWS <c>kid</c> header.
+    /// application pins the corresponding public keys and selects one by the required JWS <c language="text">kid</c> header.
     /// </remarks>
     public IList<SignInAttestationSigningKey> SigningKeys { get; set; } = [];
 

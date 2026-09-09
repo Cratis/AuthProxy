@@ -5,6 +5,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.given;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,8 @@ public class an_attested_invite_completion : Specification
     protected RecordingAttestationIssuer _attestationIssuer;
     protected RecordingHandler _handler;
     protected IErrorPageProvider _errorPageProvider;
+    protected RecordingLogger<InviteMiddleware> _logger;
+    protected string _inviteToken;
     protected bool _nextCalled;
 
     protected virtual bool InvitationCompletionEnabled => true;
@@ -37,10 +40,25 @@ public class an_attested_invite_completion : Specification
     protected virtual bool IncludeVerifiedEmailClaims => true;
     protected virtual IReadOnlyList<Claim> InvitationClaims => [new(InvitationAttestationClaims.Email, Email)];
 
+    /// <summary>Gets the challenge the established session actually answered.</summary>
+    protected virtual string SessionChallenge => Challenge;
+
+    /// <summary>
+    /// Gets the invited-email claim type the options monitor starts publishing the moment the completion
+    /// awaits the session, or <see langword="null"/> to keep publishing the staged configuration.
+    /// </summary>
+    protected virtual string? ReloadedEmailClaimDuringSession => null;
+
+    /// <summary>
+    /// Gets a value indicating whether the options monitor stops publishing any invite configuration at all
+    /// the moment the completion awaits the session.
+    /// </summary>
+    protected virtual bool RemovesInviteDuringSession => false;
+
     void Establish()
     {
         var (inviteSigningKey, publicKeyPem) = TokenFixture.GenerateKeyPair();
-        var inviteConfig = new C.AuthProxy
+        C.AuthProxy CreateConfiguration(string emailClaim) => new()
         {
             Invite = new C.Invite
             {
@@ -48,14 +66,16 @@ public class an_attested_invite_completion : Specification
                 Issuer = InviteIssuer,
                 Audience = InviteAudience,
                 TenantClaim = InvitationAttestationClaims.TenantId,
-                EmailClaim = InvitationAttestationClaims.Email,
+                EmailClaim = emailClaim,
                 ExchangeUrl = ExchangeUrl,
                 StageUrl = "https://lobby.example.com/_invite/stage",
                 Attestation = new C.InvitationAttestation(),
             }
         };
+
+        var published = CreateConfiguration(InvitationAttestationClaims.Email);
         var inviteOptions = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        inviteOptions.CurrentValue.Returns(inviteConfig);
+        inviteOptions.CurrentValue.Returns(_ => published);
 
         var authentication = new C.Authentication
         {
@@ -97,12 +117,26 @@ public class an_attested_invite_completion : Specification
             IssuedUtc = new DateTimeOffset(2026, 8, 10, 1, 2, 3, TimeSpan.Zero),
         };
         properties.Items[InvitationAuthenticationState.TransactionStateKey] = Transaction;
-        properties.Items[InvitationAuthenticationState.ChallengeStateKey] = Challenge;
+        properties.Items[InvitationAuthenticationState.ChallengeStateKey] = SessionChallenge;
         properties.Items[InvitationAuthenticationState.CapabilityHashStateKey] = CapabilityHash;
 
+        // The only await between resolving the entry state and issuing the attestation. A configuration
+        // reload published here is the exact race a completion stage that re-reads configuration loses.
         var authenticationService = Substitute.For<IAuthenticationService>();
         authenticationService.AuthenticateAsync(Arg.Any<HttpContext>(), CookieAuthenticationDefaults.AuthenticationScheme)
-            .Returns(AuthenticateResult.Success(new AuthenticationTicket(principal, properties, CookieAuthenticationDefaults.AuthenticationScheme)));
+            .Returns(_ =>
+            {
+                if (RemovesInviteDuringSession)
+                {
+                    published = new C.AuthProxy();
+                }
+                else if (ReloadedEmailClaimDuringSession is { } reloadedEmailClaim)
+                {
+                    published = CreateConfiguration(reloadedEmailClaim);
+                }
+
+                return AuthenticateResult.Success(new AuthenticationTicket(principal, properties, CookieAuthenticationDefaults.AuthenticationScheme));
+            });
 
         _context = new DefaultHttpContext
         {
@@ -123,6 +157,7 @@ public class an_attested_invite_completion : Specification
                 new Claim(InvitationAttestationClaims.TenantId, TenantId),
                 .. InvitationClaims,
             ]);
+        _inviteToken = token;
         properties.Items[InvitationAuthenticationState.CapabilityHashStateKey] = ComputeHash(token);
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}; {Cookies.InvitationEntryState}=protected-state";
         InvitationSessionFixture.GivenSessionEstablishedByTheInvitation(_context, token);
@@ -147,6 +182,7 @@ public class an_attested_invite_completion : Specification
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(new HttpClient(_handler));
         _errorPageProvider = Substitute.For<IErrorPageProvider>();
         _errorPageProvider.WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>()).Returns(Task.CompletedTask);
+        _logger = new();
 
         _middleware = new(
             _ =>
@@ -160,7 +196,7 @@ public class an_attested_invite_completion : Specification
             Substitute.For<ITenantResolver>(),
             httpClientFactory,
             _errorPageProvider,
-            Substitute.For<ILogger<InviteMiddleware>>(),
+            _logger,
             new CanonicalIdentityResolver(authenticationOptions),
             _attestationIssuer,
             protector);
@@ -195,11 +231,14 @@ public class an_attested_invite_completion : Specification
 
         public HttpStatusCode StatusCode { get; set; } = HttpStatusCode.OK;
 
+        /// <summary>Gets or sets the body the exchange endpoint answers with.</summary>
+        public string ResponseBody { get; set; } = string.Empty;
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Request = request;
             Body = request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(StatusCode);
+            return new HttpResponseMessage(StatusCode) { Content = new StringContent(ResponseBody) };
         }
     }
 }

@@ -14,10 +14,10 @@ public static class AuthProxyExtensions
     /// Adds an AuthProxy container resource to the application model.
     /// </summary>
     /// <param name="builder">The <see cref="IDistributedApplicationBuilder"/>.</param>
-    /// <param name="name">The resource name (e.g. <c>"authproxy"</c>).</param>
+    /// <param name="name">The resource name (e.g. <c language="text">"authproxy"</c>).</param>
     /// <param name="tag">
-    /// Optional Docker image tag.  Defaults to <see cref="AuthProxyResource.ContainerImageTag"/> (<c>latest</c>).
-    /// Pin this to a specific release in production (e.g. <c>"1.2.3"</c>).
+    /// Optional Docker image tag.  Defaults to <see cref="AuthProxyResource.ContainerImageTag"/> (<c language="text">latest</c>).
+    /// Pin this to a specific release in production (e.g. <c language="text">"1.2.3"</c>).
     /// </param>
     /// <returns>An <see cref="IResourceBuilder{T}"/> for the <see cref="AuthProxyResource"/>.</returns>
     public static IResourceBuilder<AuthProxyResource> AddAuthProxy(
@@ -34,12 +34,12 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceName">
-    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"main"</c>).
     /// </param>
     /// <param name="serviceResource">The Aspire resource that exposes the backend.</param>
-    /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use.  Defaults to <c language="text">"http"</c>.</param>
     /// <param name="resolveIdentityDetails">
-    /// Whether AuthProxy should call <c>GET {baseUrl}/.cratis/me</c> on this backend to enrich
+    /// Whether AuthProxy should call <c language="text">GET {baseUrl}/.cratis/me</c> on this backend to enrich
     /// the identity cookie after authentication.  Defaults to <see langword="null"/> (AuthProxy uses
     /// its own default — <see langword="true"/> when a backend URL is present).
     /// Set to <see langword="false"/> explicitly to opt this service out of identity enrichment.
@@ -69,16 +69,16 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
-    /// Declares what a named service's <c>/.cratis/me</c> answer means to AuthProxy.
+    /// Declares what a named service's <c language="text">/.cratis/me</c> answer means to AuthProxy.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceName">
-    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"main"</c>).
     /// </param>
     /// <param name="mode">
     /// What the answer is worth. <see cref="IdentityVerificationMode.BestEffort"/> — the default when this
-    /// is never called — treats the endpoint as enrichment, so only an explicit <c>403</c> denies.
+    /// is never called — treats the endpoint as enrichment, so only an explicit <c language="text">403</c> denies.
     /// <see cref="IdentityVerificationMode.Required"/> treats it as an authorization decision, so only an
     /// explicit positive admits and every failure to obtain one denies.
     /// </param>
@@ -94,7 +94,7 @@ public static class AuthProxyExtensions
     /// the method's signature and every already-built app host would fail to bind against the new package
     /// until it is rebuilt.
     /// <para>
-    /// This is orthogonal to <c>resolveIdentityDetails</c> on <c>WithBackend</c>, which decides whether the
+    /// This is orthogonal to <c language="text">resolveIdentityDetails</c> on <c language="text">WithBackend</c>, which decides whether the
     /// endpoint is called at all. Opting a service out of identity resolution and then requiring
     /// verification of it asks for a decision from a service that is never consulted, so the service simply
     /// does not take part.
@@ -153,10 +153,10 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceName">
-    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"main"</c>).
     /// </param>
     /// <param name="serviceResource">The Aspire resource that exposes the frontend.</param>
-    /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use.  Defaults to <c language="text">"http"</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithFrontend<T>(
         this IResourceBuilder<T> builder,
@@ -177,19 +177,19 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceName">
-    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"main"</c>).
     /// </param>
     /// <param name="paths">
     /// The path prefixes to serve anonymously. Each must be a rooted path of literal segments
-    /// (e.g. <c>/portal</c>), and is matched case-insensitively on segment boundaries — <c>/portal</c>
-    /// covers <c>/portal</c> and <c>/portal/anything</c>, but not <c>/portalx</c>. Anything else is
+    /// (e.g. <c language="text">/portal</c>), and is matched case-insensitively on segment boundaries — <c language="text">/portal</c>
+    /// covers <c language="text">/portal</c> and <c language="text">/portal/anything</c>, but not <c language="text">/portalx</c>. Anything else is
     /// discarded by AuthProxy, leaving that path authenticated.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <remarks>
     /// Use this for paths an application genuinely serves without a session — a magic-link landing page, a
     /// signed-token report, a public webhook receiver. Without it those paths are unreachable: an
-    /// unauthenticated caller is answered with the provider-selection page instead, at <c>HTTP 200</c>, so
+    /// unauthenticated caller is answered with the provider-selection page instead, at <c language="text">HTTP 200</c>, so
     /// a webhook or other non-browser caller records success and never retries.
     /// <para>
     /// Each entry is a prefix and covers everything under it, so name the specific leaf path whenever a
@@ -235,11 +235,11 @@ public static class AuthProxyExtensions
     /// authority on what a capability means.
     /// </param>
     /// <param name="path">
-    /// The one path a capability may be presented on. Defaults to <c>/.cratis/admission</c>. Every other
+    /// The one path a capability may be presented on. Defaults to <c language="text">/.cratis/admission</c>. Every other
     /// path — and this path with anything below it — answers the same refusal as everything else.
     /// </param>
     /// <param name="maximumLength">
-    /// The largest capability, in bytes, AuthProxy will read. Defaults to <c>4096</c>.
+    /// The largest capability, in bytes, AuthProxy will read. Defaults to <c language="text">4096</c>.
     /// </param>
     /// <param name="entryLifetime">
     /// How long an admitted browser stays admitted. Defaults to twenty minutes — it bounds an interactive
@@ -254,7 +254,7 @@ public static class AuthProxyExtensions
     /// is right for a deployment meant to be found and wrong for one whose existence is not meant to be
     /// discoverable, and this is the switch between the two.
     /// <para>
-    /// Cannot be combined with <c>WithInvite</c>: two capability mechanisms in one deployment is
+    /// Cannot be combined with <c language="text">WithInvite</c>: two capability mechanisms in one deployment is
     /// a misconfiguration, and AuthProxy refuses the combination at startup rather than silently ordering
     /// them.
     /// </para>
@@ -301,12 +301,12 @@ public static class AuthProxyExtensions
     /// traffic on.
     /// </param>
     /// <param name="bindAddress">
-    /// The address it binds. Defaults to <c>127.0.0.1</c>, which keeps it reachable from within the
+    /// The address it binds. Defaults to <c language="text">127.0.0.1</c>, which keeps it reachable from within the
     /// container and from nowhere else. Widening it publishes the endpoints to everything that can route
     /// to the address.
     /// </param>
-    /// <param name="livePath">The path answering liveness. Defaults to <c>/health/live</c>.</param>
-    /// <param name="readyPath">The path answering readiness. Defaults to <c>/health/ready</c>.</param>
+    /// <param name="livePath">The path answering liveness. Defaults to <c language="text">/health/live</c>.</param>
+    /// <param name="readyPath">The path answering readiness. Defaults to <c language="text">/health/ready</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <exception cref="InvalidManagementPort">Thrown when <paramref name="port"/> is not a port number.</exception>
     /// <remarks>
@@ -317,7 +317,7 @@ public static class AuthProxyExtensions
     /// key ring that encrypts every session cookie and issued token.
     /// <para>
     /// The endpoints live only on this listener. They are answered on no other port, they are never added
-    /// to the reverse-proxy route table, and a service that serves its own <c>/health</c> keeps serving it.
+    /// to the reverse-proxy route table, and a service that serves its own <c language="text">/health</c> keeps serving it.
     /// </para>
     /// <para>
     /// Deliberately its own method rather than another optional parameter on
@@ -356,17 +356,17 @@ public static class AuthProxyExtensions
     /// <param name="builder">The resource builder.</param>
     /// <param name="addressesOrCidrs">
     /// The addresses and ranges of the infrastructure directly in front of AuthProxy — an ingress
-    /// controller, load balancer, service mesh sidecar, or CDN egress range. Write a peer as <c>10.0.0.7</c>
-    /// or <c>2001:db8::1</c>, and a range as <c>10.0.0.0/8</c> or <c>2001:db8::/32</c>.
+    /// controller, load balancer, service mesh sidecar, or CDN egress range. Write a peer as <c language="text">10.0.0.7</c>
+    /// or <c language="text">2001:db8::1</c>, and a range as <c language="text">10.0.0.0/8</c> or <c language="text">2001:db8::/32</c>.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <exception cref="InvalidTrustedProxy">Thrown when an entry is neither an address nor a CIDR range.</exception>
     /// <remarks>
-    /// <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c> are ordinary request headers, so any caller that
+    /// <c language="text">X-Forwarded-For</c> and <c language="text">X-Forwarded-Proto</c> are ordinary request headers, so any caller that
     /// can open a connection to AuthProxy can send them. Until this is declared, AuthProxy believes all of
     /// them: the address recorded against every sign-in is whatever the caller wrote, and a spoofed
-    /// <c>X-Forwarded-Proto: https</c> makes an unencrypted request look encrypted, which is what decides
-    /// whether the session cookies carry <c>Secure</c>.
+    /// <c language="text">X-Forwarded-Proto: https</c> makes an unencrypted request look encrypted, which is what decides
+    /// whether the session cookies carry <c language="text">Secure</c>.
     /// <para>
     /// Declare the peers rather than the clients. AuthProxy matches the address it accepted the connection
     /// from, which in a container deployment is the ingress, never a browser.
@@ -405,8 +405,8 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="hops">
-    /// The number of <c>X-Forwarded-For</c> entries consumed from the right. Defaults in AuthProxy to
-    /// <c>1</c> — an ingress controller on its own. A CDN in front of a load balancer is <c>2</c>.
+    /// The number of <c language="text">X-Forwarded-For</c> entries consumed from the right. Defaults in AuthProxy to
+    /// <c language="text">1</c> — an ingress controller on its own. A CDN in front of a load balancer is <c language="text">2</c>.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <remarks>
@@ -435,7 +435,7 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="claim">
-    /// The claim type the caller must carry, for example <c>urn:github:organization</c> or <c>roles</c>.
+    /// The claim type the caller must carry, for example <c language="text">urn:github:organization</c> or <c language="text">roles</c>.
     /// </param>
     /// <param name="anyOf">
     /// The values that satisfy it. Pass none to require only that the claim is present. Values are
@@ -472,7 +472,7 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceName">
-    /// The service key used in the AuthProxy <c>Services</c> configuration (e.g. <c>"main"</c>).
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"main"</c>).
     /// </param>
     /// <param name="claim">The claim type the caller must carry.</param>
     /// <param name="anyOf">
@@ -506,13 +506,13 @@ public static class AuthProxyExtensions
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
-    /// <param name="name">The display name shown on the login page (e.g. <c>"Contoso AD"</c>).</param>
+    /// <param name="name">The display name shown on the login page (e.g. <c language="text">"Contoso AD"</c>).</param>
     /// <param name="type">The provider brand / type.  Used by the login UI to choose the correct logo.</param>
     /// <param name="authority">The OIDC authority / issuer URL.</param>
     /// <param name="clientId">The OAuth client ID.</param>
     /// <param name="clientSecret">The OAuth client secret.</param>
     /// <param name="scopes">
-    /// Optional extra OAuth scopes to request in addition to <c>openid profile email</c>.
+    /// Optional extra OAuth scopes to request in addition to <c language="text">openid profile email</c>.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithOidcProvider<T>(
@@ -584,7 +584,7 @@ public static class AuthProxyExtensions
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
-    /// <param name="name">The display name shown on the login page (e.g. <c>"GitHub"</c>).</param>
+    /// <param name="name">The display name shown on the login page (e.g. <c language="text">"GitHub"</c>).</param>
     /// <param name="type">The provider brand / type.</param>
     /// <param name="authorizationEndpoint">The OAuth 2.0 authorization endpoint URL.</param>
     /// <param name="tokenEndpoint">The OAuth 2.0 token endpoint URL.</param>
@@ -671,7 +671,7 @@ public static class AuthProxyExtensions
     /// <param name="scopes">Optional additional OAuth scopes.</param>
     /// <param name="claimMappings">
     /// Optional mappings whose key is the resulting principal claim type and whose value is the raw user-information
-    /// JSON field. For example, <c>{ ["sub"] = "id" }</c> maps a raw <c>id</c> field to the <c>sub</c> claim selected by
+    /// JSON field. For example, <c language="text">{ ["sub"] = "id" }</c> maps a raw <c language="text">id</c> field to the <c language="text">sub</c> claim selected by
     /// <paramref name="subjectClaimType"/>.
     /// </param>
     /// <param name="authorizationParameters">Optional static parameters included in every provider authorization request.</param>
@@ -714,7 +714,7 @@ public static class AuthProxyExtensions
 
     /// <summary>
     /// Adds a host-name-based tenant resolution strategy to AuthProxy.
-    /// The resolved host is matched against the <c>Domains</c> list of each configured tenant.
+    /// The resolved host is matched against the <c language="text">Domains</c> list of each configured tenant.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
@@ -726,7 +726,7 @@ public static class AuthProxyExtensions
     /// <summary>
     /// Adds a sub-host-based tenant resolution strategy to AuthProxy.
     /// The tenant ID is derived from the first subdomain label of the request host by convention
-    /// (e.g. <c>acme.example.com</c> → <c>acme</c>).
+    /// (e.g. <c language="text">acme.example.com</c> → <c language="text">acme</c>).
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
@@ -772,7 +772,7 @@ public static class AuthProxyExtensions
     /// <param name="builder">The resource builder.</param>
     /// <param name="pattern">
     /// A regular expression with a named capture group whose value becomes the tenant source identifier.
-    /// Example: <c>^/(?&lt;tenant&gt;[^/]+)/</c>.
+    /// Example: <c language="text">^/(?&lt;tenant&gt;[^/]+)/</c>.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithRouteTenantResolution<T>(
@@ -841,7 +841,7 @@ public static class AuthProxyExtensions
     /// <param name="builder">The resource builder.</param>
     /// <param name="tenantsEndpoint">
     /// Absolute URL of the endpoint that returns selectable tenants for the current authenticated user.
-    /// Expected response shape is an array of <c>{ "id": "...", "name": "..." }</c> objects.
+    /// Expected response shape is an array of <c language="text">{ "id": "...", "name": "..." }</c> objects.
     /// When <see langword="null"/> the endpoint is omitted and must be supplied via other configuration.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
@@ -872,9 +872,9 @@ public static class AuthProxyExtensions
     /// <param name="serviceResource">The Aspire resource that hosts the selectable-tenants endpoint.</param>
     /// <param name="route">
     /// The route on the service that returns the selectable tenant list,
-    /// e.g. <c>"/api/tenants/selectable"</c>.
+    /// e.g. <c language="text">"/api/tenants/selectable"</c>.
     /// </param>
-    /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use.  Defaults to <c language="text">"http"</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithSelectionTenantResolution<T>(
         this IResourceBuilder<T> builder,
@@ -903,9 +903,9 @@ public static class AuthProxyExtensions
     /// <param name="builder">The resource builder.</param>
     /// <param name="urlTemplate">
     /// A URL template used to check whether a tenant exists.
-    /// Use <c>{tenantId}</c> as a placeholder for the resolved tenant identifier,
-    /// e.g. <c>https://platform.example.com/api/tenants/{tenantId}</c>.
-    /// An HTTP GET to the resolved URL must return <c>200</c> when the tenant exists and <c>404</c> when it does not.
+    /// Use <c language="text">{tenantId}</c> as a placeholder for the resolved tenant identifier,
+    /// e.g. <c language="text">https://platform.example.com/api/tenants/{tenantId}</c>.
+    /// An HTTP GET to the resolved URL must return <c language="text">200</c> when the tenant exists and <c language="text">404</c> when it does not.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithTenantVerification<T>(
@@ -922,10 +922,10 @@ public static class AuthProxyExtensions
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceResource">The Aspire resource that hosts the tenant-verification endpoint.</param>
     /// <param name="routeTemplate">
-    /// The route on the service, including the <c>{tenantId}</c> placeholder,
-    /// e.g. <c>"/api/tenants/{tenantId}"</c>.
+    /// The route on the service, including the <c language="text">{tenantId}</c> placeholder,
+    /// e.g. <c language="text">"/api/tenants/{tenantId}"</c>.
     /// </param>
-    /// <param name="endpointName">The endpoint name to use.  Defaults to <c>"http"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use.  Defaults to <c language="text">"http"</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithTenantVerification<T>(
         this IResourceBuilder<T> builder,
@@ -948,13 +948,13 @@ public static class AuthProxyExtensions
     /// <param name="publicKeyPem">PEM-encoded RSA public key used to verify invite token signatures.</param>
     /// <param name="exchangeUrl">
     /// Absolute URL of the invite-exchange endpoint called after a successful login with a pending invite token,
-    /// e.g. <c>https://lobby.example.com/_invite/exchange</c>.
+    /// e.g. <c language="text">https://lobby.example.com/_invite/exchange</c>.
     /// </param>
     /// <param name="issuer">
-    /// Expected <c>iss</c> claim value. Leave <see langword="null"/> to skip issuer validation.
+    /// Expected <c language="text">iss</c> claim value. Leave <see langword="null"/> to skip issuer validation.
     /// </param>
     /// <param name="audience">
-    /// Expected <c>aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
+    /// Expected <c language="text">aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
     /// </param>
     /// <param name="tenantClaim">
     /// Claim in the invite token that carries the tenant ID string used for matching-tenant routing.
@@ -962,7 +962,7 @@ public static class AuthProxyExtensions
     /// </param>
     /// <param name="subjectAlreadyExistsUrl">
     /// URL to redirect to when the exchange endpoint returns HTTP 409 (subject already registered).
-    /// Leave <see langword="null"/> to serve the built-in <c>invitation-subject-already-exists.html</c> page.
+    /// Leave <see langword="null"/> to serve the built-in <c language="text">invitation-subject-already-exists.html</c> page.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithInvite<T>(
@@ -1023,7 +1023,7 @@ public static class AuthProxyExtensions
     /// <para>
     /// Signed attestations require recipient binding: also call
     /// <see cref="WithInviteEmailBinding{T}(IResourceBuilder{T}, string)"/> with a non-empty claim, and pass a
-    /// <c>tenantClaim</c> to <c>WithInvite</c>. Without both, AuthProxy fails options validation at startup.
+    /// <c language="text">tenantClaim</c> to <c language="text">WithInvite</c>. Without both, AuthProxy fails options validation at startup.
     /// </para>
     /// </remarks>
     public static IResourceBuilder<T> WithSignedInvitationAttestations<T>(
@@ -1064,14 +1064,14 @@ public static class AuthProxyExtensions
     /// <param name="publicKeyPem">PEM-encoded RSA public key used to verify invite token signatures.</param>
     /// <param name="exchangeServiceResource">The Aspire resource that hosts the invite-exchange endpoint.</param>
     /// <param name="exchangeRoute">
-    /// The route on the exchange service, e.g. <c>"/internal/invites/exchange"</c>.
+    /// The route on the exchange service, e.g. <c language="text">"/internal/invites/exchange"</c>.
     /// </param>
-    /// <param name="exchangeEndpointName">The endpoint name to use for the exchange service.  Defaults to <c>"http"</c>.</param>
+    /// <param name="exchangeEndpointName">The endpoint name to use for the exchange service.  Defaults to <c language="text">"http"</c>.</param>
     /// <param name="issuer">
-    /// Expected <c>iss</c> claim value. Leave <see langword="null"/> to skip issuer validation.
+    /// Expected <c language="text">iss</c> claim value. Leave <see langword="null"/> to skip issuer validation.
     /// </param>
     /// <param name="audience">
-    /// Expected <c>aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
+    /// Expected <c language="text">aud</c> claim value. Leave <see langword="null"/> to skip audience validation.
     /// </param>
     /// <param name="tenantClaim">
     /// Claim in the invite token that carries the tenant ID string used for matching-tenant routing.
@@ -1079,7 +1079,7 @@ public static class AuthProxyExtensions
     /// </param>
     /// <param name="subjectAlreadyExistsUrl">
     /// URL to redirect to when the exchange endpoint returns HTTP 409 (subject already registered).
-    /// Leave <see langword="null"/> to serve the built-in <c>invitation-subject-already-exists.html</c> page.
+    /// Leave <see langword="null"/> to serve the built-in <c language="text">invitation-subject-already-exists.html</c> page.
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithInvite<T>(
@@ -1144,7 +1144,7 @@ public static class AuthProxyExtensions
     /// matching, invitation validation, recipient binding, attestations, transactions, cookies, or sessions.
     /// </para>
     /// <para>
-    /// Matching-tenant invitations are those where the configured <c>TenantClaim</c> value in the invitation
+    /// Matching-tenant invitations are those where the configured <c language="text">TenantClaim</c> value in the invitation
     /// capability equals the tenant resolved for the request. The equality does not prove that the invitation
     /// was issued by that tenant — any issuer holding the signing key can write that claim. It proves only
     /// that the invitation names the tenant the request is being served for, which is enough to know whether
@@ -1170,10 +1170,10 @@ public static class AuthProxyExtensions
     /// </param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <remarks>
-    /// Compose this after either <c>WithInvite</c> overload. When the provider offers no usable address, AuthProxy
-    /// rejects the invite with <c>invitation-email-unavailable.html</c>; when the address differs from the invited
-    /// one — or the provider explicitly reports <c>email_verified=false</c> — it rejects with
-    /// <c>invitation-email-mismatch.html</c>.
+    /// Compose this after either <c language="text">WithInvite</c> overload. When the provider offers no usable address, AuthProxy
+    /// rejects the invite with <c language="text">invitation-email-unavailable.html</c>; when the address differs from the invited
+    /// one — or the provider explicitly reports <c language="text">email_verified=false</c> — it rejects with
+    /// <c language="text">invitation-email-mismatch.html</c>.
     /// <para>
     /// Not calling this method, or passing an empty claim, writes nothing and retains the released default of no
     /// recipient binding: any authenticated subject holding the invite token can redeem it.
@@ -1195,7 +1195,7 @@ public static class AuthProxyExtensions
     /// <summary>
     /// Adds a claim-forwarding entry to the AuthProxy invite system.
     /// When a pending invite cookie exists, AuthProxy reads the specified claim from the invite token
-    /// and forwards it as part of the principal sent to each <c>/.cratis/me</c> identity details endpoint.
+    /// and forwards it as part of the principal sent to each <c language="text">/.cratis/me</c> identity details endpoint.
     /// Call this method once per claim to forward; multiple calls accumulate entries.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
@@ -1233,7 +1233,7 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceResource">The Aspire resource that exposes the lobby frontend.</param>
-    /// <param name="endpointName">The endpoint name to use. Defaults to <c>"http"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use. Defaults to <c language="text">"http"</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithLobbyFrontend<T>(
         this IResourceBuilder<T> builder,
@@ -1255,7 +1255,7 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceResource">The Aspire resource that exposes the lobby backend.</param>
-    /// <param name="endpointName">The endpoint name to use. Defaults to <c>"http"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use. Defaults to <c language="text">"http"</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithLobbyBackend<T>(
         this IResourceBuilder<T> builder,
@@ -1289,8 +1289,8 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceResource">The Aspire resource that exposes the lobby registration endpoint.</param>
-    /// <param name="route">The route on the lobby service that starts registration, e.g. <c>"/register"</c>.</param>
-    /// <param name="endpointName">The endpoint name to use. Defaults to <c>"http"</c>.</param>
+    /// <param name="route">The route on the lobby service that starts registration, e.g. <c language="text">"/register"</c>.</param>
+    /// <param name="endpointName">The endpoint name to use. Defaults to <c language="text">"http"</c>.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     public static IResourceBuilder<T> WithLobbyRegistration<T>(
         this IResourceBuilder<T> builder,

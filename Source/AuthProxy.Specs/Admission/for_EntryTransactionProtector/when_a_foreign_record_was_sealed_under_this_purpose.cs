@@ -14,7 +14,7 @@ namespace Cratis.AuthProxy.Admission.for_EntryTransactionProtector;
 /// <remarks>
 /// The invitation entry state is the neighbor that matters: it is protected with the same key ring, it
 /// carries its own transaction and challenge under different property names, and it carries an
-/// <c>ExpiresAt</c> that is live for exactly the same reason this one's is. Deserialized as an entry
+/// <c language="text">ExpiresAt</c> that is live for exactly the same reason this one's is. Deserialized as an entry
 /// transaction it yields a record whose transaction and challenge are null and whose expiry is in the
 /// future — and the admission check looks at the expiry and nothing else, so it admits.
 /// <para>

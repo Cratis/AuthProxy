@@ -107,9 +107,9 @@ public static class TenantAuthenticationState
     /// <returns>A same-site relative target, or the application root when none can be derived.</returns>
     /// <remarks>
     /// This value survives the round-trip to the identity provider and is handed to the browser as the
-    /// post-authentication <c>Location</c>, so it is the single most attractive open-redirect target in
+    /// post-authentication <c language="text">Location</c>, so it is the single most attractive open-redirect target in
     /// AuthProxy: the victim sees the real domain and completes a real login before it is honored. It
-    /// arrives from an <c>AllowAnonymous</c> endpoint, so it is attacker-supplied by default.
+    /// arrives from an <c language="text">AllowAnonymous</c> endpoint, so it is attacker-supplied by default.
     /// <para>
     /// An <em>http(s)</em> absolute URL is reduced to its path and query rather than refused, which keeps a
     /// caller that sends its own origin working — the host is dropped, never honored. Any other scheme is
@@ -117,8 +117,8 @@ public static class TenantAuthenticationState
     /// </para>
     /// <para>
     /// The scheme check is doing more work than it looks like. On Unix, <see cref="Uri.TryCreate(string, UriKind, out Uri)"/>
-    /// parses a rooted path as an absolute <c>file:</c> URI, so without it <c>//evil.test/phish</c> and
-    /// <c>/\t/evil.test</c> would be run through <see cref="Uri.AbsolutePath"/> — laundering a target this
+    /// parses a rooted path as an absolute <c language="text">file:</c> URI, so without it <c language="text">//evil.test/phish</c> and
+    /// <c language="text">/\t/evil.test</c> would be run through <see cref="Uri.AbsolutePath"/> — laundering a target this
     /// method had just rejected into one that looks clean, and doing it on Linux but not on Windows.
     /// </para>
     /// </remarks>

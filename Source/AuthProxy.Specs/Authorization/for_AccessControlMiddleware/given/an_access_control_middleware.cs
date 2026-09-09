@@ -52,7 +52,7 @@ public class an_access_control_middleware : Specification
     /// Builds the middleware over the current configuration.
     /// </summary>
     /// <remarks>
-    /// Deferred to the spec rather than done in <c>Establish</c>, so a spec can change the configuration
+    /// Deferred to the spec rather than done in <c language="text">Establish</c>, so a spec can change the configuration
     /// first — the options monitor captures the instance it is told about.
     /// </remarks>
     protected void BuildMiddleware()

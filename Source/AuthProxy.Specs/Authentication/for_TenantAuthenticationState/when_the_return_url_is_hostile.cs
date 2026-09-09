@@ -4,19 +4,19 @@
 namespace Cratis.AuthProxy.Authentication.for_TenantAuthenticationState;
 
 /// <summary>
-/// The <c>returnUrl</c> the login endpoint accepts must never survive as an off-site redirect.
+/// The <c language="text">returnUrl</c> the login endpoint accepts must never survive as an off-site redirect.
 /// <para>
 /// This is the most exposed redirect sink in AuthProxy and the most valuable one to an attacker. The
-/// endpoint that feeds it — <c>/.cratis/login/{scheme}</c> — is <c>AllowAnonymous</c>, so the value is
-/// attacker-supplied by default. What it becomes is the challenge's <c>RedirectUri</c>,
-/// which ASP.NET's remote authentication handler hands straight to <c>Response.Redirect</c> once the
+/// endpoint that feeds it — <c language="text">/.cratis/login/{scheme}</c> — is <c language="text">AllowAnonymous</c>, so the value is
+/// attacker-supplied by default. What it becomes is the challenge's <c language="text">RedirectUri</c>,
+/// which ASP.NET's remote authentication handler hands straight to <c language="text">Response.Redirect</c> once the
 /// identity provider returns, without validating it. The victim therefore sees a link on the real domain,
 /// completes a genuine sign-in at the genuine provider, and only then lands wherever the link said —
 /// every signal a careful person is taught to check having already passed.
 /// </para>
 /// <para>
-/// The check that used to guard it was <c>returnUrl.StartsWith('/')</c>, which <c>//evil.test</c> and
-/// <c>/\evil.test</c> both satisfy while navigating off-site. An absolute URL is reduced to its path and
+/// The check that used to guard it was <c language="text">returnUrl.StartsWith('/')</c>, which <c language="text">//evil.test</c> and
+/// <c language="text">/\evil.test</c> both satisfy while navigating off-site. An absolute URL is reduced to its path and
 /// query rather than refused, so a caller that sends its own origin keeps working — the host is dropped,
 /// never honored.
 /// </para>

@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.given;
 
 /// <summary>
 /// Reusable context that drives <see cref="InviteMiddleware"/> through Phase 1 — the invitation link itself
-/// arriving on <c>/invite/{token}</c> — with identity providers configured, so a specification can say what
+/// arriving on <c language="text">/invite/{token}</c> — with identity providers configured, so a specification can say what
 /// the caller is offered before any provider handshake has happened.
 /// </summary>
 public class an_invitation_entry : Specification

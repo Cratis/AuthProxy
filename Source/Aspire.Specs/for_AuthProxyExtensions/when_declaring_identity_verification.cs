@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Aspire.for_AuthProxyExtensions;
 
 /// <summary>
 /// Declaring what a service's identity answer is worth is its own builder rather than another optional
-/// argument on <c>WithBackend</c>.
+/// argument on <c language="text">WithBackend</c>.
 /// <para>
 /// An optional argument is baked into the call site when the app host is compiled, so adding one to a
 /// shipped method changes its signature and every app host already built against the package fails to bind

@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Security.for_TrustedProxies.when_a_spoofed_scheme_rea
 /// The same request from the deployment's own ingress is honored, which is what proves the refusal next to it
 /// is a decision about the caller rather than a redirect that never worked.
 /// <para>
-/// A deployment terminating TLS at its ingress genuinely is served over <c>https</c>, and its logout has to
+/// A deployment terminating TLS at its ingress genuinely is served over <c language="text">https</c>, and its logout has to
 /// be able to return there. This is the case that would break if the boundary were drawn by refusing every
 /// forwarded scheme rather than by asking who sent it.
 /// </para>

@@ -6,7 +6,7 @@ using Cratis.AuthProxy.SignIns.for_SignInAttestationConfigurationValidator.given
 namespace Cratis.AuthProxy.SignIns.for_SignInAttestationConfigurationValidator.when_validating_a_configuration;
 
 /// <summary>
-/// The route binding is the RFC 9449 <c>htu</c>, which is the target's path — the query is deliberately not
+/// The route binding is the RFC 9449 <c language="text">htu</c>, which is the target's path — the query is deliberately not
 /// part of it. A notify URL that carries one therefore signs a route it does not fully name, and a captured
 /// notification could be replayed against a different query while a conformant verifier still accepted it.
 /// The only place that can be ruled out is where the endpoint is configured.

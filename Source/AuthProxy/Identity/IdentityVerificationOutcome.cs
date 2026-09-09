@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
-/// Represents what one service's <c>/.cratis/me</c> call established, and the details it supplied.
+/// Represents what one service's <c language="text">/.cratis/me</c> call established, and the details it supplied.
 /// </summary>
 /// <param name="Status">What the service established about the caller.</param>
 /// <param name="Reason">The bounded code explaining how that status was reached.</param>

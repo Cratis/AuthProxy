@@ -13,10 +13,10 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 /// </summary>
 /// <remarks>
 /// Every other scenario here declares a backend and nothing else, and a backend-only service is routed at
-/// <c>/api/{**catch-all}</c> alone — so an invitation path matches no route, is selected onto no endpoint,
+/// <c language="text">/api/{**catch-all}</c> alone — so an invitation path matches no route, is selected onto no endpoint,
 /// and reaches the invite middleware whatever the authorization step would have done with it. A real
-/// deployment declares a frontend as well (Studio sets <c>Services:{key}:Frontend:BaseUrl</c> alongside the
-/// backend), and a frontend is routed at <c>/{**catch-all}</c> — which matches every path there is,
+/// deployment declares a frontend as well (Studio sets <c language="text">Services:{key}:Frontend:BaseUrl</c> alongside the
+/// backend), and a frontend is routed at <c language="text">/{**catch-all}</c> — which matches every path there is,
 /// including the two the proxy answers itself.
 /// <para>
 /// That single configuration difference is why an invitation link looped in production while every

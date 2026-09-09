@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Management.for_ListenerAddresses;
 
 /// <summary>
 /// The one that matters in production. The official .NET container images publish their port through
-/// <c>ASPNETCORE_HTTP_PORTS</c> and set no <c>ASPNETCORE_URLS</c> at all, so a resolution that read only
+/// <c language="text">ASPNETCORE_HTTP_PORTS</c> and set no <c language="text">ASPNETCORE_URLS</c> at all, so a resolution that read only
 /// the URLs would conclude that a deployed AuthProxy listens on nothing — and re-declaring "nothing plus
 /// the management listener" would take the whole proxy off the network.
 /// </summary>

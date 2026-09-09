@@ -4,13 +4,13 @@
 namespace Cratis.AuthProxy.Scenarios.when_a_bundled_web_asset_is_requested;
 
 /// <summary>
-/// Regression coverage for a bundled <c>wwwroot</c> asset (e.g. the login-selection SPA's own script)
+/// Regression coverage for a bundled <c language="text">wwwroot</c> asset (e.g. the login-selection SPA's own script)
 /// being refused instead of served once the reverse proxy has a real backend configured. Without an
-/// explicit <c>UseRouting()</c> anchored after <c>UseStaticFiles()</c>, ASP.NET Core's implicit routing
+/// explicit <c language="text">UseRouting()</c> anchored after <c language="text">UseStaticFiles()</c>, ASP.NET Core's implicit routing
 /// insertion matches the reverse proxy's catch-all route before static files run, and
-/// <c>UseStaticFiles</c> — being endpoint-aware — skips a request that already carries a matched endpoint.
-/// The request then falls through to <c>SelectProviderMiddleware</c>, which refuses every unauthenticated,
-/// non-navigating caller with a <c>401</c>, so the asset never loads and the page it belongs to renders
+/// <c language="text">UseStaticFiles</c> — being endpoint-aware — skips a request that already carries a matched endpoint.
+/// The request then falls through to <c language="text">SelectProviderMiddleware</c>, which refuses every unauthenticated,
+/// non-navigating caller with a <c language="text">401</c>, so the asset never loads and the page it belongs to renders
 /// blank.
 /// </summary>
 /// <param name="factory">The proxy under test, with a real backend route and a bundled asset.</param>

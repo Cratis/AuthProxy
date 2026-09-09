@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.DataProtection;
 namespace Cratis.AuthProxy.Identity.for_IdentityAuthorizationCache.when_recording_with_verification_required.given;
 
 /// <summary>
-/// Provides an authorization cache for a deployment whose one service answers <c>/.cratis/me</c> with an
+/// Provides an authorization cache for a deployment whose one service answers <c language="text">/.cratis/me</c> with an
 /// authorization verdict, with the re-validation interval left for each spec to state.
 /// </summary>
 public class a_verifying_deployment : Specification

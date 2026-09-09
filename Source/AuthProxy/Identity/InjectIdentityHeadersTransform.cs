@@ -7,12 +7,12 @@ namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// A YARP <see cref="RequestTransform"/> that injects the three Microsoft Identity Platform
-/// headers (<c>x-ms-client-principal</c>, <c>x-ms-client-principal-id</c>,
-/// <c>x-ms-client-principal-name</c>) and the <c>Tenant-ID</c> header into every
+/// headers (<c language="text">x-ms-client-principal</c>, <c language="text">x-ms-client-principal-id</c>,
+/// <c language="text">x-ms-client-principal-name</c>) and the <c language="text">Tenant-ID</c> header into every
 /// proxied request, based on the authenticated user and the resolved tenant.
 /// </summary>
 /// <remarks>
-/// Every inbound copy is removed first — including the <c>x-ms-client-principal-name*</c> sibling, which a
+/// Every inbound copy is removed first — including the <c language="text">x-ms-client-principal-name*</c> sibling, which a
 /// caller could otherwise use to tell a backend a different name than the one the proxy vouched for.
 /// </remarks>
 public class InjectIdentityHeadersTransform : RequestTransform

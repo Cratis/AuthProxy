@@ -21,7 +21,7 @@ public class ClientCredentialsGrantService(
     /// <param name="serviceName">The requested service name.</param>
     /// <param name="clientId">The provided client identifier.</param>
     /// <param name="clientSecret">The provided client secret.</param>
-    /// <param name="refreshToken">The provided refresh token, for the <c>refresh_token</c> grant.</param>
+    /// <param name="refreshToken">The provided refresh token, for the <c language="text">refresh_token</c> grant.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The token issuance result.</returns>
     public Task<ClientCredentialsGrantResult> GrantAsync(

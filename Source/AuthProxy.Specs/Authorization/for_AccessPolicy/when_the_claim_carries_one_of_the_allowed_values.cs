@@ -8,8 +8,8 @@ namespace Cratis.AuthProxy.Authorization.for_AccessPolicy;
 /// <para>
 /// The values being matched are organization names, team slugs and role names — identifiers their own
 /// systems treat as case-insensitive, and which an operator copies out of a URL or a settings page, where
-/// <c>Cratis</c> and <c>cratis</c> are the same thing. An ordinal comparison would turn that into a
-/// deployment nobody can sign in to, with a <c>403</c> that says nothing about why.
+/// <c language="text">Cratis</c> and <c language="text">cratis</c> are the same thing. An ordinal comparison would turn that into a
+/// deployment nobody can sign in to, with a <c language="text">403</c> that says nothing about why.
 /// </para>
 /// <para>
 /// Also pinned here: a caller carrying several claims of the same type — the ordinary case for someone in

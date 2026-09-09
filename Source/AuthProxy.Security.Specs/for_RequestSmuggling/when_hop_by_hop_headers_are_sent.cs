@@ -7,13 +7,13 @@ namespace Cratis.AuthProxy.Security.for_RequestSmuggling;
 /// A proxy must end the client's connection and start a new one, not extend the client's connection to the
 /// origin. Hop-by-hop headers are the difference.
 /// <para>
-/// <c>Connection</c>, <c>Keep-Alive</c>, <c>Proxy-Connection</c>, <c>Upgrade</c>, <c>TE</c> and
-/// <c>Transfer-Encoding</c> describe a single hop — how these two endpoints agreed to frame and hold this
+/// <c language="text">Connection</c>, <c language="text">Keep-Alive</c>, <c language="text">Proxy-Connection</c>, <c language="text">Upgrade</c>, <c language="text">TE</c> and
+/// <c language="text">Transfer-Encoding</c> describe a single hop — how these two endpoints agreed to frame and hold this
 /// one connection. Relaying them makes the origin negotiate a connection with a client it is not connected
-/// to. That is where request smuggling lives: an attacker who can get <c>Transfer-Encoding</c> past the
+/// to. That is where request smuggling lives: an attacker who can get <c language="text">Transfer-Encoding</c> past the
 /// proxy makes the proxy and the origin disagree about where one request ends and the next begins, and
 /// then owns the front of somebody else's request — every access-control decision the proxy just made gets
-/// applied to a body the attacker wrote. <c>Upgrade</c> is the same failure in one step: an origin that
+/// applied to a body the attacker wrote. <c language="text">Upgrade</c> is the same failure in one step: an origin that
 /// accepts a relayed upgrade leaves a raw tunnel behind the proxy that no later request ever passes through
 /// it again.
 /// </para>
@@ -63,7 +63,7 @@ public class when_hop_by_hop_headers_are_sent(SecurityHarness harness) : IAsyncL
 
     /// <summary>
     /// Records the one deviation: RFC 9110 section 7.6.1 also asks an intermediary to drop every field the
-    /// <c>Connection</c> header <em>names</em>, and this one survives — the connection-token list is not
+    /// <c language="text">Connection</c> header <em>names</em>, and this one survives — the connection-token list is not
     /// parsed, only the standard hop-by-hop set is stripped.
     /// </summary>
     /// <remarks>
@@ -71,7 +71,7 @@ public class when_hop_by_hop_headers_are_sent(SecurityHarness harness) : IAsyncL
     /// should be a deliberate one. It is not exploitable: the mechanism only ever <em>removes</em> headers,
     /// so ignoring it forwards more than was asked rather than less, and the surviving header is one the
     /// same attacker already chose to send. The direction that would matter — naming a trusted hop's
-    /// identity headers in <c>Connection</c> to have them stripped — is closed by the <c>Connection</c>
+    /// identity headers in <c language="text">Connection</c> to have them stripped — is closed by the <c language="text">Connection</c>
     /// header itself never being relayed.
     /// </remarks>
     [Fact]

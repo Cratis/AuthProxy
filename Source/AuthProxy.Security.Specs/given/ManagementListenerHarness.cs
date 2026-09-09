@@ -28,8 +28,8 @@ namespace Cratis.AuthProxy.Security.given;
 /// </summary>
 /// <remarks>
 /// Real sockets, deliberately, and the only place in this suite that needs them. Every other security spec
-/// runs on <c>WebApplicationFactory</c>'s in-memory test server, which has no socket at all and reports
-/// <c>Connection.LocalPort</c> as zero — so every assertion about which listener a request arrived on would
+/// runs on <c language="text">WebApplicationFactory</c>'s in-memory test server, which has no socket at all and reports
+/// <c language="text">Connection.LocalPort</c> as zero — so every assertion about which listener a request arrived on would
 /// pass without proving anything, including against an implementation that isolated nothing.
 /// <para>
 /// The bare deployment is here because "no management section changes nothing" is a claim about what is
@@ -37,7 +37,7 @@ namespace Cratis.AuthProxy.Security.given;
 /// exactly like the other one minus the section.
 /// </para>
 /// <para>
-/// The pipeline mirrors <c>Program.cs</c> rather than running it, because these specs have to choose the
+/// The pipeline mirrors <c language="text">Program.cs</c> rather than running it, because these specs have to choose the
 /// addresses and the origin before the host is built. The registration and the pipeline placement it
 /// mirrors are the two things under test, so both are called here exactly as the program calls them.
 /// </para>

@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy;
 /// <remarks>
 /// A refused entry leaves its path authenticated, which is the safe outcome but an invisible one — the
 /// operator declared a path public and it silently is not. Naming the reason is what makes the refusal
-/// reportable, so <c>MicroserviceReverseProxyConfigProvider</c> can say which entry was dropped and why
+/// reportable, so <c language="text">MicroserviceReverseProxyConfigProvider</c> can say which entry was dropped and why
 /// rather than leaving it to be discovered from a login prompt on a path that was meant to be open.
 /// </remarks>
 public enum AnonymousPathRejection
@@ -20,16 +20,16 @@ public enum AnonymousPathRejection
     /// <summary>The entry was blank, or whitespace only.</summary>
     Empty = 1,
 
-    /// <summary>The entry does not start with <c>/</c>.</summary>
+    /// <summary>The entry does not start with <c language="text">/</c>.</summary>
     NotRooted = 2,
 
     /// <summary>The entry resolves to the application root, which would make the whole service anonymous.</summary>
     Root = 3,
 
-    /// <summary>The entry contains an empty segment, from a repeated <c>/</c>.</summary>
+    /// <summary>The entry contains an empty segment, from a repeated <c language="text">/</c>.</summary>
     EmptySegment = 4,
 
-    /// <summary>The entry contains a <c>.</c> or <c>..</c> segment.</summary>
+    /// <summary>The entry contains a <c language="text">.</c> or <c language="text">..</c> segment.</summary>
     DotSegment = 5,
 
     /// <summary>The entry contains a character outside the permitted set.</summary>

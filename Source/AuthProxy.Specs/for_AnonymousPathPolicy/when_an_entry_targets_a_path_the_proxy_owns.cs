@@ -9,9 +9,9 @@ namespace Cratis.AuthProxy.for_AnonymousPathPolicy;
 /// An anonymous route is emitted at order 0, ahead of every service-selected route, and the three
 /// middlewares stop applying their checks below a declared prefix. So pointing one at AuthProxy's own
 /// namespace does not make an endpoint public — those endpoints already admit anonymous callers where they
-/// are meant to. It <em>removes</em> the endpoint from AuthProxy: a declared <c>/.cratis</c> hands the
-/// logout, token, tenant-selection and login endpoints to a backend, and a declared <c>/invite</c> or
-/// <c>/register</c> puts those flow middlewares behind a proxied route. Both are configuration mistakes
+/// are meant to. It <em>removes</em> the endpoint from AuthProxy: a declared <c language="text">/.cratis</c> hands the
+/// logout, token, tenant-selection and login endpoints to a backend, and a declared <c language="text">/invite</c> or
+/// <c language="text">/register</c> puts those flow middlewares behind a proxied route. Both are configuration mistakes
 /// with no legitimate spelling, so they are refused outright.
 /// </para>
 /// </summary>

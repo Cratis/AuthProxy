@@ -40,4 +40,7 @@ internal static partial class InviteMiddlewareLogging
         this ILogger logger,
         Configuration.InvitationCompletionDestination destination,
         InvitationTenantRelation tenantRelation);
+
+    [LoggerMessage(LogLevel.Warning, "Attested invitation completion failed: {Reason}")]
+    internal static partial void AttestedInvitationCompletionFailed(this ILogger logger, InvitationCompletionFailureReason reason);
 }

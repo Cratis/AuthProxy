@@ -10,9 +10,9 @@ namespace Cratis.AuthProxy;
 /// Resolves the anonymous path prefixes declared in <see cref="C.Service.AnonymousPaths"/>.
 /// </summary>
 /// <remarks>
-/// Four components have to agree on what counts as an anonymous path — <c>SelectProviderMiddleware</c>
-/// (do not serve the provider-selection page), <c>TenantSelectionMiddleware</c> (do not serve the
-/// tenant chooser to a signed-in caller who has not chosen one), <c>TenancyMiddleware</c> (do not refuse
+/// Four components have to agree on what counts as an anonymous path — <c language="text">SelectProviderMiddleware</c>
+/// (do not serve the provider-selection page), <c language="text">TenantSelectionMiddleware</c> (do not serve the
+/// tenant chooser to a signed-in caller who has not chosen one), <c language="text">TenancyMiddleware</c> (do not refuse
 /// a caller with no resolvable tenant), and the reverse-proxy route table (do not apply the
 /// authenticated-user authorization policy). If one disagreed the path would still be unreachable and the
 /// disagreement would be silent, so they all resolve through here.

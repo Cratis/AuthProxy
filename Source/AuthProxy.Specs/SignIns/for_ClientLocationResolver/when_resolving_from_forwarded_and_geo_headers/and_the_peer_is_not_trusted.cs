@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.SignIns.for_ClientLocationResolver.when_resolving_fro
 /// A caller that is not one of the deployment's own proxies gets none of its claims about itself believed.
 /// </summary>
 /// <remarks>
-/// This spec used to assert the opposite — that the left-most <c>X-Forwarded-For</c> entry won — which made
+/// This spec used to assert the opposite — that the left-most <c language="text">X-Forwarded-For</c> entry won — which made
 /// the reported address the one value on the request an attacker most directly controls. Worse, the
 /// forwarded-headers middleware consumes entries from the <em>right</em>, so the address recorded against a
 /// sign-in was not even the address the rest of the proxy was using for the same request: one request, two

@@ -59,7 +59,7 @@ public class an_admission_policy : Specification
     /// <summary>
     /// Puts the given cookies on the request.
     /// </summary>
-    /// <param name="cookies">The cookies, as <c>name=value</c> pairs.</param>
+    /// <param name="cookies">The cookies, as <c language="text">name=value</c> pairs.</param>
     protected void Presenting(params string[] cookies) =>
         _context.Request.Headers.Cookie = string.Join("; ", cookies);
 }

@@ -11,8 +11,8 @@ namespace Cratis.AuthProxy.Management;
 /// </summary>
 /// <remarks>
 /// Adding a listener means re-declaring the existing ones alongside it, so what they are has to be answered
-/// before anything is changed. The host resolves them in a specific order — the <c>urls</c> setting first
-/// (<c>ASPNETCORE_URLS</c>), then the <c>HTTP_PORTS</c> and <c>HTTPS_PORTS</c> settings, which is how the
+/// before anything is changed. The host resolves them in a specific order — the <c language="text">urls</c> setting first
+/// (<c language="text">ASPNETCORE_URLS</c>), then the <c language="text">HTTP_PORTS</c> and <c language="text">HTTPS_PORTS</c> settings, which is how the
 /// official .NET container images publish port 8080 — and reading only the first of those would silently
 /// unbind the public listener of every containerized deployment.
 /// </remarks>
@@ -56,7 +56,7 @@ public sealed class ListenerAddresses
     /// <summary>
     /// Gets the port an address names.
     /// </summary>
-    /// <param name="address">The address, for example <c>http://+:8080</c> or <c>http://[::1]:9110</c>.</param>
+    /// <param name="address">The address, for example <c language="text">http://+:8080</c> or <c language="text">http://[::1]:9110</c>.</param>
     /// <returns>The port, or <see langword="null"/> when the address names none.</returns>
     public static int? PortOf(string address)
     {

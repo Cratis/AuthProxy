@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// <remarks>
 /// Every deletion is issued at the root path with the Secure attribute mirroring the request scheme, so it
 /// matches how such cookies are typically written and is not discarded by the browser. A cookie scoped to
-/// a parent domain (e.g. <c>.cratis.studio</c>) is invisible to a host-scoped deletion, so when an entry
+/// a parent domain (e.g. <c language="text">.cratis.studio</c>) is invisible to a host-scoped deletion, so when an entry
 /// carries a domain the deletion is issued for that domain as well — deleting for a parent domain of the
 /// current host is legal, which is exactly what makes it possible to kill such a straggler from here.
 /// </remarks>

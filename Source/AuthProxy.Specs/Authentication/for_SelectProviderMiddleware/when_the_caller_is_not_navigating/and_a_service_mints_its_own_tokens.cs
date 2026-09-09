@@ -8,8 +8,8 @@ namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_the_
 /// <summary>
 /// The bearer challenge is equally real when the token comes from AuthProxy itself.
 /// <para>
-/// A service configured for back-channel client credentials can exchange them at <c>/.cratis/token</c> for
-/// a token this proxy accepts, so naming <c>Bearer</c> points the caller at a door that opens — with no
+/// A service configured for back-channel client credentials can exchange them at <c language="text">/.cratis/token</c> for
+/// a token this proxy accepts, so naming <c language="text">Bearer</c> points the caller at a door that opens — with no
 /// external authority configured at all.
 /// </para>
 /// </summary>

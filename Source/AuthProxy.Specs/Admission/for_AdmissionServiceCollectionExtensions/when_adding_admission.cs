@@ -11,15 +11,15 @@ namespace Cratis.AuthProxy.Admission.for_AdmissionServiceCollectionExtensions;
 /// registration rather than from the constant it is configured with.
 /// </summary>
 /// <remarks>
-/// <c>CreateClient</c> answers for a name nothing ever registered — with <see cref="HttpClient"/>'s own
+/// <c language="text">CreateClient</c> answers for a name nothing ever registered — with <see cref="HttpClient"/>'s own
 /// hundred-second default. So deleting the registration outright leaves every existing spec green and every
 /// caller who has been admitted to nothing able to hold a request open for a hundred seconds against a
 /// verifier that stopped answering. The timeout is the thing that stops that, and this is what says it is
 /// still there.
 /// <para>
-/// Resolved through <c>AddIngressConfiguration</c> rather than through <c>AddAdmission</c> alone, because
+/// Resolved through <c language="text">AddIngressConfiguration</c> rather than through <c language="text">AddAdmission</c> alone, because
 /// that is what the process does and it is what makes the hazard reproducible: the ingress registration adds
-/// an unnamed <c>HttpClient</c> too, so a provider missing the named registration still hands back a client
+/// an unnamed <c language="text">HttpClient</c> too, so a provider missing the named registration still hands back a client
 /// — the silently wrong one — instead of failing to resolve anything.
 /// </para>
 /// </remarks>

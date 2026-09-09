@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Aspire.for_AuthProxyExtensions;
 
 /// <summary>
 /// Opening the management listener is its own builder rather than another optional argument on
-/// <c>AddAuthProxy</c>, and it writes exactly the four keys the proxy reads.
+/// <c language="text">AddAuthProxy</c>, and it writes exactly the four keys the proxy reads.
 /// <para>
 /// The Aspire package cannot reference the proxy it configures, so these strings are the only thing joining
 /// the two. A rename on either side binds nothing and falls back to a default — which for the port, the one

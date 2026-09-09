@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Admission.for_AdmissionPolicy.when_admitting_a_reques
 
 /// <summary>
 /// An entry expires on AuthProxy's own clock rather than on the browser's willingness to stop sending the
-/// cookie. A cookie whose <c>Max-Age</c> has passed is simply one a browser has been asked not to send —
+/// cookie. A cookie whose <c language="text">Max-Age</c> has passed is simply one a browser has been asked not to send —
 /// nothing stops one being sent anyway.
 /// </summary>
 public class and_the_entry_transaction_has_expired : given.an_admission_policy

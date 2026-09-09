@@ -13,21 +13,21 @@ namespace Cratis.AuthProxy;
 /// so the entry itself is attacker-relevant input: whoever writes the configuration may be copying a path
 /// from a bug report, a URL, or a template. Every rule here is fail-closed — a refused entry leaves that
 /// path authenticated, never the reverse — and the refusal is reported by
-/// <c>MicroserviceReverseProxyConfigProvider</c> rather than swallowed.
+/// <c language="text">MicroserviceReverseProxyConfigProvider</c> rather than swallowed.
 /// <para>
 /// The characters are an allow-list, not a deny-list, which is the whole point: a deny-list has to
 /// anticipate every character that means something to one of the two matchers, and the cost of missing one
 /// is a prefix that means different things to the middlewares and to the router. The permitted set is RFC
-/// 3986 <em>unreserved</em> (<c>A-Z a-z 0-9 - . _ ~</c>) plus the separator, which is every character a
+/// 3986 <em>unreserved</em> (<c language="text">A-Z a-z 0-9 - . _ ~</c>) plus the separator, which is every character a
 /// path prefix needs and nothing that carries meaning anywhere else. It excludes, by construction rather
-/// than by enumeration: <c>%</c> (a prefix whose meaning depends on encoding cannot be reasoned about, and
-/// <c>%2e%2e%2f</c> / <c>%2f</c> are the classic traversal and separator smuggling forms), <c>{}*</c> (a
-/// route <em>parameter</em> or catch-all, which would make the router match <c>/aANYTHING/…</c> where the
-/// middlewares match only the literal), <c>\</c> (a separator to some backends and not to others),
-/// <c>?#</c> (they end the path), <c>;</c> (path parameters, which some backends strip and others do not),
-/// <c>:</c> and <c>@</c> (authority syntax), control characters and whitespace (log and header injection,
+/// than by enumeration: <c language="text">%</c> (a prefix whose meaning depends on encoding cannot be reasoned about, and
+/// <c language="text">%2e%2e%2f</c> / <c language="text">%2f</c> are the classic traversal and separator smuggling forms), <c language="text">{}*</c> (a
+/// route <em>parameter</em> or catch-all, which would make the router match <c language="text">/aANYTHING/…</c> where the
+/// middlewares match only the literal), <c language="text">\</c> (a separator to some backends and not to others),
+/// <c language="text">?#</c> (they end the path), <c language="text">;</c> (path parameters, which some backends strip and others do not),
+/// <c language="text">:</c> and <c language="text">@</c> (authority syntax), control characters and whitespace (log and header injection,
 /// and invisible differences between two entries that read identically), and every non-ASCII character
-/// (<c>NFC</c> and <c>NFD</c> spellings of the same path compare unequal, so which one is anonymous would
+/// (<c language="text">NFC</c> and <c language="text">NFD</c> spellings of the same path compare unequal, so which one is anonymous would
 /// depend on how the configuration file was saved).
 /// </para>
 /// </remarks>
@@ -107,9 +107,9 @@ public static class AnonymousPathPolicy
     /// <param name="normalized">The trimmed, rooted prefix.</param>
     /// <returns><see cref="AnonymousPathRejection.None"/> when every segment is usable; otherwise the reason.</returns>
     /// <remarks>
-    /// A <c>.</c> or <c>..</c> segment is refused rather than resolved. Resolving it would be the more
-    /// forgiving choice and the wrong one: <c>/public/../admin</c> reads as scoped to <c>/public</c> while
-    /// meaning <c>/admin</c>, so silently accepting it as <c>/admin</c> would open a path the operator did
+    /// A <c language="text">.</c> or <c language="text">..</c> segment is refused rather than resolved. Resolving it would be the more
+    /// forgiving choice and the wrong one: <c language="text">/public/../admin</c> reads as scoped to <c language="text">/public</c> while
+    /// meaning <c language="text">/admin</c>, so silently accepting it as <c language="text">/admin</c> would open a path the operator did
     /// not believe they were naming. Refusing keeps a declaration's meaning the same as its spelling.
     /// </remarks>
     static AnonymousPathRejection EvaluateSegments(string normalized)
@@ -141,8 +141,8 @@ public static class AnonymousPathPolicy
     /// middlewares stop applying their checks below a declared prefix. Pointing one at AuthProxy's own
     /// namespace therefore does not make an endpoint public — those endpoints already allow anonymous
     /// callers where they are meant to — it takes the endpoint <em>away</em> from AuthProxy: a declared
-    /// <c>/.cratis</c> claims the logout, token, tenant-selection and login endpoints for a backend, and a
-    /// declared <c>/invite</c> or <c>/register</c> puts the flow middlewares behind a proxied route. The
+    /// <c language="text">/.cratis</c> claims the logout, token, tenant-selection and login endpoints for a backend, and a
+    /// declared <c language="text">/invite</c> or <c language="text">/register</c> puts the flow middlewares behind a proxied route. The
     /// prefixes are reserved so that cannot be configured by accident.
     /// </remarks>
     static bool IsReserved(string normalized)

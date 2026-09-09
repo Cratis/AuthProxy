@@ -9,10 +9,10 @@ namespace Cratis.AuthProxy;
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <remarks>
-/// <see cref="IngressExtensions.UseIngress"/> anchors endpoint matching at <c>UseRouting</c>, and YARP's
+/// <see cref="IngressExtensions.UseIngress"/> anchors endpoint matching at <c language="text">UseRouting</c>, and YARP's
 /// catch-all route matches every path — including the two prefixes that are reserved from every service
 /// precisely because no service ever serves them. Those routes are generated with the default authorization
-/// policy, which is <c>RequireAuthenticatedUser</c>, so <c>UseAuthorization</c> refused an invitation or a
+/// policy, which is <c language="text">RequireAuthenticatedUser</c>, so <c language="text">UseAuthorization</c> refused an invitation or a
 /// registration before <see cref="Invites.InviteMiddleware"/> or
 /// <see cref="Registrations.RegistrationMiddleware"/> — both registered after it — could run at all. The
 /// visible symptom was an invitation link that answered with provider selection and no pending-invitation
@@ -22,8 +22,8 @@ namespace Cratis.AuthProxy;
 /// <para>
 /// The endpoint is cleared rather than the authorization step skipped. Skipping it would leave the
 /// catch-all's authorization metadata on a request that never evaluated it, which
-/// <c>EndpointMiddleware</c> refuses outright; clearing it removes the claim on the path instead, leaving
-/// <c>UseAuthorization</c> to find nothing to enforce and pass the request on. That says what is true —
+/// <c language="text">EndpointMiddleware</c> refuses outright; clearing it removes the claim on the path instead, leaving
+/// <c language="text">UseAuthorization</c> to find nothing to enforce and pass the request on. That says what is true —
 /// these paths belong to the proxy, not to a route — and makes it impossible for one to be proxied to a
 /// backend by a route that matched it only for want of a more specific one.
 /// </para>

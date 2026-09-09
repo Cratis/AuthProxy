@@ -40,23 +40,23 @@ public class Service
     /// </summary>
     /// <remarks>
     /// Without this, every path behind the proxy requires a session: an unauthenticated request is
-    /// answered by <c>SelectProviderMiddleware</c> with the provider-selection page — at <c>HTTP 200</c>,
+    /// answered by <c language="text">SelectProviderMiddleware</c> with the provider-selection page — at <c language="text">HTTP 200</c>,
     /// so a non-browser caller records success and never retries — and any request that does reach the
     /// reverse proxy is refused by the default authorization policy. An application that legitimately
     /// serves some paths anonymously (a magic-link landing page, a signed-token report, a public webhook
     /// receiver) has no way to express that. Listing those paths here does.
     /// <para>
     /// Each entry is a path prefix, matched case-insensitively on segment boundaries exactly like the
-    /// built-in invite / registration / authentication-UI paths: <c>/portal</c> matches <c>/portal</c> and
-    /// <c>/portal/anything</c>, but not <c>/portalx</c>. Because it is a prefix, an entry covers
+    /// built-in invite / registration / authentication-UI paths: <c language="text">/portal</c> matches <c language="text">/portal</c> and
+    /// <c language="text">/portal/anything</c>, but not <c language="text">/portalx</c>. Because it is a prefix, an entry covers
     /// everything below it, so name the specific leaf path whenever a sibling under the same parent is not
     /// public. An entry that is not a plain rooted path of literal segments — blank, unrooted, the bare
-    /// <c>/</c>, or carrying a route-template character — is discarded, leaving that path authenticated.
+    /// <c language="text">/</c>, or carrying a route-template character — is discarded, leaving that path authenticated.
     /// See <see cref="AnonymousPaths.TryNormalize"/> for the exact rule.
     /// </para>
     /// <para>
     /// This does not weaken the identity boundary. Requests still flow through AuthProxy, so
-    /// <c>TenancyMiddleware</c> strips inbound <c>x-ms-client-principal*</c> and <c>Tenant-ID</c> headers
+    /// <c language="text">TenancyMiddleware</c> strips inbound <c language="text">x-ms-client-principal*</c> and <c language="text">Tenant-ID</c> headers
     /// as it does for every request, and no principal headers are injected for a caller with no session.
     /// The application stays responsible for authorizing these paths — this only stops the proxy from
     /// demanding a login before the application is ever reached.
@@ -72,21 +72,21 @@ public class Service
     /// in, never widen it. Leave unset to require only what the root requires.
     /// <para>
     /// The service a request targets is resolved the way the route table resolves it: the single
-    /// configured service when there is only one, otherwise the <c>Service-ID</c> header or the
-    /// <c>service</c> query parameter. A request in a multi-service deployment that names no service
+    /// configured service when there is only one, otherwise the <c language="text">Service-ID</c> header or the
+    /// <c language="text">service</c> query parameter. A request in a multi-service deployment that names no service
     /// matches no service route either, so only the root requirements apply to it.
     /// </para>
     /// </remarks>
     public Authorization? Authorization { get; set; }
 
     /// <summary>
-    /// Gets or sets whether to call the <c>/.cratis/me</c> identity endpoint on this service
+    /// Gets or sets whether to call the <c language="text">/.cratis/me</c> identity endpoint on this service
     /// to enrich the identity details cookie. Defaults to <see langword="true"/> when a Backend is configured.
     /// </summary>
     public bool? ResolveIdentityDetails { get; set; }
 
     /// <summary>
-    /// Gets or sets what this service's <c>/.cratis/me</c> answer means. Defaults to
+    /// Gets or sets what this service's <c language="text">/.cratis/me</c> answer means. Defaults to
     /// <see cref="IdentityVerificationMode.BestEffort"/>, the released behavior.
     /// </summary>
     /// <remarks>
@@ -95,7 +95,7 @@ public class Service
     /// service can be asked for details it is allowed to fail to supply, or asked for a decision it is not.
     /// <para>
     /// Set this to <see cref="IdentityVerificationMode.Required"/> only for a service that genuinely answers
-    /// <c>/.cratis/me</c> with an authorization verdict. Every failure to obtain that verdict then denies
+    /// <c language="text">/.cratis/me</c> with an authorization verdict. Every failure to obtain that verdict then denies
     /// the request, which is the point — but it also means an outage of that one service takes the whole
     /// proxied surface down with it, deliberately, rather than serving callers whose access nobody could
     /// confirm.
@@ -109,7 +109,7 @@ public class Service
     public IdentityVerificationMode IdentityVerification { get; set; } = IdentityVerificationMode.BestEffort;
 
     /// <summary>
-    /// Gets or sets how long AuthProxy waits for this service's <c>/.cratis/me</c> answer before treating
+    /// Gets or sets how long AuthProxy waits for this service's <c language="text">/.cratis/me</c> answer before treating
     /// the call as failed. Leave unset to let the mode decide — see
     /// <see cref="EffectiveIdentityVerificationTimeout"/>. Set to zero or a negative value to leave the wait
     /// unbounded.
@@ -122,7 +122,7 @@ public class Service
     public TimeSpan? IdentityVerificationTimeout { get; set; }
 
     /// <summary>
-    /// Gets how long AuthProxy actually waits for this service's <c>/.cratis/me</c> answer.
+    /// Gets how long AuthProxy actually waits for this service's <c language="text">/.cratis/me</c> answer.
     /// </summary>
     /// <remarks>
     /// A bound on the wait is a property of fail-closed verification, not of enrichment, so an unstated

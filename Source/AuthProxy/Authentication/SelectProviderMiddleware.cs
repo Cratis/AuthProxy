@@ -15,7 +15,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// (when exactly one provider is configured).
 /// When the proxy is in lobby mode (<see cref="C.Invite.RedirectToLobbyWhenTenantUnresolved"/> is
 /// enabled and a lobby URL is configured), unauthenticated requests without an invite token or
-/// pending invite cookie are immediately answered with the <c>invitation-required.html</c> page
+/// pending invite cookie are immediately answered with the <c language="text">invitation-required.html</c> page
 /// instead of being redirected to a login provider.
 /// Skips invite paths, registration paths, a provider's login-challenge endpoint, the providers and
 /// token endpoints, paths a service declares in <see cref="C.Service.AnonymousPaths"/>, and requests
@@ -23,7 +23,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// directly (e.g. a redirect from the cookie authentication handler, or an invite flow) is exactly what
 /// this middleware answers.
 /// Both answers are only served to a browser navigating to a document; every other caller is refused
-/// with <c>401</c>, because a page or a login redirect reads as a delivered success to a client that
+/// with <c language="text">401</c>, because a page or a login redirect reads as a delivered success to a client that
 /// checks the status code.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
@@ -138,7 +138,7 @@ public class SelectProviderMiddleware(
     /// Ordinarily the current request IS the destination — this middleware answers in place of
     /// whatever the caller was navigating to, so its path and query say where that was. The one
     /// exception is a request that already landed on the selection page's own path carrying an
-    /// explicit <c>returnUrl</c> — the cookie authentication handler's redirect, or the invite flow,
+    /// explicit <c language="text">returnUrl</c> — the cookie authentication handler's redirect, or the invite flow,
     /// send callers there this way — in which case that query value, not the wrapper URL around it, is
     /// the real destination.
     /// </remarks>
@@ -172,9 +172,9 @@ public class SelectProviderMiddleware(
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
     /// <remarks>
-    /// A <c>401</c> is required to carry a <c>WWW-Authenticate</c> challenge, and the only credential this
+    /// A <c language="text">401</c> is required to carry a <c language="text">WWW-Authenticate</c> challenge, and the only credential this
     /// proxy accepts on the wire is a bearer token — a JWT from the configured authority, or one AuthProxy
-    /// itself mints at <c>/.cratis/token</c> for a service with client credentials. The challenge is
+    /// itself mints at <c language="text">/.cratis/token</c> for a service with client credentials. The challenge is
     /// therefore emitted exactly when one of those is configured; a deployment where neither is means there
     /// is no token-based way in at all, and naming a scheme that cannot work would send a caller after
     /// credentials no endpoint would accept.

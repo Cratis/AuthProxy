@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Authorization.for_AccessPolicy;
 /// <para>
 /// Startup validation refuses such a configuration outright, so this is the second line rather than the
 /// first — but it is the line that decides which way the failure falls. Discarding an unusable requirement
-/// is how an unusable <c>AnonymousPaths</c> entry is handled, and it is fail-closed <em>there</em> because
+/// is how an unusable <c language="text">AnonymousPaths</c> entry is handled, and it is fail-closed <em>there</em> because
 /// discarding leaves the path authenticated. Here the same move would leave the gate open, so the
 /// direction has to be the other one: unsatisfiable means nobody satisfies it.
 /// </para>

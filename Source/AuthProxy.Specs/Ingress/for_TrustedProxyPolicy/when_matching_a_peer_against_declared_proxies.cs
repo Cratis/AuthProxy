@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Ingress.for_TrustedProxyPolicy;
 /// </summary>
 /// <remarks>
 /// The IPv4-mapped case is the one that silently ruins a correct configuration: a dual-stack listener reports
-/// an IPv4 peer as <c>::ffff:10.0.0.7</c>, so an operator who declared <c>10.0.0.0/8</c> would see none of
+/// an IPv4 peer as <c language="text">::ffff:10.0.0.7</c>, so an operator who declared <c language="text">10.0.0.0/8</c> would see none of
 /// their own traffic match, conclude the setting does not work, and reach for the allow-all fallback.
 /// </remarks>
 public class when_matching_a_peer_against_declared_proxies : a_trusted_proxy_policy

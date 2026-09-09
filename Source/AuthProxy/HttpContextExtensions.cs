@@ -29,7 +29,7 @@ public static class HttpContextExtensions
     /// <remarks>
     /// The value has to be usable, not merely present. Every caller of this asks it in order to <em>relax</em>
     /// something — the tenancy refusal, the provider-selection refusal, the identity caches — on the grounds
-    /// that an invite exchange is about to run. A bare <c>Cookie: .cratis-invite=</c> answered yes to that
+    /// that an invite exchange is about to run. A bare <c language="text">Cookie: .cratis-invite=</c> answered yes to that
     /// while <see cref="TryGetPendingInvitationToken"/> answered no to the exchange itself, so the relaxation
     /// happened and the exchange did not, and any caller could ask for it.
     /// </remarks>
@@ -68,9 +68,9 @@ public static class HttpContextExtensions
     /// <remarks>
     /// These two prefixes are reserved (<see cref="AnonymousPathPolicy"/>) precisely because they are never
     /// routed to a backend — the invitation and registration middlewares answer them in full, validating
-    /// their own capabilities as they go. Both middlewares run after <c>UseAuthorization</c>, so the
+    /// their own capabilities as they go. Both middlewares run after <c language="text">UseAuthorization</c>, so the
     /// reverse proxy's catch-all route would otherwise select an endpoint carrying the default
-    /// <c>RequireAuthenticatedUser</c> policy and the request would be challenged before either of them
+    /// <c language="text">RequireAuthenticatedUser</c> policy and the request would be challenged before either of them
     /// ever saw it: an invitation link would redirect to provider selection instead of staging the
     /// invitation, and the flow could only complete on a second pass once a cookie it never planted
     /// happened to exist.
@@ -88,7 +88,7 @@ public static class HttpContextExtensions
 
     /// <summary>
     /// Determines whether the request targets a specific provider's login challenge endpoint
-    /// (e.g. <c>/.cratis/login/github</c>) — as opposed to the provider-selection page itself.
+    /// (e.g. <c language="text">/.cratis/login/github</c>) — as opposed to the provider-selection page itself.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if the request initiates a specific provider's challenge; otherwise <see langword="false"/>.</returns>
@@ -140,15 +140,15 @@ public static class HttpContextExtensions
     /// AuthProxy refuses unauthenticated callers by writing a page — provider selection, tenant selection —
     /// and a page has to be delivered with a success status to render. That is the right answer to a person
     /// in a browser and the wrong answer to everything else: a webhook or an integration reads the
-    /// <c>200</c> as delivered and never retries, and a frontend's <c>fetch()</c> passes the conventional
-    /// <c>response.ok</c> check and only fails later, on parsing. Callers that are not navigating are
+    /// <c language="text">200</c> as delivered and never retries, and a frontend's <c language="text">fetch()</c> passes the conventional
+    /// <c language="text">response.ok</c> check and only fails later, on parsing. Callers that are not navigating are
     /// refused with a status instead, so the refusal is visible where it is checked.
     /// <para>
     /// <see cref="FetchDestinationHeader"/> decides when it is present, because it is the only signal that
     /// separates a document navigation from a scripted request issued by the very same browser —
-    /// <c>fetch()</c> sends <c>Accept: *&#47;*</c>, which reads as "HTML will do" and is exactly the
+    /// <c language="text">fetch()</c> sends <c language="text">Accept: *&#47;*</c>, which reads as "HTML will do" and is exactly the
     /// misclassification to avoid. Only when the header is absent — a client predating fetch metadata —
-    /// does <c>Accept</c> decide, and then nothing short of an explicit <c>text/html</c> counts, so a
+    /// does <c language="text">Accept</c> decide, and then nothing short of an explicit <c language="text">text/html</c> counts, so a
     /// caller that states nothing is treated as the API caller it almost always is.
     /// </para>
     /// </remarks>
@@ -217,12 +217,12 @@ public static class HttpContextExtensions
     }
 
     /// <summary>
-    /// Determines whether an <c>Accept</c> entry asks for HTML.
+    /// Determines whether an <c language="text">Accept</c> entry asks for HTML.
     /// </summary>
-    /// <param name="mediaType">The parsed <c>Accept</c> entry.</param>
+    /// <param name="mediaType">The parsed <c language="text">Accept</c> entry.</param>
     /// <returns><see langword="true"/> when the entry asks for HTML; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// Only an explicit <c>text/html</c> counts. The wildcards <c>*&#47;*</c> and <c>text/*</c> do not:
+    /// Only an explicit <c language="text">text/html</c> counts. The wildcards <c language="text">*&#47;*</c> and <c language="text">text/*</c> do not:
     /// they are what a client sends when it will take whatever it is given, and reading them as a request
     /// for a page is the misclassification that turns a refusal into a recorded success. A quality of zero
     /// is the caller stating outright that HTML is unacceptable, so it is honored rather than matched.

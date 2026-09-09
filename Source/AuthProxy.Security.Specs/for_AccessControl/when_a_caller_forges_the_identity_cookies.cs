@@ -6,15 +6,15 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// <summary>
 /// OWASP A01 / A08 — the decision that a caller is authorized must not be something the caller can write.
 /// <para>
-/// AuthProxy asks every configured service's <c>/.cratis/me</c> endpoint whether a signed-in user is
+/// AuthProxy asks every configured service's <c language="text">/.cratis/me</c> endpoint whether a signed-in user is
 /// authorized at all, and remembers the answer so the question is not re-asked on every proxied request.
-/// Where that memory lives is the whole security question. The readable <c>.cratis-identity</c> cookie
+/// Where that memory lives is the whole security question. The readable <c language="text">.cratis-identity</c> cookie
 /// cannot be it: it is written non-HTTP-only on purpose, so a frontend can render the signed-in user from
 /// it, which means script on any proxied origin can rewrite it and any non-browser client can simply send
-/// one. Treating its presence as proof meant <c>Cookie: .cratis-identity=x</c> alongside a valid session
+/// one. Treating its presence as proof meant <c language="text">Cookie: .cratis-identity=x</c> alongside a valid session
 /// skipped the authorization call entirely — a user whose access had been revoked stayed authorized for as
 /// long as they chose to keep sending it, and no expiry could stop them, because a cookie's
-/// <c>Max-Age</c> is a request to the browser rather than a rule.
+/// <c language="text">Max-Age</c> is a request to the browser rather than a rule.
 /// </para>
 /// <para>
 /// So the authorization answer is remembered in a separate HTTP-only cookie sealed with data protection
@@ -71,7 +71,7 @@ public class when_a_caller_forges_the_identity_cookies(SecurityHarness harness) 
     /// to authorize them.
     /// </summary>
     /// <param name="hint">A label making the user recognizable in a failure.</param>
-    /// <param name="cookies">The raw <c>Cookie</c> header to present, if any.</param>
+    /// <param name="cookies">The raw <c language="text">Cookie</c> header to present, if any.</param>
     /// <returns><see langword="true"/> when the origin was asked; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// A fresh user each time, because the resolver also keeps a short-lived server-side cache keyed by

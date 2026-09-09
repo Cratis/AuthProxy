@@ -5,11 +5,11 @@ namespace Cratis.AuthProxy.Management.for_ManagementListenerIsolation.given;
 
 /// <summary>
 /// A management listener on its own port, and the means to present it a request that arrived on a chosen
-/// socket carrying a chosen <c>Host</c> header.
+/// socket carrying a chosen <c language="text">Host</c> header.
 /// </summary>
 /// <remarks>
 /// The two are set independently on purpose. Which socket a request arrived on is a fact of the connection;
-/// what the <c>Host</c> header says is whatever the caller wrote. Every question these specs ask is about
+/// what the <c language="text">Host</c> header says is whatever the caller wrote. Every question these specs ask is about
 /// what happens when the two disagree.
 /// </remarks>
 public class an_isolated_management_listener : Specification

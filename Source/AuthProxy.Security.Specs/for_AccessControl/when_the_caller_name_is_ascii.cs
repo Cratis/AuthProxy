@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// The counterpart to <see cref="when_the_caller_name_is_not_ascii"/>, and the reason the encoding is
 /// applied conditionally rather than always: an existing deployment must see the identity headers it has
 /// always seen, byte for byte, with nothing added. Backends parse these headers, and a proxy that started
-/// sending <c>UTF-8''user%40example.com</c> to everyone would break every one of them at once.
+/// sending <c language="text">UTF-8''user%40example.com</c> to everyone would break every one of them at once.
 /// <para>
 /// Asserted against the header dictionary the origin actually recorded, so the claim is about what went
 /// over the socket rather than about what the transform intended.

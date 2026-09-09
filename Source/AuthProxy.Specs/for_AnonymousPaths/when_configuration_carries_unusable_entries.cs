@@ -6,16 +6,16 @@ namespace Cratis.AuthProxy.for_AnonymousPaths;
 /// <summary>
 /// Entries that cannot express a path prefix must be discarded rather than matched.
 /// <para>
-/// The empty entry is the one that matters: <c>PathString.StartsWithSegments(string.Empty)</c> is true
+/// The empty entry is the one that matters: <c language="text">PathString.StartsWithSegments(string.Empty)</c> is true
 /// for every request, so a stray blank value — an env var set but never given a value, a trailing index
 /// in a configuration array — would otherwise turn the entire service anonymous, silently and globally.
 /// That is the worst possible failure for this feature, so it is pinned here rather than left to review.
-/// The bare <c>/</c> is the same failure spelled differently.
+/// The bare <c language="text">/</c> is the same failure spelled differently.
 /// </para>
 /// <para>
 /// The route-template characters are the second class. A prefix is interpolated into an ASP.NET route
-/// template, so <c>/a{x}</c> would become a route <em>parameter</em> and make the router match
-/// <c>/anything/…</c> while the middlewares matched only the literal — the two components disagreeing
+/// template, so <c language="text">/a{x}</c> would become a route <em>parameter</em> and make the router match
+/// <c language="text">/anything/…</c> while the middlewares matched only the literal — the two components disagreeing
 /// about the same prefix, which is the failure the shared matcher exists to prevent.
 /// </para>
 /// </summary>

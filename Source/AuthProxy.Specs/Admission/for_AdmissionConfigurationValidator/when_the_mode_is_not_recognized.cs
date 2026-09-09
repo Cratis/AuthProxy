@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Admission.for_AdmissionConfigurationValidator;
 
 /// <summary>
 /// The mode is asked about before anything else, because everything below is asked of a mode that was
-/// understood. A value outside the enum is neither <c>Public</c> nor <c>CapabilityOnly</c>, so the early
+/// understood. A value outside the enum is neither <c language="text">Public</c> nor <c language="text">CapabilityOnly</c>, so the early
 /// return for "not capability-only" would hand it straight past every check here — leaving a deployment that
 /// asked to be closed accepted as configured, and gated by nothing.
 /// </summary>

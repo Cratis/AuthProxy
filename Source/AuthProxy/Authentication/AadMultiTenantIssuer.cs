@@ -7,15 +7,15 @@ using Microsoft.IdentityModel.Tokens;
 namespace Cratis.AuthProxy.Authentication;
 
 /// <summary>
-/// Validates token issuers for the multi-tenant Microsoft Entra authorities (<c>common</c>,
-/// <c>organizations</c>, <c>consumers</c>).
+/// Validates token issuers for the multi-tenant Microsoft Entra authorities (<c language="text">common</c>,
+/// <c language="text">organizations</c>, <c language="text">consumers</c>).
 /// </summary>
 /// <remarks>
 /// A multi-tenant authority's discovery metadata declares its issuer as the literal template
-/// <c>https://login.microsoftonline.com/{tenantid}/v2.0</c>, while every issued token carries the signing
+/// <c language="text">https://login.microsoftonline.com/{tenantid}/v2.0</c>, while every issued token carries the signing
 /// tenant's real issuer — so the default comparison rejects every token (IDX10205), for organizational and
 /// personal accounts alike. The fix Microsoft documents is a tenant-aware validator: substitute the token's
-/// own <c>tid</c> claim into the template and require the issuer to match. The tenant is not an open
+/// own <c language="text">tid</c> claim into the template and require the issuer to match. The tenant is not an open
 /// wildcard — the issuer must be exactly the Microsoft issuer for the tenant that the token itself claims,
 /// with the signing key already validated against Microsoft's metadata before this runs.
 /// </remarks>
@@ -39,7 +39,7 @@ public static class AadMultiTenantIssuer
 
     /// <summary>
     /// Validates that a token's issuer is the Microsoft issuer for the tenant the token itself names in its
-    /// <c>tid</c> claim. Assign to <see cref="TokenValidationParameters.IssuerValidator"/>.
+    /// <c language="text">tid</c> claim. Assign to <see cref="TokenValidationParameters.IssuerValidator"/>.
     /// </summary>
     /// <param name="issuer">The issuer from the token being validated.</param>
     /// <param name="token">The token being validated.</param>

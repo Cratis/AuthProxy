@@ -6,12 +6,12 @@ using System.Reflection;
 namespace Cratis.AuthProxy.ErrorPages.for_ErrorPageProvider;
 
 /// <summary>
-/// Every page the proxy can ask for must exist in the shipped <c>Pages</c> folder.
+/// Every page the proxy can ask for must exist in the shipped <c language="text">Pages</c> folder.
 /// <para>
 /// A missing one is not an error anywhere — <see cref="ErrorPageProvider"/> falls back to a minimal inline
 /// document, so the deployment gets a bare "Error 200" heading where the sign-in chooser belongs and
-/// nothing reports why. That is exactly how <c>select-provider.html</c> came to be absent while its twin
-/// <c>invitation-select-provider.html</c> shipped: both are listed in the documentation as defaults, and
+/// nothing reports why. That is exactly how <c language="text">select-provider.html</c> came to be absent while its twin
+/// <c language="text">invitation-select-provider.html</c> shipped: both are listed in the documentation as defaults, and
 /// only one of them was there.
 /// </para>
 /// </summary>

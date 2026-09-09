@@ -28,7 +28,7 @@ public class InvitationAttestation
     /// </summary>
     /// <remarks>
     /// Keep the previous key during a rotation until every attestation it signed has expired. The invitation
-    /// authority pins the corresponding public keys and selects one by the required JWT <c>kid</c> header.
+    /// authority pins the corresponding public keys and selects one by the required JWT <c language="text">kid</c> header.
     /// </remarks>
     public IList<InvitationAttestationSigningKey> SigningKeys { get; set; } = [];
 

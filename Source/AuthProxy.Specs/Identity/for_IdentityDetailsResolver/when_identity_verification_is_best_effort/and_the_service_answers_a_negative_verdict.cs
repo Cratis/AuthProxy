@@ -8,9 +8,9 @@ namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_ve
 
 /// <summary>
 /// The compatibility fence for the default mode. The released proxy read no verdict out of a successful
-/// body at all — it took <c>details</c> and forwarded the caller — so a service answering the full envelope
-/// with <c>isAuthorized: false</c> was admitted and enriched. That is the exact shape
-/// <c>IdentityProviderResult</c> serializes, so it is what a service reaching for the documented response
+/// body at all — it took <c language="text">details</c> and forwarded the caller — so a service answering the full envelope
+/// with <c language="text">isAuthorized: false</c> was admitted and enriched. That is the exact shape
+/// <c language="text">IdentityProviderResult</c> serializes, so it is what a service reaching for the documented response
 /// type writes, and there are deployments answering it today for reasons that have nothing to do with
 /// authorization: an account mid-onboarding, a trial that has lapsed into read-only, a profile the
 /// application renders a banner for.
@@ -18,7 +18,7 @@ namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_ve
 /// Reading it as a refusal here would take those deployments down on an upgrade, without a configuration
 /// change and without anything to look at but a forbidden page. A deployment that wants the verdict
 /// enforced asks for it with <see cref="C.IdentityVerificationMode.Required"/>, and
-/// <c>when_identity_verification_is_required/and_the_service_refuses_the_caller</c> is the same body pinned
+/// <c language="text">when_identity_verification_is_required/and_the_service_refuses_the_caller</c> is the same body pinned
 /// on the other side of that choice.
 /// </para>
 /// </summary>

@@ -129,7 +129,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     /// <summary>
     /// Creates an <see cref="HttpClient"/> that:
     /// - Does not follow redirects (so tests can inspect 302 responses).
-    /// - Optionally appears authenticated (sets the <c>X-Test-Auth</c> header on every request).
+    /// - Optionally appears authenticated (sets the <c language="text">X-Test-Auth</c> header on every request).
     /// - Optionally carries an invite token cookie.
     /// </summary>
     /// <param name="authenticated">Whether the client should appear authenticated.</param>

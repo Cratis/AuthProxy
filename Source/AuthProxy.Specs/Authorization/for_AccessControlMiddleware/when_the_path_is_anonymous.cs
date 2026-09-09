@@ -10,7 +10,7 @@ namespace Cratis.AuthProxy.Authorization.for_AccessControlMiddleware;
 /// This is not a loophole so much as the only coherent reading. A declared path exists precisely for
 /// callers who have no session — a webhook receiver, a magic-link landing page, a signed-token report —
 /// and a caller with no session carries no claims, so any requirement at all would refuse every one of
-/// them. A payment provider posting a webhook would get a <c>403</c> it cannot do anything about, and the
+/// them. A payment provider posting a webhook would get a <c language="text">403</c> it cannot do anything about, and the
 /// declaration that was supposed to make the path reachable would have been undone by a setting made
 /// somewhere else entirely.
 /// </para>

@@ -23,7 +23,7 @@ namespace Cratis.AuthProxy.Security.given;
 /// It is deliberately end to end and deliberately configured with everything a caller could learn something
 /// from — a declared anonymous path, configured providers, real page assets and a real origin. The question
 /// these specs ask is not what the client sees, which is easy to get right, but whether anything at all
-/// reached the application: a refusal that still caused a request, a <c>/.cratis/me</c> call or a log entry
+/// reached the application: a refusal that still caused a request, a <c language="text">/.cratis/me</c> call or a log entry
 /// inside the backend is a refusal that told an unadmitted caller the backend is there.
 /// </para>
 /// </remarks>

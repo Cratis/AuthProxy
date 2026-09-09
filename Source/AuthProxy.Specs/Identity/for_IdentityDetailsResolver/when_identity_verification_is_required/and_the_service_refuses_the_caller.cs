@@ -6,7 +6,7 @@ using System.Net;
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_verification_is_required;
 
 /// <summary>
-/// An outright refusal still denies, and now in both of the ways a service can express it: the <c>403</c>
+/// An outright refusal still denies, and now in both of the ways a service can express it: the <c language="text">403</c>
 /// that used to be the only path to a denial at all, and a well-formed body whose verdict is no. The second
 /// is what a service reaching for the documented response shape actually writes.
 /// </summary>

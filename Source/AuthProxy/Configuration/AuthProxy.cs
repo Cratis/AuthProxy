@@ -47,7 +47,7 @@ public class AuthProxy
 
     /// <summary>
     /// Gets or sets the credential-linking configuration.
-    /// Set this section to enable the session-preserving <c>/.cratis/link/{scheme}</c> flow.
+    /// Set this section to enable the session-preserving <c language="text">/.cratis/link/{scheme}</c> flow.
     /// </summary>
     public Link? Link { get; set; }
 
@@ -81,7 +81,7 @@ public class AuthProxy
     /// <summary>
     /// Gets or sets the absolute path to a directory containing custom error pages.
     /// Pages are looked up by their <see cref="WellKnownPageNames"/> file name inside this directory.
-    /// When empty or unset the ingress uses the built-in <c>Pages</c> directory.
+    /// When empty or unset the ingress uses the built-in <c language="text">Pages</c> directory.
     /// Override this by mounting a custom pages directory into the container and pointing
     /// this setting at the mount path.
     /// </summary>

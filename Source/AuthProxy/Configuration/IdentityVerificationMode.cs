@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
-/// Represents what a service's answer on <c>/.cratis/me</c> means to AuthProxy.
+/// Represents what a service's answer on <c language="text">/.cratis/me</c> means to AuthProxy.
 /// </summary>
 /// <remarks>
 /// Calling the identity endpoint answers two different questions at once, and they have opposite failure
@@ -25,10 +25,10 @@ namespace Cratis.AuthProxy.Configuration;
 public enum IdentityVerificationMode
 {
     /// <summary>
-    /// The endpoint enriches identity details, and only an HTTP <c>403</c> refuses the caller. Every other
+    /// The endpoint enriches identity details, and only an HTTP <c language="text">403</c> refuses the caller. Every other
     /// answer lets the request through and merges whatever details came with it — an unreachable service, a
-    /// timeout, a non-success status other than <c>403</c>, an empty body, an unparseable body, and a
-    /// well-formed body whose own <c>isAuthorized</c> or <c>isAuthenticated</c> verdict is negative or
+    /// timeout, a non-success status other than <c language="text">403</c>, an empty body, an unparseable body, and a
+    /// well-formed body whose own <c language="text">isAuthorized</c> or <c language="text">isAuthenticated</c> verdict is negative or
     /// self-contradicting. This is the released behavior, exactly, and remains the default.
     /// </summary>
     /// <remarks>
@@ -48,7 +48,7 @@ public enum IdentityVerificationMode
     /// <remarks>
     /// A denial expires the readable identity cookie and the sealed authorization record by asking the
     /// browser to delete them, and evicts the in-memory result. Two of those three are requests rather than
-    /// guarantees: a non-browser caller that ignores <c>Set-Cookie</c> keeps presenting the sealed record it
+    /// guarantees: a non-browser caller that ignores <c language="text">Set-Cookie</c> keeps presenting the sealed record it
     /// was issued and is short-circuited on it until it expires. So what this mode bounds is revocation
     /// <em>latency</em> — a positive can be reused for at most
     /// <see cref="Session.IdentityRevalidationInterval"/> (the sealed record) or

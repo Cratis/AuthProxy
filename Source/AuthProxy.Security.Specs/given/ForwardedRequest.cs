@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Security.given;
 /// </summary>
 /// <param name="Method">The HTTP method.</param>
 /// <param name="Path">The request path.</param>
-/// <param name="QueryString">The query string, including the leading <c>?</c> when present.</param>
+/// <param name="QueryString">The query string, including the leading <c language="text">?</c> when present.</param>
 /// <param name="Headers">Every header the origin received, keyed case-insensitively.</param>
 public sealed record ForwardedRequest(
     string Method,

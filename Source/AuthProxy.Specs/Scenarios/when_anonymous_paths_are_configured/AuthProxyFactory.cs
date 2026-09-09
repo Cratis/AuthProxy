@@ -46,7 +46,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
 
     /// <summary>
     /// Gets the tenant-resolution settings the host runs with.
-    /// Defaults to a strategy that always resolves, so that <c>TenancyMiddleware</c> never reaches its
+    /// Defaults to a strategy that always resolves, so that <c language="text">TenancyMiddleware</c> never reaches its
     /// tenant-unresolved branch and the scenario measures the other enforcement points on their own.
     /// </summary>
     protected virtual IEnumerable<KeyValuePair<string, string?>> TenantResolutionSettings =>

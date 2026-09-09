@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Management.for_ManagementEndpoints;
 
 /// <summary>
-/// A ready instance answers <c>200</c>, having asked the readiness check for the answer.
+/// A ready instance answers <c language="text">200</c>, having asked the readiness check for the answer.
 /// </summary>
 public class when_the_instance_is_ready : given.a_management_endpoint
 {

@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.SignIns.for_ClientLocationResolver.when_resolving_fro
 /// </summary>
 /// <remarks>
 /// The connection address and the raw header deliberately disagree here. Reading the header back would report
-/// <c>203.0.113.7</c> while every other part of the proxy — the cookie decisions, the reverse-proxy transform,
+/// <c language="text">203.0.113.7</c> while every other part of the proxy — the cookie decisions, the reverse-proxy transform,
 /// the access log — used the address the middleware settled on, so the assertion is as much about consistency
 /// as about trust.
 /// </remarks>

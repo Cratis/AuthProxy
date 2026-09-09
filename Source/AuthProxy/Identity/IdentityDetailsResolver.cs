@@ -13,9 +13,9 @@ using C = Cratis.AuthProxy.Configuration;
 namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
-/// Calls every service's <c>/.cratis/me</c> endpoint to retrieve application-specific
+/// Calls every service's <c language="text">/.cratis/me</c> endpoint to retrieve application-specific
 /// identity details, merges the JSON results, converts them to an <see cref="IdentityProviderResult"/>
-/// and stores it in the <c>.cratis-identity</c> response cookie as a base64-encoded JSON string.
+/// and stores it in the <c language="text">.cratis-identity</c> response cookie as a base64-encoded JSON string.
 /// </summary>
 /// <param name="config">The auth proxy configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
@@ -26,7 +26,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <remarks>
 /// What each service's answer is worth is a per-service setting — see
 /// <see cref="C.IdentityVerificationMode"/>. Under <see cref="C.IdentityVerificationMode.BestEffort"/> only
-/// an HTTP <c>403</c> denies, which is exactly what the released proxy denied on and nothing more. Under
+/// an HTTP <c language="text">403</c> denies, which is exactly what the released proxy denied on and nothing more. Under
 /// <see cref="C.IdentityVerificationMode.Required"/> only an explicit positive admits, and every other
 /// outcome denies and erases what an earlier positive left behind.
 /// </remarks>
@@ -202,9 +202,9 @@ public class IdentityDetailsResolver(
     /// <returns><see langword="true"/> when the request may continue; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// <see cref="C.IdentityVerificationMode.BestEffort"/> denies on the one trigger the released proxy
-    /// denied on — an HTTP <c>403</c> — and on nothing else. The released call never read a verdict out of
-    /// the body at all: it returned <c>details</c> and forwarded the caller whatever the body said about
-    /// <c>isAuthorized</c>. Promoting a body-level negative to a denial here would change what the
+    /// denied on — an HTTP <c language="text">403</c> — and on nothing else. The released call never read a verdict out of
+    /// the body at all: it returned <c language="text">details</c> and forwarded the caller whatever the body said about
+    /// <c language="text">isAuthorized</c>. Promoting a body-level negative to a denial here would change what the
     /// <em>default</em> mode does to services that never opted in, and would do it silently, to the exact
     /// response shape the documented envelope tells them to write.
     /// <see cref="C.IdentityVerificationMode.Required"/> is where a body-level verdict becomes a decision.
@@ -272,7 +272,7 @@ public class IdentityDetailsResolver(
     /// Refusing without erasing would be nearly useless: an earlier success leaves a sealed record, a
     /// readable cookie and an in-memory result behind, and any one of them lets the very next request skip
     /// the question that was just answered no. All three go together, and they go on every refusal — the
-    /// released code cleared none of them, and <c>Clear</c> had no caller at all.
+    /// released code cleared none of them, and <c language="text">Clear</c> had no caller at all.
     /// </remarks>
     IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason)
     {

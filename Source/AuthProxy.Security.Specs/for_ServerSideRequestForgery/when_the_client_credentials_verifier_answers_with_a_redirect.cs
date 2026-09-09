@@ -21,14 +21,14 @@ namespace Cratis.AuthProxy.Security.for_ServerSideRequestForgery;
 /// <remarks>
 /// This one is the sharpest of the set: the body is the client identifier and the client secret, in
 /// plaintext, and the call is reachable from an entirely anonymous POST to the token endpoint. A handler
-/// that follows a <c>307</c> re-sends method and body to the named host — and while
-/// <c>SocketsHttpHandler</c> strips <c>Authorization</c> across origins, it strips neither the body nor a
+/// that follows a <c language="text">307</c> re-sends method and body to the named host — and while
+/// <c language="text">SocketsHttpHandler</c> strips <c language="text">Authorization</c> across origins, it strips neither the body nor a
 /// custom header, so nothing about the credentials is left behind.
 /// <para>
 /// Asserted against real sockets and the real registration, for the same reason the capability verifier's
 /// twin is: the redirect is followed, if it is followed at all, inside the primary message handler, below
 /// every seam a substitute could stand in at. The client under test is registered by
-/// <c>AddIngressAuthentication</c> with no handler configuration of its own, so what this pins is that the
+/// <c language="text">AddIngressAuthentication</c> with no handler configuration of its own, so what this pins is that the
 /// pipeline's default covers a client that never asked to be covered.
 /// </para>
 /// </remarks>

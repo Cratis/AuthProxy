@@ -16,8 +16,8 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// forward without a session.
 /// </para>
 /// <para>
-/// Asserted against a real origin rather than on the client-facing status. A <c>404</c> that still caused a
-/// forwarded request, or still caused the proxy's own <c>/.cratis/me</c> call, is a refusal that did work
+/// Asserted against a real origin rather than on the client-facing status. A <c language="text">404</c> that still caused a
+/// forwarded request, or still caused the proxy's own <c language="text">/.cratis/me</c> call, is a refusal that did work
 /// and wrote a log line inside the application on behalf of a caller who was refused — and the declared
 /// anonymous path is the pointed case, because that is the one route which normally reaches the backend
 /// with no session at all.

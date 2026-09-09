@@ -11,23 +11,23 @@ namespace Cratis.AuthProxy.Links;
 /// <summary>
 /// Middleware that serves the session-preserving credential-linking flow.
 /// <para>
-/// A request to <c>/.cratis/link/{scheme}?returnUrl=…&amp;token=…</c> triggers an OAuth/OIDC challenge for
+/// A request to <c language="text">/.cratis/link/{scheme}?returnUrl=…&amp;token=…</c> triggers an OAuth/OIDC challenge for
 /// the requested provider — but, unlike the login flow, the resulting authentication does <em>not</em>
 /// replace the primary session cookie. Instead the freshly authenticated subject is captured on the
 /// provider callback and posted to the application (see
-/// <see cref="AuthenticationServiceCollectionExtensions"/> <c>OnTicketReceived</c> and
+/// <see cref="AuthenticationServiceCollectionExtensions"/> <c language="text">OnTicketReceived</c> and
 /// <see cref="ILinkSubjectExchanger"/>). The link mode marker and the one-time link token travel through
 /// the challenge's <see cref="AuthenticationProperties"/> so the callback can recognize the flow.
 /// </para>
 /// <para>
-/// The bare <c>/.cratis/link?token=…</c> path serves the flow's embeddable provider-selection page, and
-/// <c>/.cratis/link/complete</c> the completion page a successful link ends on — see
+/// The bare <c language="text">/.cratis/link?token=…</c> path serves the flow's embeddable provider-selection page, and
+/// <c language="text">/.cratis/link/complete</c> the completion page a successful link ends on — see
 /// <see cref="LinkFlowPages"/> for how the pages, the embedding product, and the provider window talk to
 /// each other.
 /// </para>
 /// <para>
 /// Linking only makes sense for an already signed-in user, so an unauthenticated request is rejected
-/// rather than challenged. The <c>returnUrl</c> is constrained to a same-site relative path so the flow
+/// rather than challenged. The <c language="text">returnUrl</c> is constrained to a same-site relative path so the flow
 /// can never be turned into an open redirect.
 /// </para>
 /// </summary>
@@ -139,7 +139,7 @@ public class LinkMiddleware(
 
     /// <summary>
     /// Determines whether the request is a navigation inside a frame, going by the browser-set
-    /// <c>Sec-Fetch-Dest</c> fetch metadata header.
+    /// <c language="text">Sec-Fetch-Dest</c> fetch metadata header.
     /// </summary>
     /// <param name="request">The current <see cref="HttpRequest"/>.</param>
     /// <returns><see langword="true"/> when the navigation targets a frame; otherwise <see langword="false"/>.</returns>

@@ -26,7 +26,7 @@ public static class TrustedProxyAddress
     /// <remarks>
     /// A bare address resolves to the single-address network containing only it, so an entry is always a
     /// range and matching is one operation rather than two. A CIDR range is normalized to its network
-    /// address, so <c>10.0.0.1/8</c> and <c>10.0.0.0/8</c> name the same range — the conventional reading,
+    /// address, so <c language="text">10.0.0.1/8</c> and <c language="text">10.0.0.0/8</c> name the same range — the conventional reading,
     /// and the one every other tool an operator copies a range from applies.
     /// </remarks>
     public static IPNetwork? Resolve(string value)

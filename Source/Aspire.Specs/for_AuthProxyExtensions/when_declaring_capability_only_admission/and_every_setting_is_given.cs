@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Aspire.for_AuthProxyExtensions.when_declaring_capabil
 /// <summary>
 /// Every setting a deployment overrides reaches the proxy in the form its configuration binder reads —
 /// notably the lifetime, which binds as a <see cref="TimeSpan"/> and therefore has to be written in the
-/// invariant <c>hh:mm:ss</c> form rather than in whatever the host's culture would produce.
+/// invariant <c language="text">hh:mm:ss</c> form rather than in whatever the host's culture would produce.
 /// </summary>
 public class and_every_setting_is_given : given.an_auth_proxy_resource
 {

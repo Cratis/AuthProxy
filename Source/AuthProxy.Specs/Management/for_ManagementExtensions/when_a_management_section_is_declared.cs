@@ -10,9 +10,9 @@ namespace Cratis.AuthProxy.Management.for_ManagementExtensions;
 /// them.
 /// <para>
 /// This is the one assertion standing between an opt-in health endpoint and a total outage. Declaring the
-/// listener the idiomatic-looking way — <c>ConfigureKestrel(options =&gt; options.Listen(...))</c> — makes
-/// Kestrel discard the hosting addresses entirely, because <c>PreferHostingUrls</c> is
-/// <see langword="false"/> by default: it logs "Overriding address(es)" and binds only what <c>Listen</c>
+/// listener the idiomatic-looking way — <c language="text">ConfigureKestrel(options =&gt; options.Listen(...))</c> — makes
+/// Kestrel discard the hosting addresses entirely, because <c language="text">PreferHostingUrls</c> is
+/// <see langword="false"/> by default: it logs "Overriding address(es)" and binds only what <c language="text">Listen</c>
 /// named. The public listener
 /// of every containerized deployment comes from those hosting addresses, so switching on a health endpoint
 /// would take the proxy off the network and leave a perfectly healthy-looking probe answering on loopback.

@@ -22,7 +22,7 @@ namespace Cratis.AuthProxy.Security.for_ServerSideRequestForgery;
 /// <remarks>
 /// The startup validator constrains the verifier to one absolute http or https URL precisely so a deployment
 /// cannot be pointed somewhere it did not mean. A message handler that follows redirects hands that
-/// constraint back on the first <c>3xx</c>: an unauthenticated POST to the presentation path becomes an
+/// constraint back on the first <c language="text">3xx</c>: an unauthenticated POST to the presentation path becomes an
 /// AuthProxy-originated POST to any host the proxy can route to, carrying the caller's plaintext capability
 /// in the body — an internal metadata service, an admin API, anything reachable from inside.
 /// <para>

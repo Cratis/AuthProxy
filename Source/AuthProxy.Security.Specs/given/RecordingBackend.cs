@@ -17,13 +17,13 @@ namespace Cratis.AuthProxy.Security.given;
 /// </summary>
 /// <remarks>
 /// The security question that matters most for a reverse proxy is not what it answers the client, but what
-/// it hands the origin — a spoofed <c>x-ms-client-principal</c> that reaches a backend is a full identity
+/// it hands the origin — a spoofed <c language="text">x-ms-client-principal</c> that reaches a backend is a full identity
 /// forgery, and no amount of inspecting the client-facing response would reveal it. Asserting on that
 /// requires an origin that actually exists, so this listens on a real socket: YARP forwards over the
 /// network stack rather than through the in-memory test server, and what arrives here is exactly what a
 /// deployed backend would see.
 /// <para>
-/// It also answers <c>/.cratis/me</c>, because AuthProxy calls it on every authenticated request to
+/// It also answers <c language="text">/.cratis/me</c>, because AuthProxy calls it on every authenticated request to
 /// resolve identity details, and a backend that refused would make every authenticated spec a 403 about
 /// something else.
 /// </para>
@@ -59,7 +59,7 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// Gets or sets what the origin answers on the identity endpoint.
     /// </summary>
     /// <remarks>
-    /// Settable because a deployment that treats <c>/.cratis/me</c> as an authorization decision has to be
+    /// Settable because a deployment that treats <c language="text">/.cratis/me</c> as an authorization decision has to be
     /// shown failing and then recovering, and the whole point of asserting end to end is that the failure
     /// arrives the way a real one would — over a socket, from an origin that genuinely answered that way.
     /// The default answers an empty object, which is what every other security spec's deployment expects.
@@ -147,7 +147,7 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// <param name="path">The path to look for.</param>
     /// <returns>The last request to that path, or <see langword="null"/> when there was none.</returns>
     /// <remarks>
-    /// An authenticated request produces two calls here — the proxy's own <c>/.cratis/me</c> identity
+    /// An authenticated request produces two calls here — the proxy's own <c language="text">/.cratis/me</c> identity
     /// resolution and then the forwarded request itself — so a spec that means "the request I sent" has to
     /// say which one, rather than trusting the order they happen to arrive in.
     /// </remarks>

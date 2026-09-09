@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Configuration.for_Admission;
 /// </summary>
 /// <remarks>
 /// The entry lifetime is the one with a reason outside itself: it has to outlast ASP.NET Core's own
-/// fifteen-minute <c>RemoteAuthenticationTimeout</c>, because an entry that expires while the framework
+/// fifteen-minute <c language="text">RemoteAuthenticationTimeout</c>, because an entry that expires while the framework
 /// still considers the handshake live returns the caller to the uniform refusal with nothing anywhere to
 /// diagnose it from. The Aspire mirror pins the same number from the other side; without this the half that
 /// actually runs in production could be moved back under that bound with every spec still green.

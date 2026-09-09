@@ -27,8 +27,8 @@ namespace Cratis.AuthProxy.Security.given;
 /// </para>
 /// <para>
 /// Two identity providers are configured so an unauthenticated browser is served the selection page rather
-/// than challenged. That page sets a cookie whose <c>Secure</c> flag is taken straight from the request
-/// scheme, which is what makes a spoofed <c>X-Forwarded-Proto</c> observable as something a browser would act
+/// than challenged. That page sets a cookie whose <c language="text">Secure</c> flag is taken straight from the request
+/// scheme, which is what makes a spoofed <c language="text">X-Forwarded-Proto</c> observable as something a browser would act
 /// on rather than as an internal value.
 /// </para>
 /// </remarks>

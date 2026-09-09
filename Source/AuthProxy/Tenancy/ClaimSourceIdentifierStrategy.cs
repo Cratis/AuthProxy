@@ -7,11 +7,11 @@ using C = Cratis.AuthProxy.Configuration;
 namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
-/// Resolves the tenant source identifier from a claim in the <c>x-ms-client-principal</c>
+/// Resolves the tenant source identifier from a claim in the <c language="text">x-ms-client-principal</c>
 /// that is already present on the request (set by a prior authentication step).
 /// Uses the Microsoft standard tenant claim
-/// <c>http://schemas.microsoft.com/identity/claims/tenantid</c> by default,
-/// but the claim type can be overridden via the <c>claimType</c> option.
+/// <c language="text">http://schemas.microsoft.com/identity/claims/tenantid</c> by default,
+/// but the claim type can be overridden via the <c language="text">claimType</c> option.
 /// </summary>
 public class ClaimSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<ClaimOptions>
 {

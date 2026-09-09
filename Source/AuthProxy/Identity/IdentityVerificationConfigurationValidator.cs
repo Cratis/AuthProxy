@@ -21,7 +21,7 @@ namespace Cratis.AuthProxy.Identity;
 /// choose between refusing every caller of a deployment that is misconfigured rather than under attack, and
 /// admitting them, and both answers are wrong for a condition that is a configuration mistake rather than a
 /// property of the request. <see cref="C.AuthProxy.TenantResolutions"/> naming a strategy — even
-/// <c>Specified</c>, for a single-tenant deployment — is what clears it.
+/// <c language="text">Specified</c>, for a single-tenant deployment — is what clears it.
 /// </para>
 /// </remarks>
 public class IdentityVerificationConfigurationValidator : IValidateOptions<C.AuthProxy>

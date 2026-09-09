@@ -51,7 +51,7 @@ public class when_the_capability_admits : given.a_capability_admission
     }
 
     /// <summary>
-    /// A browser silently drops a <c>Set-Cookie</c> past 4096 bytes, and in this mode a dropped entry cookie
+    /// A browser silently drops a <c language="text">Set-Cookie</c> past 4096 bytes, and in this mode a dropped entry cookie
     /// means a caller who was admitted receives the uniform refusal for the rest of the entry's life — with
     /// nothing in any response and nothing in any log to say why, because that is the whole design.
     /// </summary>

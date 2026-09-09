@@ -7,10 +7,10 @@ namespace Cratis.AuthProxy.for_AnonymousPathPolicy;
 /// A declared prefix must mean exactly what it spells. Every traversal form is refused rather than
 /// resolved, so a prefix can never open a path the operator did not name.
 /// <para>
-/// Resolving would be the more forgiving choice and the wrong one: <c>/public/../admin</c> reads as scoped
-/// to <c>/public</c> while meaning <c>/admin</c>, so accepting it as <c>/admin</c> would hand an
-/// unauthenticated caller a surface nobody typed. The encoded spellings — <c>%2e%2e%2f</c>, <c>%2f</c>,
-/// <c>%00</c> — are refused one step earlier, by the character allow-list, which is why they are pinned
+/// Resolving would be the more forgiving choice and the wrong one: <c language="text">/public/../admin</c> reads as scoped
+/// to <c language="text">/public</c> while meaning <c language="text">/admin</c>, so accepting it as <c language="text">/admin</c> would hand an
+/// unauthenticated caller a surface nobody typed. The encoded spellings — <c language="text">%2e%2e%2f</c>, <c language="text">%2f</c>,
+/// <c language="text">%00</c> — are refused one step earlier, by the character allow-list, which is why they are pinned
 /// here alongside the literal form: they are the same attack and must not survive by taking a different
 /// route through the check.
 /// </para>

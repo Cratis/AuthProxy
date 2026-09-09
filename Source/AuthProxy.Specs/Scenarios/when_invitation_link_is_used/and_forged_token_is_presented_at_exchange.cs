@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 
 /// <summary>
 /// End-to-end scenario for the Phase-2 trust boundary: an authenticated caller places a self-crafted,
-/// untrusted-signed token in the <c>.cratis-invite</c> cookie (which HTTP-only does not prevent).
+/// untrusted-signed token in the <c language="text">.cratis-invite</c> cookie (which HTTP-only does not prevent).
 /// AuthProxy must re-validate the token at the exchange forward and refuse to hand it to the exchange endpoint.
 /// </summary>
 /// <param name="factory">The shared application factory.</param>

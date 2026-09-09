@@ -9,8 +9,8 @@ namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvid
 /// An entry that is not a rooted path of literal segments must produce no route at all.
 /// <para>
 /// A declared prefix is interpolated into an ASP.NET route template, so an unvalidated entry would be
-/// read as template syntax rather than as a literal: <c>/route{parameter}</c> would match
-/// <c>/routeanything/…</c> anonymously, and <c>//double</c> or <c>/catch/{**all}</c> is not a legal
+/// read as template syntax rather than as a literal: <c language="text">/route{parameter}</c> would match
+/// <c language="text">/routeanything/…</c> anonymously, and <c language="text">//double</c> or <c language="text">/catch/{**all}</c> is not a legal
 /// template at all and would fail the proxy's configuration load at startup. Neither can be reached from
 /// configuration, and this pins that the route table sees exactly what the middlewares see.
 /// </para>

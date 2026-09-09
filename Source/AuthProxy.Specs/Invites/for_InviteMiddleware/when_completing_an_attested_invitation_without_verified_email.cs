@@ -23,5 +23,10 @@ public class when_completing_an_attested_invitation_without_verified_email : an_
     [Fact] void should_not_call_the_completion_endpoint() => _handler.Request.ShouldBeNull();
     [Fact] void should_not_issue_a_complete_attestation() => _attestationIssuer.Identity.ShouldBeNull();
     [Fact] void should_not_continue_the_pipeline() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_serve_a_branded_denial() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationInvalid, StatusCodes.Status403Forbidden);
+
+    /// <summary>
+    /// The identity provider supplied no usable email at all, so the invitee sees the dedicated
+    /// unavailable-address outcome instead of a generic invalid-link denial that offers no real recovery.
+    /// </summary>
+    [Fact] void should_serve_the_email_unavailable_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden);
 }

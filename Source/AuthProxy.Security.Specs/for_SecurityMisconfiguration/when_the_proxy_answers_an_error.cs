@@ -18,7 +18,7 @@ namespace Cratis.AuthProxy.Security.for_SecurityMisconfiguration;
 /// Endpoint selection runs ahead of authentication, so a caller who can make route matching itself fail
 /// gets that failure — and in a misconfigured environment its stack trace — without presenting a
 /// credential. That is what a request satisfying two routes at once used to do here: sending both the
-/// <c>Service-ID</c> header and the <c>?service=</c> query parameter matched two candidate routes with the
+/// <c language="text">Service-ID</c> header and the <c language="text">?service=</c> query parameter matched two candidate routes with the
 /// same template and the same order, which ASP.NET reports as an ambiguity and surfaces as a bare 500 to
 /// anyone at all. Both shapes are exercised below, authenticated and not, so a reordering that reopens the
 /// ambiguity is caught rather than shipped.

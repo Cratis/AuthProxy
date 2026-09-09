@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.for_UniformDenial;
 /// <remarks>
 /// The refusal is written after other middleware has had the request, and what those left behind is exactly
 /// what would describe the deployment: a challenge header says there is something to authenticate against, a
-/// <c>Location</c> names a provider, a <c>Set-Cookie</c> hands out state to a caller who presented nothing.
+/// <c language="text">Location</c> names a provider, a <c language="text">Set-Cookie</c> hands out state to a caller who presented nothing.
 /// Clearing them is the difference between one refusal and a family of them.
 /// <para>
 /// Written as its own spec because nothing else can see the clear happen. Every spec that observes a refusal

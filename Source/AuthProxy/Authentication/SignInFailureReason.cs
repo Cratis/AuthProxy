@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// A failed sign-in must never surface as a bare error page — the browser is redirected back to provider
 /// selection with one of these reasons so the page can show the person what happened and offer the way
 /// forward: trying again. The values are part of the page contract, so a custom
-/// <c>select-provider.html</c> can rely on them.
+/// <c language="text">select-provider.html</c> can rely on them.
 /// </remarks>
 public static class SignInFailureReason
 {

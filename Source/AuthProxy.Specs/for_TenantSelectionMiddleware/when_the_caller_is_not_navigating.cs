@@ -7,14 +7,14 @@ using System.Text;
 namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 
 /// <summary>
-/// The tenant-selection page is served at <c>200</c> exactly as the provider-selection page was, and it is
+/// The tenant-selection page is served at <c language="text">200</c> exactly as the provider-selection page was, and it is
 /// the same defect: a caller that is not navigating to a document reads it as a delivered success.
 /// <para>
 /// This one is reached by a caller that <em>is</em> authenticated, so it is the shape an already-signed-in
-/// frontend hits — a <c>fetch()</c> for data that comes back as a tenant chooser with <c>response.ok</c>
-/// true. It gets <c>403</c> rather than <c>401</c>: the caller is authenticated, and answering <c>401</c>
+/// frontend hits — a <c language="text">fetch()</c> for data that comes back as a tenant chooser with <c language="text">response.ok</c>
+/// true. It gets <c language="text">403</c> rather than <c language="text">401</c>: the caller is authenticated, and answering <c language="text">401</c>
 /// would tell a frontend to restart a login it has already completed, which is the loop
-/// <c>TenancyMiddleware</c> already avoids for the no-organization case.
+/// <c language="text">TenancyMiddleware</c> already avoids for the no-organization case.
 /// </para>
 /// </summary>
 public class when_the_caller_is_not_navigating : Specification

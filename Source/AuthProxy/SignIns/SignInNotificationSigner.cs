@@ -17,10 +17,10 @@ namespace Cratis.AuthProxy.SignIns;
 /// <remarks>
 /// The envelope binds six facts about the notification it accompanies, so that reaching the application's
 /// private endpoint is no longer enough to choose which user it records as having signed in: provenance
-/// (<c>iss</c> plus the <c>kid</c> header selecting the key), audience (<c>aud</c>), route
+/// (<c language="text">iss</c> plus the <c language="text">kid</c> header selecting the key), audience (<c language="text">aud</c>), route
 /// (<see cref="SignInAttestationClaims.HttpMethod"/> and <see cref="SignInAttestationClaims.HttpUri"/>), body
-/// (<see cref="SignInAttestationClaims.BodyHash"/> over the exact bytes posted), time (<c>iat</c>, <c>nbf</c>,
-/// <c>exp</c>) and replay (a random <c>jti</c>). Provenance, audience, time and replay come from
+/// (<see cref="SignInAttestationClaims.BodyHash"/> over the exact bytes posted), time (<c language="text">iat</c>, <c language="text">nbf</c>,
+/// <c language="text">exp</c>) and replay (a random <c language="text">jti</c>). Provenance, audience, time and replay come from
 /// <see cref="AttestationSigner"/> — the one signing implementation, shared with invitation attestation — and
 /// route and body are added here.
 /// </remarks>

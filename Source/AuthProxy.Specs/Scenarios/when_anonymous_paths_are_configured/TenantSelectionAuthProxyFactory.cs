@@ -12,7 +12,7 @@ namespace Cratis.AuthProxy.Scenarios.when_anonymous_paths_are_configured;
 /// <summary>
 /// The same host with tenant selection configured and a caller who <em>is</em> signed in but has not
 /// chosen a tenant — the state a signed-in user is in on their first request, and the one state in which
-/// <c>TenantSelectionMiddleware</c> answers rather than forwards.
+/// <c language="text">TenantSelectionMiddleware</c> answers rather than forwards.
 /// </summary>
 public class TenantSelectionAuthProxyFactory : AuthProxyFactory
 {

@@ -9,23 +9,23 @@ namespace Cratis.AuthProxy;
 /// </summary>
 /// <remarks>
 /// AuthProxy hands the browser a redirect target the caller supplied in four places — the login endpoint's
-/// <c>returnUrl</c>, the link flow's <c>returnUrl</c>, tenant selection's <c>returnUrl</c>, and logout's
-/// <c>redirect</c>. Each had grown its own version of "is this relative", and they disagreed: one accepted
-/// <c>//evil.test</c> outright, and the two that rejected it still accepted <c>/\evil.test</c>. An open
+/// <c language="text">returnUrl</c>, the link flow's <c language="text">returnUrl</c>, tenant selection's <c language="text">returnUrl</c>, and logout's
+/// <c language="text">redirect</c>. Each had grown its own version of "is this relative", and they disagreed: one accepted
+/// <c language="text">//evil.test</c> outright, and the two that rejected it still accepted <c language="text">/\evil.test</c>. An open
 /// redirect on the authentication proxy is the strongest phishing primitive a system can offer — the
 /// victim sees the real domain, completes a real login at the real identity provider, and only then lands
 /// on the attacker's page — so the check lives here once rather than being re-derived per call site.
 /// <para>
-/// A single leading <c>/</c> is not enough to be same-site, because the browser decides what a
-/// <c>Location</c> means, not the string's first character:
+/// A single leading <c language="text">/</c> is not enough to be same-site, because the browser decides what a
+/// <c language="text">Location</c> means, not the string's first character:
 /// </para>
 /// <list type="bullet">
-///   <item><c>//evil.test</c> is protocol-relative and navigates off-site.</item>
-///   <item><c>/\evil.test</c> is the same thing to every major browser, which normalize <c>\</c> to
-///     <c>/</c> in the authority position.</item>
-///   <item><c>/</c> followed by a tab, carriage return or newline is <em>also</em> the same thing:
-///     browsers strip those characters from a URL before parsing it, so <c>/\tevil.test</c> is fetched as
-///     <c>//evil.test</c>. Control characters are what make a header-injection payload too, so they are
+///   <item><c language="text">//evil.test</c> is protocol-relative and navigates off-site.</item>
+///   <item><c language="text">/\evil.test</c> is the same thing to every major browser, which normalize <c language="text">\</c> to
+///     <c language="text">/</c> in the authority position.</item>
+///   <item><c language="text">/</c> followed by a tab, carriage return or newline is <em>also</em> the same thing:
+///     browsers strip those characters from a URL before parsing it, so <c language="text">/\tevil.test</c> is fetched as
+///     <c language="text">//evil.test</c>. Control characters are what make a header-injection payload too, so they are
 ///     refused rather than stripped.</item>
 /// </list>
 /// </remarks>

@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Registrations;
 
 /// <summary>
 /// Middleware that implements the AuthProxy registration bootstrap flow.
-/// Visiting <c>/register</c> stores a short-lived cookie and either redirects to the generic
+/// Visiting <c language="text">/register</c> stores a short-lived cookie and either redirects to the generic
 /// provider-selection page or immediately challenges the single configured provider.
 /// After authentication completes, the middleware redirects the user to the configured
 /// lobby registration endpoint.

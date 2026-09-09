@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Scenarios.when_anonymous_paths_are_configured;
 /// End-to-end in a single-service deployment: the declared prefixes must beat the catch-all route that
 /// shape adds.
 /// <para>
-/// A single-service proxy also emits <c>/{**catch-all}</c> and <c>/api/{**catch-all}</c> carrying the
+/// A single-service proxy also emits <c language="text">/{**catch-all}</c> and <c language="text">/api/{**catch-all}</c> carrying the
 /// authenticated-user policy, and both overlap every declared prefix. The declared route only wins by
 /// being ordered ahead of them; if it lost, the request would be refused by authorization on the catch-all
 /// instead — reachable in the deployment shape a single application actually runs, and invisible in a

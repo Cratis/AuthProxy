@@ -6,8 +6,8 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// <summary>
 /// OWASP A01 — Broken Access Control. A caller must not be able to tell the origin who they are.
 /// <para>
-/// AuthProxy's entire value is that a backend can trust <c>x-ms-client-principal</c>,
-/// <c>x-ms-client-principal-id</c>, <c>x-ms-client-principal-name</c> and <c>Tenant-ID</c> as proof of
+/// AuthProxy's entire value is that a backend can trust <c language="text">x-ms-client-principal</c>,
+/// <c language="text">x-ms-client-principal-id</c>, <c language="text">x-ms-client-principal-name</c> and <c language="text">Tenant-ID</c> as proof of
 /// identity, because the proxy is the only thing that writes them. If an inbound copy survived to the
 /// origin, every backend behind the proxy would be authenticating whoever asked — the single worst failure
 /// this component can have, and one no client-facing response would reveal. So the assertion is made

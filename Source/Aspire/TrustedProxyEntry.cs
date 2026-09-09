@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Aspire;
 /// Decides whether a declared trusted proxy is something AuthProxy will be able to resolve.
 /// </summary>
 /// <remarks>
-/// Deliberately a copy of the rule AuthProxy applies in <c>TrustedProxyAddress</c> rather than a call into
+/// Deliberately a copy of the rule AuthProxy applies in <c language="text">TrustedProxyAddress</c> rather than a call into
 /// it: this package is a hosting integration that an app host references on its own, without the proxy
 /// assembly, the same reason <see cref="OidcProviderType"/> and <see cref="IdentityVerificationMode"/> are
 /// declared here too. Keep the two in step — the value of checking here is that the answer matches what the

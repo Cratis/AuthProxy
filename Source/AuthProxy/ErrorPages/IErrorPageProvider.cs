@@ -10,11 +10,11 @@ public interface IErrorPageProvider
 {
     /// <summary>
     /// Writes the content of the named error page into the response.
-    /// Sets <see cref="HttpResponse.StatusCode"/> and <c>Content-Type: text/html</c> before sending.
+    /// Sets <see cref="HttpResponse.StatusCode"/> and <c language="text">Content-Type: text/html</c> before sending.
     /// If the named page does not exist a minimal inline HTML fallback is written instead.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <param name="pageName">The file name of the page, e.g. <c>"404.html"</c> or <c>"invitation-expired.html"</c>.</param>
+    /// <param name="pageName">The file name of the page, e.g. <c language="text">"404.html"</c> or <c language="text">"invitation-expired.html"</c>.</param>
     /// <param name="statusCode">The HTTP status code to set on the response.</param>
     /// <param name="substitutions">
     /// Optional literal tokens to replace in the page content before it is written — how a page that must

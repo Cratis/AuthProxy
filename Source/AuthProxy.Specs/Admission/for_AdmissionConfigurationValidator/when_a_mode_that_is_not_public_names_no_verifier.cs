@@ -10,7 +10,7 @@ namespace Cratis.AuthProxy.Admission.for_AdmissionConfigurationValidator;
 /// <remarks>
 /// <see cref="Admission.IAdmissionPolicy.IsConfigured"/> turns the gate on for every mode that is not
 /// public, so any mode the validator skips is a deployment that starts clean and then refuses every caller
-/// alive with a <c>404</c> that says nothing. Two of the three places that branch on the mode were corrected
+/// alive with a <c language="text">404</c> that says nothing. Two of the three places that branch on the mode were corrected
 /// to ask "is this public"; this is what stops the third from drifting back, and what makes adding a third
 /// mode fail here rather than in production.
 /// </remarks>

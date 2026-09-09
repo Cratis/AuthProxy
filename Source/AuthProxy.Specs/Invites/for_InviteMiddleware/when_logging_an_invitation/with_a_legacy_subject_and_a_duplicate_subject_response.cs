@@ -6,7 +6,7 @@ using System.Net;
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_logging_an_invitation;
 
 /// <summary>
-/// The exchange endpoint answering <c>409</c> says the subject already belongs to a user. That the collision
+/// The exchange endpoint answering <c language="text">409</c> says the subject already belongs to a user. That the collision
 /// happened is the diagnostic; the colliding identifier is not.
 /// </summary>
 public class with_a_legacy_subject_and_a_duplicate_subject_response : given.an_invite_exchange_with_recorded_logs

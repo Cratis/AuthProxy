@@ -20,7 +20,7 @@ public class ClaimRequirement
 {
     /// <summary>
     /// Gets or sets the claim type that must be present on the authenticated principal, for example
-    /// <c>urn:github:organization</c> or <c>roles</c>.
+    /// <c language="text">urn:github:organization</c> or <c language="text">roles</c>.
     /// </summary>
     public string Claim { get; set; } = string.Empty;
 

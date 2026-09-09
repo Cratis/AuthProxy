@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Security.for_Injection;
 /// <para>
 /// CR/LF injection is header forgery through the back door. AuthProxy copies caller-supplied values into
 /// two places where a line break would be catastrophic: the request it forwards to the origin, and the
-/// <c>Location</c> it hands the browser. A newline surviving into the forwarded request means the attacker
+/// <c language="text">Location</c> it hands the browser. A newline surviving into the forwarded request means the attacker
 /// is writing headers the backend trusts — the same identity forgery the proxy exists to prevent, only
 /// smuggled inside a value nobody thought to sanitize. A newline surviving into a response splits the
 /// response itself: the attacker appends headers, or a second body the browser accepts as a legitimate
@@ -19,27 +19,27 @@ namespace Cratis.AuthProxy.Security.for_Injection;
 /// The payloads travel in URLs rather than in headers, because a header attempt would test the client
 /// instead of the proxy — <see cref="System.Net.Http.HttpClient"/> will not put a control character on the
 /// wire. Both forms are sent, and both arrive: <see cref="Uri"/> percent-escapes the raw
-/// <c>CR</c>/<c>LF</c> as it builds the request, so the raw and the pre-encoded payload reach AuthProxy as
+/// <c language="text">CR</c>/<c language="text">LF</c> as it builds the request, so the raw and the pre-encoded payload reach AuthProxy as
 /// the same bytes — and ASP.NET Core hands both back as genuine control characters once the query value is
 /// decoded. Nothing is normalized away here; every payload reaches the code under test intact.
 /// </para>
 /// <para>
 /// Three sinks are probed. The query string of a proxied request lands in the request the backend sees, so
 /// that assertion is made against what the origin actually recorded rather than against the client-facing
-/// response. The <c>returnUrl</c> of <c>/.cratis/login/{scheme}</c> is the value AuthProxy normalizes and
+/// response. The <c language="text">returnUrl</c> of <c language="text">/.cratis/login/{scheme}</c> is the value AuthProxy normalizes and
 /// round-trips through the identity provider; the endpoint runs and consumes it, but this harness replaces
 /// the authentication schemes to present a session as a header, which leaves the configured provider with
-/// no handler to challenge with, so that probe cannot produce a redirect to read. The <c>redirect</c> of
-/// <c>/.cratis/logout</c> is therefore probed as well — it is the sink in this harness that does reach a
-/// real <c>Location</c> header, and without it the response-splitting assertions would pass by never
+/// no handler to challenge with, so that probe cannot produce a redirect to read. The <c language="text">redirect</c> of
+/// <c language="text">/.cratis/logout</c> is therefore probed as well — it is the sink in this harness that does reach a
+/// real <c language="text">Location</c> header, and without it the response-splitting assertions would pass by never
 /// having a redirect to inspect.
 /// </para>
 /// <para>
 /// That third probe is written to leave the redirect policy only one thing to object to. A payload that
-/// does not begin with <c>/</c> is refused for not looking same-site at all, which would prove nothing
+/// does not begin with <c language="text">/</c> is refused for not looking same-site at all, which would prove nothing
 /// about line breaks, so the redirect variants keep a real same-site path in front and drop the space out
-/// of the forged header. What remains that a policy could refuse is the <c>CR</c> and the <c>LF</c>. A
-/// clean target is sent through the same endpoint as a control, so the payloads falling back to <c>/</c>
+/// of the forged header. What remains that a policy could refuse is the <c language="text">CR</c> and the <c language="text">LF</c>. A
+/// clean target is sent through the same endpoint as a control, so the payloads falling back to <c language="text">/</c>
 /// reads as a refusal rather than as an endpoint that ignores the parameter.
 /// </para>
 /// </summary>
@@ -171,7 +171,7 @@ public class when_request_values_carry_crlf(SecurityHarness harness) : IAsyncLif
     /// <param name="Failure">The failure that replaced an answer, or an empty string when there was one.</param>
     /// <param name="HeaderNames">Every response header name.</param>
     /// <param name="HeaderValues">Every response header value, concatenated.</param>
-    /// <param name="Location">The raw <c>Location</c> header, or an empty string when there was none.</param>
+    /// <param name="Location">The raw <c language="text">Location</c> header, or an empty string when there was none.</param>
     sealed record Exchange(bool Reached, string Failure, IReadOnlyCollection<string> HeaderNames, string HeaderValues, string Location)
     {
         /// <summary>
@@ -181,11 +181,11 @@ public class when_request_values_carry_crlf(SecurityHarness harness) : IAsyncLif
         /// <remarks>
         /// The harness replaces the authentication schemes so a spec can present a session as a header, and
         /// that leaves the configured OIDC provider without a handler to challenge with. The endpoint still
-        /// runs — it parses and normalizes the caller's <c>returnUrl</c> before it ever asks for a
+        /// runs — it parses and normalizes the caller's <c language="text">returnUrl</c> before it ever asks for a
         /// challenge, so the payload does reach the code under test — but dispatch then fails and there is
         /// no response to read a header from. Recognizing that exact failure keeps it from silently
         /// standing in for a genuine refusal, and makes this spec fail the day the scheme becomes
-        /// challengeable and a real <c>Location</c> needs asserting on.
+        /// challengeable and a real <c language="text">Location</c> needs asserting on.
         /// </remarks>
         public bool FailedOnlyAtSchemeDispatch =>
             Failure.Contains("No authentication handler is registered", StringComparison.Ordinal);

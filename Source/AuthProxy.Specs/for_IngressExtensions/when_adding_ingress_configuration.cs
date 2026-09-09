@@ -43,7 +43,7 @@ public class when_adding_ingress_configuration : Specification
     /// The middleware runs a peer check only when it knows at least one proxy or network, so an empty pair is
     /// what "believe every caller" means to it. This spec previously asserted the same two zeroes as a
     /// requirement rather than as a compatibility fallback, which is why the boundary was never noticed to be
-    /// missing. <c>ForwardLimit</c> is asserted alongside them because a bound-but-unread setting would look
+    /// missing. <c language="text">ForwardLimit</c> is asserted alongside them because a bound-but-unread setting would look
     /// identical here otherwise.
     /// </remarks>
     [Fact]

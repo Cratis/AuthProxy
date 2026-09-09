@@ -15,7 +15,7 @@ namespace Cratis.AuthProxy.Identity.for_IdentityMiddleware.given;
 /// Everything is left mutable so a spec states only the one thing it is about: whether a tenant reached
 /// <see cref="HttpContext.Items"/>, what the deployment requires, and what the path is. The resolver is a
 /// substitute rather than the real one because the question here is not what a verdict is worth — that is
-/// <c>for_IdentityDetailsResolver</c>'s — but whether the verdict is asked for at all.
+/// <c language="text">for_IdentityDetailsResolver</c>'s — but whether the verdict is asked for at all.
 /// </remarks>
 public class an_identity_middleware : Specification
 {

@@ -6,10 +6,10 @@ using Microsoft.AspNetCore.Authentication;
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_request_is_for_the_selection_page_itself;
 
 /// <summary>
-/// A request landing directly on <c>/.cratis/select-provider</c> — the way the cookie authentication
+/// A request landing directly on <c language="text">/.cratis/select-provider</c> — the way the cookie authentication
 /// handler's redirect and the invite flow both send an unauthenticated caller there — must be answered
 /// by this middleware itself, not deferred to a later handler. Regression coverage: this path used to be
-/// treated as already-authentication-UI and skipped via <c>next()</c>, landing on a separate, unbranded
+/// treated as already-authentication-UI and skipped via <c language="text">next()</c>, landing on a separate, unbranded
 /// page instead of the one this middleware serves for every other unauthenticated request.
 /// </summary>
 public class and_multiple_providers_are_configured : Specification

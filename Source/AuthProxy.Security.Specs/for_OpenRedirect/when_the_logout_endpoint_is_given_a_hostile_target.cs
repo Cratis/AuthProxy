@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Security.for_OpenRedirect;
 /// </para>
 /// <para>
 /// A single leading slash is not what makes a URL same-site, and the payloads below are the ways that
-/// assumption fails. <c>//evil.test</c> is protocol-relative. <c>/\evil.test</c> is the same URL to every
+/// assumption fails. <c language="text">//evil.test</c> is protocol-relative. <c language="text">/\evil.test</c> is the same URL to every
 /// major browser, which normalize a backslash to a slash in the authority position. A slash followed by a
 /// tab, carriage return or newline is also the same URL, because browsers strip those characters before
 /// parsing — so the string the server checked and the URL the browser fetched are different strings. Every

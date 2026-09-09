@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_binding_the_invite_to_the_invited_email;
 
 /// <summary>
-/// Some OIDC providers put the account's address in <c>preferred_username</c> — Entra's is the user principal
+/// Some OIDC providers put the account's address in <c language="text">preferred_username</c> — Entra's is the user principal
 /// name. The binding still has to accept it: what disqualifies the claim is holding a username, not the claim
 /// it arrived in. This is the control for
 /// <see cref="and_the_provider_supplies_no_email_address"/>, which differs only in the shape of the value.

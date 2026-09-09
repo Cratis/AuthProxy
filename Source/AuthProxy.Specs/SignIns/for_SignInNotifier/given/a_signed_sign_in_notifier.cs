@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace Cratis.AuthProxy.SignIns.for_SignInNotifier.given;
 
 /// <summary>
-/// A notifier wired exactly as the host wires it once <c>SignIn:Attestation</c> is configured — the same
+/// A notifier wired exactly as the host wires it once <c language="text">SignIn:Attestation</c> is configured — the same
 /// released notifier, with the envelope signer available to it.
 /// </summary>
 public class a_signed_sign_in_notifier : a_sign_in_notifier

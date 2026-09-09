@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy;
 /// Reduces a request path to the bounded route label that may be written to a log sink.
 /// </summary>
 /// <remarks>
-/// An invitation arrives as <c>/invite/{capability}</c>, so on a Phase-1 invitation request the request path
+/// An invitation arrives as <c language="text">/invite/{capability}</c>, so on a Phase-1 invitation request the request path
 /// <em>is</em> a live bearer capability. Rendering a raw path into a log therefore hands that capability to
 /// every sink the logs reach. Only the leading route segment is bounded by what this proxy routes rather than
 /// by what a caller put in the URL, so that is all this keeps; everything after it becomes a fixed marker.

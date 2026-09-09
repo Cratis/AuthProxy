@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Management.for_ManagementConfigurationValidator;
 
 /// <summary>
-/// A path that does not start with <c>/</c> matches no request, so the listener would open, accept the
+/// A path that does not start with <c language="text">/</c> matches no request, so the listener would open, accept the
 /// probe's connection, and answer it the same not-found it answers everything else. That reads as an
 /// application fault rather than as a typo in a path.
 /// </summary>

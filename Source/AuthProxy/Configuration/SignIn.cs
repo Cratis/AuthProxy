@@ -19,13 +19,13 @@ public class SignIn
 {
     /// <summary>
     /// Gets or sets the absolute URL of the application endpoint that records a completed sign-in,
-    /// e.g. <c>https://studio.example.com/api/internal/sign-ins</c>.
-    /// AuthProxy posts <c>{ subject, identityProvider, ipAddress, location, browser, operatingSystem, userAgent }</c>
+    /// e.g. <c language="text">https://studio.example.com/api/internal/sign-ins</c>.
+    /// AuthProxy posts <c language="text">{ subject, identityProvider, ipAddress, location, browser, operatingSystem, userAgent }</c>
     /// to it. Leave empty to disable sign-in notifications.
     /// </summary>
     /// <remarks>
     /// With <see cref="Attestation"/> configured this URL must carry no query. The signed route binding is the
-    /// RFC 9449 <c>htu</c>, which covers the path only, so a query would travel unsigned — a captured
+    /// RFC 9449 <c language="text">htu</c>, which covers the path only, so a query would travel unsigned — a captured
     /// notification could then be replayed against a different query and still verify.
     /// </remarks>
     public string NotifyUrl { get; set; } = string.Empty;

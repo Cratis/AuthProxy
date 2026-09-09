@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Admission.for_CapabilityAdmission;
 
 /// <summary>
-/// The entry transaction is marked <c>Secure</c> whenever the request itself is encrypted — which behind a
+/// The entry transaction is marked <c language="text">Secure</c> whenever the request itself is encrypted — which behind a
 /// TLS-terminating ingress is what the forwarded headers have already made it say.
 /// </summary>
 public class when_the_presentation_arrives_over_https : given.a_capability_admission

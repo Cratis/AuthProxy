@@ -16,7 +16,7 @@ namespace Cratis.AuthProxy.Management;
 /// without a credential by design, so anything it says is said to whoever can reach the port.
 /// <para>
 /// Liveness consults nothing at all: no dependency is resolved and no I/O is performed, so it answers
-/// <c>200</c> for as long as the request loop is servicing requests, including while every dependency is
+/// <c language="text">200</c> for as long as the request loop is servicing requests, including while every dependency is
 /// unreachable. That is what stops an orchestrator restarting a healthy proxy during somebody else's
 /// outage.
 /// </para>

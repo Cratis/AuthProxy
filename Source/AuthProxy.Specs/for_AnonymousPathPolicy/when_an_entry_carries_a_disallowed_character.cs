@@ -10,9 +10,9 @@ namespace Cratis.AuthProxy.for_AnonymousPathPolicy;
 /// <para>
 /// The failure this prevents is a prefix that means one thing to the middlewares, which match a literal
 /// with <see cref="PathString.StartsWithSegments(PathString)"/>, and another to the router, which matches
-/// an ASP.NET route template built from the same string. <c>/a{x}</c> is the sharpest example: as a
-/// template it is a route <em>parameter</em>, so the router would serve <c>/aANYTHING/…</c> anonymously
-/// while the middlewares matched only <c>/a{x}</c> — an unauthenticated surface far wider than anything
+/// an ASP.NET route template built from the same string. <c language="text">/a{x}</c> is the sharpest example: as a
+/// template it is a route <em>parameter</em>, so the router would serve <c language="text">/aANYTHING/…</c> anonymously
+/// while the middlewares matched only <c language="text">/a{x}</c> — an unauthenticated surface far wider than anything
 /// declared.
 /// </para>
 /// </summary>

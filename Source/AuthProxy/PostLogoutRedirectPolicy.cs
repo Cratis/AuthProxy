@@ -14,13 +14,13 @@ namespace Cratis.AuthProxy;
 /// relative-URL check used for tenant selection. Instead it is validated against an allow-list of origins
 /// that combines the proxy's own public origin with the configured service frontends, the lobby frontend,
 /// and any explicitly configured origins. A missing or disallowed target falls back to the application root
-/// (<c>/</c>).
+/// (<c language="text">/</c>).
 /// <para>
 /// Only the <em>scheme</em> half of that self-origin is bounded by the trusted-proxy boundary, because that
-/// is the half the forwarded-headers middleware settles. The host half is <c>Request.Host</c> as it
-/// arrived, and the shipped <c>AllowedHosts</c> is <c>*</c>, so a caller that can choose the <c>Host</c>
+/// is the half the forwarded-headers middleware settles. The host half is <c language="text">Request.Host</c> as it
+/// arrived, and the shipped <c language="text">AllowedHosts</c> is <c language="text">*</c>, so a caller that can choose the <c language="text">Host</c>
 /// header can put its own origin on this list and be redirected back to it after logout. Bound it with
-/// <c>AllowedHosts</c> — the ASP.NET host-filtering setting — to make the self-origin mean the deployment's
+/// <c language="text">AllowedHosts</c> — the ASP.NET host-filtering setting — to make the self-origin mean the deployment's
 /// own name rather than whatever was asked for.
 /// </para>
 /// </remarks>

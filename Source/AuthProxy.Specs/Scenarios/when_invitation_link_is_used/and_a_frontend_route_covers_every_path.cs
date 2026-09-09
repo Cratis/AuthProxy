@@ -11,8 +11,8 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 /// the invitation flow.
 /// </summary>
 /// <remarks>
-/// The catch-all is generated with the default authorization policy — <c>RequireAuthenticatedUser</c> — and
-/// the invite middleware is registered after <c>UseAuthorization</c>. Without releasing the proxy-owned
+/// The catch-all is generated with the default authorization policy — <c language="text">RequireAuthenticatedUser</c> — and
+/// the invite middleware is registered after <c language="text">UseAuthorization</c>. Without releasing the proxy-owned
 /// flows from the route that matched them, authorization refused the request first and redirected the
 /// browser to provider selection: no invitation staged, and no pending-invitation cookie, so the sign-in
 /// that followed carried no capability binding and the invitation could only complete on a later pass.

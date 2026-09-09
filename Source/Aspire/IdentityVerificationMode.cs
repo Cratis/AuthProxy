@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Aspire;
 
 /// <summary>
-/// Represents what a service's answer on <c>/.cratis/me</c> means to AuthProxy.
+/// Represents what a service's answer on <c language="text">/.cratis/me</c> means to AuthProxy.
 /// </summary>
 /// <remarks>
 /// Mirrors the AuthProxy configuration enumeration of the same name. The member names are what is written
@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Aspire;
 public enum IdentityVerificationMode
 {
     /// <summary>
-    /// The endpoint enriches identity details. Any answer that is not an explicit <c>403</c> lets the
+    /// The endpoint enriches identity details. Any answer that is not an explicit <c language="text">403</c> lets the
     /// request through and merges whatever details came with it, including an unreachable service, a
     /// timeout, another non-success status, an empty body, an unparseable body, and a body whose own
     /// verdict is negative. This is the released behavior and the default.

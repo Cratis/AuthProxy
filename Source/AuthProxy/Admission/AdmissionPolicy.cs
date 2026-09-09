@@ -66,7 +66,7 @@ public class AdmissionPolicy(IEntryTransactionProtector protector, TimeProvider 
     /// <returns><see langword="true"/> when such a cookie is present; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// It is a shape check and not a proof, and the difference matters: a caller writes their own cookie
-    /// names, so anything named <c>.AspNetCore.Correlation.</c>-something satisfies this. What it buys is
+    /// names, so anything named <c language="text">.AspNetCore.Correlation.</c>-something satisfies this. What it buys is
     /// that an entry transaction alone does not carry a callback — a caller replaying a provider callback
     /// path has to have been through a handshake this proxy started, or invent a cookie that says they
     /// were. The value of that cookie is never read here.

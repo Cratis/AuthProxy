@@ -7,10 +7,10 @@ namespace Cratis.AuthProxy.Security.for_TrustedProxies;
 /// OWASP A05 — Security Misconfiguration. A caller that is not one of the deployment's own proxies must not
 /// be able to say where it is or how it got here.
 /// <para>
-/// <c>X-Forwarded-For</c> and <c>X-Forwarded-Proto</c> are ordinary request headers, and until a boundary is
+/// <c language="text">X-Forwarded-For</c> and <c language="text">X-Forwarded-Proto</c> are ordinary request headers, and until a boundary is
 /// declared they are believed from anyone who can open a connection. The address is what gets written into
 /// the audit record of a sign-in; the scheme is what decides whether eleven session cookies carry
-/// <c>Secure</c>, what the OIDC <c>post_logout_redirect_uri</c> claims the proxy's public origin to be, and
+/// <c language="text">Secure</c>, what the OIDC <c language="text">post_logout_redirect_uri</c> claims the proxy's public origin to be, and
 /// which origins the post-logout allow-list admits. All of that is settled by two values, so the two values
 /// are what this asserts on.
 /// </para>

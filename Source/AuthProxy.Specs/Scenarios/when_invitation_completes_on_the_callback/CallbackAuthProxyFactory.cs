@@ -65,10 +65,10 @@ public class CallbackAuthProxyFactory : WebApplicationFactory<Program>
     public HttpStatusCode ExchangeStatusCode { get; set; } = HttpStatusCode.OK;
 
     /// <summary>
-    /// Extracts the reusable <c>name=value</c> cookie pairs a response set, skipping deletions.
+    /// Extracts the reusable <c language="text">name=value</c> cookie pairs a response set, skipping deletions.
     /// </summary>
     /// <param name="response">The response whose cookies to collect.</param>
-    /// <returns>The cookie pairs, ready for a <c>Cookie</c> request header.</returns>
+    /// <returns>The cookie pairs, ready for a <c language="text">Cookie</c> request header.</returns>
     public static IReadOnlyList<string> CookiesFrom(HttpResponseMessage response) =>
         response.Headers.TryGetValues("Set-Cookie", out var setCookies)
             ? setCookies

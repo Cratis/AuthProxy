@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Cratis.AuthProxy.for_IngressExtensions.given;
 
 /// <summary>
-/// An application configured through <c>AddIngressConfiguration</c> from a supplied ingress section.
+/// An application configured through <c language="text">AddIngressConfiguration</c> from a supplied ingress section.
 /// </summary>
 /// <remarks>
 /// Built from configuration keys rather than from an options object, because the keys are the surface a

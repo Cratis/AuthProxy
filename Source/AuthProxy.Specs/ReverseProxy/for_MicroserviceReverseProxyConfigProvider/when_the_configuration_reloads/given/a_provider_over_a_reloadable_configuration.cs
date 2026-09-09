@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvider.when_the_configuration_reloads.given;
 
 /// <summary>
-/// A provider over a configuration declaring <c>/portal</c> anonymous, with the change listener it registers
+/// A provider over a configuration declaring <c language="text">/portal</c> anonymous, with the change listener it registers
 /// captured so a spec can call it the way a reload does. A single service with only a frontend keeps the
 /// generated table small enough to read.
 /// </summary>

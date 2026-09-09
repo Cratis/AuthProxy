@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Identity.for_ClientPrincipalExtensions;
 
 /// <summary>
 /// A safe name is written exactly as it always was, and any sibling header left behind by an earlier
-/// caller is removed rather than left to contradict it. A stale <c>x-ms-client-principal-name*</c> would
+/// caller is removed rather than left to contradict it. A stale <c language="text">x-ms-client-principal-name*</c> would
 /// tell a backend the plain header is encoded when it is not, which is a name change by omission.
 /// </summary>
 public class when_setting_identity_headers_for_a_safe_name : Specification

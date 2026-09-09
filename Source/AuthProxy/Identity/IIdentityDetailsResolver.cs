@@ -7,14 +7,14 @@ namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// Defines the contract for resolving additional identity details from a microservice's
-/// <c>/.cratis/me</c> endpoint and persisting them as the <c>.cratis-identity</c> cookie.
+/// <c language="text">/.cratis/me</c> endpoint and persisting them as the <c language="text">.cratis-identity</c> cookie.
 /// </summary>
 public interface IIdentityDetailsResolver
 {
     /// <summary>
-    /// Calls <c>/.cratis/me</c> on every configured microservice that exposes an
+    /// Calls <c language="text">/.cratis/me</c> on every configured microservice that exposes an
     /// identity details endpoint, merges the results and writes (or refreshes) the
-    /// <c>.cratis-identity</c> response cookie as a full <see cref="IdentityProviderResult"/>.
+    /// <c language="text">.cratis-identity</c> response cookie as a full <see cref="IdentityProviderResult"/>.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="principal">The <see cref="ClientPrincipal"/> representing the authenticated user.</param>

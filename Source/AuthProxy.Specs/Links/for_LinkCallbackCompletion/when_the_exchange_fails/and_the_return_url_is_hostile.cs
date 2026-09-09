@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Links.for_LinkCallbackCompletion.when_the_exchange_fa
 
 /// <summary>
 /// A tampered return URL must not reach the browser on the failure path either — neither as a
-/// <c>Location</c> header nor echoed into the page.
+/// <c language="text">Location</c> header nor echoed into the page.
 /// </summary>
 public class and_the_return_url_is_hostile : a_link_callback_context
 {

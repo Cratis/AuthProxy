@@ -12,12 +12,12 @@ namespace Cratis.AuthProxy.Scenarios.when_capability_only_admission_is_configure
 /// <param name="Headers">Every header that came back, normalized and sorted.</param>
 /// <param name="Body">The bytes that came back.</param>
 /// <remarks>
-/// Comparing statuses alone is the mistake this type exists to prevent: a gate can answer <c>404</c>
-/// everywhere and still describe the deployment through an <c>Allow</c>, a <c>WWW-Authenticate</c>, a
+/// Comparing statuses alone is the mistake this type exists to prevent: a gate can answer <c language="text">404</c>
+/// everywhere and still describe the deployment through an <c language="text">Allow</c>, a <c language="text">WWW-Authenticate</c>, a
 /// content type or a body length that varies with the route.
 /// <para>
-/// <c>Date</c> is excluded because it is a clock reading rather than anything about the request. Everything
-/// else — including <c>Content-Length</c> and <c>Content-Type</c> — is compared exactly.
+/// <c language="text">Date</c> is excluded because it is a clock reading rather than anything about the request. Everything
+/// else — including <c language="text">Content-Length</c> and <c language="text">Content-Type</c> — is compared exactly.
 /// </para>
 /// </remarks>
 public sealed record ObservedAnswer(string Route, string Method, int StatusCode, string Headers, string Body)

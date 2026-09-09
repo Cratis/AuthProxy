@@ -9,8 +9,8 @@ namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvid
 /// A declared anonymous path must produce a route that relaxes the authorization policy, and nothing else
 /// in the table may be relaxed with it.
 /// <para>
-/// Every other generated route carries <c>AuthorizationPolicy = "default"</c>, which is
-/// <c>RequireAuthenticatedUser()</c>. Clearing <c>SelectProviderMiddleware</c> and <c>TenancyMiddleware</c>
+/// Every other generated route carries <c language="text">AuthorizationPolicy = "default"</c>, which is
+/// <c language="text">RequireAuthenticatedUser()</c>. Clearing <c language="text">SelectProviderMiddleware</c> and <c language="text">TenancyMiddleware</c>
 /// gets a request as far as authorization and no further, so this is the third of the three places that
 /// have to agree before a declared path is actually reachable.
 /// </para>

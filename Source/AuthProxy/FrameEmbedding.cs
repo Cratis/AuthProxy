@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Declares whether a page the proxy serves may be embedded in a frame, via
-/// <c>Content-Security-Policy: frame-ancestors</c> (with <c>X-Frame-Options</c> for the deny case).
+/// <c language="text">Content-Security-Policy: frame-ancestors</c> (with <c language="text">X-Frame-Options</c> for the deny case).
 /// </summary>
 /// <remarks>
 /// The proxy's own pages fall in two classes. Sign-in pages (provider selection, invitation selection)
@@ -38,7 +38,7 @@ public static class FrameEmbedding
     /// configured.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <param name="ancestors">The configured allowed ancestor origins; <c>"self"</c> names the proxy's own origin.</param>
+    /// <param name="ancestors">The configured allowed ancestor origins; <c language="text">"self"</c> names the proxy's own origin.</param>
     public static void Apply(HttpContext context, IEnumerable<string> ancestors)
     {
         var sources = ancestors
@@ -59,7 +59,7 @@ public static class FrameEmbedding
 
     /// <summary>
     /// Resolves the configured ancestors to the concrete origins a framed page may post messages to,
-    /// translating <c>"self"</c> to the origin of the current request.
+    /// translating <c language="text">"self"</c> to the origin of the current request.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="ancestors">The configured allowed ancestor origins.</param>

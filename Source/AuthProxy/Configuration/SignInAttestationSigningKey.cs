@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Configuration;
 public class SignInAttestationSigningKey
 {
     /// <summary>
-    /// Gets or sets the key identifier written to the JWS <c>kid</c> header.
+    /// Gets or sets the key identifier written to the JWS <c language="text">kid</c> header.
     /// </summary>
     public string KeyId { get; set; } = string.Empty;
 

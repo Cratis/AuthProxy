@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Identity;
 /// Defines the contract for remembering, across requests, that a principal was authorized in a tenant.
 /// </summary>
 /// <remarks>
-/// Resolving identity details means calling <c>/.cratis/me</c> on every configured service, and the answer
+/// Resolving identity details means calling <c language="text">/.cratis/me</c> on every configured service, and the answer
 /// includes whether the caller is authorized at all. Doing that on every request would put a fan-out of
 /// backend calls in front of every proxied request, so the outcome is remembered on the client — which
 /// makes the remembered value an authorization decision travelling through the caller's own browser, and
