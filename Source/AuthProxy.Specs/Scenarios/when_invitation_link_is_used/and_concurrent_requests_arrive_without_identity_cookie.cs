@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 
 /// <summary>
 /// End-to-end scenario: multiple simultaneous authenticated requests that all arrive without the
-/// <c>.cratis-identity</c> cookie must only trigger a single call to the identity details provider.
+/// <c language="text">.cratis-identity</c> cookie must only trigger a single call to the identity details provider.
 /// Without caching, every concurrent request would invoke the endpoint, causing a thundering-herd
 /// effect on the initial page load after the invite exchange.
 /// </summary>

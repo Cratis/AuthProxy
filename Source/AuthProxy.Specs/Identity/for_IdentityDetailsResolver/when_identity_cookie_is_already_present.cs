@@ -7,13 +7,13 @@ using Cratis.Arc.Identity;
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver;
 
 /// <summary>
-/// The readable <c>.cratis-identity</c> cookie must not, on its own, decide that a caller is authorized.
+/// The readable <c language="text">.cratis-identity</c> cookie must not, on its own, decide that a caller is authorized.
 /// <para>
 /// It is written non-HTTP-only so a frontend can render the signed-in user from it, which means script on
 /// any proxied origin can write it — and a non-browser caller can simply send it. This resolver used to
 /// short-circuit on its mere presence, without ever reading its value, so
-/// <c>Cookie: .cratis-identity=x</c> alongside a valid session was enough to skip every configured
-/// service's <c>/.cratis/me</c> authorization call, for as long as the caller kept sending it. A user
+/// <c language="text">Cookie: .cratis-identity=x</c> alongside a valid session was enough to skip every configured
+/// service's <c language="text">/.cratis/me</c> authorization call, for as long as the caller kept sending it. A user
 /// whose backend authorization had been revoked stayed authorized at the proxy by choice.
 /// </para>
 /// <para>

@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Admission;
 /// </summary>
 /// <remarks>
 /// Every failure here is one that would otherwise start cleanly and then refuse every caller alive, with a
-/// <c>404</c> that says nothing about why. Naming it at startup names it at the one moment somebody is
+/// <c language="text">404</c> that says nothing about why. Naming it at startup names it at the one moment somebody is
 /// watching.
 /// </remarks>
 public class AdmissionConfigurationValidator : IValidateOptions<C.AuthProxy>

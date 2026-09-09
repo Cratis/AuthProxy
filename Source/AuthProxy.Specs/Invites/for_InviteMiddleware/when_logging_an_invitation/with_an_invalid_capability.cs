@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_logging_an_invitation;
 
 /// <summary>
-/// An invitation arrives as <c>/invite/{capability}</c>, so on a Phase-1 invitation request the request path
+/// An invitation arrives as <c language="text">/invite/{capability}</c>, so on a Phase-1 invitation request the request path
 /// <em>is</em> a live bearer capability. Refusing it must not be the thing that writes it to every log sink.
 /// </summary>
 public class with_an_invalid_capability : given.an_invite_exchange_with_recorded_logs

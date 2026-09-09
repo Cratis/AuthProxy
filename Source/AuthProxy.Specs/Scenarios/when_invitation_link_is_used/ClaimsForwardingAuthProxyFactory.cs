@@ -4,8 +4,8 @@
 namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 
 /// <summary>
-/// Factory variant that adds <c>ClaimsToForward</c> configuration so that the
-/// <c>organization_id</c> claim from the invite token is forwarded as <c>organization</c>
+/// Factory variant that adds <c language="text">ClaimsToForward</c> configuration so that the
+/// <c language="text">organization_id</c> claim from the invite token is forwarded as <c language="text">organization</c>
 /// to the identity details provider.
 /// </summary>
 public class ClaimsForwardingAuthProxyFactory : AuthProxyFactory

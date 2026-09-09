@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.given;
 /// </summary>
 /// <typeparam name="TCategoryName">The logger category.</typeparam>
 /// <remarks>
-/// A source-generated <c>[LoggerMessage]</c> method returns before it formats anything when
+/// A source-generated <c language="text">[LoggerMessage]</c> method returns before it formats anything when
 /// <see cref="ILogger.IsEnabled(LogLevel)"/> answers no, and a substituted logger answers no by default. A
 /// disclosure specification written against a substituted logger therefore records nothing and passes no
 /// matter what the code under test writes — it proves nothing at all. This logger keeps every level enabled

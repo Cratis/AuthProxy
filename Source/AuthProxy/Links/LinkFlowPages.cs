@@ -12,10 +12,10 @@ namespace Cratis.AuthProxy.Links;
 /// embedding posture the flow requires.
 /// </summary>
 /// <remarks>
-/// The link flow is designed to run inside an <c>iframe</c> on the product's page (see
+/// The link flow is designed to run inside an <c language="text">iframe</c> on the product's page (see
 /// <see cref="C.Link.EmbedAncestors"/>): the framed selection page opens the provider leg in a separate
 /// top-level window — external identity providers refuse to render framed — and the completion and failure
-/// pages report back over a <c>BroadcastChannel</c> so the framed page can tell its parent the outcome.
+/// pages report back over a <c language="text">BroadcastChannel</c> so the framed page can tell its parent the outcome.
 /// Every page is served through <see cref="IErrorPageProvider"/> so a deployment can restyle it, and every
 /// page carries the frame-ancestors policy resolved from configuration — none by default.
 /// </remarks>

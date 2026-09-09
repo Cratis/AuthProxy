@@ -8,11 +8,11 @@ namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvid
 /// <summary>
 /// A service with no endpoint to forward to must not take a prefix away from a service that has one.
 /// <para>
-/// A <c>Services</c> entry does not have to declare a backend or a frontend — the lobby's registration
+/// A <c language="text">Services</c> entry does not have to declare a backend or a frontend — the lobby's registration
 /// service is configured that way — so a declaration on such an entry produces no route. If that
 /// declaration still claimed the prefix, the service that can actually serve it would be skipped, and the
 /// path would match no route at all while all three middlewares went on treating it as anonymous: a
-/// <c>404</c> on a path the deployment declared public, caused by a service that never even appears in the
+/// <c language="text">404</c> on a path the deployment declared public, caused by a service that never even appears in the
 /// route table.
 /// </para>
 /// </summary>

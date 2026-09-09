@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// Reads a paged GitHub REST collection and projects each entry to a single string.
 /// </summary>
 /// <remarks>
-/// GitHub pages every collection endpoint and links the next page from a <c>Link</c> header rather than
+/// GitHub pages every collection endpoint and links the next page from a <c language="text">Link</c> header rather than
 /// from the body, so a single request answers "the first hundred organizations", which for authorization
 /// is a different question from the one being asked. Following the links is what makes membership in the
 /// hundred-and-first organization count.
@@ -126,7 +126,7 @@ internal static class GitHubPagedResourceReader
         }.Uri;
 
     /// <summary>
-    /// Resolves the next page from the response's <c>Link</c> header.
+    /// Resolves the next page from the response's <c language="text">Link</c> header.
     /// </summary>
     /// <param name="response">The response just read.</param>
     /// <param name="origin">The collection URL the read started from.</param>

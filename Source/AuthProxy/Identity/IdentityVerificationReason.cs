@@ -21,7 +21,7 @@ public enum IdentityVerificationReason
     Verified = 0,
 
     /// <summary>
-    /// The service answered <c>403 Forbidden</c>, refusing the caller outright.
+    /// The service answered <c language="text">403 Forbidden</c>, refusing the caller outright.
     /// </summary>
     Forbidden = 1,
 

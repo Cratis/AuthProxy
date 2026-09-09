@@ -11,11 +11,11 @@ namespace Cratis.AuthProxy.Identity;
 /// Remembers an authorization outcome in a cookie the caller cannot forge.
 /// </summary>
 /// <remarks>
-/// The readable <c>.cratis-identity</c> cookie exists so a frontend can render the signed-in user without
+/// The readable <c language="text">.cratis-identity</c> cookie exists so a frontend can render the signed-in user without
 /// a round-trip, which is why it is written non-HTTP-only and in plain base64. That makes it useless as
 /// evidence: any script on a proxied origin, and any non-browser client at all, can write whatever it
 /// likes into it. This writes the <em>decision</em> to a separate HTTP-only cookie sealed with ASP.NET
-/// data protection, so the value that skips the <c>/.cratis/me</c> authorization call is one only
+/// data protection, so the value that skips the <c language="text">/.cratis/me</c> authorization call is one only
 /// AuthProxy can have produced.
 /// <para>
 /// The versioned structured payload names the principal's account binding and the tenant it was issued for,
@@ -25,7 +25,7 @@ namespace Cratis.AuthProxy.Identity;
 /// bearer value, so without the comparison a caller could keep a record issued for one tenant and present
 /// it while acting in another, or a record from an old session could authorize whoever holds the browser
 /// next. The expiry is carried inside the sealed payload rather than left to the cookie's
-/// <c>Max-Age</c>, because <c>Max-Age</c> is a request to the browser and a client that declines to honor
+/// <c language="text">Max-Age</c>, because <c language="text">Max-Age</c> is a request to the browser and a client that declines to honor
 /// it would otherwise hold an authorization that never lapses.
 /// </para>
 /// </remarks>

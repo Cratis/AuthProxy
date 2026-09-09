@@ -6,7 +6,7 @@ using Microsoft.Net.Http.Headers;
 namespace Cratis.AuthProxy.Management.for_ManagementEndpoints;
 
 /// <summary>
-/// An instance that cannot serve traffic answers <c>503</c> — and says no more about it than a ready one
+/// An instance that cannot serve traffic answers <c language="text">503</c> — and says no more about it than a ready one
 /// does.
 /// <para>
 /// The reason is the interesting part to an attacker and useless to a probe: it names a filesystem path, a

@@ -8,9 +8,9 @@ namespace Cratis.AuthProxy.Scenarios.when_capability_only_admission_is_configure
 /// indistinguishable refusal.
 /// <para>
 /// This is the whole feature stated as one table. AuthProxy's interactive contract is otherwise an oracle
-/// in five different voices: <c>/.cratis/login/{scheme}</c> says whether a provider is configured,
-/// <c>/.cratis/providers</c> lists them, <c>/.cratis/token</c> confirms an AuthProxy is answering,
-/// <c>SelectProviderMiddleware</c> answers a browser and an API caller differently, and the invite
+/// in five different voices: <c language="text">/.cratis/login/{scheme}</c> says whether a provider is configured,
+/// <c language="text">/.cratis/providers</c> lists them, <c language="text">/.cratis/token</c> confirms an AuthProxy is answering,
+/// <c language="text">SelectProviderMiddleware</c> answers a browser and an API caller differently, and the invite
 /// middleware distinguishes an expired invitation from an invalid one. A closed deployment has to answer
 /// all of them the same way it answers a path that was never there.
 /// </para>

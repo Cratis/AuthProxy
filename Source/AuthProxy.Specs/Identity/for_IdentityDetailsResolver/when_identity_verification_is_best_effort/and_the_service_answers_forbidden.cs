@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_ve
 
 /// <summary>
 /// The other half of the fence, and the reason the default mode is not simply "admit everything": an HTTP
-/// <c>403</c> is the one answer the released proxy refused on, and it still refuses on it. Without this the
+/// <c language="text">403</c> is the one answer the released proxy refused on, and it still refuses on it. Without this the
 /// pair of specs would read as though the default mode had no denial at all, and a later change removing the
 /// last one would look like a simplification.
 /// </summary>

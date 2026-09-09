@@ -13,7 +13,7 @@ public interface ISignInNotificationSigner
     /// </summary>
     /// <remarks>
     /// When this is <see langword="false"/> a notification is posted exactly as it always has been — unsigned,
-    /// with no <c>Authorization</c> header. When it is <see langword="true"/> an unsigned notification is never
+    /// with no <c language="text">Authorization</c> header. When it is <see langword="true"/> an unsigned notification is never
     /// an acceptable outcome: a caller that cannot obtain an envelope must refuse to post at all.
     /// </remarks>
     bool IsEnabled { get; }

@@ -4,10 +4,10 @@
 namespace Cratis.AuthProxy.Security.for_AccessControl;
 
 /// <summary>
-/// OWASP A01 / A05 — a deployment whose <c>/.cratis/me</c> endpoint answers with an authorization decision
+/// OWASP A01 / A05 — a deployment whose <c language="text">/.cratis/me</c> endpoint answers with an authorization decision
 /// must not admit callers when that decision could not be obtained.
 /// <para>
-/// The released proxy caught every transport failure, timeout, non-<c>403</c> status, empty body and parse
+/// The released proxy caught every transport failure, timeout, non-<c language="text">403</c> status, empty body and parse
 /// failure and answered them with an empty-but-successful identity, then hard-coded the result to authorized
 /// and sealed it into a cookie. So the one moment the proxy knew least about a caller — the backend it asks
 /// being down, unreachable, or answering something it could not read — was the moment it was most

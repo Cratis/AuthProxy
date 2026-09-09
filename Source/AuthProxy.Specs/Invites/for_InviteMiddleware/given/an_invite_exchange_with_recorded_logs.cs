@@ -51,7 +51,7 @@ public class an_invite_exchange_with_recorded_logs : an_invite_exchange
     /// <summary>
     /// Marks the request as authenticated by a legacy provider account whose subject is the sentinel.
     /// </summary>
-    /// <param name="claims">Additional claims (e.g. <c>email</c>, <c>email_verified</c>) for the account.</param>
+    /// <param name="claims">Additional claims (e.g. <c language="text">email</c>, <c language="text">email_verified</c>) for the account.</param>
     protected void GivenLegacyAuthenticatedUserWith(params Claim[] claims) =>
         _context.User = new ClaimsPrincipal(new ClaimsIdentity(claims.Prepend(new Claim("sub", SensitiveSubject)), "aad"));
 

@@ -18,8 +18,8 @@ namespace Cratis.AuthProxy.SignIns;
 ///   <item>the client IP, taken from the connection's remote address as the forwarded-headers middleware
 ///   left it, which is the address of the trusted proxy's declared client when the request came through
 ///   the deployment's own infrastructure and the caller's own address otherwise; and</item>
-///   <item>coarse geo headers that popular fronting layers add — Cloudflare's <c>CF-IPCountry</c>, and the
-///   conventional <c>X-Geo-*</c> / <c>X-AppEngine-*</c> city/region/country headers — read only when the
+///   <item>coarse geo headers that popular fronting layers add — Cloudflare's <c language="text">CF-IPCountry</c>, and the
+///   conventional <c language="text">X-Geo-*</c> / <c language="text">X-AppEngine-*</c> city/region/country headers — read only when the
 ///   request came from a trusted proxy.</item>
 /// </list>
 /// <para>

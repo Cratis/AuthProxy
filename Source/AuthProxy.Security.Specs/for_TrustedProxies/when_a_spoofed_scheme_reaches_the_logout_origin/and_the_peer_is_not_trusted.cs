@@ -7,8 +7,8 @@ namespace Cratis.AuthProxy.Security.for_TrustedProxies.when_a_spoofed_scheme_rea
 /// OWASP A01 — Broken Access Control (open redirect). A caller must not be able to widen the post-logout
 /// allow-list by naming the scheme the proxy thinks it is served over.
 /// <para>
-/// The allow-list admits the proxy's own public origin, built from <c>Request.Scheme</c> and
-/// <c>Request.Host</c>. A caller that could set the scheme would add a second origin to that list — the same
+/// The allow-list admits the proxy's own public origin, built from <c language="text">Request.Scheme</c> and
+/// <c language="text">Request.Host</c>. A caller that could set the scheme would add a second origin to that list — the same
 /// host under the other scheme — and the logout endpoint would then redirect to it. The target chosen here is
 /// exactly that: the same host, the other scheme, and nothing else about the deployment changed.
 /// </para>

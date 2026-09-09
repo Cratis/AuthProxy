@@ -4,12 +4,12 @@
 namespace Cratis.AuthProxy.Management.for_ManagementListenerIsolation;
 
 /// <summary>
-/// The <c>Host</c> header decides nothing, in either direction.
+/// The <c language="text">Host</c> header decides nothing, in either direction.
 /// <para>
-/// ASP.NET's own way of scoping endpoints to a port is <c>RequireHost("*:9110")</c>, and it matches that
+/// ASP.NET's own way of scoping endpoints to a port is <c language="text">RequireHost("*:9110")</c>, and it matches that
 /// header — which is a string the caller typed. Written into a request on the public listener it would make
 /// the private endpoints answer the internet; written into an ordinary request it would make the proxy
-/// refuse a legitimate caller who happens to sit behind an ingress that rewrites <c>Host</c>. Gating on the
+/// refuse a legitimate caller who happens to sit behind an ingress that rewrites <c language="text">Host</c>. Gating on the
 /// socket the request was accepted on is the only thing here a caller cannot reach.
 /// </para>
 /// </summary>

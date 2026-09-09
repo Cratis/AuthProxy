@@ -9,9 +9,9 @@ namespace Cratis.AuthProxy.SignIns;
 /// <remarks>
 /// The envelope is a profile of RFC 9449 (DPoP) rather than a scheme of its own: <see cref="HttpMethod"/> and
 /// <see cref="HttpUri"/> are the RFC 9449 route claims with the RFC 9449 semantics, and the standard
-/// <c>iss</c>, <c>aud</c>, <c>iat</c>, <c>nbf</c>, <c>exp</c> and <c>jti</c> claims carry provenance, audience,
+/// <c language="text">iss</c>, <c language="text">aud</c>, <c language="text">iat</c>, <c language="text">nbf</c>, <c language="text">exp</c> and <c language="text">jti</c> claims carry provenance, audience,
 /// time and replay resistance. <see cref="BodyHash"/> is the one AuthProxy extension — RFC 9449 has no body
-/// digest — and uses the identical construction to its <c>ath</c> claim.
+/// digest — and uses the identical construction to its <c language="text">ath</c> claim.
 /// </remarks>
 public static class SignInAttestationClaims
 {

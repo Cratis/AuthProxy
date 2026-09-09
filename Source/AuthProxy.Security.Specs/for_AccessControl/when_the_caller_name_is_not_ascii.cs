@@ -10,13 +10,13 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// a caller no backend can authorize, which is a denial of access every bit as total as a wrong policy.
 /// <para>
 /// A display name is whatever the identity provider says it is, and providers say things like
-/// <c>Søren Wærstad</c>. .NET will not write a character above <c>U+007F</c> to a header field — it throws
+/// <c language="text">Søren Wærstad</c>. .NET will not write a character above <c language="text">U+007F</c> to a header field — it throws
 /// before a byte reaches the socket — so such a person's proxied request failed at the gateway, their
-/// <c>/.cratis/me</c> resolution failed silently, and the application did not work for them at all.
+/// <c language="text">/.cratis/me</c> resolution failed silently, and the application did not work for them at all.
 /// </para>
 /// <para>
 /// Only a real socket can show this. An in-memory transform spec passes either way, because
-/// <c>HttpRequestMessage.Headers.Add</c> checks for CR, LF and NUL and nothing else — the ASCII refusal
+/// <c language="text">HttpRequestMessage.Headers.Add</c> checks for CR, LF and NUL and nothing else — the ASCII refusal
 /// happens in the connection, when the request is written. So the assertion is made against a real origin,
 /// on stock Kestrel defaults, with no request-header encoding configured anywhere.
 /// </para>

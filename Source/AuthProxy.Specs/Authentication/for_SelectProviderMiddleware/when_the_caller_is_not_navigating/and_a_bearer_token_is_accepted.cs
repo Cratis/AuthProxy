@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_the_
 /// <summary>
 /// A refusal must name a credential the caller can come back with when one exists.
 /// <para>
-/// A <c>401</c> is required to carry a <c>WWW-Authenticate</c> challenge, and a bare one tells an
+/// A <c language="text">401</c> is required to carry a <c language="text">WWW-Authenticate</c> challenge, and a bare one tells an
 /// integration only that it was refused — not that presenting a bearer token would have worked. With JWT
 /// bearer configured the token is obtainable from the authority, so the challenge is real and actionable.
 /// </para>

@@ -17,16 +17,16 @@ public class Link
 {
     /// <summary>
     /// Gets or sets the absolute URL of the application endpoint that records the freshly authenticated
-    /// subject for a link, e.g. <c>https://studio.example.com/api/internal/identity-providers/link</c>.
-    /// AuthProxy posts <c>{ subject, identityProvider }</c> to it with the one-time link token supplied by
+    /// subject for a link, e.g. <c language="text">https://studio.example.com/api/internal/identity-providers/link</c>.
+    /// AuthProxy posts <c language="text">{ subject, identityProvider }</c> to it with the one-time link token supplied by
     /// the application as the bearer token, exactly as the invite exchange does.
     /// Leave empty to disable the link callback.
     /// </summary>
     public string ExchangeUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the origins allowed to embed the link-flow pages in an <c>iframe</c>. The literal
-    /// <c>"self"</c> names the proxy's own origin — the common case, where the product is served through
+    /// Gets or sets the origins allowed to embed the link-flow pages in an <c language="text">iframe</c>. The literal
+    /// <c language="text">"self"</c> names the proxy's own origin — the common case, where the product is served through
     /// the proxy. Empty by default, which forbids framing the link pages entirely; nothing else the proxy
     /// serves is ever opened to framing by this setting.
     /// </summary>

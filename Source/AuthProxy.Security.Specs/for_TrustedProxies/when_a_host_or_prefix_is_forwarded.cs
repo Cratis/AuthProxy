@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Security.for_TrustedProxies;
 /// <para>
 /// The host is the second half of the proxy's own public origin — the half a spoofed scheme cannot reach on
 /// its own — so a deployment that started honoring it would let a caller name the origin the OIDC
-/// <c>post_logout_redirect_uri</c> points at and the origin the post-logout allow-list admits. The prefix
+/// <c language="text">post_logout_redirect_uri</c> points at and the origin the post-logout allow-list admits. The prefix
 /// moves every path the proxy matches on, which would silently reclassify a protected path as an anonymous
 /// one. Neither is a header anyone would notice becoming trusted, which is why it is asserted rather than
 /// assumed.

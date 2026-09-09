@@ -10,8 +10,8 @@ namespace Cratis.AuthProxy;
 /// </summary>
 /// <remarks>
 /// Every refusal has to be the same refusal — same status, same headers, same bytes — because anything that
-/// varies is an answer. A different status for a path that exists, a <c>WWW-Authenticate</c> where a
-/// challenge would have started, an <c>Allow</c> listing the methods a route accepts, a <c>Location</c>
+/// varies is an answer. A different status for a path that exists, a <c language="text">WWW-Authenticate</c> where a
+/// challenge would have started, an <c language="text">Allow</c> listing the methods a route accepts, a <c language="text">Location</c>
 /// pointing at a provider, a cookie issued on the way out: each of those is a question answered for a
 /// caller who has presented nothing.
 /// <para>
@@ -29,8 +29,8 @@ namespace Cratis.AuthProxy;
 /// </para>
 /// <para>
 /// It is deliberately <em>not</em> written through <see cref="ErrorPages.IErrorPageProvider"/>. That
-/// provider injects a <c>&lt;base href="/_pages/"&gt;</c> so a branded page can load its assets, and
-/// <c>/_pages</c> is one of the things a closed deployment closes — so a branded refusal would render
+/// provider injects a <c language="text">&lt;base href="/_pages/"&gt;</c> so a branded page can load its assets, and
+/// <c language="text">/_pages</c> is one of the things a closed deployment closes — so a branded refusal would render
 /// without its assets and, worse, would be a distinguishable answer: it says an AuthProxy is here and that
 /// it has pages.
 /// </para>

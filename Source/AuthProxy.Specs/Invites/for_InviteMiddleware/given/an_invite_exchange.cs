@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.given;
 /// Reusable context that drives <see cref="InviteMiddleware"/> through its Phase-2 (post-login)
 /// invite exchange using a <em>real</em> <see cref="InviteTokenValidator"/> and a signed invite token,
 /// so re-validation and email binding are actually exercised. Concrete specs set the pending invite
-/// cookie and the authenticated user in their own <c>Establish</c>, then invoke the middleware.
+/// cookie and the authenticated user in their own <c language="text">Establish</c>, then invoke the middleware.
 /// </summary>
 public class an_invite_exchange : Specification
 {
@@ -96,8 +96,8 @@ public class an_invite_exchange : Specification
     /// needs to forge, expire, or otherwise diverge from a valid token.
     /// </summary>
     /// <param name="signingKey">The key to sign with; defaults to the configured (trusted) key.</param>
-    /// <param name="issuer">The <c>iss</c> claim; defaults to the expected issuer.</param>
-    /// <param name="audience">The <c>aud</c> claim; defaults to the expected audience.</param>
+    /// <param name="issuer">The <c language="text">iss</c> claim; defaults to the expected issuer.</param>
+    /// <param name="audience">The <c language="text">aud</c> claim; defaults to the expected audience.</param>
     /// <param name="expires">The expiry time; defaults to one hour from now.</param>
     /// <param name="notBefore">The earliest valid time; defaults to one minute ago.</param>
     /// <param name="claims">Additional claims to embed in the token.</param>
@@ -112,9 +112,9 @@ public class an_invite_exchange : Specification
         TokenFixture.CreateToken(signingKey ?? _signingKey, issuer, audience, expires, notBefore, claims);
 
     /// <summary>
-    /// Marks the request as authenticated, always carrying a <c>sub</c> claim plus any supplied claims.
+    /// Marks the request as authenticated, always carrying a <c language="text">sub</c> claim plus any supplied claims.
     /// </summary>
-    /// <param name="claims">Additional claims (e.g. <c>email</c>, <c>email_verified</c>) for the account.</param>
+    /// <param name="claims">Additional claims (e.g. <c language="text">email</c>, <c language="text">email_verified</c>) for the account.</param>
     protected void GivenAuthenticatedUserWith(params Claim[] claims) =>
         _context.User = new ClaimsPrincipal(new ClaimsIdentity(claims.Prepend(new Claim("sub", "user-123")), "aad"));
 
@@ -123,7 +123,7 @@ public class an_invite_exchange : Specification
     /// invitation's own challenge, exactly as a Phase-2 request arrives once the provider has signed the
     /// caller in for the invitation.
     /// </summary>
-    /// <param name="token">The token to carry in the <c>.cratis-invite</c> cookie.</param>
+    /// <param name="token">The token to carry in the <c language="text">.cratis-invite</c> cookie.</param>
     protected void GivenPendingInviteCookie(string token)
     {
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}";
@@ -134,7 +134,7 @@ public class an_invite_exchange : Specification
     /// Places the given token in the pending invite cookie while the caller is signed in from before the
     /// invitation was ever opened — the browser that already had a session with another provider.
     /// </summary>
-    /// <param name="token">The token to carry in the <c>.cratis-invite</c> cookie.</param>
+    /// <param name="token">The token to carry in the <c language="text">.cratis-invite</c> cookie.</param>
     protected void GivenPendingInviteCookieOnAPreExistingSession(string token)
     {
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}";

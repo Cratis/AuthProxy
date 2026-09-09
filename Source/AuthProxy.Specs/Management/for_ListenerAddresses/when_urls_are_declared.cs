@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 namespace Cratis.AuthProxy.Management.for_ListenerAddresses;
 
 /// <summary>
-/// <c>ASPNETCORE_URLS</c> is the highest-priority answer, and several of them are separated by semicolons.
+/// <c language="text">ASPNETCORE_URLS</c> is the highest-priority answer, and several of them are separated by semicolons.
 /// </summary>
 public class when_urls_are_declared : Specification
 {

@@ -47,8 +47,8 @@ public class OAuthProvider
     /// </summary>
     /// <remarks>
     /// This supports providers such as GitHub whose regular user-information endpoint can omit a private email and
-    /// does not establish verification. The endpoint must return a JSON array with <c>email</c>, <c>verified</c>,
-    /// and <c>primary</c> properties. AuthProxy selects exactly one primary, verified address.
+    /// does not establish verification. The endpoint must return a JSON array with <c language="text">email</c>, <c language="text">verified</c>,
+    /// and <c language="text">primary</c> properties. AuthProxy selects exactly one primary, verified address.
     /// </remarks>
     public string VerifiedEmailEndpoint { get; set; } = string.Empty;
 
@@ -70,8 +70,8 @@ public class OAuthProvider
 
     /// <summary>
     /// Gets or sets the claim mappings from the user-info JSON response.
-    /// Key is the claim type (e.g. <c>ClaimTypes.Name</c> or a custom URN);
-    /// value is the JSON field name in the user-info response (e.g. <c>login</c>).
+    /// Key is the claim type (e.g. <c language="text">ClaimTypes.Name</c> or a custom URN);
+    /// value is the JSON field name in the user-info response (e.g. <c language="text">login</c>).
     /// </summary>
     public IDictionary<string, string> ClaimMappings { get; set; } = new Dictionary<string, string>();
 
@@ -79,7 +79,7 @@ public class OAuthProvider
     /// Gets or sets additional static parameters included in every authorization request to this provider.
     /// </summary>
     /// <remarks>
-    /// Framework-owned OAuth parameters such as <c>state</c>, <c>redirect_uri</c>, and <c>client_id</c> cannot be configured here.
+    /// Framework-owned OAuth parameters such as <c language="text">state</c>, <c language="text">redirect_uri</c>, and <c language="text">client_id</c> cannot be configured here.
     /// </remarks>
     public IDictionary<string, string> AuthorizationParameters { get; set; } = new Dictionary<string, string>();
 

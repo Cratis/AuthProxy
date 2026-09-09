@@ -14,7 +14,7 @@ namespace Cratis.AuthProxy.Security.given;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The in-memory test server never opens a socket, so <c>Connection.RemoteIpAddress</c> is <see langword="null"/>
+/// The in-memory test server never opens a socket, so <c language="text">Connection.RemoteIpAddress</c> is <see langword="null"/>
 /// on every request it serves. That is fatal to a spec about a trusted-proxy boundary and fatal in the worst
 /// possible way: a null address matches no known network, so the untrusted direction passes for entirely the
 /// wrong reason and the trusted direction cannot be written at all. A whole suite would sit there green while

@@ -19,7 +19,7 @@ public class ServiceClientCredentials
 
     /// <summary>
     /// Gets or sets the internal verification endpoint that AuthProxy should call with the supplied client credentials.
-    /// Relative values are resolved against the service backend <c>BaseUrl</c>; absolute values are used as-is.
+    /// Relative values are resolved against the service backend <c language="text">BaseUrl</c>; absolute values are used as-is.
     /// </summary>
     [Required]
     public string VerificationPath { get; set; } = "/.cratis/client-credentials/verify";

@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.for_AnonymousPaths;
 /// A declared prefix must match on segment boundaries, case-insensitively, and nowhere else.
 /// <para>
 /// Case-insensitivity is not an accident: ASP.NET route templates match literal segments
-/// case-insensitively, so the route table would serve <c>/PORTAL</c> anonymously whatever the middlewares
+/// case-insensitively, so the route table would serve <c language="text">/PORTAL</c> anonymously whatever the middlewares
 /// decided. The two have to agree, and this pins which way.
 /// </para>
 /// </summary>

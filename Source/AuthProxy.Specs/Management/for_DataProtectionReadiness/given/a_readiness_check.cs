@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Management.for_DataProtectionReadiness.given;
 /// </summary>
 /// <remarks>
 /// Deliberately the real stack rather than a substituted <see cref="IDataProtectionProvider"/>. What is
-/// being specified is that a <c>Protect</c>/<c>Unprotect</c> round-trip forces the key ring to initialize
+/// being specified is that a <c language="text">Protect</c>/<c language="text">Unprotect</c> round-trip forces the key ring to initialize
 /// and reports what happened when it does — and a substitute would answer whatever it was told to,
 /// including for the failure that matters.
 /// <para>

@@ -16,7 +16,7 @@ namespace Cratis.AuthProxy.Scenarios.when_capability_only_admission_is_configure
 /// have one.
 /// </para>
 /// <para>
-/// Asserted against the routing table rather than against a response, because a <c>404</c> is what the gate
+/// Asserted against the routing table rather than against a response, because a <c language="text">404</c> is what the gate
 /// answers to everything and would say nothing about whether the route was ever declared.
 /// </para>
 /// </summary>

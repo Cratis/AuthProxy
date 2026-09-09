@@ -41,7 +41,7 @@ public class Admission
     /// </summary>
     /// <remarks>
     /// Twenty rather than ten because of what sits inside the round-trip it has to outlast: ASP.NET Core's
-    /// own <c>RemoteAuthenticationOptions.RemoteAuthenticationTimeout</c> allows fifteen minutes at the
+    /// own <c language="text">RemoteAuthenticationOptions.RemoteAuthenticationTimeout</c> allows fifteen minutes at the
     /// provider, and enrolling in MFA, resetting a password or working through a consent screen routinely
     /// uses them. An entry shorter than that expires while the framework still considers the handshake
     /// live, and the caller comes back to the uniform refusal — with no recovery, and by design nothing in

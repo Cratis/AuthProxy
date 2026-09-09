@@ -117,7 +117,7 @@ public static class IngressExtensions
     /// <summary>
     /// Configures the middleware pipeline: forwarded headers, static files, authentication,
     /// authorization, tenancy, invites, and the reverse proxy.
-    /// Also maps the <c>/.cratis/providers</c> endpoint and the per-provider login endpoints.
+    /// Also maps the <c language="text">/.cratis/providers</c> endpoint and the per-provider login endpoints.
     /// </summary>
     /// <param name="app">The <see cref="WebApplication"/> to configure.</param>
     /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>

@@ -12,8 +12,8 @@ namespace Cratis.AuthProxy.Attestations;
 /// </summary>
 /// <remarks>
 /// This is the one signing implementation in AuthProxy. It owns the bindings every signed AuthProxy assertion
-/// carries — provenance (<c>iss</c> plus the <c>kid</c> header selecting the key), audience (<c>aud</c>),
-/// freshness (<c>iat</c>, <c>nbf</c>, <c>exp</c>) and replay resistance (a random 256-bit <c>jti</c>) — and
+/// carries — provenance (<c language="text">iss</c> plus the <c language="text">kid</c> header selecting the key), audience (<c language="text">aud</c>),
+/// freshness (<c language="text">iat</c>, <c language="text">nbf</c>, <c language="text">exp</c>) and replay resistance (a random 256-bit <c language="text">jti</c>) — and
 /// leaves every protocol-specific binding to the caller's claims. Signing never throws on unusable key
 /// material; it reports failure so a caller can refuse to send rather than fall back to an unsigned call.
 /// </remarks>
@@ -44,8 +44,8 @@ public static class AttestationSigner
     /// Tries to sign one assertion carrying the supplied protocol claims.
     /// </summary>
     /// <param name="contract">The resolved signing parameters.</param>
-    /// <param name="issuedAt">The instant the assertion is issued, from which <c>iat</c>, <c>nbf</c> and <c>exp</c> are derived.</param>
-    /// <param name="claims">The protocol claims to bind, extended in place with the generated <c>jti</c>.</param>
+    /// <param name="issuedAt">The instant the assertion is issued, from which <c language="text">iat</c>, <c language="text">nbf</c> and <c language="text">exp</c> are derived.</param>
+    /// <param name="claims">The protocol claims to bind, extended in place with the generated <c language="text">jti</c>.</param>
     /// <param name="attestation">The compact signed JWS when successful; otherwise an empty string.</param>
     /// <returns><see langword="true"/> when the assertion was signed; otherwise <see langword="false"/>.</returns>
     /// <remarks>

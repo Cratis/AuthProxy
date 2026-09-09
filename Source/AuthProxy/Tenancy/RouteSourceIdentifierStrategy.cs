@@ -7,9 +7,9 @@ namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
 /// Resolves the tenant source identifier from the request path using a named-group
-/// regular expression. The named group must be called <c>sourceIdentifier</c>.
-/// Configure the expression via the <c>pattern</c> option, e.g.:
-/// <c>\/(?&lt;sourceIdentifier&gt;[\w]+)\/</c>.
+/// regular expression. The named group must be called <c language="text">sourceIdentifier</c>.
+/// Configure the expression via the <c language="text">pattern</c> option, e.g.:
+/// <c language="text">\/(?&lt;sourceIdentifier&gt;[\w]+)\/</c>.
 /// </summary>
 public class RouteSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<RouteOptions>
 {

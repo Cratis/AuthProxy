@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Security.for_Injection;
 /// <summary>
 /// OWASP A03 — Injection. A caller must not be able to name a file outside the pages directory.
 /// <para>
-/// The <c>/_pages</c> branch is the one place AuthProxy reads the disk on behalf of an unauthenticated
+/// The <c language="text">/_pages</c> branch is the one place AuthProxy reads the disk on behalf of an unauthenticated
 /// caller, and by design it answers before authentication so a login or error page stays reachable without
 /// a session. Anonymous, pre-auth and file-backed is the highest-value path-traversal combination the
 /// component has: a deployment's configuration, its data-protection keys and its mounted secrets all live
@@ -14,24 +14,24 @@ namespace Cratis.AuthProxy.Security.for_Injection;
 /// file read for anyone who can reach the host.
 /// </para>
 /// <para>
-/// That risk is concrete rather than theoretical here, because the proxy's own <c>appsettings.json</c> sits
-/// directly beside its <c>Pages</c> directory — one <c>../</c> is the entire distance between serving a
+/// That risk is concrete rather than theoretical here, because the proxy's own <c language="text">appsettings.json</c> sits
+/// directly beside its <c language="text">Pages</c> directory — one <c language="text">../</c> is the entire distance between serving a
 /// login page and serving the deployment's configuration. So the payloads walk the evasion ladder instead
-/// of repeating one canonical <c>../</c>: percent-encoded dots, an encoded separator, doubled dots that
+/// of repeating one canonical <c language="text">../</c>: percent-encoded dots, an encoded separator, doubled dots that
 /// survive a naive strip, double encoding, Windows-style backslashes, and a rooted path.
 /// </para>
 /// <para>
 /// The payloads do not all arrive intact, and the spec is written so that this is visible rather than
 /// papered over. Two layers below AuthProxy defuse most of them, and neither is this component's code:
 /// <see cref="Uri"/> collapses dot segments and rewrites backslashes as the request is built, so the three
-/// plain <c>../</c> forms are already ordinary paths before the proxy sees them and are then refused by the
-/// authentication gate; and the request path never decodes <c>%2f</c> into a separator, so the
+/// plain <c language="text">../</c> forms are already ordinary paths before the proxy sees them and are then refused by the
+/// authentication gate; and the request path never decodes <c language="text">%2f</c> into a separator, so the
 /// encoded-separator forms arrive as one long literal file name inside the pages directory rather than as a
 /// walk out of it. What is left reaches the pages handler and is refused there for want of a file.
 /// </para>
 /// <para>
 /// That ordering is worth stating plainly, because it means the explicit containment check in
-/// <c>ResolvePageAssetPath</c> — resolving the full path and requiring it to stay under the directory — is
+/// <c language="text">ResolvePageAssetPath</c> — resolving the full path and requiring it to stay under the directory — is
 /// never the thing that says no in these runs. It is the backstop for the day a layer above stops
 /// normalizing, which is exactly how traversal bugs have historically appeared. So the assertions are made
 /// on the outcome (nothing from outside the page directories is ever returned, and no payload comes back
@@ -40,10 +40,10 @@ namespace Cratis.AuthProxy.Security.for_Injection;
 /// </para>
 /// <para>
 /// A branch that answered 404 to everything would satisfy an outcome assertion while protecting nothing, so
-/// three requests prove the surface is live alongside the attacks: <c>select-provider.html</c> from the
-/// configured directory, <c>403.html</c> from the content-root directory that is the actual sibling of
-/// <c>appsettings.json</c>, and the same file addressed with an encoded separator, which must fail — it is
-/// what establishes that <c>%2f</c> is inert here and that the encoded-separator payloads were therefore
+/// three requests prove the surface is live alongside the attacks: <c language="text">select-provider.html</c> from the
+/// configured directory, <c language="text">403.html</c> from the content-root directory that is the actual sibling of
+/// <c language="text">appsettings.json</c>, and the same file addressed with an encoded separator, which must fail — it is
+/// what establishes that <c language="text">%2f</c> is inert here and that the encoded-separator payloads were therefore
 /// never a traversal in the first place.
 /// </para>
 /// </summary>

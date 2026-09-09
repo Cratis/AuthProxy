@@ -7,18 +7,18 @@ namespace Cratis.AuthProxy.for_HttpContextExtensions;
 
 /// <summary>
 /// An HTML page is only an answer to a caller that is navigating to one. Everything else — a webhook, an
-/// integration, a <c>fetch()</c> from the application's own frontend — is asking for data, and answering it
+/// integration, a <c language="text">fetch()</c> from the application's own frontend — is asking for data, and answering it
 /// with a page is what turns a refusal into a recorded success.
 /// <para>
-/// <c>Sec-Fetch-Dest</c> is the deciding signal because it is the only one that separates a document
+/// <c language="text">Sec-Fetch-Dest</c> is the deciding signal because it is the only one that separates a document
 /// navigation from a scripted request: both arrive from the same browser, on the same connection, and
-/// <c>fetch()</c> sends <c>Accept: *&#47;*</c>, which a naive read of <c>Accept</c> treats as "any content
+/// <c language="text">fetch()</c> sends <c language="text">Accept: *&#47;*</c>, which a naive read of <c language="text">Accept</c> treats as "any content
 /// type will do — including HTML". That read is exactly the defect. Only when the header is absent
-/// entirely (a client predating Fetch Metadata) does <c>Accept</c> decide, and then only an explicit
-/// <c>text/html</c> counts.
+/// entirely (a client predating Fetch Metadata) does <c language="text">Accept</c> decide, and then only an explicit
+/// <c language="text">text/html</c> counts.
 /// </para>
 /// <para>
-/// A caller sending <c>Accept: *&#47;*</c> together with <c>Sec-Fetch-Dest: empty</c> is the case the whole
+/// A caller sending <c language="text">Accept: *&#47;*</c> together with <c language="text">Sec-Fetch-Dest: empty</c> is the case the whole
 /// rule exists for, and a duplicated destination header is the case that shows which way an unrecognized
 /// signal falls: every rejection here means "not navigating", never "serve the page anyway".
 /// </para>

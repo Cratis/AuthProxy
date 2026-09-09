@@ -5,12 +5,12 @@ namespace Cratis.AuthProxy.Security.for_Injection;
 
 /// <summary>
 /// OWASP A03 — Injection. A display name is attacker-influenced data that AuthProxy copies into a header
-/// field, which is the classic shape of response/request splitting: a name containing <c>CRLF</c> followed
-/// by <c>x-ms-client-principal-id: attacker</c> would, if it were written literally, hand the origin a
+/// field, which is the classic shape of response/request splitting: a name containing <c language="text">CRLF</c> followed
+/// by <c language="text">x-ms-client-principal-id: attacker</c> would, if it were written literally, hand the origin a
 /// second identity header that the proxy never vouched for.
 /// <para>
-/// The encoder cannot express that. Its output alphabet is the RFC 8187 <c>attr-char</c> set plus
-/// <c>%</c>, so CR, LF and NUL have no representation other than an escape — the property is structural
+/// The encoder cannot express that. Its output alphabet is the RFC 8187 <c language="text">attr-char</c> set plus
+/// <c language="text">%</c>, so CR, LF and NUL have no representation other than an escape — the property is structural
 /// rather than a check that could be forgotten. Asserted against a real origin, because the only proof
 /// that matters is the set of headers a backend actually received.
 /// </para>

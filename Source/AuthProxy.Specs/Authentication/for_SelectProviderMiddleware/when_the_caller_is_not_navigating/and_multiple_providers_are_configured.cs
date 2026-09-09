@@ -6,14 +6,14 @@ using Microsoft.AspNetCore.Authentication;
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_the_caller_is_not_navigating;
 
 /// <summary>
-/// A caller that is not navigating to a document must be refused with <c>401</c>, not handed the
-/// provider-selection page at <c>200</c>.
+/// A caller that is not navigating to a document must be refused with <c language="text">401</c>, not handed the
+/// provider-selection page at <c language="text">200</c>.
 /// <para>
 /// The status code is the defect, not the page. A webhook, an e-sign callback or any integration reads
-/// <c>200</c> as delivered and never retries; nothing errors, nothing is queued for redelivery. The same
-/// <c>200</c> defeats the conventional <c>!response.ok</c> check in every browser client — Arc's own
-/// identity bootstrap calls <c>/.cratis/me</c> and gets HTML with <c>response.ok</c> true, so only the
-/// subsequent <c>.json()</c> fails.
+/// <c language="text">200</c> as delivered and never retries; nothing errors, nothing is queued for redelivery. The same
+/// <c language="text">200</c> defeats the conventional <c language="text">!response.ok</c> check in every browser client — Arc's own
+/// identity bootstrap calls <c language="text">/.cratis/me</c> and gets HTML with <c language="text">response.ok</c> true, so only the
+/// subsequent <c language="text">.json()</c> fails.
 /// </para>
 /// <para>
 /// The providers cookie is withheld with the page: it exists so the selection page can render the

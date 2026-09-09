@@ -4,9 +4,9 @@
 namespace Cratis.AuthProxy.Security.for_TrustedProxies;
 
 /// <summary>
-/// The standardized <c>Forwarded</c> header changes nothing, even from a peer the deployment trusts.
+/// The standardized <c language="text">Forwarded</c> header changes nothing, even from a peer the deployment trusts.
 /// <para>
-/// It is the header a reader of RFC 7239 would reach for, and AuthProxy consumes only the <c>X-Forwarded-*</c>
+/// It is the header a reader of RFC 7239 would reach for, and AuthProxy consumes only the <c language="text">X-Forwarded-*</c>
 /// family — so a value here is inert. That is worth pinning from the trusted side rather than the untrusted
 /// one: from an outsider it would be refused anyway, and the claim being made is the stronger one that no
 /// amount of trust makes this header mean anything. The sign-in notification is asserted alongside, because a

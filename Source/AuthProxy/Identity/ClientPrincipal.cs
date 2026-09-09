@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Identity;
 /// Represents the Microsoft Client Principal Data definition used by Azure Static Web Apps,
 /// Container Apps and App Service. The ingress builds this from the authenticated
 /// <see cref="System.Security.Claims.ClaimsPrincipal"/> and forwards it as
-/// <c>x-ms-client-principal</c> (base64-encoded JSON) on every proxied request.
+/// <c language="text">x-ms-client-principal</c> (base64-encoded JSON) on every proxied request.
 /// </summary>
 /// <remarks>
 /// See https://learn.microsoft.com/azure/static-web-apps/user-information for the
@@ -21,7 +21,7 @@ public class ClientPrincipal
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    /// <summary>Gets or sets the identity provider (e.g. <c>aad</c>, <c>github</c>).</summary>
+    /// <summary>Gets or sets the identity provider (e.g. <c language="text">aad</c>, <c language="text">github</c>).</summary>
     [JsonPropertyName("identityProvider")]
     public string IdentityProvider { get; set; } = string.Empty;
 
@@ -78,7 +78,7 @@ public class ClientPrincipal
 
     /// <summary>
     /// Serializes the principal to a base64-encoded JSON string suitable for
-    /// the <c>x-ms-client-principal</c> header.
+    /// the <c language="text">x-ms-client-principal</c> header.
     /// </summary>
     /// <returns>A base64-encoded JSON string representing this principal.</returns>
     public string ToBase64() => Convert.ToBase64String(ToJsonBytes());

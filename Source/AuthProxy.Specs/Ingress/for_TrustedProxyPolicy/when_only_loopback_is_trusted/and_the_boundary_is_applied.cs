@@ -8,10 +8,10 @@ using Microsoft.AspNetCore.Builder;
 namespace Cratis.AuthProxy.Ingress.for_TrustedProxyPolicy.when_only_loopback_is_trusted;
 
 /// <summary>
-/// <c>LoopbackOnly</c> used to be expressed by returning without touching the options, on the reasoning that
+/// <c language="text">LoopbackOnly</c> used to be expressed by returning without touching the options, on the reasoning that
 /// loopback is the framework's own default and there was nothing to add. That reasoning holds only while the
-/// defaults are still there, and they are not always: <c>ASPNETCORE_FORWARDEDHEADERS_ENABLED</c>, the
-/// standard switch for containerized ASP.NET images, has <c>ConfigureWebDefaults</c> clear both lists — and
+/// defaults are still there, and they are not always: <c language="text">ASPNETCORE_FORWARDEDHEADERS_ENABLED</c>, the
+/// standard switch for containerized ASP.NET images, has <c language="text">ConfigureWebDefaults</c> clear both lists — and
 /// the forwarded-headers middleware treats two empty lists as "believe every caller", the exact opposite of
 /// the mode's name. A mode that names a boundary has to write the boundary down.
 /// </summary>

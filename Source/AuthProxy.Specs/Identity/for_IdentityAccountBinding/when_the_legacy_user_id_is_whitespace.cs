@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Identity.for_IdentityAccountBinding;
 /// Specifies that a legacy principal with a whitespace-only user identifier never becomes a reusable binding.
 /// </summary>
 /// <remarks>
-/// Whitespace round-trips through <c>IsNullOrWhiteSpace</c> checks that only look for an empty string, so it
+/// Whitespace round-trips through <c language="text">IsNullOrWhiteSpace</c> checks that only look for an empty string, so it
 /// is exactly the kind of value that used to slip through and become a shared cache/lock key for every
 /// caller whose provider omitted a subject claim.
 /// </remarks>

@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 
 /// <summary>
-/// End-to-end scenario: once a <c>.cratis-identity</c> cookie is present the identity details
+/// End-to-end scenario: once a <c language="text">.cratis-identity</c> cookie is present the identity details
 /// provider must not be called again on subsequent requests.
 /// </summary>
 /// <param name="factory">The shared application factory.</param>

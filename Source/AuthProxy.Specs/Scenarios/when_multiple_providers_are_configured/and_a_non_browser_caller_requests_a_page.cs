@@ -8,18 +8,18 @@ namespace Cratis.AuthProxy.Scenarios.when_multiple_providers_are_configured;
 
 /// <summary>
 /// End-to-end: the callers that are not browsers navigating to a document must be refused with
-/// <c>401</c> rather than handed the provider-selection page at <c>200</c>.
+/// <c language="text">401</c> rather than handed the provider-selection page at <c language="text">200</c>.
 /// <para>
-/// Three shapes are exercised because each records the <c>200</c> as a success in its own way — a
-/// <c>fetch()</c> from a frontend (<c>Sec-Fetch-Dest: empty</c>, <c>Accept: *&#47;*</c>), a webhook stating
+/// Three shapes are exercised because each records the <c language="text">200</c> as a success in its own way — a
+/// <c language="text">fetch()</c> from a frontend (<c language="text">Sec-Fetch-Dest: empty</c>, <c language="text">Accept: *&#47;*</c>), a webhook stating
 /// only that it wants JSON, and a bare client stating nothing at all. The last is the one that matters
-/// most for delivery: it is what most webhook senders and every <c>curl</c> look like, and it is the shape
+/// most for delivery: it is what most webhook senders and every <c language="text">curl</c> look like, and it is the shape
 /// a naive Accept-only rule would still answer with HTML.
 /// </para>
 /// <para>
-/// <c>/.cratis/me</c> is requested by name because it is the concrete instance: Arc's
-/// <c>IdentityProvider</c> calls it on boot, and the page arriving as <c>200 text/html</c> makes
-/// <c>response.ok</c> true so only the following <c>.json()</c> fails.
+/// <c language="text">/.cratis/me</c> is requested by name because it is the concrete instance: Arc's
+/// <c language="text">IdentityProvider</c> calls it on boot, and the page arriving as <c language="text">200 text/html</c> makes
+/// <c language="text">response.ok</c> true so only the following <c language="text">.json()</c> fails.
 /// </para>
 /// </summary>
 /// <param name="factory">The shared application factory.</param>

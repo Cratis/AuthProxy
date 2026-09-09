@@ -16,8 +16,8 @@ namespace Cratis.AuthProxy;
 /// Middleware that handles the well-known logout endpoint (<see cref="WellKnownPaths.Logout"/>) and its
 /// post-logout callback (<see cref="WellKnownPaths.LogoutCallback"/>). It performs a full-chain logout:
 /// when the session was established through an OIDC provider it initiates RP-initiated logout by redirecting
-/// the browser to that provider's end-session endpoint with an <c>id_token_hint</c> and a
-/// <c>post_logout_redirect_uri</c> pointing back to the callback; the callback then clears every AuthProxy
+/// the browser to that provider's end-session endpoint with an <c language="text">id_token_hint</c> and a
+/// <c language="text">post_logout_redirect_uri</c> pointing back to the callback; the callback then clears every AuthProxy
 /// cookie and redirects to the validated final destination. OAuth 2.0 providers (such as GitHub) have no
 /// standard OIDC end-session endpoint, so for those — and whenever there is no active OIDC session — it
 /// falls back to a local-only logout that clears cookies and redirects directly.

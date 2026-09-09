@@ -4,11 +4,11 @@
 namespace Cratis.AuthProxy.SignIns;
 
 /// <summary>
-/// Represents the browser and operating system parsed from a request's <c>User-Agent</c> header.
+/// Represents the browser and operating system parsed from a request's <c language="text">User-Agent</c> header.
 /// </summary>
-/// <param name="Browser">The browser name (for example <c>Chrome</c>, <c>Safari</c>, <c>Firefox</c>), or an empty string when unknown.</param>
-/// <param name="OperatingSystem">The operating system name (for example <c>Windows</c>, <c>macOS</c>, <c>iOS</c>), or an empty string when unknown.</param>
-/// <param name="Raw">The raw <c>User-Agent</c> header value.</param>
+/// <param name="Browser">The browser name (for example <c language="text">Chrome</c>, <c language="text">Safari</c>, <c language="text">Firefox</c>), or an empty string when unknown.</param>
+/// <param name="OperatingSystem">The operating system name (for example <c language="text">Windows</c>, <c language="text">macOS</c>, <c language="text">iOS</c>), or an empty string when unknown.</param>
+/// <param name="Raw">The raw <c language="text">User-Agent</c> header value.</param>
 public record UserAgentInfo(string Browser, string OperatingSystem, string Raw)
 {
     /// <summary>

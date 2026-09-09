@@ -15,7 +15,7 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// <para>
 /// Asserted against a real origin rather than on the client-facing status, because the status is the part
 /// that is easy to get right. The refusal is only worth anything if nothing reached the backend: the
-/// request itself, obviously, but also the proxy's own <c>/.cratis/me</c> identity call, which runs later
+/// request itself, obviously, but also the proxy's own <c language="text">/.cratis/me</c> identity call, which runs later
 /// in the pipeline and would otherwise mean a refused caller still caused work — and a log entry — inside
 /// the application.
 /// </para>

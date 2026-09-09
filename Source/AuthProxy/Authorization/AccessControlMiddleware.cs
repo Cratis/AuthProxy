@@ -14,13 +14,13 @@ namespace Cratis.AuthProxy.Authorization;
 /// <remarks>
 /// It runs directly after authorization and ahead of tenancy, identity resolution and the reverse proxy,
 /// so a caller who is not allowed in is turned away before any of them run — no tenant is resolved, no
-/// <c>/.cratis/me</c> call is made against a backend, and nothing is forwarded. That ordering is the whole
+/// <c language="text">/.cratis/me</c> call is made against a backend, and nothing is forwarded. That ordering is the whole
 /// point of calling it a first gate.
 /// <para>
-/// The refusal is an HTML page at <c>403</c> rather than a redirect. A redirect back to the identity
+/// The refusal is an HTML page at <c language="text">403</c> rather than a redirect. A redirect back to the identity
 /// provider is the obvious wrong answer here: the caller is already signed in and would sign in again as
-/// the same person, so it loops. <c>403</c> is also a status a non-browser caller can act on, unlike the
-/// <c>200</c> a provider-selection page has to be served with, so the same answer works for both and the
+/// the same person, so it loops. <c language="text">403</c> is also a status a non-browser caller can act on, unlike the
+/// <c language="text">200</c> a provider-selection page has to be served with, so the same answer works for both and the
 /// page carries the way out — signing out and coming back as someone else.
 /// </para>
 /// <para>

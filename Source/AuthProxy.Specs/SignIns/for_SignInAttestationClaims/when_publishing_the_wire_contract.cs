@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.SignIns.for_SignInAttestationClaims;
 /// would leave all of them green while every deployed verifier broke — the claim names and the purpose value
 /// are a contract with software AuthProxy does not build. These literals are what makes such a rename fail
 /// here instead of in production. The separation assertions do the same for the collision the shape of
-/// <see cref="InvitationAttestationClaims"/> otherwise makes invisible: both protocols sign a <c>purpose</c>
+/// <see cref="InvitationAttestationClaims"/> otherwise makes invisible: both protocols sign a <c language="text">purpose</c>
 /// claim with the same key material, so two purposes that ever converged would let one protocol's assertion be
 /// replayed as the other's.
 /// </remarks>

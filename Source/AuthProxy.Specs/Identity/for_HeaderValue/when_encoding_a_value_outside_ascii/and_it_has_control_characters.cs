@@ -4,9 +4,9 @@
 namespace Cratis.AuthProxy.Identity.for_HeaderValue.when_encoding_a_value_outside_ascii;
 
 /// <summary>
-/// A carriage return, a line feed and a NUL are all below <c>U+0080</c>, so an encoder that asked only
+/// A carriage return, a line feed and a NUL are all below <c language="text">U+0080</c>, so an encoder that asked only
 /// "is this ASCII?" would pass them straight through and let a claim value write its own header. The
-/// encoder emits nothing but RFC 8187 <c>attr-char</c> octets, which makes that structurally impossible
+/// encoder emits nothing but RFC 8187 <c language="text">attr-char</c> octets, which makes that structurally impossible
 /// rather than merely checked for.
 /// </summary>
 public class and_it_has_control_characters : Specification

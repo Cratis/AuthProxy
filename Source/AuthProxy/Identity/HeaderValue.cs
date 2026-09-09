@@ -11,15 +11,15 @@ namespace Cratis.AuthProxy.Identity;
 /// Turns an identity value into something an HTTP header field can actually carry, and back again.
 /// </summary>
 /// <remarks>
-/// A header field value is octets, and .NET refuses to put a character above <c>U+007F</c> on the wire:
-/// the request never reaches the socket, it throws. A person named <c>Søren Wærstad</c> was therefore not
+/// A header field value is octets, and .NET refuses to put a character above <c language="text">U+007F</c> on the wire:
+/// the request never reaches the socket, it throws. A person named <c language="text">Søren Wærstad</c> was therefore not
 /// merely garbled downstream — the proxied request failed at the gateway and the identity-endpoint call
 /// failed silently, so the application did not work for them at all. Names carrying arbitrary Unicode are
-/// the normal case rather than the exotic one: three of the six claims <c>userDetails</c> is resolved from
+/// the normal case rather than the exotic one: three of the six claims <c language="text">userDetails</c> is resolved from
 /// are provider display names.
 /// <para>
-/// The encoding is the <see href="https://www.rfc-editor.org/rfc/rfc8187">RFC 8187</see> <c>ext-value</c> —
-/// percent-encoded UTF-8 behind a self-describing <c>UTF-8''</c> prefix, which covers every code point
+/// The encoding is the <see href="https://www.rfc-editor.org/rfc/rfc8187">RFC 8187</see> <c language="text">ext-value</c> —
+/// percent-encoded UTF-8 behind a self-describing <c language="text">UTF-8''</c> prefix, which covers every code point
 /// including the astral planes and needs no separate version header to announce itself.
 /// </para>
 /// <para>
@@ -29,9 +29,9 @@ namespace Cratis.AuthProxy.Identity;
 /// one, see <see cref="RequiresExtendedValue"/> — is encoded.
 /// </para>
 /// <para>
-/// Percent-encoding is deliberately conservative: only RFC 8187 <c>attr-char</c> octets survive verbatim,
+/// Percent-encoding is deliberately conservative: only RFC 8187 <c language="text">attr-char</c> octets survive verbatim,
 /// so an encoded value can never contain CR, LF or NUL. Combined with the rule that anything already
-/// carrying the <c>UTF-8''</c> prefix is itself encoded, a consumer that decodes exactly the values the
+/// carrying the <c language="text">UTF-8''</c> prefix is itself encoded, a consumer that decodes exactly the values the
 /// sibling header announces can never obtain a header separator out of an identity value.
 /// </para>
 /// </remarks>
@@ -54,22 +54,22 @@ public static class HeaderValue
         value.All(character => character < 0x80 && !char.IsControl(character));
 
     /// <summary>
-    /// Determines whether a value has to be carried as an RFC 8187 <c>ext-value</c>.
+    /// Determines whether a value has to be carried as an RFC 8187 <c language="text">ext-value</c>.
     /// </summary>
     /// <param name="value">The value to inspect.</param>
     /// <returns><see langword="true"/> when the value cannot travel verbatim; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// This is what decides whether the starred sibling header is emitted alongside the plain one, the same
-    /// way <c>Content-Disposition</c> pairs <c>filename</c> with <c>filename*</c> (RFC 6266 §4.3).
+    /// way <c language="text">Content-Disposition</c> pairs <c language="text">filename</c> with <c language="text">filename*</c> (RFC 6266 §4.3).
     /// <para>
     /// A value that merely <em>looks</em> encoded counts too, and that half is a security boundary rather
-    /// than a nicety. Every character of <c>UTF-8''victim%0D%0AX-Admin:%20true</c> is printable US-ASCII, so
+    /// than a nicety. Every character of <c language="text">UTF-8''victim%0D%0AX-Admin:%20true</c> is printable US-ASCII, so
     /// a rule that asked only "is this ASCII?" forwarded it byte for byte with no sibling — and any consumer
     /// deciding to decode on the <em>prefix</em>, which is what the published guidance used to show, got a
     /// carriage return and a line feed back out of a display name the person chose for themselves. Encoding
     /// such a value instead means the sibling's presence is the single unambiguous statement that the plain
-    /// header carries an <c>ext-value</c>, and decoding it yields the literal name rather than a header
-    /// separator. No realistic name begins with <c>UTF-8''</c>, so byte-for-byte transit is untouched.
+    /// header carries an <c language="text">ext-value</c>, and decoding it yields the literal name rather than a header
+    /// separator. No realistic name begins with <c language="text">UTF-8''</c>, so byte-for-byte transit is untouched.
     /// </para>
     /// </remarks>
     public static bool RequiresExtendedValue(string value) =>
@@ -79,7 +79,7 @@ public static class HeaderValue
     /// Converts a value to the form that goes on the wire.
     /// </summary>
     /// <param name="value">The value to convert.</param>
-    /// <returns>The value itself when it can travel verbatim; otherwise its RFC 8187 <c>ext-value</c> form.</returns>
+    /// <returns>The value itself when it can travel verbatim; otherwise its RFC 8187 <c language="text">ext-value</c> form.</returns>
     /// <remarks>
     /// Expressed through <see cref="RequiresExtendedValue"/> so the wire form and the sibling header can
     /// never disagree about whether a value is encoded — a disagreement is exactly what makes a decoded
@@ -94,7 +94,7 @@ public static class HeaderValue
     /// <param name="decoded">The original value, or <paramref name="value"/> unchanged when it could not be decoded.</param>
     /// <returns><see langword="true"/> when <paramref name="decoded"/> holds the original; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// A value without the <c>UTF-8''</c> prefix was never encoded, so it decodes to itself. Because
+    /// A value without the <c language="text">UTF-8''</c> prefix was never encoded, so it decodes to itself. Because
     /// <see cref="ToTransportValue"/> encodes anything that carries that prefix, this is the exact inverse
     /// of it for <em>every</em> value — including one whose author wrote the prefix themselves.
     /// <para>

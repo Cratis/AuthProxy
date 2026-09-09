@@ -6,7 +6,7 @@ using System.Net;
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_verification_is_required.given;
 
 /// <summary>
-/// Provides a resolver for a deployment whose one service answers <c>/.cratis/me</c> with an authorization
+/// Provides a resolver for a deployment whose one service answers <c language="text">/.cratis/me</c> with an authorization
 /// verdict, plus a scriptable identity endpoint to answer with.
 /// </summary>
 /// <remarks>

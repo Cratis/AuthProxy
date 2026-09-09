@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Attestations.for_AttestationSigningContract;
 
 /// <summary>
 /// The contract is a record, and a record's generated rendering prints every one of its properties — including
-/// the signing key. One <c>LogDebug("{Contract}", contract)</c> added by anyone, at any point, would write the
+/// the signing key. One <c language="text">LogDebug("{Contract}", contract)</c> added by anyone, at any point, would write the
 /// private key to the log without a single line of code looking wrong. The rendering has to be safe by
 /// construction rather than by everybody remembering.
 /// </summary>

@@ -14,20 +14,20 @@ public class Invite
     public string PublicKeyPem { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the expected token issuer (<c>iss</c> claim).
+    /// Gets or sets the expected token issuer (<c language="text">iss</c> claim).
     /// Leave empty to skip issuer validation.
     /// </summary>
     public string Issuer { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the expected token audience (<c>aud</c> claim).
+    /// Gets or sets the expected token audience (<c language="text">aud</c> claim).
     /// Leave empty to skip audience validation.
     /// </summary>
     public string Audience { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the absolute URL of the invitation authority's completion endpoint,
-    /// e.g. <c>https://lobby.example.com/_invite/exchange</c>.
+    /// e.g. <c language="text">https://lobby.example.com/_invite/exchange</c>.
     /// </summary>
     public string ExchangeUrl { get; set; } = string.Empty;
 
@@ -54,7 +54,7 @@ public class Invite
     /// Gets or sets the URL to redirect to when the authenticated user's subject is already
     /// associated with an existing user during the invite exchange (Phase 2).
     /// When set, the user is redirected to this URL instead of the built-in
-    /// <c>invitation-subject-already-exists.html</c> page.
+    /// <c language="text">invitation-subject-already-exists.html</c> page.
     /// Leave empty to serve the built-in well-known error page.
     /// </summary>
     public string SubjectAlreadyExistsUrl { get; set; } = string.Empty;
@@ -100,24 +100,24 @@ public class Invite
     /// verification status are forwarded to the exchange endpoint regardless of this setting.
     /// </summary>
     /// <remarks>
-    /// AuthProxy reads the address from <c>email</c>, then <c>ClaimTypes.Email</c>, and finally
-    /// <c>preferred_username</c> only when that value has an email-address shape. If no address is available,
-    /// AuthProxy rejects the invite with <c>invitation-email-unavailable.html</c>. If the address differs from
-    /// the invited address, or the provider explicitly supplies <c>email_verified=false</c>, AuthProxy rejects
-    /// it with <c>invitation-email-mismatch.html</c>.
+    /// AuthProxy reads the address from <c language="text">email</c>, then <c language="text">ClaimTypes.Email</c>, and finally
+    /// <c language="text">preferred_username</c> only when that value has an email-address shape. If no address is available,
+    /// AuthProxy rejects the invite with <c language="text">invitation-email-unavailable.html</c>. If the address differs from
+    /// the invited address, or the provider explicitly supplies <c language="text">email_verified=false</c>, AuthProxy rejects
+    /// it with <c language="text">invitation-email-mismatch.html</c>.
     /// <para>
-    /// The <c>email_verified</c> claim is provider-supplied evidence, not a universal AuthProxy attestation.
+    /// The <c language="text">email_verified</c> claim is provider-supplied evidence, not a universal AuthProxy attestation.
     /// An explicit <see langword="false"/> is rejected; a missing or unparsable value is forwarded as
     /// <see langword="null"/> and does not independently prove ownership. OAuth provider registrations do not
-    /// currently map <c>email_verified</c>, so their address is accepted as provider-supplied session evidence
-    /// with a <see langword="null"/> verification status. For example, GitHub's <c>/user</c> response can omit
-    /// a private email address, and AuthProxy does not make a separate <c>/user/emails</c> request.
+    /// currently map <c language="text">email_verified</c>, so their address is accepted as provider-supplied session evidence
+    /// with a <see langword="null"/> verification status. For example, GitHub's <c language="text">/user</c> response can omit
+    /// a private email address, and AuthProxy does not make a separate <c language="text">/user/emails</c> request.
     /// </para>
     /// </remarks>
     public string EmailClaim { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets a value indicating whether the invitation ID from the invite token (<c>jti</c>)
+    /// Gets or sets a value indicating whether the invitation ID from the invite token (<c language="text">jti</c>)
     /// should be appended to the lobby redirect URL query string after a successful invite exchange.
     /// Defaults to <see langword="false"/>.
     /// </summary>
@@ -125,7 +125,7 @@ public class Invite
 
     /// <summary>
     /// Gets or sets the query-string key used when <see cref="AppendInvitationIdToQueryString"/> is enabled.
-    /// Defaults to <c>invitationId</c>.
+    /// Defaults to <c language="text">invitationId</c>.
     /// </summary>
     public string InvitationIdQueryStringKey { get; set; } = "invitationId";
 

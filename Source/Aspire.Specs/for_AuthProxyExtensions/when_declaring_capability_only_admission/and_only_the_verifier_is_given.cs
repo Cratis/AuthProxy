@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Aspire.for_AuthProxyExtensions.when_declaring_capabil
 
 /// <summary>
 /// Closing the interactive contract is its own builder rather than another optional argument on
-/// <c>AddAuthProxy</c>, and naming only the verifier writes every key the proxy reads — with the same
+/// <c language="text">AddAuthProxy</c>, and naming only the verifier writes every key the proxy reads — with the same
 /// defaults the proxy itself would have used.
 /// <para>
 /// The Aspire package cannot reference the proxy it configures, so these strings are the only thing joining

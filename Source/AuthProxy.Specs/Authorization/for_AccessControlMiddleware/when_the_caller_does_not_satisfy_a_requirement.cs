@@ -9,8 +9,8 @@ namespace Cratis.AuthProxy.Authorization.for_AccessControlMiddleware;
 /// Two properties, and both matter. The request must not continue — everything downstream is tenancy,
 /// identity resolution against a backend, and the reverse proxy, so continuing would mean the very caller
 /// being refused had already caused a call into the application. And the answer must be a page at
-/// <c>403</c> rather than a redirect: the caller <em>is</em> authenticated, so sending them back to the
-/// identity provider signs them in again as the same person and loops forever. <c>403</c> is also a status
+/// <c language="text">403</c> rather than a redirect: the caller <em>is</em> authenticated, so sending them back to the
+/// identity provider signs them in again as the same person and loops forever. <c language="text">403</c> is also a status
 /// a non-browser client can act on, so one answer serves both.
 /// </para>
 /// </summary>

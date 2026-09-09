@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvid
 /// A declared prefix is matched without any service-selection header or query parameter — an anonymous
 /// caller cannot be expected to send one — so two services declaring the same prefix emit two routes with
 /// an identical template and an identical order. ASP.NET cannot choose between them and throws
-/// <c>AmbiguousMatchException</c>, which surfaces as <c>HTTP 500</c> on the declared path: a
+/// <c language="text">AmbiguousMatchException</c>, which surfaces as <c language="text">HTTP 500</c> on the declared path: a
 /// configuration mistake that is invisible at startup and takes down exactly the path it was meant to
 /// open.
 /// </para>
@@ -72,7 +72,7 @@ public class when_two_services_declare_the_same_anonymous_path : Specification
     /// <returns>Every route whose template matches, ignoring case.</returns>
     /// <remarks>
     /// A declared prefix is not lower-cased on the way in, so an ordinal comparison would see
-    /// <c>/portal</c> and <c>/Portal</c> as two different templates and miss the collision entirely —
+    /// <c language="text">/portal</c> and <c language="text">/Portal</c> as two different templates and miss the collision entirely —
     /// while ASP.NET, matching case-insensitively, still cannot choose between them.
     /// </remarks>
     IEnumerable<RouteConfig> RoutesMatching(string path) =>

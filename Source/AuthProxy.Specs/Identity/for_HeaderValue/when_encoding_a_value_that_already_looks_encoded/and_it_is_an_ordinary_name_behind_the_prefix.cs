@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Identity.for_HeaderValue.when_encoding_a_value_that_a
 /// A display name is whatever the person typed, and nothing stops them typing the charset prefix. Every
 /// character of it is printable US-ASCII, so a rule that asked only "is this ASCII?" sent it verbatim and
 /// emitted no sibling — leaving the plain header carrying something indistinguishable from an
-/// <c>ext-value</c> and nothing anywhere saying which it was. Encoding it makes the two answerable
+/// <c language="text">ext-value</c> and nothing anywhere saying which it was. Encoding it makes the two answerable
 /// separately: the sibling says it is encoded, and decoding gives back exactly what was typed.
 /// </summary>
 public class and_it_is_an_ordinary_name_behind_the_prefix : Specification

@@ -15,7 +15,7 @@ namespace Cratis.AuthProxy.Authentication.for_GitHubMembershipClaimsEnricher;
 /// </para>
 /// <para>
 /// A team claim is qualified by its organization because a slug is only unique within one: two
-/// organizations may both have a <c>planner</c> team, and an unqualified claim would let membership of
+/// organizations may both have a <c language="text">planner</c> team, and an unqualified claim would let membership of
 /// either satisfy a requirement written for one. The endpoints are derived from the configured user
 /// endpoint, which is what lets GitHub Enterprise work without another setting.
 /// </para>

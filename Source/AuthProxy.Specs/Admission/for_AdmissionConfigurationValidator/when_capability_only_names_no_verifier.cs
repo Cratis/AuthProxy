@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Admission.for_AdmissionConfigurationValidator;
 
 /// <summary>
 /// Closing the door without saying who holds the key is refused at startup rather than at every request.
-/// The alternative is a deployment that starts cleanly and then answers <c>404</c> to everyone alive, with
+/// The alternative is a deployment that starts cleanly and then answers <c language="text">404</c> to everyone alive, with
 /// nothing in the answer — by design — to say why.
 /// </summary>
 public class when_capability_only_names_no_verifier : given.an_admission_configuration_validator

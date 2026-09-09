@@ -6,9 +6,9 @@ using System.Net;
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_verification_is_required;
 
 /// <summary>
-/// Every non-success status other than <c>403</c> used to be logged and then ignored, so a bad request, an
+/// Every non-success status other than <c language="text">403</c> used to be logged and then ignored, so a bad request, an
 /// expired back-channel credential, a routing mistake and a whole backend being down were all as good as a
-/// yes. Only <c>403</c> denied, which made the safe answer depend on a misconfigured service choosing
+/// yes. Only <c language="text">403</c> denied, which made the safe answer depend on a misconfigured service choosing
 /// exactly the right code to refuse with.
 /// <para>
 /// Written across the range rather than one code per file because the behavior under specification is a

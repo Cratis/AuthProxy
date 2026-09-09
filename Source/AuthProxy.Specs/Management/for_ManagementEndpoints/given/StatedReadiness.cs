@@ -8,9 +8,9 @@ namespace Cratis.AuthProxy.Management.for_ManagementEndpoints.given;
 /// </summary>
 /// <param name="ready">What it answers.</param>
 /// <remarks>
-/// Hand-written rather than substituted. <c>IReadinessCheck</c> is internal, and a dynamic proxy over an
+/// Hand-written rather than substituted. <c language="text">IReadinessCheck</c> is internal, and a dynamic proxy over an
 /// internal type would need the proxy generator's assembly named in AuthProxy's own
-/// <c>InternalsVisibleTo</c> — a permanent widening of the shipped assembly's surface, to serve a spec.
+/// <c language="text">InternalsVisibleTo</c> — a permanent widening of the shipped assembly's surface, to serve a spec.
 /// <para>
 /// Counting matters as much as answering: liveness must consult nothing, and the only way to see that it
 /// did not is to ask this how many times it was called.

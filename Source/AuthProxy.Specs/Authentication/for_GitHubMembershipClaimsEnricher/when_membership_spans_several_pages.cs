@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Authentication.for_GitHubMembershipClaimsEnricher;
 /// <summary>
 /// Paging is followed, and only within the host the read started from.
 /// <para>
-/// GitHub pages every collection and links the next page from a <c>Link</c> header rather than from the
+/// GitHub pages every collection and links the next page from a <c language="text">Link</c> header rather than from the
 /// body, so a read that stopped at the first response would answer "the first hundred organizations" — a
 /// different question from the one authorization is asking, and one whose wrong answer is a member being
 /// refused for a reason nothing in the configuration explains.

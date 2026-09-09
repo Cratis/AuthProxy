@@ -87,7 +87,7 @@ public class a_capability_admission : Specification
     }
 
     /// <summary>
-    /// Gets the whole <c>Set-Cookie</c> header the response carries for the entry transaction.
+    /// Gets the whole <c language="text">Set-Cookie</c> header the response carries for the entry transaction.
     /// </summary>
     /// <returns>The header value, or an empty string when none was issued.</returns>
     protected string IssuedCookieHeader() =>

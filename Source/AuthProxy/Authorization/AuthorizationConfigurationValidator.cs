@@ -12,7 +12,7 @@ namespace Cratis.AuthProxy.Authorization;
 /// <remarks>
 /// Such a requirement can never be satisfied, so the proxy would start and then refuse every single
 /// caller — an outage whose cause is a blank value in an environment variable and whose symptom is a
-/// <c>403</c> page saying nothing about it. Failing at startup names it instead, at the one moment
+/// <c language="text">403</c> page saying nothing about it. Failing at startup names it instead, at the one moment
 /// somebody is watching.
 /// <para>
 /// The alternative — dropping the malformed requirement — is the one thing that must not happen: a

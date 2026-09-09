@@ -40,7 +40,7 @@ public class OidcProvider
     public string ClientSecret { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets extra OAuth scopes to request (in addition to <c>openid profile email</c>).
+    /// Gets or sets extra OAuth scopes to request (in addition to <c language="text">openid profile email</c>).
     /// </summary>
     public IList<string> Scopes { get; set; } = [];
 

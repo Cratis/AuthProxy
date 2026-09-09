@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Authorization.for_AccessControlMiddleware;
 /// <summary>
 /// A caller with no session is left to the machinery that already refuses them.
 /// <para>
-/// Refusing them here instead would replace a sign-in with a dead end: <c>SelectProviderMiddleware</c>
+/// Refusing them here instead would replace a sign-in with a dead end: <c language="text">SelectProviderMiddleware</c>
 /// answers an unauthenticated browser with the provider chooser or a challenge, and the
 /// not-authorized page offers only signing out — of a session that does not exist. This gate is about who
 /// a signed-in caller <em>is</em>, not about whether there is one.

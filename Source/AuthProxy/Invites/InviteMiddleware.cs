@@ -19,13 +19,13 @@ namespace Cratis.AuthProxy.Invites;
 /// Middleware that implements the two-phase invite flow:
 /// <list type="number">
 ///   <item>
-///     Handles <c>/invite/{token}</c> – validates the token, stores it in a short-lived
+///     Handles <c language="text">/invite/{token}</c> – validates the token, stores it in a short-lived
 ///     HTTP-only cookie and redirects the user to the OIDC login.
 ///     If multiple identity providers are configured — or the caller already carries a session, whose
 ///     identity is not the one this invitation may bind — the invitation provider-selection page is served
 ///     so the user chooses which provider to complete the invitation with.
-///     If the token is expired the <c>invitation-expired.html</c> error page is returned.
-///     If the token is malformed or has an invalid signature the <c>invitation-invalid.html</c> page is returned.
+///     If the token is expired the <c language="text">invitation-expired.html</c> error page is returned.
+///     If the token is malformed or has an invalid signature the <c language="text">invitation-invalid.html</c> page is returned.
 ///   </item>
 ///   <item>
 ///     After a successful OIDC login – detects the pending invite cookie, confirms the session was

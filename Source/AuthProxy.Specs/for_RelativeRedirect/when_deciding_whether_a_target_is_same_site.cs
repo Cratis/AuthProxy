@@ -6,15 +6,15 @@ namespace Cratis.AuthProxy.for_RelativeRedirect;
 /// <summary>
 /// The single check that decides whether a caller-supplied redirect target can navigate off-site.
 /// <para>
-/// Four endpoints hand the browser a target the caller chose — the login <c>returnUrl</c>, the link
-/// <c>returnUrl</c>, tenant selection's <c>returnUrl</c>, and logout's <c>redirect</c> — and each used to
+/// Four endpoints hand the browser a target the caller chose — the login <c language="text">returnUrl</c>, the link
+/// <c language="text">returnUrl</c>, tenant selection's <c language="text">returnUrl</c>, and logout's <c language="text">redirect</c> — and each used to
 /// carry its own version of this check. They disagreed, which is the whole reason the check moved here: one
-/// accepted <c>//evil.test</c> outright, and the two that rejected it still accepted <c>/\evil.test</c>.
+/// accepted <c language="text">//evil.test</c> outright, and the two that rejected it still accepted <c language="text">/\evil.test</c>.
 /// </para>
 /// <para>
-/// What every disagreement had in common was treating a leading <c>/</c> as proof of same-site. It is not,
-/// because the browser decides what a <c>Location</c> means. <c>//host</c> is protocol-relative;
-/// <c>/\host</c> is the same URL to every major browser, which normalize a backslash to a slash in the
+/// What every disagreement had in common was treating a leading <c language="text">/</c> as proof of same-site. It is not,
+/// because the browser decides what a <c language="text">Location</c> means. <c language="text">//host</c> is protocol-relative;
+/// <c language="text">/\host</c> is the same URL to every major browser, which normalize a backslash to a slash in the
 /// authority position; and a slash followed by a tab, carriage return or newline is also the same URL,
 /// because browsers strip those characters before parsing — so the string checked here and the URL actually
 /// fetched would be different strings.

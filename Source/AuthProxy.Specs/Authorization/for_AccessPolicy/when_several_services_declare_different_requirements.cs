@@ -9,8 +9,8 @@ namespace Cratis.AuthProxy.Authorization.for_AccessPolicy;
 /// <para>
 /// The gate runs before endpoint selection — it has to refuse a caller before a tenant is resolved or a
 /// backend is called, and long before YARP picks a route — so it cannot ask which route was chosen and has
-/// to read the request the same way the route table will. That is the <c>Service-ID</c> header, then the
-/// <c>service</c> query parameter. If the two ever disagreed, one service's requirements would guard
+/// to read the request the same way the route table will. That is the <c language="text">Service-ID</c> header, then the
+/// <c language="text">service</c> query parameter. If the two ever disagreed, one service's requirements would guard
 /// another service's traffic.
 /// </para>
 /// </summary>

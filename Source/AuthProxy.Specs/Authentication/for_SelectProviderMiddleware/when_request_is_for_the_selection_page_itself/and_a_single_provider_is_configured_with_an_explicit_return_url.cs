@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware.when_request_is_for_the_selection_page_itself;
 
 /// <summary>
-/// When the caller already landed on <c>/.cratis/select-provider?returnUrl=...</c> — the wrapper the
+/// When the caller already landed on <c language="text">/.cratis/select-provider?returnUrl=...</c> — the wrapper the
 /// cookie authentication handler's redirect and the invite flow use — the real destination is the query
 /// value, not the wrapper path around it. Regression coverage for a challenge that used to redirect back
 /// to the wrapper URL instead of the caller's actual destination once this path stopped being skipped.

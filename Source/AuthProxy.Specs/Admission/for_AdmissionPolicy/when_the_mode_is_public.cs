@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Admission.for_AdmissionPolicy;
 
 /// <summary>
 /// Naming the default explicitly is still the default. A deployment that writes
-/// <c>Mode: Public</c> — or that carries a capability section it has not switched on — is gated by nothing.
+/// <c language="text">Mode: Public</c> — or that carries a capability section it has not switched on — is gated by nothing.
 /// </summary>
 public class when_the_mode_is_public : given.an_admission_policy
 {

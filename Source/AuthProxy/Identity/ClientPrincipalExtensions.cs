@@ -98,7 +98,7 @@ public static class ClientPrincipalExtensions
     /// <param name="principal">The <see cref="ClientPrincipal"/> whose identity to forward.</param>
     /// <remarks>
     /// Every value goes through <see cref="HeaderValue.ToTransportValue"/>, so a name a header field cannot
-    /// carry is sent as an RFC 8187 <c>ext-value</c> and announced by the
+    /// carry is sent as an RFC 8187 <c language="text">ext-value</c> and announced by the
     /// <see cref="Headers.PrincipalNameExtended"/> sibling. An already-safe name is untouched and no
     /// sibling is written — see <see cref="HeaderValue"/> for why the encoding is conditional.
     /// </remarks>

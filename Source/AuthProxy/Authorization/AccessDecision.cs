@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Authorization;
 /// <remarks>
 /// The unsatisfied claim is carried so a refusal can be logged as something an operator can act on. A
 /// deployment that gates on organization membership and a deployment that gates on a role produce the
-/// same <c>403</c>, and "which requirement was it" is the only part that differs and the only part worth
+/// same <c language="text">403</c>, and "which requirement was it" is the only part that differs and the only part worth
 /// looking up. It is deliberately the claim <em>type</em> and never the value the caller carried, which
 /// would put an identity into the log.
 /// </remarks>

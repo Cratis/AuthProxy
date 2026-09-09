@@ -371,7 +371,7 @@ public static class AuthenticationServiceCollectionExtensions
     /// <param name="provider">The provider completing the sign-in.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     /// <remarks>
-    /// Runs after <c>RunClaimActions</c>, on the identity that is about to be signed into the cookie, so
+    /// Runs after <c language="text">RunClaimActions</c>, on the identity that is about to be signed into the cookie, so
     /// what an enricher adds is persisted with the session and travels with every later request — no
     /// second call to the provider, and nothing to re-fetch. An enricher that has nothing to contribute for
     /// this provider is not called at all, so a deployment with no such provider pays for none of this.

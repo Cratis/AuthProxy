@@ -10,8 +10,8 @@ namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
 /// Middleware that resolves identity details for every authenticated request:
-/// enriches the principal, calls <c>/.cratis/me</c> on configured services, and
-/// writes the result to the <c>.cratis-identity</c> response cookie.
+/// enriches the principal, calls <c language="text">/.cratis/me</c> on configured services, and
+/// writes the result to the <c language="text">.cratis-identity</c> response cookie.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>

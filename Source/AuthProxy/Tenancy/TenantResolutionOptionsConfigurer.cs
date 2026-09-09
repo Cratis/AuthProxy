@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Tenancy;
 /// to its concrete typed options class based on the <see cref="C.TenantSourceIdentifierResolverType"/> discriminator.
 /// </summary>
 /// <remarks>
-/// Because <see cref="C.TenantResolution.Options"/> is typed as <c>object?</c>, the standard configuration
+/// Because <see cref="C.TenantResolution.Options"/> is typed as <c language="text">object?</c>, the standard configuration
 /// binder cannot determine which concrete type to instantiate. This post-configure step reads the raw
 /// <see cref="IConfiguration"/> sub-section for each resolution entry and binds it to the correct typed
 /// options record, ensuring full environment-variable support and compile-time safety.

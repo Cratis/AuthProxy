@@ -7,7 +7,7 @@ namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_ve
 
 /// <summary>
 /// A successful status with nothing in it is the most misleading of the failure shapes: it looks like the
-/// happy path to every layer that only checks the status code. <c>204 No Content</c>, an empty body and a
+/// happy path to every layer that only checks the status code. <c language="text">204 No Content</c>, an empty body and a
 /// body of whitespace all state a verdict nowhere, so none of them may be read as one.
 /// </summary>
 public class and_the_service_answers_nothing_to_read : given.a_required_verification_resolver

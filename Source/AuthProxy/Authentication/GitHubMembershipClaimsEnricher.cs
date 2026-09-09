@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// <remarks>
 /// GitHub's user endpoint — the one <see cref="C.OAuthProvider.UserInformationEndpoint"/> names — returns a
 /// profile and nothing about membership, so there is no claim to match on and no mapping that could produce
-/// one. Membership lives behind <c>/user/orgs</c> and <c>/user/teams</c>, which is why gating on a GitHub
+/// one. Membership lives behind <c language="text">/user/orgs</c> and <c language="text">/user/teams</c>, which is why gating on a GitHub
 /// organization is not a matter of configuration alone.
 /// <para>
 /// Fetching it once, at sign-in, and turning it into claims is what keeps a single authorization mechanism:
@@ -69,13 +69,13 @@ public class GitHubMembershipClaimsEnricher(ILogger<GitHubMembershipClaimsEnrich
     /// Resolves a membership collection endpoint from the configured user-information endpoint.
     /// </summary>
     /// <param name="provider">The provider whose endpoints to read.</param>
-    /// <param name="resource">The collection under the user endpoint (<c>orgs</c> or <c>teams</c>).</param>
+    /// <param name="resource">The collection under the user endpoint (<c language="text">orgs</c> or <c language="text">teams</c>).</param>
     /// <param name="url">The resolved URL when the endpoint is usable.</param>
     /// <returns><see langword="true"/> when the URL could be resolved; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// Derived rather than configured, so GitHub Enterprise works without a second setting: the collections
     /// sit directly under whatever user endpoint is already configured, whether that is
-    /// <c>https://api.github.com/user</c> or <c>https://github.example.com/api/v3/user</c>.
+    /// <c language="text">https://api.github.com/user</c> or <c language="text">https://github.example.com/api/v3/user</c>.
     /// </remarks>
     static bool TryResolveResource(C.OAuthProvider provider, string resource, out Uri url)
     {

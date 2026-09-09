@@ -22,7 +22,7 @@ namespace Cratis.AuthProxy.Links;
 /// that the link did not complete, while the cause is logged where the operator can see it.
 /// </para>
 /// <para>
-/// Both outcomes end in <c>HandleResponse()</c>. That short-circuit is what stops the remote authentication
+/// Both outcomes end in <c language="text">HandleResponse()</c>. That short-circuit is what stops the remote authentication
 /// handler signing the second identity into the primary cookie scheme — without it a failed link quietly
 /// swaps the account the person is signed in as.
 /// </para>

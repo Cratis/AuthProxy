@@ -8,8 +8,8 @@ namespace Cratis.AuthProxy.for_TenancyMiddleware;
 /// removed, and must be forwarded rather than refused for having no resolvable tenant.
 /// <para>
 /// The header strip is the property that makes declaring a path anonymous safe. A caller reaching an
-/// anonymous path has no session, so anything it sends in <c>x-ms-client-principal*</c> or
-/// <c>Tenant-ID</c> is unverified — the application's identity handler would build a principal straight
+/// anonymous path has no session, so anything it sends in <c language="text">x-ms-client-principal*</c> or
+/// <c language="text">Tenant-ID</c> is unverified — the application's identity handler would build a principal straight
 /// out of it. Because the request still travels through AuthProxy, the strip that runs for every other
 /// request runs for this one too; that is the whole reason to solve this inside the proxy instead of
 /// routing around it at the ingress, where those headers would arrive untouched.

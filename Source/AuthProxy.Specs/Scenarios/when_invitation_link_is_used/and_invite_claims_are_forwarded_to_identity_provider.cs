@@ -6,8 +6,8 @@ using Cratis.AuthProxy.Invites;
 namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 
 /// <summary>
-/// End-to-end scenario: verifies that claims declared in <c>ClaimsToForward</c> are extracted
-/// from the invite token and included in the <c>x-ms-client-principal</c> header sent to the
+/// End-to-end scenario: verifies that claims declared in <c language="text">ClaimsToForward</c> are extracted
+/// from the invite token and included in the <c language="text">x-ms-client-principal</c> header sent to the
 /// identity details provider.
 /// </summary>
 /// <param name="factory">The shared application factory with claims-forwarding config.</param>

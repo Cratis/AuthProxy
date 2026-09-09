@@ -14,13 +14,13 @@ namespace Cratis.AuthProxy.Configuration;
 public class LogoutCookie
 {
     /// <summary>
-    /// Gets or sets the exact name of the cookie to delete, e.g. <c>_oauth2_proxy_admin</c>.
+    /// Gets or sets the exact name of the cookie to delete, e.g. <c language="text">_oauth2_proxy_admin</c>.
     /// Entries with an empty name are ignored.
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the domain the cookie was scoped to, e.g. <c>.cratis.studio</c>.
+    /// Gets or sets the domain the cookie was scoped to, e.g. <c language="text">.cratis.studio</c>.
     /// When set, the deletion is issued for this domain in addition to the request host — required to kill
     /// a cookie that was written for a parent domain, since a host-scoped deletion cannot touch it.
     /// Leave empty for a cookie scoped to the request host itself.

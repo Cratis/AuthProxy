@@ -20,13 +20,13 @@ namespace Cratis.AuthProxy.Configuration;
 /// The listener is private by intent. It defaults to loopback so it is reachable from a sidecar or a
 /// kubelet on the same network namespace and from nowhere else, and the paths it answers exist only on it —
 /// they are never added to the anonymous-path policy, the middleware pipeline or the reverse-proxy route
-/// table, so a service that already serves <c>/health</c> keeps serving it.
+/// table, so a service that already serves <c language="text">/health</c> keeps serving it.
 /// </para>
 /// </remarks>
 public class Management
 {
     /// <summary>
-    /// Gets or sets the address the management listener binds. Defaults to <c>127.0.0.1</c>, which keeps it
+    /// Gets or sets the address the management listener binds. Defaults to <c language="text">127.0.0.1</c>, which keeps it
     /// reachable from within the pod or container and unreachable from the network.
     /// Widen it only when the probe genuinely runs elsewhere, and understand that doing so publishes the
     /// endpoints to everything that can route to the address.
@@ -43,7 +43,7 @@ public class Management
 
     /// <summary>
     /// Gets or sets the path answering liveness — whether the request loop is servicing requests at all.
-    /// It consults nothing, so it stays <c>200</c> while storage, the identity provider and every backend
+    /// It consults nothing, so it stays <c language="text">200</c> while storage, the identity provider and every backend
     /// are unreachable, which is what keeps an orchestrator from restarting a healthy process during an
     /// outage of something else.
     /// </summary>

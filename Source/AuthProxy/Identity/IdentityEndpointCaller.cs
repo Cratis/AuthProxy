@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
-/// Calls one service's <c>/.cratis/me</c> endpoint and reports what it established.
+/// Calls one service's <c language="text">/.cratis/me</c> endpoint and reports what it established.
 /// </summary>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="logger">

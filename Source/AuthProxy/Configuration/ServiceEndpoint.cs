@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Configuration;
 public class ServiceEndpoint
 {
     /// <summary>
-    /// Gets or sets the base URL of the endpoint (e.g. <c>http://my-service:8080/</c>).
+    /// Gets or sets the base URL of the endpoint (e.g. <c language="text">http://my-service:8080/</c>).
     /// </summary>
     [Required, Url]
     public string BaseUrl { get; set; } = string.Empty;

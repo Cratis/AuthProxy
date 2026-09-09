@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Identity.for_IdentityMiddleware.when_no_tenant_resolv
 
 /// <summary>
 /// The one deliberate exemption, pinned so it stays deliberate. A path a service lists in
-/// <c>AnonymousPaths</c> is declared to be served without a session at all — a magic-link landing page, a
+/// <c language="text">AnonymousPaths</c> is declared to be served without a session at all — a magic-link landing page, a
 /// signed-token report, a public webhook receiver — so demanding an identity verdict for it would refuse
 /// exactly what the declaration exists to permit. The application stays responsible for authorizing those
 /// paths, which is what the setting already says.

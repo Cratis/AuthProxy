@@ -88,7 +88,7 @@ public class ClaimGatedHarness : WebApplicationFactory<Program>
     /// Builds a request from an authenticated caller carrying the given claims.
     /// </summary>
     /// <param name="pathAndQuery">The path and query to request.</param>
-    /// <param name="claims">The claims, as <c>type=value</c> pairs separated by semicolons.</param>
+    /// <param name="claims">The claims, as <c language="text">type=value</c> pairs separated by semicolons.</param>
     /// <returns>The request.</returns>
     public static HttpRequestMessage WithClaims(string pathAndQuery, string claims)
     {

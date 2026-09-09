@@ -6,7 +6,7 @@ using C = Cratis.AuthProxy.Configuration;
 namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
-/// Always resolves to the tenant ID specified in the <c>tenantId</c> option.
+/// Always resolves to the tenant ID specified in the <c language="text">tenantId</c> option.
 /// Used for single-tenant deployments.
 /// </summary>
 public class SpecifiedSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<SpecifiedOptions>

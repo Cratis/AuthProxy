@@ -12,7 +12,7 @@ namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 /// <para>
 /// Skipping provider selection and the unresolved-tenant refusal only covers callers with no session at
 /// all. A signed-in user with no tenant cookie who requests a declared anonymous path reaches tenant
-/// selection instead, and is answered with the tenant-selection page at <c>200</c> — the same HTML-instead
+/// selection instead, and is answered with the tenant-selection page at <c language="text">200</c> — the same HTML-instead
 /// -of-data, success-instead-of-refusal shape the anonymous path exists to remove, one middleware further
 /// down. A declared path has to be reachable for every caller, not only for the signed-out ones.
 /// </para>

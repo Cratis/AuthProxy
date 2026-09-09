@@ -8,12 +8,12 @@ namespace Cratis.AuthProxy.Security.for_ClosedDeployment;
 /// asserting that requires reading the wire.
 /// </summary>
 /// <remarks>
-/// Every other spec about this mode runs on <c>WebApplicationFactory</c>'s in-memory test server, and an
+/// Every other spec about this mode runs on <c language="text">WebApplicationFactory</c>'s in-memory test server, and an
 /// exhaustive comparison taken there compares what the *application* wrote. Two things a caller receives are
 /// invisible at that layer, and both of them were wrong:
 /// <list type="bullet">
 /// <item><description>
-/// Kestrel adds its own <c>Server</c> header at serialization time, after every middleware has stopped
+/// Kestrel adds its own <c language="text">Server</c> header at serialization time, after every middleware has stopped
 /// touching the response — so clearing the headers cannot remove it, and it was only switched off as a side
 /// effect of configuring a management port. A deployment whose stated purpose is not to be discoverable was
 /// answering every scanner with the name of what is running it.
@@ -21,7 +21,7 @@ namespace Cratis.AuthProxy.Security.for_ClosedDeployment;
 /// <item><description>
 /// The management middleware runs ahead of the admission gate, so a management path offered to the *public*
 /// listener was refused by the management endpoints instead — a different status framing, a different body
-/// and a <c>Cache-Control</c> nothing else carried. An unadmitted caller probing the documented default path
+/// and a <c language="text">Cache-Control</c> nothing else carried. An unadmitted caller probing the documented default path
 /// learned that an AuthProxy is here, that it has a management listener, and what its paths are called.
 /// </description></item>
 /// </list>

@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.for_AnonymousPathPolicy;
 /// which failure it was.
 /// <para>
 /// The entries that resolve to the application root are the ones that matter most:
-/// <c>PathString.StartsWithSegments(string.Empty)</c> is true for every request, so a blank value — an
+/// <c language="text">PathString.StartsWithSegments(string.Empty)</c> is true for every request, so a blank value — an
 /// environment variable set but never given one, a trailing index in a configuration array — would turn an
 /// entire service anonymous, silently and globally. That is the worst outcome this feature can produce, so
 /// every spelling of it is pinned here rather than left to review.

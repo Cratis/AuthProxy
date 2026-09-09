@@ -153,12 +153,12 @@ class InviteCompletion(
     /// </summary>
     /// <param name="principal">The authenticated principal completing the invitation.</param>
     /// <param name="emailVerified">
-    /// The value of the provider's <c>email_verified</c> claim when present; otherwise <see langword="null"/>.
+    /// The value of the provider's <c language="text">email_verified</c> claim when present; otherwise <see langword="null"/>.
     /// </param>
     /// <returns>The authenticated email, or an empty string when none is available.</returns>
     /// <remarks>
-    /// <c>preferred_username</c> is a username, not an address — for a GitHub OAuth provider it is conventionally
-    /// mapped from <c>login</c>. It is read only when it actually holds an address, which several OIDC providers
+    /// <c language="text">preferred_username</c> is a username, not an address — for a GitHub OAuth provider it is conventionally
+    /// mapped from <c language="text">login</c>. It is read only when it actually holds an address, which several OIDC providers
     /// put there (Entra's is the user principal name). Returning a login name here would make a provider that
     /// supplied no address at all indistinguishable from one that supplied somebody else's.
     /// </remarks>
@@ -421,7 +421,7 @@ class InviteCompletion(
     /// <param name="inviteToken">The validated invite token.</param>
     /// <param name="authenticatedEmail">The authenticating account's email.</param>
     /// <param name="emailVerified">
-    /// The provider's <c>email_verified</c> value: <see langword="true"/>, <see langword="false"/>, or
+    /// The provider's <c language="text">email_verified</c> value: <see langword="true"/>, <see langword="false"/>, or
     /// <see langword="null"/> when the provider supplies no independent verification claim.
     /// </param>
     /// <returns>

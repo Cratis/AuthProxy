@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.Identity.for_HeaderValue.when_encoding_a_value_that_a
 
 /// <summary>
 /// The attack the prefix rule exists for. Setting a provider display name to
-/// <c>UTF-8''victim%0D%0AX-Admin:%20true</c> is printable US-ASCII throughout, so it used to travel byte for
+/// <c language="text">UTF-8''victim%0D%0AX-Admin:%20true</c> is printable US-ASCII throughout, so it used to travel byte for
 /// byte with no sibling — and a backend following the published decode snippet, which branched on the
 /// prefix, decoded it and obtained a carriage return, a line feed and a header of the caller's choosing.
 /// CR and LF were structurally impossible to <em>emit</em> and perfectly possible to <em>reconstruct</em>.

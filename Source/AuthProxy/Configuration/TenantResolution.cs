@@ -15,7 +15,7 @@ public class TenantResolution
 
     /// <summary>
     /// Gets or sets the strategy-specific options (e.g. claim type, regex pattern, fixed tenant ID).
-    /// Populated at startup by <c>TenantResolutionOptionsConfigurer</c> which binds the configuration
+    /// Populated at startup by <c language="text">TenantResolutionOptionsConfigurer</c> which binds the configuration
     /// sub-section to the concrete typed options class that matches <see cref="Strategy"/>.
     /// </summary>
     public object? Options { get; set; }

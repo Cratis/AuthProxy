@@ -11,15 +11,15 @@ namespace Cratis.AuthProxy.Management;
 /// <param name="readyPath">The path answering readiness.</param>
 /// <remarks>
 /// Isolation is gated on <see cref="ConnectionInfo.LocalPort"/> — the socket Kestrel accepted the request
-/// on — and deliberately not on the <c>Host</c> header. ASP.NET's own port-scoping convention,
-/// <c>RequireHost("*:9110")</c>, matches that header, and a header is whatever the caller wrote: a request
-/// arriving on the public listener carrying <c>Host: anything:9110</c> would be treated as a management
+/// on — and deliberately not on the <c language="text">Host</c> header. ASP.NET's own port-scoping convention,
+/// <c language="text">RequireHost("*:9110")</c>, matches that header, and a header is whatever the caller wrote: a request
+/// arriving on the public listener carrying <c language="text">Host: anything:9110</c> would be treated as a management
 /// request and answered from a surface that is supposed to be unreachable from the network. The accepted
 /// socket cannot be forged by a caller, which is the entire point.
 /// <para>
 /// It gates in both directions. The management paths answer only on the management port, so probing the
 /// public listener for them gets the same not-found as any other unknown path; and the management port
-/// answers only those paths, so nothing that arrives on it — not <c>/</c>, not a declared anonymous path,
+/// answers only those paths, so nothing that arrives on it — not <c language="text">/</c>, not a declared anonymous path,
 /// not a bundled asset — is ever handed to the middleware pipeline or the reverse proxy.
 /// </para>
 /// </remarks>

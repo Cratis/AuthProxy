@@ -12,8 +12,8 @@ namespace Cratis.AuthProxy.Aspire.for_AuthProxyExtensions.when_declaring_anonymo
 /// way to write an app host, which is what makes this worth pinning.
 /// </para>
 /// <para>
-/// Two services are used to show the count is kept per service: <c>other</c> starts at its own zero rather
-/// than continuing <c>main</c>'s numbering.
+/// Two services are used to show the count is kept per service: <c language="text">other</c> starts at its own zero rather
+/// than continuing <c language="text">main</c>'s numbering.
 /// </para>
 /// </summary>
 public class and_they_are_declared_across_several_calls : given.an_auth_proxy_resource

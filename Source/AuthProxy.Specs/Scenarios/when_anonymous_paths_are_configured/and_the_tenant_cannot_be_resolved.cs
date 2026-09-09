@@ -9,9 +9,9 @@ namespace Cratis.AuthProxy.Scenarios.when_anonymous_paths_are_configured;
 /// End-to-end scenario with tenant resolutions configured that cannot resolve for a caller with no
 /// session: the declared anonymous paths must still be forwarded rather than refused for having no tenant.
 /// <para>
-/// The test destinations do not exist, so reaching the forwarder surfaces as <c>502 Bad Gateway</c> — a
-/// status only a forwarded request can produce. Without <c>TenancyMiddleware</c>'s anonymous skip these
-/// would be <c>401</c> instead: the same closed door as before the feature, one middleware later.
+/// The test destinations do not exist, so reaching the forwarder surfaces as <c language="text">502 Bad Gateway</c> — a
+/// status only a forwarded request can produce. Without <c language="text">TenancyMiddleware</c>'s anonymous skip these
+/// would be <c language="text">401</c> instead: the same closed door as before the feature, one middleware later.
 /// </para>
 /// </summary>
 /// <param name="factory">The shared application factory.</param>

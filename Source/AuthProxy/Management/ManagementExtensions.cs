@@ -23,10 +23,10 @@ public static class ManagementExtensions
     /// socket is opened, and the process binds exactly what it binds today.
     /// <para>
     /// ⚠️ The listener is added by <em>re-declaring</em> the host's addresses, never with
-    /// <c>ConfigureKestrel(options =&gt; options.Listen(...))</c>. Populating
-    /// <c>KestrelServerOptions.ListenOptions</c> makes Kestrel discard the hosting addresses entirely
-    /// whenever <c>PreferHostingUrls</c> is left at its default of <see langword="false"/> — it logs
-    /// "Overriding address(es)" and binds only what was passed to <c>Listen</c>. The public listener of
+    /// <c language="text">ConfigureKestrel(options =&gt; options.Listen(...))</c>. Populating
+    /// <c language="text">KestrelServerOptions.ListenOptions</c> makes Kestrel discard the hosting addresses entirely
+    /// whenever <c language="text">PreferHostingUrls</c> is left at its default of <see langword="false"/> — it logs
+    /// "Overriding address(es)" and binds only what was passed to <c language="text">Listen</c>. The public listener of
     /// every containerized deployment comes from those hosting addresses, so an opt-in health endpoint
     /// would take the whole proxy off the network. Both listeners have to come from the same place, and
     /// the public one is already in the addresses.

@@ -4,7 +4,7 @@
 namespace Cratis.AuthProxy.SignIns;
 
 /// <summary>
-/// Parses a <c>User-Agent</c> header into a coarse browser and operating-system description.
+/// Parses a <c language="text">User-Agent</c> header into a coarse browser and operating-system description.
 /// </summary>
 /// <remarks>
 /// This is a deliberately lightweight, dependency-free heuristic — it recognizes the mainstream browsers and
@@ -15,9 +15,9 @@ namespace Cratis.AuthProxy.SignIns;
 public static class UserAgentParser
 {
     /// <summary>
-    /// Parses the supplied <c>User-Agent</c> header value.
+    /// Parses the supplied <c language="text">User-Agent</c> header value.
     /// </summary>
-    /// <param name="userAgent">The raw <c>User-Agent</c> header value.</param>
+    /// <param name="userAgent">The raw <c language="text">User-Agent</c> header value.</param>
     /// <returns>The parsed <see cref="UserAgentInfo"/>; <see cref="UserAgentInfo.Unknown"/> when the value is empty.</returns>
     public static UserAgentInfo Parse(string? userAgent)
     {

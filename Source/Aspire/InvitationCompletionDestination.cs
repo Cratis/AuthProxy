@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Aspire;
 /// This setting changes only the post-completion redirect choice. It does not change invitation staging,
 /// completion, tenant matching, recipient binding, attestations, transactions, cookies, or sessions.
 /// <para>
-/// Matching-tenant invitations are those where the configured <c>TenantClaim</c> value in the invitation
+/// Matching-tenant invitations are those where the configured <c language="text">TenantClaim</c> value in the invitation
 /// capability equals the tenant resolved for the request. The equality does not prove that the invitation
 /// was issued by that tenant — any issuer holding the signing key can write that claim. It proves only
 /// that the invitation names the tenant the request is being served for, which is enough to know whether

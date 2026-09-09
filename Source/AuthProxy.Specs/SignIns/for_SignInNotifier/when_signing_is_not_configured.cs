@@ -8,8 +8,8 @@ namespace Cratis.AuthProxy.SignIns.for_SignInNotifier;
 
 /// <summary>
 /// The compatibility contract. The signer is wired exactly as the host wires it, but no
-/// <c>SignIn:Attestation</c> section exists — so the request that leaves must be indistinguishable from the
-/// one the released four-argument notifier sends: the same body bytes, and no <c>Authorization</c> header.
+/// <c language="text">SignIn:Attestation</c> section exists — so the request that leaves must be indistinguishable from the
+/// one the released four-argument notifier sends: the same body bytes, and no <c language="text">Authorization</c> header.
 /// </summary>
 public class when_signing_is_not_configured : a_signed_sign_in_notifier
 {

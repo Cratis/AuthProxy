@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.for_HttpContextExtensions;
 /// <summary>
 /// Every caller of this asks it in order to <em>relax</em> something on the grounds that an invite exchange
 /// is about to run: the tenancy refusal, the provider-selection refusal, the identity caches. Answering on
-/// the cookie's presence alone let a bare <c>Cookie: .cratis-invite=</c> buy all of that while
+/// the cookie's presence alone let a bare <c language="text">Cookie: .cratis-invite=</c> buy all of that while
 /// <see cref="HttpContextExtensions.TryGetPendingInvitationToken"/> — which is what actually runs the
 /// exchange — rejected the same blank value. So the relaxations happened, the exchange did not, and the
 /// cookie is the caller's to send.

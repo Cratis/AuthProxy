@@ -28,9 +28,9 @@ namespace Cratis.AuthProxy.Security.given;
 /// one that did not — so a refusal can be read as the bytes that actually leave the process.
 /// </summary>
 /// <remarks>
-/// Real sockets, and for a reason the rest of this suite's harnesses cannot cover. <c>TestServer</c> is not a
-/// server: it writes no <c>Server</c> header, honors no <c>AddServerHeader</c>, reports
-/// <c>Connection.LocalPort</c> as zero and never serializes a response. Everything a spec observes there is
+/// Real sockets, and for a reason the rest of this suite's harnesses cannot cover. <c language="text">TestServer</c> is not a
+/// server: it writes no <c language="text">Server</c> header, honors no <c language="text">AddServerHeader</c>, reports
+/// <c language="text">Connection.LocalPort</c> as zero and never serializes a response. Everything a spec observes there is
 /// what the *application* wrote, so an exhaustive header comparison taken at that layer proves the
 /// application is uniform and says nothing about what a caller receives — which is where both of the
 /// distinguishable refusals this harness exists for were hiding.
@@ -100,12 +100,12 @@ public sealed class ClosedDeploymentHarness : IDisposable
     /// </summary>
     /// <param name="port">The port to ask.</param>
     /// <param name="path">The path to ask for.</param>
-    /// <returns>The response, verbatim, with the <c>Date</c> line removed.</returns>
+    /// <returns>The response, verbatim, with the <c language="text">Date</c> line removed.</returns>
     /// <remarks>
     /// Raw rather than through <see cref="HttpClient"/> because the question is what the process writes, and
-    /// a client hands back a parsed view of it — status line casing, header order, a <c>Server</c> header, a
-    /// chunked body framing. <c>Connection: close</c> so the response ends at end of stream and no framing
-    /// has to be re-implemented here. Only <c>Date</c> is removed, because it is a clock reading rather than
+    /// a client hands back a parsed view of it — status line casing, header order, a <c language="text">Server</c> header, a
+    /// chunked body framing. <c language="text">Connection: close</c> so the response ends at end of stream and no framing
+    /// has to be re-implemented here. Only <c language="text">Date</c> is removed, because it is a clock reading rather than
     /// anything about the request.
     /// </remarks>
     public static async Task<string> Raw(int port, string path)

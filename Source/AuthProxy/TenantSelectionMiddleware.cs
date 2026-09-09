@@ -338,9 +338,9 @@ public class TenantSelectionMiddleware(
         [property: System.Text.Json.Serialization.JsonPropertyName("name")] string Name);
 
     /// <summary>
-    /// The outcome of calling the tenant endpoint. <c>Succeeded</c> is <see langword="false"/> only when
+    /// The outcome of calling the tenant endpoint. <c language="text">Succeeded</c> is <see langword="false"/> only when
     /// the endpoint could not give an authoritative answer (unreachable, server error, unparseable body);
-    /// an authoritative "no tenants" answer has <c>Succeeded</c> <see langword="true"/> with an empty list.
+    /// an authoritative "no tenants" answer has <c language="text">Succeeded</c> <see langword="true"/> with an empty list.
     /// </summary>
     /// <param name="Succeeded">Whether the endpoint gave an authoritative answer.</param>
     /// <param name="Tenants">The tenants available to the user when the call succeeded.</param>

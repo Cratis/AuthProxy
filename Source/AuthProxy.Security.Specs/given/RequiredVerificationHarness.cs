@@ -14,7 +14,7 @@ using Microsoft.Extensions.Options;
 namespace Cratis.AuthProxy.Security.given;
 
 /// <summary>
-/// A running AuthProxy whose one service answers <c>/.cratis/me</c> with an authorization verdict, in front
+/// A running AuthProxy whose one service answers <c language="text">/.cratis/me</c> with an authorization verdict, in front
 /// of a real recording origin whose answer a spec controls.
 /// </summary>
 /// <remarks>

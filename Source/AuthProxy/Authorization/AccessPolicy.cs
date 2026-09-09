@@ -16,7 +16,7 @@ namespace Cratis.AuthProxy.Authorization;
 /// requirement in the combined set has to hold. A service can therefore only ever narrow who reaches it,
 /// which is the property that makes a root requirement worth writing — if a service section could replace
 /// it, the root would be a default rather than a floor, and a service added later without an
-/// <c>Authorization</c> section would silently be the way in.
+/// <c language="text">Authorization</c> section would silently be the way in.
 /// </remarks>
 public class AccessPolicy : IAccessPolicy
 {
@@ -78,9 +78,9 @@ public class AccessPolicy : IAccessPolicy
     /// <remarks>
     /// This runs before endpoint selection — the gate has to refuse a caller before anything reads a
     /// backend, and long before YARP picks a route — so the target is worked out from the request rather
-    /// than from a selected endpoint. It mirrors <c>MicroserviceReverseProxyConfigProvider</c> exactly: a
+    /// than from a selected endpoint. It mirrors <c language="text">MicroserviceReverseProxyConfigProvider</c> exactly: a
     /// single-service deployment routes everything to that service, and beyond that a service is named by
-    /// the <c>Service-ID</c> header or the <c>service</c> query parameter, header first.
+    /// the <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, header first.
     /// <para>
     /// A request in a multi-service deployment that names no service reaches no service route either, so
     /// answering <see langword="null"/> costs nothing: the root requirements still apply, and the request
@@ -119,14 +119,14 @@ public class AccessPolicy : IAccessPolicy
     /// <returns><see langword="true"/> when the requirement is satisfied; otherwise <see langword="false"/>.</returns>
     /// <remarks>
     /// A requirement naming no claim can never be satisfied, so it denies. That is the fail-closed
-    /// direction, and the opposite of how an unusable <c>AnonymousPaths</c> entry is treated: discarding an
+    /// direction, and the opposite of how an unusable <c language="text">AnonymousPaths</c> entry is treated: discarding an
     /// entry there leaves a path authenticated, discarding a requirement here would let everybody in.
     /// Startup validation refuses the configuration outright, so this is the second line rather than the
     /// first.
     /// <para>
     /// Values are compared case-insensitively. The values being matched are organization names, team
     /// slugs, group names and roles — identifiers their own systems treat as case-insensitive — so an
-    /// ordinal comparison would turn <c>cratis</c> against <c>Cratis</c> into a locked-out deployment with
+    /// ordinal comparison would turn <c language="text">cratis</c> against <c language="text">Cratis</c> into a locked-out deployment with
     /// nothing in the response to say why.
     /// </para>
     /// </remarks>

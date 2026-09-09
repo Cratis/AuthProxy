@@ -9,7 +9,7 @@ namespace Cratis.AuthProxy.Authentication.for_GitHubMembershipClaimsEnricher;
 /// Tying it to the scope rather than to a separate switch avoids the state where the two disagree — a
 /// switch turned on without the scope produces empty membership and a deployment nobody can sign in to,
 /// while the scope granted without the switch produces claims that were fetched and then not used. GitHub
-/// answers <c>/user/orgs</c> with public memberships only and refuses <c>/user/teams</c> outright without
+/// answers <c language="text">/user/orgs</c> with public memberships only and refuses <c language="text">/user/teams</c> outright without
 /// it, so the scope is not merely correlated with wanting the claims: it is the condition under which they
 /// can be true.
 /// </para>
