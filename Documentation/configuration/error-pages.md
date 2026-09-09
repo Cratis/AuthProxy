@@ -21,7 +21,7 @@ condition is detected:
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
 | `invitation-email-unavailable.html` | Email binding is enabled, but the identity provider supplied no authenticated-session email address during invite exchange (Phase 2). | 403 |
-| `invitation-email-mismatch.html` | Email binding is enabled, and the identity provider supplied another address or explicitly reported `email_verified=false` during invite exchange (Phase 2). | 403 |
+| `invitation-email-mismatch.html` | Email binding is enabled, and the identity provider supplied another address or did not report the address as verified during invite exchange (Phase 2). | 403 |
 
 ---
 
@@ -115,9 +115,14 @@ that exposes an address.
 
 ### `invitation-email-mismatch.html`
 
-Served during Phase 2 when the provider supplied an address different from the invited address, or explicitly
-reported `email_verified=false`. An absent `email_verified` claim is not universal proof of ownership and is
-forwarded as `null`; OAuth providers do not currently map that claim. See
+Served during Phase 2 when the provider supplied an address different from the invited address, or did not
+report the address as verified.
+
+What counts as unverified depends on the mode. In the legacy unsigned exchange (no `Invite.Attestation`) only
+an explicit `email_verified=false` mismatches; an absent claim is forwarded as `null` for the backend to judge,
+and OAuth providers do not currently map that claim. With `Invite.Attestation` configured, the completion fails
+closed: only a single `email_verified` claim parsing to exactly `true` counts as verified, so a missing,
+duplicated, malformed, or non-`true` claim is answered with this page too. See
 [Invitation to Organization](lobby/invitation-to-organization.md) for the complete binding behavior.
 
 ---
