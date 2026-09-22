@@ -6,7 +6,7 @@
 [![C# Build](https://github.com/Cratis/AuthProxy/actions/workflows/dotnet-build.yml/badge.svg)](https://github.com/Cratis/AuthProxy/actions/workflows/dotnet-build.yml)
 [![Publish](https://github.com/Cratis/AuthProxy/actions/workflows/publish.yml/badge.svg)](https://github.com/Cratis/AuthProxy/actions/workflows/publish.yml)
 
-Cratis AuthProxy is a reverse proxy, built on .NET and [YARP](https://microsoft.github.io/reverse-proxy/), that sits in front of your backend and frontend services and owns the cross-cutting edge concerns of a web application: who the user is, which tenant they belong to, whether they are allowed in, and how someone who was invited gets onboarded.
+Cratis AuthProxy is a reverse proxy, that sits in front of your backend and frontend services and owns the cross-cutting edge concerns of a web application: who the user is, which tenant they belong to, whether they are allowed in, and how someone who was invited gets onboarded.
 
 Requests are authenticated, scoped to a tenant, and enriched with identity **before** they reach your services — the resolved tenant and identity travel on trusted headers, so your application code stays focused on the domain instead of re-implementing OpenID Connect handshakes, tenant resolution, and invite flows in every service.
 
