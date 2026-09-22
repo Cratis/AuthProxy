@@ -1,6 +1,6 @@
 # AuthProxy
 
-## Authentication and multi-tenancy gateway for ASP.NET Core applications
+## Authentication and multi-tenancy gateway
 
 [![Docker](https://img.shields.io/docker/v/cratis/authproxy?label=Docker&logo=docker&sort=semver)](https://hub.docker.com/r/cratis/authproxy)
 [![C# Build](https://github.com/Cratis/AuthProxy/actions/workflows/dotnet-build.yml/badge.svg)](https://github.com/Cratis/AuthProxy/actions/workflows/dotnet-build.yml)
