@@ -120,7 +120,7 @@ Set the application endpoint that records a completed sign-in under `Cratis:Auth
 
 Equivalent environment variable:
 
-```
+```dotenv
 Cratis__AuthProxy__SignIn__NotifyUrl=https://studio.example.com/api/internal/sign-ins
 ```
 

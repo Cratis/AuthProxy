@@ -3,7 +3,7 @@
 AuthProxy exposes a well-known logout endpoint that ends the current session and returns the user to a
 validated destination:
 
-```
+```text
 GET /.cratis/logout?redirect=<absolute-url>
 ```
 
@@ -83,7 +83,7 @@ Whether the *identity provider* still remembers the user is governed by the full
 The post-logout destination is supplied as an **absolute URL** in the `redirect` query-string parameter,
 for example:
 
-```
+```text
 /.cratis/logout?redirect=https://cratis.studio
 ```
 
@@ -128,7 +128,7 @@ optionally a port) with no path; malformed or non-HTTP(S) entries are ignored.
 
 Equivalent environment variables (one indexed key per entry):
 
-```
+```dotenv
 Cratis__AuthProxy__Logout__AllowedRedirectOrigins__0=https://cratis.studio
 ```
 
@@ -178,7 +178,7 @@ so they reliably match how such cookies are typically written.
 
 Equivalent environment variables (one indexed entry per cookie):
 
-```
+```dotenv
 Cratis__AuthProxy__Logout__AdditionalCookies__0__Name=_oauth2_proxy_admin
 Cratis__AuthProxy__Logout__AdditionalCookies__0__Domain=.cratis.studio
 ```

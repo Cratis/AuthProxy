@@ -4,7 +4,7 @@ AuthProxy can let an **already signed-in** user prove control of an additional i
 associate it with their existing account — without ever replacing their current session. This is the
 proof-of-control building block behind an application's "add a credential" feature.
 
-```
+```text
 GET /.cratis/link?token=<one-time-link-token>                                  → embeddable provider-selection page
 GET /.cratis/link/{scheme}?returnUrl=<relative-url>&token=<one-time-link-token> → challenge for one provider
 GET /.cratis/link/complete                                                     → completion page
@@ -42,7 +42,7 @@ frame. The flow is therefore split:
 Embedding is **off by default**. The link pages send `Content-Security-Policy: frame-ancestors 'none'`
 (plus `X-Frame-Options: DENY`) until the deployment names the origins allowed to frame them:
 
-```
+```dotenv
 Cratis__AuthProxy__Link__EmbedAncestors__0=self
 ```
 
@@ -143,7 +143,7 @@ Set the application endpoint that records the freshly authenticated subject unde
 
 Equivalent environment variables:
 
-```
+```dotenv
 Cratis__AuthProxy__Link__ExchangeUrl=https://studio.example.com/api/internal/identity-providers/link
 Cratis__AuthProxy__Link__EmbedAncestors__0=self
 ```
