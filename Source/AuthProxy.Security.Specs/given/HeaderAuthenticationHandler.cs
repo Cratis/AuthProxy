@@ -33,7 +33,7 @@ public class HeaderAuthenticationHandler(
     public const string Scheme = "SecuritySpecScheme";
 
     /// <summary>
-    /// The header a spec sends to give its caller extra claims, as <c>type=value</c> pairs separated by
+    /// The header a spec sends to give its caller extra claims, as <c language="text">type=value</c> pairs separated by
     /// semicolons.
     /// </summary>
     /// <remarks>
@@ -45,14 +45,14 @@ public class HeaderAuthenticationHandler(
 
     /// <summary>
     /// The header a spec sends to give its caller claims whose values are not US-ASCII — the same
-    /// <c>type=value</c> pair format as <see cref="ClaimsHeader"/>, base64-encoded UTF-8.
+    /// <c language="text">type=value</c> pair format as <see cref="ClaimsHeader"/>, base64-encoded UTF-8.
     /// </summary>
     /// <remarks>
-    /// A spec cannot declare a name like <c>Søren Wærstad</c> through <see cref="ClaimsHeader"/>, because
+    /// A spec cannot declare a name like <c language="text">Søren Wærstad</c> through <see cref="ClaimsHeader"/>, because
     /// that header is itself subject to the very limitation these specs exist to prove is handled. Encoding
     /// it here keeps the harness honest: the spec's own transport is a spec concern, and nothing about the
     /// production path is relaxed to accommodate it — the claim arrives at
-    /// <c>BuildClientPrincipal</c> as an ordinary .NET string, exactly as a real provider's would.
+    /// <c language="text">BuildClientPrincipal</c> as an ordinary .NET string, exactly as a real provider's would.
     /// </remarks>
     public const string EncodedClaimsHeader = "X-Security-Spec-Claims-Encoded";
 

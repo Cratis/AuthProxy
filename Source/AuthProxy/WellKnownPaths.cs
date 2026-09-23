@@ -16,7 +16,7 @@ public static class WellKnownPaths
 
     /// <summary>
     /// The path prefix the authentication handlers use for provider callbacks. The provider scheme is
-    /// appended directly rather than as a segment (e.g. <c>/signin-microsoft</c>).
+    /// appended directly rather than as a segment (e.g. <c language="text">/signin-microsoft</c>).
     /// </summary>
     public const string SignInPrefix = "/signin-";
 
@@ -27,13 +27,13 @@ public static class WellKnownPaths
 
     /// <summary>
     /// The well-known path for the OIDC providers endpoint.
-    /// Returns a JSON array of <c>OidcProviderInfo</c> objects.
+    /// Returns a JSON array of <c language="text">OidcProviderInfo</c> objects.
     /// </summary>
     public const string Providers = "/.cratis/providers";
 
     /// <summary>
     /// The well-known path prefix for initiating a login flow for a specific provider.
-    /// Append the scheme name to complete the URL (e.g. <c>/.cratis/login/microsoft</c>).
+    /// Append the scheme name to complete the URL (e.g. <c language="text">/.cratis/login/microsoft</c>).
     /// </summary>
     public const string LoginPrefix = "/.cratis/login";
 
@@ -57,13 +57,13 @@ public static class WellKnownPaths
     /// The well-known path that logs the current user out. It initiates a full-chain logout: when the
     /// session was established through an OIDC provider it redirects the browser to that provider's
     /// end-session endpoint (RP-initiated logout), otherwise it clears the local session directly. The
-    /// final destination is supplied in the <c>redirect</c> query-string parameter.
+    /// final destination is supplied in the <c language="text">redirect</c> query-string parameter.
     /// </summary>
     public const string Logout = "/.cratis/logout";
 
     /// <summary>
     /// The well-known path the identity provider redirects back to after an RP-initiated logout completes.
-    /// It clears every AuthProxy-generated cookie and redirects to the validated final <c>redirect</c>
+    /// It clears every AuthProxy-generated cookie and redirects to the validated final <c language="text">redirect</c>
     /// target that was carried across the round-trip. Must be a segment under <see cref="Logout"/> so the
     /// logout middleware can distinguish it from the initiation request.
     /// </summary>
@@ -71,7 +71,7 @@ public static class WellKnownPaths
 
     /// <summary>
     /// The well-known path prefix for initiating a session-preserving link flow for a specific provider.
-    /// Append the scheme name to complete the URL (e.g. <c>/.cratis/link/github</c>).
+    /// Append the scheme name to complete the URL (e.g. <c language="text">/.cratis/link/github</c>).
     /// Unlike <see cref="LoginPrefix"/>, the link flow authenticates a second provider identity for the
     /// already signed-in user <em>without</em> replacing the primary authentication cookie/session.
     /// The bare path (no scheme) serves the flow's embeddable provider-selection page.
@@ -81,13 +81,13 @@ public static class WellKnownPaths
     /// <summary>
     /// The well-known path a completed credential link lands on. It serves the flow's completion page,
     /// which broadcasts the outcome to the embedding selection page and closes its window. The segment is
-    /// reserved — a provider scheme can never be named <c>complete</c>.
+    /// reserved — a provider scheme can never be named <c language="text">complete</c>.
     /// </summary>
     public const string LinkComplete = "/.cratis/link/complete";
 
     /// <summary>
     /// The well-known path prefix that triggers invite-token handling.
-    /// Append the token to complete the URL (e.g. <c>/invite/&lt;token&gt;</c>).
+    /// Append the token to complete the URL (e.g. <c language="text">/invite/&lt;token&gt;</c>).
     /// </summary>
     public const string InvitePathPrefix = "/invite";
 

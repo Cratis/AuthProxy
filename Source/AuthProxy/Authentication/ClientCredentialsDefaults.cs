@@ -40,7 +40,7 @@ public static class ClientCredentialsDefaults
 
     /// <summary>
     /// The claim type that stores the tenant resolved from the downstream verification response.
-    /// Configure a <c>Claim</c> tenant resolution strategy with this claim type to have AuthProxy
+    /// Configure a <c language="text">Claim</c> tenant resolution strategy with this claim type to have AuthProxy
     /// resolve the tenant for client-credentials-authenticated requests.
     /// </summary>
     public const string TenantClaimType = "cratis/tenant";

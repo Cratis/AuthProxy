@@ -55,7 +55,7 @@ public static class UniformDenial
     /// A refusal is a statement about the caller, not about the resource, so a shared cache that stored one
     /// would go on serving it to callers who would have been answered — and, worse, a cache that stored an
     /// <em>answer</em> under the same key would serve it to callers who have presented nothing. Saying
-    /// <c>no-store</c> on the refusal is the half of that this type owns.
+    /// <c language="text">no-store</c> on the refusal is the half of that this type owns.
     /// </remarks>
     public const string CacheControl = "no-store";
 

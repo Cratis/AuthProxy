@@ -17,17 +17,17 @@ public static class GitHubClaimTypes
 {
     /// <summary>
     /// The claim carrying an organization the signed-in user belongs to, as its GitHub login
-    /// (for example <c>Cratis</c>). One claim is added per organization.
+    /// (for example <c language="text">Cratis</c>). One claim is added per organization.
     /// </summary>
     public const string Organization = "urn:github:organization";
 
     /// <summary>
-    /// The claim carrying a team the signed-in user belongs to, as <c>organization/team-slug</c>
-    /// (for example <c>Cratis/planner</c>). One claim is added per team.
+    /// The claim carrying a team the signed-in user belongs to, as <c language="text">organization/team-slug</c>
+    /// (for example <c language="text">Cratis/planner</c>). One claim is added per team.
     /// </summary>
     /// <remarks>
     /// Qualified by organization because a team slug is only unique within one: two organizations may both
-    /// have a <c>developers</c> team, and an unqualified claim would let membership of either satisfy a
+    /// have a <c language="text">developers</c> team, and an unqualified claim would let membership of either satisfy a
     /// requirement meant for one. The slug is the name in the team's URL, which is what an operator has in
     /// front of them when writing the requirement.
     /// </remarks>

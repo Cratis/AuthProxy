@@ -28,7 +28,7 @@ public class a_best_effort_verification_resolver : Specification
 
     /// <summary>
     /// The envelope a service answers when it states the caller is authenticated but not authorized. This is
-    /// the exact shape <c>IdentityProviderResult</c> serializes, so it is what a service reaching for the
+    /// the exact shape <c language="text">IdentityProviderResult</c> serializes, so it is what a service reaching for the
     /// documented response type writes.
     /// </summary>
     protected const string NegativeBody = /*lang=json,strict*/

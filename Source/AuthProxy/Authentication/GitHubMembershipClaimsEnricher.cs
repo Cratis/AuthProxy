@@ -33,8 +33,8 @@ public class GitHubMembershipClaimsEnricher(ILogger<GitHubMembershipClaimsEnrich
     /// The scopes that let a token see the organizations and teams a user belongs to.
     /// </summary>
     /// <remarks>
-    /// This is also the opt-in. Without one of these GitHub answers <c>/user/orgs</c> with public
-    /// memberships only and refuses <c>/user/teams</c> outright, so membership claims would be
+    /// This is also the opt-in. Without one of these GitHub answers <c language="text">/user/orgs</c> with public
+    /// memberships only and refuses <c language="text">/user/teams</c> outright, so membership claims would be
     /// misleading where they were not simply absent. Requesting the scope is therefore the same statement
     /// as asking for the claims, and a deployment that does not request it makes no extra calls and gets
     /// exactly the sign-in it got before.

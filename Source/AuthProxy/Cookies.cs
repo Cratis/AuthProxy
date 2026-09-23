@@ -17,7 +17,7 @@ public static class Cookies
 
     /// <summary>
     /// HTTP-only cookie holding the sealed record that a principal was authorized in a tenant, used to
-    /// skip the <c>/.cratis/me</c> authorization call on subsequent requests.
+    /// skip the <c language="text">/.cratis/me</c> authorization call on subsequent requests.
     /// </summary>
     /// <remarks>
     /// Separate from <see cref="Identity"/> precisely because that one is readable and writable by the
@@ -54,7 +54,7 @@ public static class Cookies
 
     /// <summary>
     /// Short-lived cookie injected by the proxy when serving the invitation provider-selection page.
-    /// Contains a JSON array of <c>OidcProviderInfo</c> objects so the page can render
+    /// Contains a JSON array of <c language="text">OidcProviderInfo</c> objects so the page can render
     /// per-provider sign-in links without a separate HTTP round-trip.
     /// This cookie is intentionally <em>not</em> HTTP-only so that client-side script can read it.
     /// </summary>
@@ -62,7 +62,7 @@ public static class Cookies
 
     /// <summary>
     /// Short-lived cookie injected by the proxy when serving the tenant-selection page.
-    /// Contains a JSON array of tenant options (<c>id</c> and <c>name</c>) so the page can render
+    /// Contains a JSON array of tenant options (<c language="text">id</c> and <c language="text">name</c>) so the page can render
     /// without calling the tenant endpoint directly.
     /// This cookie is intentionally <em>not</em> HTTP-only so that client-side script can read it.
     /// </summary>
