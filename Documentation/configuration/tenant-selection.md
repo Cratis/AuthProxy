@@ -29,7 +29,7 @@ only when the cookie lists more than one tenant).
 
 To switch, the toolbar navigates to the same selection endpoint used by the selection page:
 
-```
+```text
 /.cratis/select-tenant?tenantId=<id>&returnUrl=<current path>
 ```
 

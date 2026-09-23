@@ -49,7 +49,7 @@ Any page file that is present overrides the built-in default; missing files fall
 
 Equivalent environment variable:
 
-```
+```dotenv
 Cratis__AuthProxy__PagesPath=/mnt/pages
 ```
 

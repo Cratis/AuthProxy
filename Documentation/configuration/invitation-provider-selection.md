@@ -198,7 +198,7 @@ providers.forEach(function (provider) {
 
 ### Direct access flow (`select-provider.html`)
 
-```
+```text
 User navigates to protected resource
         │
         ▼
@@ -225,7 +225,7 @@ Unauthenticated request detected
 
 ### Invitation flow (`invitation-select-provider.html`)
 
-```
+```text
 User clicks invite link
         │
         ▼

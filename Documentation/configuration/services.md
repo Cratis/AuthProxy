@@ -244,7 +244,7 @@ for the timeout that follows from it.
 | answers `200` with contradicting verdicts | forward, merge details | **deny** |
 
 An **unambiguous positive** is a body carrying `isAuthorized: true` as a JSON boolean, and not
-contradicting it with `isAuthenticated: false`. A response that carries only details states no verdict — 
+contradicting it with `isAuthenticated: false`. A response that carries only details states no verdict —
 which is exactly right for a service being asked only to enrich, and never enough for one being asked to
 decide. Property names are matched without regard to casing; a quoted `"true"` is not a verdict.
 
