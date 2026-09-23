@@ -20,7 +20,7 @@ public static class WellKnownPageNames
 
     /// <summary>
     /// The page returned when an authenticated caller does not satisfy the claim requirements declared in
-    /// <c>Cratis:AuthProxy:Authorization</c> — signed in, but not someone this deployment lets in.
+    /// <c language="text">Cratis:AuthProxy:Authorization</c> — signed in, but not someone this deployment lets in.
     /// </summary>
     /// <remarks>
     /// Distinct from <see cref="Forbidden"/>, which answers the application refusing a caller it does
@@ -71,21 +71,21 @@ public static class WellKnownPageNames
 
     /// <summary>
     /// The page served when a valid invitation token is presented and multiple identity providers
-    /// are configured.  The page reads the <c>.cratis-providers</c> cookie injected by the proxy
+    /// are configured.  The page reads the <c language="text">.cratis-providers</c> cookie injected by the proxy
     /// and renders a sign-in button for each available provider.
     /// </summary>
     public const string InvitationSelectProvider = "invitation-select-provider.html";
 
     /// <summary>
     /// The page served when an unauthenticated user reaches the proxy and multiple identity
-    /// providers are configured.  The page reads the <c>.cratis-providers</c> cookie injected
+    /// providers are configured.  The page reads the <c language="text">.cratis-providers</c> cookie injected
     /// by the proxy and renders a sign-in button for each available provider.
     /// </summary>
     public const string SelectProvider = "select-provider.html";
 
     /// <summary>
     /// The page served when tenant selection is enabled and the authenticated user has no selected tenant.
-    /// The page reads the <c>.cratis-tenants</c> cookie injected by the proxy and renders a selectable list.
+    /// The page reads the <c language="text">.cratis-tenants</c> cookie injected by the proxy and renders a selectable list.
     /// </summary>
     public const string SelectTenant = "select-tenant.html";
 
@@ -99,7 +99,7 @@ public static class WellKnownPageNames
     /// The page returned when a credential-link callback completes without the application having recorded
     /// the link — the exchange could not be performed, or the application refused it — and when the
     /// provider round-trip of a link challenge fails. It broadcasts the failure on the link flow's
-    /// <c>BroadcastChannel</c> so an embedding selection page can offer a retry.
+    /// <c language="text">BroadcastChannel</c> so an embedding selection page can offer a retry.
     /// </summary>
     /// <remarks>
     /// Deliberately generic: the same page answers every cause, so a caller cannot tell "the provider
@@ -109,17 +109,17 @@ public static class WellKnownPageNames
     public const string LinkFailed = "link-failed.html";
 
     /// <summary>
-    /// The provider-selection page of the credential-link flow, served at <c>/.cratis/link</c> for the
-    /// product to embed in a modal <c>iframe</c>. It lists the configured providers, opens the chosen
+    /// The provider-selection page of the credential-link flow, served at <c language="text">/.cratis/link</c> for the
+    /// product to embed in a modal <c language="text">iframe</c>. It lists the configured providers, opens the chosen
     /// provider's link challenge in a separate top-level window — external identity providers refuse to
-    /// render framed — and reports the outcome to its parent once the flow's <c>BroadcastChannel</c>
+    /// render framed — and reports the outcome to its parent once the flow's <c language="text">BroadcastChannel</c>
     /// delivers it.
     /// </summary>
     public const string LinkSelectProvider = "link-select-provider.html";
 
     /// <summary>
-    /// The page a completed credential link ends on, served at <c>/.cratis/link/complete</c>. It
-    /// broadcasts the completion on the link flow's <c>BroadcastChannel</c> and closes its window.
+    /// The page a completed credential link ends on, served at <c language="text">/.cratis/link/complete</c>. It
+    /// broadcasts the completion on the link flow's <c language="text">BroadcastChannel</c> and closes its window.
     /// </summary>
     public const string LinkComplete = "link-complete.html";
 }

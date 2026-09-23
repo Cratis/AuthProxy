@@ -35,7 +35,7 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// </summary>
     /// <remarks>
     /// A sign-in notification is the one thing about a request that leaves the proxy as a body rather than as
-    /// headers, and its <c>ipAddress</c> and <c>location</c> are the audit record a forged forwarded header
+    /// headers, and its <c language="text">ipAddress</c> and <c language="text">location</c> are the audit record a forged forwarded header
     /// would poison. Reading it here means asserting on what the application would actually have been told.
     /// </remarks>
     public const string SignInNotificationPath = "/.security-spec/sign-ins";

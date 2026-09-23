@@ -33,7 +33,7 @@ public class when_capability_only_admission_is_configured(CapabilityOnlyHarness 
     /// </summary>
     /// <remarks>
     /// All of them are meant to be refused before they reach anything. But if the gate ever stops refusing,
-    /// <c>/.cratis/login/provider-one</c> reaches <c>ChallengeAsync</c> for a scheme this harness deliberately
+    /// <c language="text">/.cratis/login/provider-one</c> reaches <c language="text">ChallengeAsync</c> for a scheme this harness deliberately
     /// replaced and throws — which errors the whole class with "No authentication handler is registered", a
     /// message about the harness rather than about the gate. Leading with the provider list makes the first
     /// thing that goes wrong a recorded answer that differs, which is the actual finding.

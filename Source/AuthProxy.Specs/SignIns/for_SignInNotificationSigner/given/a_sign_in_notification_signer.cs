@@ -14,7 +14,7 @@ public class a_sign_in_notification_signer : Specification
     protected const string Audience = "ada";
     protected const string KeyId = "sign-in-2026-08";
 
-    /// <summary>A target carrying a query and a fragment, so the RFC 9449 <c>htu</c> spelling is observable.</summary>
+    /// <summary>A target carrying a query and a fragment, so the RFC 9449 <c language="text">htu</c> spelling is observable.</summary>
     protected static readonly Uri Target = new("https://studio.example.com/api/internal/sign-ins?trace=1#frag");
 
     protected static readonly byte[] Body = Encoding.UTF8.GetBytes("{\"subject\":\"subject-123\"}");

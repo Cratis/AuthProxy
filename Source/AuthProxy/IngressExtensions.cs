@@ -32,8 +32,8 @@ public static class IngressExtensions
     /// </summary>
     /// <remarks>
     /// Standard guidance for containerized ASP.NET images, and incompatible with declaring the boundary
-    /// here: setting it has <c>ConfigureWebDefaults</c> clear the known-proxy and known-network lists and
-    /// call <c>UseForwardedHeaders</c> before any application middleware — so the peer
+    /// here: setting it has <c language="text">ConfigureWebDefaults</c> clear the known-proxy and known-network lists and
+    /// call <c language="text">UseForwardedHeaders</c> before any application middleware — so the peer
     /// <see cref="Ingress.TrustedProxyMiddleware"/> records is already the one the header replaced.
     /// </remarks>
     public const string ForwardedHeadersEnvironmentVariable = "ASPNETCORE_FORWARDEDHEADERS_ENABLED";
