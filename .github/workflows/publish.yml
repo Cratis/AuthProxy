@@ -37,6 +37,7 @@ on:
 
 
 permissions:
+  issues: write
   contents: write
   packages: write
   id-token: write
