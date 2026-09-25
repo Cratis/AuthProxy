@@ -38,6 +38,7 @@ public class when_multiple_providers_and_auth_bootstrap_path : Specification
                 .BuildServiceProvider()
         };
         httpContext.Request.Path = WellKnownPaths.Providers;
+        httpContext.Request.Headers["Sec-Fetch-Dest"] = "document";
 
         _redirectContext = new RedirectContext<CookieAuthenticationOptions>(
             httpContext,
