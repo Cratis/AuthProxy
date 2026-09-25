@@ -41,6 +41,7 @@ public class when_multiple_providers_and_non_auth_path : Specification
         };
         httpContext.Request.Path = RequestPath;
         httpContext.Request.QueryString = new QueryString("?category=books");
+        httpContext.Request.Headers["Sec-Fetch-Dest"] = "document";
 
         _redirectContext = new RedirectContext<CookieAuthenticationOptions>(
             httpContext,

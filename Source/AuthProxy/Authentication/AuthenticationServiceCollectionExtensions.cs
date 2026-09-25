@@ -145,8 +145,22 @@ public static class AuthenticationServiceCollectionExtensions
 
         // Redirect unauthenticated users to the provider selection page (multiple providers)
         // or directly to the single provider login endpoint.
+        //
+        // That redirect is an answer to a person in a browser. A frontend's fetch()/XHR call that hit an
+        // expired session follows it transparently and reads the resulting login page as a plain 200 -
+        // the conventional response.ok check passes, and the caller (a command POST, an identity poll)
+        // either misreads the page as its expected JSON or never learns the session ended at all. The same
+        // IsDocumentNavigation() classification TenantSelectionMiddleware and SelectProviderMiddleware
+        // already use for their own refusals belongs here too: a caller that is not navigating gets the
+        // refusal as a 401 it can act on, and only an actual browser navigation gets redirected.
         options.Events.OnRedirectToLogin = async ctx =>
         {
+            if (!ctx.HttpContext.IsDocumentNavigation())
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
             var authConfig = ctx.HttpContext.RequestServices
                 .GetRequiredService<IOptionsMonitor<C.Authentication>>()
                 .CurrentValue;

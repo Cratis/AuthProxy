@@ -37,6 +37,7 @@ public class when_single_oidc_provider_is_configured : Specification
                 .BuildServiceProvider()
         };
         httpContext.Request.Path = "/home";
+        httpContext.Request.Headers["Sec-Fetch-Dest"] = "document";
 
         _redirectContext = new RedirectContext<CookieAuthenticationOptions>(
             httpContext,
