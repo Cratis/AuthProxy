@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis.Arc.Core" Version="22.23.0" />
+    <PackageVersion Include="Cratis.Arc.Core" Version="22.24.0" />
     <!-- Microsoft -->
     <PackageVersion Include="Aspire.Hosting" Version="13.5.4" />
     <PackageVersion Include="Aspire.Hosting.NodeJs" Version="9.5.2" />
