@@ -30,6 +30,8 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
             {
                 ["roles"] = new[] { "Administrator" },
                 ["role"] = "Administrator",
+                ["Roles"] = "Administrator",
+                ["HTTP://SCHEMAS.MICROSOFT.COM/WS/2008/06/IDENTITY/CLAIMS/ROLE"] = "Administrator",
                 ["urn:cratis:bearer:scope"] = "direct:admin",
                 ["urn:cratis:bearer:client-id"] = "trusted-client",
                 ["urn:cratis:identity:subject"] = "someone-else",
@@ -48,7 +50,7 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
 
     [Fact] public void should_forward_the_request() => Assert.NotNull(_principal);
     [Fact] public void should_grant_no_role() => Assert.Equal(["anonymous", "authenticated"], _principal!.UserRoles);
-    [Fact] public void should_drop_the_role_claims() => Assert.DoesNotContain(_principal!.Claims, _ => string.Equals(_.Type, "roles", StringComparison.Ordinal) || string.Equals(_.Type, "role", StringComparison.Ordinal) || _.Type.EndsWith("/role", StringComparison.Ordinal));
+    [Fact] public void should_drop_the_role_claims() => Assert.DoesNotContain(_principal!.Claims, _ => string.Equals(_.Type, "roles", StringComparison.OrdinalIgnoreCase) || string.Equals(_.Type, "role", StringComparison.OrdinalIgnoreCase) || _.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase));
     [Fact] public void should_forward_only_the_scopes_it_validated() =>
         Assert.Equal(["direct:read", "direct:work"], _principal!.Claims.Where(_ => _.Type == "urn:cratis:bearer:scope").Select(_ => _.Value).Order());
     [Fact] public void should_forward_no_client_claim() => Assert.DoesNotContain(_principal!.Claims, _ => _.Type == "urn:cratis:bearer:client-id");

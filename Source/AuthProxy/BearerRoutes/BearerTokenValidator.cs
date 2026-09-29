@@ -309,7 +309,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         // Role claims are dropped too: the issuer vouches for who the caller is and what the client may attempt,
         // and the forwarded principal carries no role the backend did not grant itself.
         forwarded = [.. tokenClaims
-            .Where(_ => !CanonicalIdentityClaims.IsReserved(_.Type) && !BearerRouteClaims.IsReserved(_.Type) && !IsRoleClaim(_.Type))
+            .Where(_ => !CanonicalIdentityClaims.IsReserved(_.Type) && !BearerRouteClaims.IsReserved(_.Type) && !RoleClaims.Is(_.Type))
             .Select(_ => new Claim(_.Type, _.Value, _.ValueType))];
 
         foreach (var (target, source) in route.Route.ClaimMappings)
@@ -331,9 +331,4 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
         return true;
     }
-
-    static bool IsRoleClaim(string claimType) =>
-        string.Equals(claimType, ClaimTypes.Role, StringComparison.Ordinal)
-        || string.Equals(claimType, "role", StringComparison.Ordinal)
-        || string.Equals(claimType, "roles", StringComparison.Ordinal);
 }

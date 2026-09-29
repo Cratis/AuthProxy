@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Buffers;
-using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -134,7 +133,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
                     $"{at}:{nameof(C.BearerRoute.RequiredClaims)}:{i}:{nameof(C.ClaimRequirement.Claim)} must name a claim type. " +
                     "A requirement without one can never be satisfied and would refuse every token.");
             }
-            else if (IsRoleClaim(claim))
+            else if (RoleClaims.Is(claim))
             {
                 failures.Add(
                     $"{at}:{nameof(C.BearerRoute.RequiredClaims)}:{i} requires the role claim '{claim}', which a bearer token never carries: " +
@@ -148,7 +147,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             {
                 failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} has a mapping with an empty claim type.");
             }
-            else if (CanonicalIdentityClaims.IsReserved(target) || BearerRouteClaims.IsReserved(target) || IsRoleClaim(target))
+            else if (CanonicalIdentityClaims.IsReserved(target) || BearerRouteClaims.IsReserved(target) || RoleClaims.Is(target))
             {
                 failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} may not write '{target}': AuthProxy owns that claim type.");
             }
@@ -187,9 +186,4 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
 
     static bool Overlaps(string first, string second) =>
         new PathString(first).StartsWithSegments(second) || new PathString(second).StartsWithSegments(first);
-
-    static bool IsRoleClaim(string claimType) =>
-        string.Equals(claimType, ClaimTypes.Role, StringComparison.Ordinal)
-        || string.Equals(claimType, "role", StringComparison.Ordinal)
-        || string.Equals(claimType, "roles", StringComparison.Ordinal);
 }
