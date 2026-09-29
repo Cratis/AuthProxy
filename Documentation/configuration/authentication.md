@@ -565,9 +565,11 @@ A token is accepted only when all of these hold:
 - Its `iss` is exactly one of the route's issuers.
 - Its signature verifies against a key in the issuer's JWKS. The metadata document (RFC 8414, or OpenID Connect
   discovery) must name exactly the configured issuer. Metadata and keys are cached and refreshed periodically,
-  and a token naming an unknown key triggers a rate-limited refresh, so key rotation needs no restart. If the
-  keys cannot be retrieved after the last good copy, tokens are refused.
-- Its `typ` header is an access-token type (`at+jwt` by default).
+  and a token naming an unknown key triggers a refresh at most every 30 seconds per issuer, so key rotation needs
+  no restart. A failed refresh keeps the last keys that were retrieved in use. Only when no keys have been
+  retrieved yet, or the metadata names another issuer, are tokens refused — with `503`, not as invalid.
+- Its `typ` header is an access-token type: the issuer's `TokenTypes`, `at+jwt` or `application/at+jwt` by
+  default.
 - Its `aud` names one of the route's audiences.
 - It has an `exp`, and it is within its lifetime allowing the route's clock skew (30 seconds by default).
 - It carries every scope the route requires, a single `sub`, and a single usable tenant.
@@ -585,19 +587,20 @@ first, so a requirement on a role can never be met by a bearer token.
 |-----------|----------|
 | Path on the route still percent-encoded after decoding, or containing a backslash, a `;` (path parameter, as in `/mcp/..;/api`) or a `.`/`..` segment | `400`, no challenge |
 | No bearer token (a browser session does not count) | `401`, `WWW-Authenticate: Bearer resource_metadata="<ResourceMetadataUrl>"` |
-| Token invalid, expired, wrongly signed, from another issuer or for another audience | `401`, `WWW-Authenticate: Bearer error="invalid_token", resource_metadata="…"` |
+| Token invalid, expired, wrongly signed, from another issuer or for another audience; without a single `sub`; or without a claim a `ClaimMappings` entry reads | `401`, `WWW-Authenticate: Bearer error="invalid_token", resource_metadata="…"` |
 | Token lacks a required scope | `403`, `WWW-Authenticate: Bearer error="insufficient_scope", scope="<required scopes>", resource_metadata="…"` |
 | Token does not satisfy the claim requirements that apply on the route | `403` |
-| Token carries no tenant, or the tenant fails verification | `403` |
-| The issuer's metadata or keys cannot be retrieved | `503` with `Retry-After` |
+| Token carries no single usable tenant, or the tenant fails verification | `403` |
+| The issuer's metadata or keys have never been retrieved, or the metadata names another issuer | `503` with `Retry-After: 30` |
 | Bearer-route token on any other path — whatever the case of the scheme or the whitespace after it, and in any of several `Authorization` headers | `401`, `WWW-Authenticate: Bearer error="invalid_token"` |
 
-`resource_metadata` is omitted when the route declares no `ResourceMetadataUrl`. Every refusal carries
-`Cache-Control: no-store` and an empty body; the reason is logged, not returned.
+`resource_metadata` is omitted when the route declares no `ResourceMetadataUrl`. Every refusal in the table
+carries `Cache-Control: no-store` and an empty body; the reason is logged, not returned.
 
 The path of `ResourceMetadataUrl` (for example `/.well-known/oauth-protected-resource/mcp`) is forwarded to the
-service backend for `GET` and `HEAD` without authentication and without any identity headers, so a client can
-discover the authorization server before it has a token. The backend serves the document.
+service backend for `GET` and `HEAD` without authentication and without any identity headers, `Cookie` or
+`Authorization`, so a client can discover the authorization server before it has a token. The backend serves the
+document. Any other method on that path is answered `405` with `Allow: GET, HEAD`.
 
 ### Forwarded headers
 
@@ -605,7 +608,7 @@ A request accepted on a bearer route is forwarded to the service backend with:
 
 | Header | Value |
 |--------|-------|
-| `x-ms-client-principal` | The principal: `identityProvider` from the route's `IdentityProvider`, `userId` from `sub`, `userDetails` from `preferred_username` or `name`, roles `anonymous` and `authenticated`, and the token's claims — after the route's `ClaimMappings` have applied. |
+| `x-ms-client-principal` | The principal: `identityProvider` from the route's `IdentityProvider`, `userId` from `sub`, `userDetails` from `preferred_username`, else `name`, else `sub`, roles `anonymous` and `authenticated`, and the token's claims — after the route's `ClaimMappings` have applied. |
 | `x-ms-client-principal-id`, `x-ms-client-principal-name` | As for a browser session, from the same principal. |
 | `Tenant-ID` | The tenant from the token. |
 | `x-cratis-token-scope` | The granted scopes, space-separated. |
@@ -618,6 +621,8 @@ claim, and role claims in the token are not forwarded: a token never grants a ro
 
 Every inbound copy of these headers is removed on every route, bearer or not. The `Cookie` header is not
 forwarded on a bearer route, and neither is `Authorization` unless the route sets `ForwardAuthorizationHeader`.
+Every other request header is passed through as for any proxied request; AuthProxy adds no `Service-ID`.
+
 ### Identity verification is not applied
 
 A bearer route **never calls `/.cratis/me`**, whatever `IdentityVerification` says. That endpoint answers for

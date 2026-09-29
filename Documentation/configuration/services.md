@@ -524,15 +524,18 @@ every token-authenticated request instead.
     `AcceptWithoutIdentityVerification: true`.
 
   Setting it is the operator's statement that, on this route, the validated token, its scopes and the claim
-  requirements are the whole decision at the edge and the backend answers for the rest. It is forwarded straight to the service **backend**,
-  whichever of the service's endpoints would otherwise serve that path, and without a `Service-ID` header.
+  requirements are the whole decision at the edge and the backend answers for the rest.
+- An accepted request is forwarded straight to the service **backend**, whichever of the service's endpoints
+  would otherwise serve that path, with its path and query unchanged. AuthProxy adds no `Service-ID` header; one
+  the caller sent is passed through like any other request header that is not an identity header.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
 - A request whose path on the route still carries percent-encoding after the server has decoded it (such as an
   encoded `/`), a backslash, a `;` anywhere in it, or a `.` or `..` segment is refused with `400` before its token
   is read: a backend that decoded or normalized it differently would receive a principal vouched for at a path
   that is not a bearer route. The `;` starts a path parameter, which Tomcat, Jetty and Spring strip before
   resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`.
-- Every refusal is an API-style `400`, `401`, `403` or `503` — never a redirect or a page. See
+- Every refusal is an API-style `400`, `401`, `403` or `503` — or `405` for a method other than `GET` or `HEAD`
+  on the `ResourceMetadataUrl` path — never a redirect or a page. See
   [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).
 - A token from a bearer-route issuer is refused with `401` on every path that is **not** one of the issuer's
   bearer routes, even where another bearer scheme (the [JWT Bearer](authentication.md#jwt-bearer-api) handler)
