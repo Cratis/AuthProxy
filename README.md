@@ -16,7 +16,7 @@ Without a gateway, every service re-implements the same boilerplate: an OIDC han
 
 ## What it handles
 
-- **Authentication** — OpenID Connect (single or multiple providers with a built-in provider-selection page; Microsoft Entra ID, Google, GitHub, Apple, or any custom OIDC provider), OAuth 2.0, JWT Bearer for machine-to-machine calls, and back-channel client credentials exchanged at `/.cratis/token`.
+- **Authentication** — OpenID Connect (single or multiple providers with a built-in provider-selection page; Microsoft Entra ID, Google, GitHub, Apple, or any custom OIDC provider), OAuth 2.0, JWT Bearer for machine-to-machine calls, back-channel client credentials exchanged at `/.cratis/token`, and per-service bearer routes that accept access tokens from an external authorization server such as Cratis Identity.
 - **Authorization** — require a claim (a role, a group, a GitHub organization or team) before any request is forwarded.
 - **Multi-tenancy** — resolve the current tenant per request from the host, a subdomain, a claim, the route, a selection page, or a fixed value, with optional remote tenant verification. Downstream services receive the tenant on a `Tenant-ID` header.
 - **Identity enrichment** — calls a `/.cratis/me` endpoint on your service and attaches the enriched identity to forwarded requests as a trusted header.

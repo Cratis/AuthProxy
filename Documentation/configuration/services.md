@@ -42,6 +42,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required`, unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
+| `BearerRoutes` | `BearerRouteConfig[]` | `[]` | Path prefixes authenticated by an access token from an external authorization server instead of a browser session. See [Bearer routes](#bearer-routes). |
 
 ### ServiceEndpointConfig properties
 
@@ -396,3 +397,96 @@ The verification endpoint's response can optionally include a `tenant` property,
 carries on the issued tokens and can resolve into the `Tenant-ID` header on proxied requests.
 See [Back-channel client credentials](authentication.md#back-channel-client-credentials) for the full
 token, tenant-resolution, and refresh-token flow.
+
+---
+
+## Bearer routes
+
+A bearer route is a path prefix on a service that is called by programs — a CLI, an MCP client, another
+service — with an access token issued by an external authorization server such as Cratis Identity. AuthProxy
+stays a relying party: it validates the token and forwards the request, and it never issues these tokens.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "direct": {
+          "Backend": { "BaseUrl": "http://direct:8080/" },
+          "Frontend": { "BaseUrl": "http://direct:8080/" },
+          "BearerRoutes": [
+            {
+              "PathPrefix": "/mcp",
+              "Issuers": [ { "Issuer": "https://auth.example/" } ],
+              "Audiences": [ "direct-api" ],
+              "RequiredScopes": [ "direct:read" ],
+              "ResourceMetadataUrl": "https://cratis.direct/.well-known/oauth-protected-resource/mcp",
+              "IdentityProvider": "github",
+              "ClaimMappings": {
+                "sub": "github_id",
+                "preferred_username": "github_login"
+              }
+            },
+            {
+              "PathPrefix": "/v1",
+              "Issuers": [ { "Issuer": "https://auth.example/" } ],
+              "Audiences": [ "direct-api" ],
+              "ResourceMetadataUrl": "https://cratis.direct/.well-known/oauth-protected-resource/v1",
+              "IdentityProvider": "github",
+              "ClaimMappings": {
+                "sub": "github_id",
+                "preferred_username": "github_login"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+This is Direct's shape: Cratis Identity issues tokens with `aud=direct-api` for both `https://cratis.direct/mcp`
+and `https://cratis.direct/v1`. The claim mappings make a token-authenticated request carry the same
+`x-ms-client-principal-id` (the numeric GitHub id) and `x-ms-client-principal-name` (the GitHub login) as a
+browser session signed in through Direct's GitHub provider, so Direct resolves the same user either way. The
+Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:bearer:subject` claim.
+
+### BearerRouteConfig properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `PathPrefix` | `string` | — | The prefix this route covers, for example `/mcp`. Matched case-insensitively on segment boundaries, with the same rules as [anonymous paths](#what-a-valid-entry-looks-like). The longest matching prefix wins. |
+| `Issuers` | `BearerIssuerConfig[]` | — | The authorization servers whose tokens are accepted. At least one. |
+| `Audiences` | `string[]` | — | The token's `aud` must name at least one of these. At least one. |
+| `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
+| `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication. |
+| `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |
+| `ClaimMappings` | `map<string, string>` | `{}` | Forwarded claim type → token claim it is read from. A mapped source claim missing from the token refuses the token. Claim types containing `:` cannot be keys, because `:` separates configuration sections. |
+| `IdentityProvider` | `string` | `bearer` | The identity provider named in the forwarded principal. |
+| `ForwardAuthorizationHeader` | `bool` | `false` | Whether the backend also receives the `Authorization` header. |
+| `ClockSkew` | `TimeSpan` | `00:00:30` | Allowed clock skew for `exp` and `nbf`. At most `00:05:00`. |
+
+### BearerIssuerConfig properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `Issuer` | `string` | — | The issuer identifier. The token's `iss` and the issuer metadata's `issuer` must both be exactly this value. HTTPS, or plain HTTP on a loopback host for development. |
+| `MetadataAddress` | `string` | RFC 8414 address | The metadata document. Defaults to `/.well-known/oauth-authorization-server` inserted between the issuer's host and path. An OpenID Connect discovery document works too. |
+| `TokenTypes` | `string[]` | `at+jwt`, `application/at+jwt` | Accepted JWT `typ` header values, so an ID token cannot be presented as an access token. |
+
+### What a bearer route changes
+
+- A request on a bearer route is answered before static files, authentication, provider selection, tenant
+  selection and identity enrichment — none of them apply. It is forwarded straight to the service **backend**,
+  whichever of the service's endpoints would otherwise serve that path, and without a `Service-ID` header.
+- The session cookie is never read, and the `Cookie` header is not forwarded.
+- Every refusal is an API-style `401`, `403` or `503` — never a redirect or a page. See
+  [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).
+- A token from a bearer-route issuer is refused with `401` on every path that is **not** one of the issuer's
+  bearer routes, even where another bearer scheme (the [JWT Bearer](authentication.md#jwt-bearer-api) handler)
+  would accept it. A browser-only surface such as `/api` stays browser-only.
+- A route that overlaps an anonymous path, repeats another route's prefix, names no issuer or audience, or
+  belongs to a service without a backend is refused at startup.
+- With no bearer route configured, nothing changes.
+
