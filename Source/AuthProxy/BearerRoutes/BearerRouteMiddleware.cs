@@ -58,8 +58,7 @@ public class BearerRouteMiddleware(
             return;
         }
 
-        if (BearerTokenValidator.TryReadPresentedIssuer(context.Request, out var issuer)
-            && BearerRouteTable.IsBearerRouteIssuer(issuer, current))
+        if (BearerTokenValidator.TryFindPresentedIssuer(context.Request, _ => BearerRouteTable.IsBearerRouteIssuer(_, current), out var issuer))
         {
             logger.BearerTokenOutsideItsRoutes(issuer, RequestPathRedaction.Redact(context.Request.Path));
             BearerChallenge.Unauthorized(context, resourceMetadataUrl: null, "invalid_token");

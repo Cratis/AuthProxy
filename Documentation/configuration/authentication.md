@@ -581,7 +581,7 @@ A token is accepted only when all of these hold:
 | Token lacks a required scope | `403`, `WWW-Authenticate: Bearer error="insufficient_scope", scope="<required scopes>", resource_metadata="…"` |
 | Token carries no tenant, or the tenant fails verification | `403` |
 | The issuer's metadata or keys cannot be retrieved | `503` with `Retry-After` |
-| Bearer-route token on any other path | `401`, `WWW-Authenticate: Bearer error="invalid_token"` |
+| Bearer-route token on any other path — whatever the case of the scheme or the whitespace after it, and in any of several `Authorization` headers | `401`, `WWW-Authenticate: Bearer error="invalid_token"` |
 
 `resource_metadata` is omitted when the route declares no `ResourceMetadataUrl`. Every refusal carries
 `Cache-Control: no-store` and an empty body; the reason is logged, not returned.

@@ -59,20 +59,47 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
             .Distinct(StringComparer.Ordinal);
 
     /// <summary>
-    /// Reads the issuer a request's bearer token claims to come from, without validating anything.
+    /// Finds a bearer token in a request whose claimed issuer matches, without validating anything.
     /// </summary>
     /// <param name="request">The request.</param>
-    /// <param name="issuer">The claimed issuer.</param>
-    /// <returns><see langword="true"/> when the request carries a readable, unencrypted JWT naming an issuer; otherwise <see langword="false"/>.</returns>
+    /// <param name="matches">Decides whether a claimed issuer is one being looked for.</param>
+    /// <param name="issuer">The first matching claimed issuer.</param>
+    /// <returns><see langword="true"/> when some bearer token in the request names a matching issuer; otherwise <see langword="false"/>.</returns>
     /// <remarks>
+    /// This is the reading used to <em>refuse</em> a token, so it is deliberately more lenient than any scheme
+    /// that might accept one: every <c language="text">Authorization</c> value is looked at, and every comma-separated
+    /// part of each, since the JWT Bearer handler reads the values joined by commas; the scheme is matched
+    /// case-insensitively and may be followed by any run of whitespace; and the token is trimmed. A header the
+    /// strict reading of <see cref="Validate"/> would call malformed must not escape a refusal that a more
+    /// forgiving handler downstream would then not make.
+    /// <para>
     /// Only good for deciding which rules apply to a token, never for trusting it: nothing about the value has
     /// been checked.
+    /// </para>
     /// </remarks>
-    public static bool TryReadPresentedIssuer(HttpRequest request, out string issuer)
+    public static bool TryFindPresentedIssuer(HttpRequest request, Func<string, bool> matches, out string issuer)
     {
         issuer = string.Empty;
-        return ReadBearerToken(request, out var token) == TokenPresence.Present
-            && TryReadUnvalidatedIssuer(token, out issuer);
+        foreach (var value in request.Headers.Authorization)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                continue;
+            }
+
+            foreach (var part in value.Split(','))
+            {
+                if (TryReadLenientBearerToken(part, out var token)
+                    && TryReadUnvalidatedIssuer(token, out var candidate)
+                    && matches(candidate))
+                {
+                    issuer = candidate;
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <inheritdoc/>
@@ -218,6 +245,23 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         return token.Length > 0 && token.AsSpan().IndexOfAnyExcept(_tokenCharacters) < 0
             ? TokenPresence.Present
             : TokenPresence.Malformed;
+    }
+
+    static bool TryReadLenientBearerToken(string value, out string token)
+    {
+        const string scheme = "Bearer";
+
+        token = string.Empty;
+        var trimmed = value.AsSpan().Trim();
+        if (trimmed.Length <= scheme.Length
+            || !trimmed.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)
+            || !char.IsWhiteSpace(trimmed[scheme.Length]))
+        {
+            return false;
+        }
+
+        token = trimmed[scheme.Length..].Trim().ToString();
+        return token.Length > 0;
     }
 
     static bool TryReadUnvalidatedIssuer(string token, out string issuer)
