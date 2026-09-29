@@ -78,6 +78,37 @@ public static class BearerRouteTable
     }
 
     /// <summary>
+    /// Determines whether a request path means the same thing to AuthProxy and to any backend that reads it.
+    /// </summary>
+    /// <param name="path">The request path, as decoded by the server.</param>
+    /// <returns><see langword="true"/> when the path carries nothing a backend could decode or normalize differently; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// The server decodes a path before the gate sees it, except for an encoded <c language="text">/</c>, and a double-encoded
+    /// character arrives still encoded. Either leaves a <c language="text">%</c> in the path, as does anything else the
+    /// backend might decode once more. A backslash is a separator to some servers, and a dot segment is removed by
+    /// most. A backend that decoded <c language="text">/mcp/..%2Fapi</c> into <c language="text">/api</c> would receive a principal
+    /// vouched for on a bearer route at a path that is not one, so a bearer route accepts none of these.
+    /// </remarks>
+    public static bool IsUnambiguous(PathString path)
+    {
+        var value = path.Value ?? string.Empty;
+        if (value.Contains('%', StringComparison.Ordinal) || value.Contains('\\', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        foreach (var segment in value.Split('/'))
+        {
+            if (string.Equals(segment, ".", StringComparison.Ordinal) || string.Equals(segment, "..", StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Finds the bearer route whose protected-resource metadata document a request path names.
     /// </summary>
     /// <param name="path">The request path.</param>

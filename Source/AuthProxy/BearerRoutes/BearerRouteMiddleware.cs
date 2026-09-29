@@ -64,6 +64,13 @@ public class BearerRouteMiddleware(
 
         if (BearerRouteTable.TryMatch(context.Request.Path, current, out var route))
         {
+            if (!BearerRouteTable.IsUnambiguous(context.Request.Path))
+            {
+                logger.BearerRoutePathAmbiguous(route.Prefix, route.ServiceName);
+                BearerChallenge.BadRequest(context);
+                return;
+            }
+
             await Authenticate(context, route, current);
             return;
         }

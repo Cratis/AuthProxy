@@ -84,6 +84,16 @@ public static class BearerChallenge
     }
 
     /// <summary>
+    /// Writes a bare <c language="text">400</c>: the request path is not one AuthProxy will vouch for a principal on.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    public static void BadRequest(HttpContext context)
+    {
+        NoStore(context);
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+    }
+
+    /// <summary>
     /// Builds the value of a <c language="text">WWW-Authenticate</c> bearer challenge.
     /// </summary>
     /// <param name="resourceMetadataUrl">The protected-resource metadata URL to name, if any.</param>

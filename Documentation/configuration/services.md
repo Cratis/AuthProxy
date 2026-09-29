@@ -490,7 +490,11 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
   answers for the rest. It is forwarded straight to the service **backend**,
   whichever of the service's endpoints would otherwise serve that path, and without a `Service-ID` header.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
-- Every refusal is an API-style `401`, `403` or `503` — never a redirect or a page. See
+- A request whose path on the route still carries percent-encoding after the server has decoded it (such as an
+  encoded `/`), a backslash, or a `.` or `..` segment is refused with `400` before its token is read: a backend
+  that decoded or normalized it differently would receive a principal vouched for at a path that is not a
+  bearer route.
+- Every refusal is an API-style `400`, `401`, `403` or `503` — never a redirect or a page. See
   [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).
 - A token from a bearer-route issuer is refused with `401` on every path that is **not** one of the issuer's
   bearer routes, even where another bearer scheme (the [JWT Bearer](authentication.md#jwt-bearer-api) handler)
