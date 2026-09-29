@@ -224,6 +224,11 @@ GitHub Enterprise works without further configuration: the membership endpoints 
 
 ## What a refused caller sees
 
+On a [bearer route](services.md#bearer-routes) the requirements apply to the access token's principal, after the
+route's claim mappings, and a refusal is a bare `403` with no page — the caller is a program, not a person.
+
+For a browser session:
+
 The [`not-authorized.html`](well-known-pages.md) page, at `403`, with a **Sign out** link.
 
 Both halves are deliberate. A redirect back to the identity provider — the reflex for "not allowed" — is

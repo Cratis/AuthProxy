@@ -93,4 +93,17 @@ public class BearerRoute
     /// <see cref="DefaultClockSkew"/>; at most <see cref="MaximumClockSkew"/>.
     /// </summary>
     public TimeSpan? ClockSkew { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this route accepts callers although the deployment requires identity
+    /// verification. Defaults to <see langword="false"/>.
+    /// </summary>
+    /// <remarks>
+    /// A bearer route never calls <c language="text">/.cratis/me</c>: it has no browser session to verify. When any service
+    /// declares <see cref="IdentityVerificationMode.Required"/>, every forwarded request is meant to carry a positive
+    /// verdict, so a bearer route in that deployment is refused at startup unless it sets this — stating that for
+    /// this route the validated token, its scopes and the claim requirements are the whole decision, and that the
+    /// backend answers for everything else.
+    /// </remarks>
+    public bool AcceptWithoutIdentityVerification { get; set; }
 }

@@ -17,6 +17,9 @@ internal static partial class BearerRoutesLogging
     [LoggerMessage(LogLevel.Information, "A token from bearer-route issuer '{Issuer}' was presented on {Path}, which is not one of its bearer routes. Refused.")]
     internal static partial void BearerTokenOutsideItsRoutes(this ILogger logger, string issuer, string path);
 
+    [LoggerMessage(LogLevel.Information, "A valid bearer token on route '{Route}' of service '{Service}' does not satisfy the required claim '{Claim}'. Refused.")]
+    internal static partial void BearerAccessDenied(this ILogger logger, string route, string service, string claim);
+
     [LoggerMessage(LogLevel.Warning, "Tenant '{TenantId}' named by a bearer token on {Path} could not be verified. Refused.")]
     internal static partial void BearerTenantNotVerified(this ILogger logger, string tenantId, string path);
 

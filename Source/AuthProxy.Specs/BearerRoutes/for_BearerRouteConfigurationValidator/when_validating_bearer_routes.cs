@@ -19,6 +19,18 @@ public class when_validating_bearer_routes : Specification
     ValidateOptionsResult _withLargeClockSkew;
     ValidateOptionsResult _mappingIntoReservedClaim;
     ValidateOptionsResult _withQuotedScope;
+    ValidateOptionsResult _withoutIssuers;
+    ValidateOptionsResult _withRootPrefix;
+    ValidateOptionsResult _withProxyOwnedPrefix;
+    ValidateOptionsResult _withPlainHttpResourceMetadata;
+    ValidateOptionsResult _prefixOfAnotherService;
+    ValidateOptionsResult _resourceMetadataOfAnotherService;
+    ValidateOptionsResult _withEmptyMapping;
+    ValidateOptionsResult _mappingIntoRoles;
+    ValidateOptionsResult _verificationRequired;
+    ValidateOptionsResult _verificationRequiredByAnotherService;
+    ValidateOptionsResult _verificationRequiredAndAcceptedWithout;
+    ValidateOptionsResult _verificationRequiredOfANonParticipant;
 
     void Because()
     {
@@ -33,6 +45,18 @@ public class when_validating_bearer_routes : Specification
         _withLargeClockSkew = validator.Validate(null, Configuration(_ => _.ClockSkew = TimeSpan.FromHours(1)));
         _mappingIntoReservedClaim = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string> { ["urn:cratis:bearer:scope"] = "scope" }));
         _withQuotedScope = validator.Validate(null, Configuration(_ => _.RequiredScopes = ["direct:\"read"]));
+        _withoutIssuers = validator.Validate(null, Configuration(_ => _.Issuers = []));
+        _withRootPrefix = validator.Validate(null, Configuration(_ => _.PathPrefix = "/"));
+        _withProxyOwnedPrefix = validator.Validate(null, Configuration(_ => _.PathPrefix = "/.cratis/mcp"));
+        _withPlainHttpResourceMetadata = validator.Validate(null, Configuration(_ => _.ResourceMetadataUrl = "http://direct.example.test/.well-known/oauth-protected-resource/mcp"));
+        _prefixOfAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = Service(Route())));
+        _resourceMetadataOfAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = Service(Route(prefix: "/v1"))));
+        _withEmptyMapping = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string> { ["sub"] = " " }));
+        _mappingIntoRoles = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string> { ["roles"] = "groups" }));
+        _verificationRequired = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
+        _verificationRequiredByAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" } })));
+        _verificationRequiredAndAcceptedWithout = validator.Validate(null, Configuration(_ => _.AcceptWithoutIdentityVerification = true, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
+        _verificationRequiredOfANonParticipant = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" }, ResolveIdentityDetails = false })));
     }
 
     [Fact] void should_accept_a_complete_route() => _valid.Succeeded.ShouldBeTrue();
@@ -44,30 +68,63 @@ public class when_validating_bearer_routes : Specification
     [Fact] void should_refuse_a_clock_skew_beyond_the_maximum() => _withLargeClockSkew.Failed.ShouldBeTrue();
     [Fact] void should_refuse_a_mapping_into_a_claim_authproxy_owns() => _mappingIntoReservedClaim.Failed.ShouldBeTrue();
     [Fact] void should_refuse_a_scope_that_is_not_a_scope_token() => _withQuotedScope.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_route_without_an_issuer() => _withoutIssuers.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_the_root_as_a_prefix() => _withRootPrefix.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_prefix_under_a_path_the_proxy_owns() => _withProxyOwnedPrefix.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_plain_http_resource_metadata_url_off_loopback() => _withPlainHttpResourceMetadata.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_prefix_another_service_already_routes() => _prefixOfAnotherService.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_resource_metadata_path_another_service_already_serves() => _resourceMetadataOfAnotherService.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_mapping_with_an_empty_claim_type() => _withEmptyMapping.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_mapping_into_a_role_claim() => _mappingIntoRoles.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_route_when_its_service_requires_identity_verification() => _verificationRequired.Failed.ShouldBeTrue();
+    [Fact] void should_name_the_setting_that_accepts_it() => _verificationRequired.FailureMessage.ShouldContain(nameof(C.BearerRoute.AcceptWithoutIdentityVerification));
+    [Fact] void should_refuse_a_route_when_another_service_requires_identity_verification() => _verificationRequiredByAnotherService.Failed.ShouldBeTrue();
+    [Fact] void should_accept_a_route_that_accepts_callers_without_identity_verification() => _verificationRequiredAndAcceptedWithout.Succeeded.ShouldBeTrue();
+    [Fact] void should_ignore_a_verification_requirement_of_a_service_that_resolves_no_identity() => _verificationRequiredOfANonParticipant.Succeeded.ShouldBeTrue();
 
-    static C.AuthProxy Configuration(Action<C.BearerRoute> adjust, bool backend = true, bool declareRoute = true)
+    static C.AuthProxy Configuration(
+        Action<C.BearerRoute> adjust,
+        bool backend = true,
+        bool declareRoute = true,
+        Action<C.AuthProxy>? adjustConfiguration = null)
     {
-        var route = new C.BearerRoute
-        {
-            PathPrefix = "/mcp",
-            Issuers = [new C.BearerIssuer { Issuer = "https://auth.example.test/" }],
-            Audiences = ["direct-api"],
-            RequiredScopes = ["direct:read"],
-            ResourceMetadataUrl = "https://direct.example.test/.well-known/oauth-protected-resource/mcp",
-        };
+        var route = Route();
         adjust(route);
 
-        return new()
+        var service = Service(declareRoute ? route : null);
+        service.AnonymousPaths = ["/public"];
+        if (!backend)
         {
-            Services = new Dictionary<string, C.Service>
-            {
-                ["main"] = new()
-                {
-                    Backend = backend ? new C.ServiceEndpoint { BaseUrl = "https://backend.example.test" } : null,
-                    AnonymousPaths = ["/public"],
-                    BearerRoutes = declareRoute ? [route] : [],
-                },
-            },
+            service.Backend = null;
+        }
+
+        var configuration = new C.AuthProxy
+        {
+            Services = new Dictionary<string, C.Service> { ["main"] = service },
         };
+        adjustConfiguration?.Invoke(configuration);
+
+        return configuration;
+    }
+
+    static C.BearerRoute Route(string prefix = "/mcp") => new()
+    {
+        PathPrefix = prefix,
+        Issuers = [new C.BearerIssuer { Issuer = "https://auth.example.test/" }],
+        Audiences = ["direct-api"],
+        RequiredScopes = ["direct:read"],
+        ResourceMetadataUrl = "https://direct.example.test/.well-known/oauth-protected-resource/mcp",
+    };
+
+    static C.Service Service(C.BearerRoute? route) => new()
+    {
+        Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.test" },
+        BearerRoutes = route is null ? [] : [route],
+    };
+
+    static C.Service RequiringVerification(C.Service service)
+    {
+        service.IdentityVerification = C.IdentityVerificationMode.Required;
+        return service;
     }
 }

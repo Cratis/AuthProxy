@@ -466,6 +466,7 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
 | `IdentityProvider` | `string` | `bearer` | The identity provider named in the forwarded principal. |
 | `ForwardAuthorizationHeader` | `bool` | `false` | Whether the backend also receives the `Authorization` header. |
 | `ClockSkew` | `TimeSpan` | `00:00:30` | Allowed clock skew for `exp` and `nbf`. At most `00:05:00`. |
+| `AcceptWithoutIdentityVerification` | `bool` | `false` | Accept this route's callers in a deployment where a service declares `IdentityVerification: Required`. See [What a bearer route changes](#what-a-bearer-route-changes). |
 
 ### BearerIssuerConfig properties
 
@@ -478,7 +479,15 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
 ### What a bearer route changes
 
 - A request on a bearer route is answered before static files, authentication, provider selection, tenant
-  selection and identity enrichment — none of them apply. It is forwarded straight to the service **backend**,
+  selection and identity enrichment — none of them apply. [Admission](admission.md) and the trusted-proxy
+  boundary run first and apply as to any request.
+- The deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
+  the token's principal after `ClaimMappings`. A token that does not satisfy them is refused with `403`.
+- A bearer route never calls `/.cratis/me`, so it cannot obtain the verdict `IdentityVerification: Required`
+  asks for. When any service declares `Required`, AuthProxy **refuses to start** with a bearer route unless the
+  route sets `AcceptWithoutIdentityVerification: true` — the operator's statement that, on this route, the
+  validated token, its scopes and the claim requirements are the whole decision at the edge and the backend
+  answers for the rest. It is forwarded straight to the service **backend**,
   whichever of the service's endpoints would otherwise serve that path, and without a `Service-ID` header.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
 - Every refusal is an API-style `401`, `403` or `503` — never a redirect or a page. See
@@ -487,6 +496,7 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
   bearer routes, even where another bearer scheme (the [JWT Bearer](authentication.md#jwt-bearer-api) handler)
   would accept it. A browser-only surface such as `/api` stays browser-only.
 - A route that overlaps an anonymous path, repeats another route's prefix, names no issuer or audience, or
-  belongs to a service without a backend is refused at startup.
+  belongs to a service without a backend is refused at startup, as is one that does not accept callers without
+  identity verification in a deployment that requires it.
 - With no bearer route configured, nothing changes.
 

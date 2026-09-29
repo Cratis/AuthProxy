@@ -31,11 +31,18 @@ public class AccessPolicy : IAccessPolicy
         || config.Services.Values.Any(_ => _.Authorization?.HasRequirements == true);
 
     /// <inheritdoc/>
-    public AccessDecision Evaluate(HttpContext context, C.AuthProxy config)
+    public AccessDecision Evaluate(HttpContext context, C.AuthProxy config) =>
+        Evaluate(context.User, RequirementsFor(config, ResolveService(context, config)));
+
+    /// <inheritdoc/>
+    public AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName) =>
+        Evaluate(user, RequirementsFor(config, FindService(config, serviceName)));
+
+    static AccessDecision Evaluate(ClaimsPrincipal user, IEnumerable<C.ClaimRequirement> requirements)
     {
-        foreach (var requirement in RequirementsFor(context, config))
+        foreach (var requirement in requirements)
         {
-            if (!IsSatisfied(requirement, context.User))
+            if (!IsSatisfied(requirement, user))
             {
                 return AccessDecision.Denied(requirement.Claim);
             }
@@ -47,17 +54,16 @@ public class AccessPolicy : IAccessPolicy
     /// <summary>
     /// Gets every requirement that applies to a request: the root's, then the target service's.
     /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
+    /// <param name="service">The targeted service, if any.</param>
     /// <returns>The applicable requirements, root-first.</returns>
-    static IEnumerable<C.ClaimRequirement> RequirementsFor(HttpContext context, C.AuthProxy config)
+    static IEnumerable<C.ClaimRequirement> RequirementsFor(C.AuthProxy config, C.Service? service)
     {
         foreach (var requirement in config.Authorization.RequiredClaims)
         {
             yield return requirement;
         }
 
-        var service = ResolveService(context, config);
         if (service?.Authorization is null)
         {
             yield break;
@@ -100,16 +106,14 @@ public class AccessPolicy : IAccessPolicy
             serviceId = context.Request.Query[ServiceQueryParameter].FirstOrDefault();
         }
 
-        if (string.IsNullOrWhiteSpace(serviceId))
-        {
-            return null;
-        }
+        return string.IsNullOrWhiteSpace(serviceId) ? null : FindService(config, serviceId);
+    }
 
-        return config.Services
-            .Where(_ => string.Equals(_.Key, serviceId.Trim(), StringComparison.OrdinalIgnoreCase))
+    static C.Service? FindService(C.AuthProxy config, string serviceName) =>
+        config.Services
+            .Where(_ => string.Equals(_.Key, serviceName.Trim(), StringComparison.OrdinalIgnoreCase))
             .Select(_ => _.Value)
             .FirstOrDefault();
-    }
 
     /// <summary>
     /// Determines whether a principal satisfies a single requirement.

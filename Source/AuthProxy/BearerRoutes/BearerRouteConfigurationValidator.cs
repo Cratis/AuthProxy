@@ -41,6 +41,15 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
                 var route = service.BearerRoutes[index];
                 var at = $"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.Services)}:{serviceName}:{nameof(C.Service.BearerRoutes)}:{index}";
                 ValidateRoute(at, serviceName, service, route, prefixes, metadataPaths, anonymousPaths, failures);
+
+                if (options.RequiresIdentityVerification && !route.AcceptWithoutIdentityVerification)
+                {
+                    failures.Add(
+                        $"{at}: the deployment requires identity verification ({nameof(C.IdentityVerificationMode)}.{nameof(C.IdentityVerificationMode.Required)}), " +
+                        "which a bearer route does not perform: it has no browser session to verify through /.cratis/me. Set " +
+                        $"{nameof(C.BearerRoute.AcceptWithoutIdentityVerification)} on the route to accept its callers on the token and " +
+                        "the claim requirements alone, or remove the route.");
+                }
             }
         }
 

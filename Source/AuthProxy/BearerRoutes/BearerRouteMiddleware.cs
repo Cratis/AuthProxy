@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
@@ -15,6 +16,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="validator">The access-token validator.</param>
+/// <param name="accessPolicy">The deployment's claim requirements, applied to the token's principal.</param>
 /// <param name="tenantVerifier">The tenant existence verifier, applied when tenant verification is configured.</param>
 /// <param name="forwarder">The forwarder to the service backend.</param>
 /// <param name="logger">The logger.</param>
@@ -25,6 +27,13 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// refuse a token from a bearer-route issuer on a path that is not one of the bearer routes, so such a token
 /// cannot authenticate a browser-only surface through any other bearer support the deployment has configured.
 /// <para>
+/// The deployment's claim requirements (<see cref="C.AuthProxy.Authorization"/> and the route's service's own)
+/// apply here as they do to a browser session, to the principal after the route's claim mappings. Identity
+/// verification through <c language="text">/.cratis/me</c> does not run here; a deployment that requires it may declare a
+/// bearer route only when the route says it accepts callers without it
+/// (<see cref="C.BearerRoute.AcceptWithoutIdentityVerification"/>), which startup validation enforces.
+/// </para>
+/// <para>
 /// With no bearer route configured it hands every request on untouched.
 /// </para>
 /// </remarks>
@@ -32,6 +41,7 @@ public class BearerRouteMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
     IBearerTokenValidator validator,
+    IAccessPolicy accessPolicy,
     ITenantVerifier tenantVerifier,
     IBearerRouteForwarder forwarder,
     ILogger<BearerRouteMiddleware> logger)
@@ -54,7 +64,7 @@ public class BearerRouteMiddleware(
 
         if (BearerRouteTable.TryMatch(context.Request.Path, current, out var route))
         {
-            await Authenticate(context, route);
+            await Authenticate(context, route, current);
             return;
         }
 
@@ -80,7 +90,7 @@ public class BearerRouteMiddleware(
         await forwarder.Forward(context, route, identity: null);
     }
 
-    async Task Authenticate(HttpContext context, ResolvedBearerRoute route)
+    async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
         var validation = await validator.Validate(context.Request, route, context.RequestAborted);
         if (!validation.Succeeded)
@@ -88,6 +98,17 @@ public class BearerRouteMiddleware(
             logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
             BearerChallenge.Write(context, validation, route);
             return;
+        }
+
+        if (accessPolicy.IsConfigured(current))
+        {
+            var decision = accessPolicy.Evaluate(validation.Principal!, current, route.ServiceName);
+            if (!decision.IsGranted)
+            {
+                logger.BearerAccessDenied(route.Prefix, route.ServiceName, decision.UnsatisfiedClaim);
+                BearerChallenge.Forbidden(context);
+                return;
+            }
         }
 
         if (!await tenantVerifier.VerifyAsync(validation.TenantId!))
