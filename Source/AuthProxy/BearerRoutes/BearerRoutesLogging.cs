@@ -17,7 +17,7 @@ internal static partial class BearerRoutesLogging
     [LoggerMessage(LogLevel.Information, "A token from bearer-route issuer '{Issuer}' was presented on {Path}, which is not one of its bearer routes. Refused.")]
     internal static partial void BearerTokenOutsideItsRoutes(this ILogger logger, string issuer, string path);
 
-    [LoggerMessage(LogLevel.Information, "A request on bearer route '{Route}' of service '{Service}' has an encoded character, a backslash or a dot segment in its path. Refused.")]
+    [LoggerMessage(LogLevel.Information, "A request on bearer route '{Route}' of service '{Service}' has an encoded character, a backslash, a semicolon or a dot segment in its path. Refused.")]
     internal static partial void BearerRoutePathAmbiguous(this ILogger logger, string route, string service);
 
     [LoggerMessage(LogLevel.Information, "A valid bearer token on route '{Route}' of service '{Service}' does not satisfy the required claim '{Claim}'. Refused.")]

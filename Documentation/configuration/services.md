@@ -491,9 +491,10 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
   whichever of the service's endpoints would otherwise serve that path, and without a `Service-ID` header.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
 - A request whose path on the route still carries percent-encoding after the server has decoded it (such as an
-  encoded `/`), a backslash, or a `.` or `..` segment is refused with `400` before its token is read: a backend
-  that decoded or normalized it differently would receive a principal vouched for at a path that is not a
-  bearer route.
+  encoded `/`), a backslash, a `;` anywhere in it, or a `.` or `..` segment is refused with `400` before its token
+  is read: a backend that decoded or normalized it differently would receive a principal vouched for at a path
+  that is not a bearer route. The `;` starts a path parameter, which Tomcat, Jetty and Spring strip before
+  resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`.
 - Every refusal is an API-style `400`, `401`, `403` or `503` — never a redirect or a page. See
   [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).
 - A token from a bearer-route issuer is refused with `401` on every path that is **not** one of the issuer's

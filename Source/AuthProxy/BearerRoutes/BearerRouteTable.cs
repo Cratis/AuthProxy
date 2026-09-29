@@ -86,13 +86,18 @@ public static class BearerRouteTable
     /// The server decodes a path before the gate sees it, except for an encoded <c language="text">/</c>, and a double-encoded
     /// character arrives still encoded. Either leaves a <c language="text">%</c> in the path, as does anything else the
     /// backend might decode once more. A backslash is a separator to some servers, and a dot segment is removed by
-    /// most. A backend that decoded <c language="text">/mcp/..%2Fapi</c> into <c language="text">/api</c> would receive a principal
-    /// vouched for on a bearer route at a path that is not one, so a bearer route accepts none of these.
+    /// most. A semicolon starts a path parameter, which some servers strip before resolving dot segments — Tomcat,
+    /// Jetty and Spring read <c language="text">/mcp/..;/api</c> as <c language="text">/api</c> — and others keep, the same
+    /// rule <see cref="AnonymousPathPolicy"/> applies to a declared prefix. A backend that decoded
+    /// <c language="text">/mcp/..%2Fapi</c> into <c language="text">/api</c> would receive a principal vouched for on a bearer route
+    /// at a path that is not one, so a bearer route accepts none of these.
     /// </remarks>
     public static bool IsUnambiguous(PathString path)
     {
         var value = path.Value ?? string.Empty;
-        if (value.Contains('%', StringComparison.Ordinal) || value.Contains('\\', StringComparison.Ordinal))
+        if (value.Contains('%', StringComparison.Ordinal)
+            || value.Contains('\\', StringComparison.Ordinal)
+            || value.Contains(';', StringComparison.Ordinal))
         {
             return false;
         }

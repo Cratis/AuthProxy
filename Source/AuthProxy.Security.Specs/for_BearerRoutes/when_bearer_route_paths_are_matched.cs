@@ -9,7 +9,8 @@ namespace Cratis.AuthProxy.Security.for_BearerRoutes;
 /// A bearer route covers its prefix case-insensitively and on segment boundaries only: <c language="text">/mcpx</c> and
 /// <c language="text">/api/mcp</c> are not <c language="text">/mcp</c>, so a token presented there is refused as off its routes. A
 /// path on a bearer route that a backend could decode or normalize into some other path — an encoded separator, any
-/// other remaining percent-encoding, a backslash, a dot segment — is refused before the token is looked at, because
+/// other remaining percent-encoding, a backslash, a dot segment, a path parameter (<c language="text">;</c>), which
+/// Tomcat, Jetty and Spring strip before resolving the dot segment it hides in — is refused before the token is looked at, because
 /// the principal forwarded with it would be vouched for at a path that is not a bearer route.
 /// <para>
 /// Paths are set on the server-side request directly, as the server would hand them to the gate after decoding;
@@ -30,6 +31,9 @@ public class when_bearer_route_paths_are_matched(BearerRouteHarness harness) : I
     HttpContext? _dotSegment;
     HttpContext? _backslash;
     HttpContext? _backslashAfterThePrefix;
+    HttpContext? _parentSegmentWithPathParameter;
+    HttpContext? _currentSegmentWithPathParameter;
+    HttpContext? _pathParameterOnAnOrdinarySegment;
 
     public async Task InitializeAsync()
     {
@@ -45,6 +49,9 @@ public class when_bearer_route_paths_are_matched(BearerRouteHarness harness) : I
         _dotSegment = await Send("/mcp/../api/items");
         _backslash = await Send("/mcp/tools\\..\\..\\api\\items");
         _backslashAfterThePrefix = await Send("/mcp\\..\\api\\items");
+        _parentSegmentWithPathParameter = await Send("/mcp/..;/api/items");
+        _currentSegmentWithPathParameter = await Send("/mcp/.;/x");
+        _pathParameterOnAnOrdinarySegment = await Send("/mcp/tools;jsessionid=abc");
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -63,6 +70,10 @@ public class when_bearer_route_paths_are_matched(BearerRouteHarness harness) : I
     [Fact] public void should_refuse_a_dot_segment() => Assert.Equal(StatusCodes.Status400BadRequest, _dotSegment!.Response.StatusCode);
     [Fact] public void should_refuse_a_backslash() => Assert.Equal(StatusCodes.Status400BadRequest, _backslash!.Response.StatusCode);
     [Fact] public void should_not_match_the_prefix_followed_by_a_backslash() => Assert.Equal(StatusCodes.Status401Unauthorized, _backslashAfterThePrefix!.Response.StatusCode);
+    [Fact] public void should_refuse_a_parent_segment_hidden_by_a_path_parameter() => Assert.Equal(StatusCodes.Status400BadRequest, _parentSegmentWithPathParameter!.Response.StatusCode);
+    [Fact] public void should_refuse_a_current_segment_hidden_by_a_path_parameter() => Assert.Equal(StatusCodes.Status400BadRequest, _currentSegmentWithPathParameter!.Response.StatusCode);
+    [Fact] public void should_refuse_a_path_parameter_on_any_segment() => Assert.Equal(StatusCodes.Status400BadRequest, _pathParameterOnAnOrdinarySegment!.Response.StatusCode);
+    [Fact] public void should_forward_none_of_the_path_parameter_paths() => Assert.DoesNotContain(harness.Origin.Received, _ => _.Path.Contains(';', StringComparison.Ordinal));
     [Fact] public void should_forward_none_of_the_refused_paths() => Assert.DoesNotContain(harness.Origin.Received, _ => _.Path.Contains("api", StringComparison.OrdinalIgnoreCase) || _.Path.Contains("mcpx", StringComparison.OrdinalIgnoreCase));
 
     Task<HttpContext> Send(string path)
