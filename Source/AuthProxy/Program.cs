@@ -4,7 +4,6 @@
 using Cratis.AuthProxy;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
-using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
@@ -26,7 +25,6 @@ builder.AddInvites();
 builder.AddLinks();
 builder.AddSignIns();
 builder.SetupReverseProxy();
-builder.AddBearerRoutes();
 builder.AddManagement();
 
 var app = builder.Build();

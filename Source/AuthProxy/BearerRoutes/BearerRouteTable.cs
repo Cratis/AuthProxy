@@ -10,11 +10,11 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// Resolves the bearer routes declared in <see cref="C.Service.BearerRoutes"/>.
 /// </summary>
 /// <remarks>
-/// The authentication scheme selector, the bearer gate, the tenancy and identity middlewares, the anonymous-path
-/// matcher and the reverse-proxy route table all have to agree on which paths are bearer routes, so they all
-/// resolve through here. A route that cannot be resolved — an unusable prefix or metadata URL, an issuer that is
-/// not an absolute HTTPS URI, a service without a backend — is left out, which leaves its path on the
-/// browser-session model; <see cref="BearerRouteConfigurationValidator"/> refuses such a configuration at startup.
+/// The bearer gate and the configuration validator have to agree on which paths are bearer routes and which
+/// issuers they accept, so both resolve through here. A route that cannot be resolved — an unusable prefix or
+/// metadata URL, an issuer that is not an absolute HTTPS URI, a service without a backend — is left out, which
+/// leaves its path on the browser-session model; <see cref="BearerRouteConfigurationValidator"/> refuses such a
+/// configuration at startup.
 /// </remarks>
 public static class BearerRouteTable
 {

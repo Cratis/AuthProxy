@@ -105,6 +105,10 @@ public static class IngressExtensions
         // that never opts in.
         builder.AddAdmission();
 
+        // The same holds for the bearer-route gate: UseIngress always places it, and it hands every request on
+        // untouched for a deployment that declares no bearer route.
+        builder.AddBearerRoutes();
+
         var dataProtectionBuilder = builder.Services.AddDataProtection().SetApplicationName("Cratis.AuthProxy");
         var dataProtectionKeysPath = builder.Configuration[$"{C.AuthProxy.SectionKey}:DataProtectionKeysPath"];
         if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))

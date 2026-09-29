@@ -23,8 +23,8 @@ public static class BearerRouteServiceCollectionExtensions
     /// <param name="builder">The <see cref="WebApplicationBuilder"/> to configure.</param>
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     /// <remarks>
-    /// Must follow the reverse-proxy registration, whose forwarder and transform builder the bearer-route
-    /// forwarder uses.
+    /// The bearer-route forwarder uses the reverse proxy's forwarder, client factory and transform builder, which
+    /// the reverse-proxy registration provides; they are resolved when the pipeline is built, not here.
     /// </remarks>
     public static WebApplicationBuilder AddBearerRoutes(this WebApplicationBuilder builder)
     {
