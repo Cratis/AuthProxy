@@ -52,6 +52,8 @@ public class TenancyMiddleware(
         context.Request.Headers.Remove(Headers.PrincipalName);
         context.Request.Headers.Remove(Headers.PrincipalNameExtended);
         context.Request.Headers.Remove(Headers.TenantId);
+        context.Request.Headers.Remove(Headers.TokenClientId);
+        context.Request.Headers.Remove(Headers.TokenScope);
 
         // 2. Resolve tenant.
         if (!tenantResolver.TryResolve(context, out string tenantId))

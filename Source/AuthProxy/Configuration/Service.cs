@@ -166,4 +166,14 @@ public class Service
     /// When configured, AuthProxy can verify client credentials against the service and mint scoped bearer tokens.
     /// </summary>
     public ServiceClientCredentials? ClientCredentials { get; set; }
+
+    /// <summary>
+    /// Gets or sets the path prefixes on this service that are authenticated by an access token from an external
+    /// authorization server rather than by a browser session.
+    /// </summary>
+    /// <remarks>
+    /// Each route is forwarded to the service's <see cref="Backend"/>. Leave empty to keep every path on the
+    /// browser-session model.
+    /// </remarks>
+    public IList<BearerRoute> BearerRoutes { get; set; } = [];
 }

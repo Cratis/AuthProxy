@@ -42,6 +42,21 @@ public static class Headers
     public const string TenantId = "Tenant-ID";
 
     /// <summary>
+    /// The client an access token was issued to — its <c language="text">azp</c>, or failing that its
+    /// <c language="text">client_id</c> — sent only for a request authenticated on a bearer route.
+    /// </summary>
+    /// <remarks>
+    /// This is the client's asserted identity: a public client cannot prove which program is using it.
+    /// </remarks>
+    public const string TokenClientId = "x-cratis-token-client-id";
+
+    /// <summary>
+    /// The space-separated scopes granted to an access token, sent only for a request authenticated on a bearer
+    /// route.
+    /// </summary>
+    public const string TokenScope = "x-cratis-token-scope";
+
+    /// <summary>
     /// Service identifier used to route requests to the appropriate service.
     /// </summary>
     public const string ServiceId = "Service-ID";

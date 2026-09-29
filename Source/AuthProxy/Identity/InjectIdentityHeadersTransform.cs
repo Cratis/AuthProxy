@@ -27,6 +27,10 @@ public class InjectIdentityHeadersTransform : RequestTransform
         context.ProxyRequest.Headers.Remove(Headers.PrincipalName);
         context.ProxyRequest.Headers.Remove(Headers.PrincipalNameExtended);
 
+        // Only a bearer route vouches for these, and bearer routes are never forwarded through here.
+        context.ProxyRequest.Headers.Remove(Headers.TokenClientId);
+        context.ProxyRequest.Headers.Remove(Headers.TokenScope);
+
         var principal = httpContext.BuildClientPrincipal();
         if (principal is not null)
         {
