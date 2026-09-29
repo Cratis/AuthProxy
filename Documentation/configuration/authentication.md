@@ -574,8 +574,10 @@ A token is accepted only when all of these hold:
 
 Then the deployment's [claim requirements](authorization.md) apply — the proxy-wide `Authorization` section and
 the route's service's own — to the principal after the route's `ClaimMappings`, exactly as they apply to a
-browser session. Role claims are dropped from the token first, so a requirement on a role can never be met by a
-bearer token.
+browser session, together with the route's own `RequiredClaims`. A route that sets
+`IgnoreDeploymentRequiredClaims` is held to its own requirements only, for a deployment whose requirements name a
+claim the issuer does not mint; AuthProxy logs a warning at startup for it. Role claims are dropped from the token
+first, so a requirement on a role can never be met by a bearer token.
 
 ### Responses
 
@@ -585,7 +587,7 @@ bearer token.
 | No bearer token (a browser session does not count) | `401`, `WWW-Authenticate: Bearer resource_metadata="<ResourceMetadataUrl>"` |
 | Token invalid, expired, wrongly signed, from another issuer or for another audience | `401`, `WWW-Authenticate: Bearer error="invalid_token", resource_metadata="…"` |
 | Token lacks a required scope | `403`, `WWW-Authenticate: Bearer error="insufficient_scope", scope="<required scopes>", resource_metadata="…"` |
-| Token does not satisfy the deployment's claim requirements | `403` |
+| Token does not satisfy the claim requirements that apply on the route | `403` |
 | Token carries no tenant, or the tenant fails verification | `403` |
 | The issuer's metadata or keys cannot be retrieved | `503` with `Retry-After` |
 | Bearer-route token on any other path — whatever the case of the scheme or the whitespace after it, and in any of several `Authorization` headers | `401`, `WWW-Authenticate: Bearer error="invalid_token"` |

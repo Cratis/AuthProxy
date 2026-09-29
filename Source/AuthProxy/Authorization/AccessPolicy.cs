@@ -35,8 +35,14 @@ public class AccessPolicy : IAccessPolicy
         Evaluate(context.User, RequirementsFor(config, ResolveService(context, config)));
 
     /// <inheritdoc/>
-    public AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName) =>
-        Evaluate(user, RequirementsFor(config, FindService(config, serviceName)));
+    public AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName, C.BearerRoute route)
+    {
+        var requirements = route.IgnoreDeploymentRequiredClaims
+            ? route.RequiredClaims
+            : RequirementsFor(config, FindService(config, serviceName)).Concat(route.RequiredClaims);
+
+        return Evaluate(user, requirements);
+    }
 
     static AccessDecision Evaluate(ClaimsPrincipal user, IEnumerable<C.ClaimRequirement> requirements)
     {

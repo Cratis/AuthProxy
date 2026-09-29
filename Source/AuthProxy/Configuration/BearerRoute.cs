@@ -95,6 +95,31 @@ public class BearerRoute
     public TimeSpan? ClockSkew { get; set; }
 
     /// <summary>
+    /// Gets or sets claim requirements of this route's own, which the token's principal must satisfy after
+    /// <see cref="ClaimMappings"/> — every one of them, in addition to whatever deployment requirements apply.
+    /// </summary>
+    /// <remarks>
+    /// Composed exactly like <see cref="Authorization.RequiredClaims"/>: the list is an <em>and</em>, each
+    /// requirement's <see cref="ClaimRequirement.AnyOf"/> an <em>or</em>. A token never carries a role, so a
+    /// requirement on a role claim is refused at startup.
+    /// </remarks>
+    public IList<ClaimRequirement> RequiredClaims { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the deployment's claim requirements — the proxy-wide
+    /// <see cref="AuthProxy.Authorization"/> and the route's service's own — are left out on this route.
+    /// Defaults to <see langword="false"/>: they apply to a bearer token as they do to a browser session.
+    /// </summary>
+    /// <remarks>
+    /// For a deployment whose requirements name a claim only its browser sign-in produces — a GitHub team read
+    /// from the GitHub API, say — and which the token issuer does not mint. Without this, every token on the
+    /// route would be refused. Setting it widens who reaches the service through this route, so AuthProxy logs a
+    /// warning at startup naming the requirements it leaves out; state what the route requires instead in
+    /// <see cref="RequiredClaims"/>.
+    /// </remarks>
+    public bool IgnoreDeploymentRequiredClaims { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether this route accepts callers although the deployment requires identity
     /// verification. Defaults to <see langword="false"/>.
     /// </summary>

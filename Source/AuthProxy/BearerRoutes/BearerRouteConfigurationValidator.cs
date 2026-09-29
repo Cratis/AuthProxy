@@ -125,6 +125,23 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             failures.Add($"{at}:{nameof(C.BearerRoute.ClockSkew)} must be between zero and {C.BearerRoute.MaximumClockSkew}.");
         }
 
+        for (var i = 0; i < route.RequiredClaims.Count; i++)
+        {
+            var claim = route.RequiredClaims[i].Claim?.Trim();
+            if (string.IsNullOrEmpty(claim))
+            {
+                failures.Add(
+                    $"{at}:{nameof(C.BearerRoute.RequiredClaims)}:{i}:{nameof(C.ClaimRequirement.Claim)} must name a claim type. " +
+                    "A requirement without one can never be satisfied and would refuse every token.");
+            }
+            else if (IsRoleClaim(claim))
+            {
+                failures.Add(
+                    $"{at}:{nameof(C.BearerRoute.RequiredClaims)}:{i} requires the role claim '{claim}', which a bearer token never carries: " +
+                    "AuthProxy drops role claims from every token, so the requirement would refuse every token.");
+            }
+        }
+
         foreach (var (target, source) in route.ClaimMappings)
         {
             if (string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(source))

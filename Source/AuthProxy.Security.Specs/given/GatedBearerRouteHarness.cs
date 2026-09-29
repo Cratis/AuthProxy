@@ -13,6 +13,11 @@ namespace Cratis.AuthProxy.Security.given;
 /// bearer route maps <c language="text">preferred_username</c> from the token's <c language="text">github_login</c>, so what is
 /// checked is the principal after the mapping, not the token as issued. Every bearer route states that it
 /// accepts callers without identity verification, which a deployment requiring verification must say.
+/// <para>
+/// The <see cref="BearerRouteHarness.ForwardingRoutePrefix"/> route leaves the deployment's requirements out and
+/// requires <see cref="MembershipClaim"/> instead — the shape of a deployment whose requirements name a claim the
+/// token issuer does not mint.
+/// </para>
 /// </remarks>
 public class GatedBearerRouteHarness : BearerRouteHarness
 {
@@ -21,6 +26,12 @@ public class GatedBearerRouteHarness : BearerRouteHarness
 
     /// <summary>The value of <see cref="RequiredClaim"/> the deployment accepts.</summary>
     public const string RequiredValue = "Cratis";
+
+    /// <summary>The claim the route ignoring the deployment's requirements requires instead.</summary>
+    public const string MembershipClaim = "membership";
+
+    /// <summary>The value of <see cref="MembershipClaim"/> that route accepts.</summary>
+    public const string MembershipValue = "direct";
 
     /// <inheritdoc/>
     protected override void AddSettings(IDictionary<string, string?> settings)
@@ -32,6 +43,10 @@ public class GatedBearerRouteHarness : BearerRouteHarness
         settings[$"{service}:Authorization:RequiredClaims:0:Claim"] = "preferred_username";
         settings[$"{service}:Authorization:RequiredClaims:0:AnyOf:0"] = GitHubLogin;
         settings[$"{service}:IdentityVerification"] = nameof(C.IdentityVerificationMode.Required);
+
+        settings[$"{service}:BearerRoutes:1:{nameof(C.BearerRoute.IgnoreDeploymentRequiredClaims)}"] = "true";
+        settings[$"{service}:BearerRoutes:1:{nameof(C.BearerRoute.RequiredClaims)}:0:Claim"] = MembershipClaim;
+        settings[$"{service}:BearerRoutes:1:{nameof(C.BearerRoute.RequiredClaims)}:0:AnyOf:0"] = MembershipValue;
 
         for (var route = 0; route < 3; route++)
         {

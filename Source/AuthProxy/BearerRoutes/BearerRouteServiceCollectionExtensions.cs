@@ -33,6 +33,7 @@ public static class BearerRouteServiceCollectionExtensions
         builder.Services.AddSingleton<IBearerTokenValidator, BearerTokenValidator>();
         builder.Services.AddSingleton<IBearerRouteForwarder, BearerRouteForwarder>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, BearerRouteConfigurationValidator>();
+        builder.Services.AddHostedService<BearerRouteStartupReport>();
 
         return builder;
     }

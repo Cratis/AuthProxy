@@ -410,6 +410,11 @@ stays a relying party: it validates the token and forwards the request, and it n
 {
   "Cratis": {
     "AuthProxy": {
+      "Authorization": {
+        "RequiredClaims": [
+          { "Claim": "urn:github:team", "AnyOf": [ "Cratis/direct" ] }
+        ]
+      },
       "Services": {
         "direct": {
           "Backend": { "BaseUrl": "http://direct:8080/" },
@@ -425,7 +430,8 @@ stays a relying party: it validates the token and forwards the request, and it n
               "ClaimMappings": {
                 "sub": "github_id",
                 "preferred_username": "github_login"
-              }
+              },
+              "IgnoreDeploymentRequiredClaims": true
             },
             {
               "PathPrefix": "/v1",
@@ -436,7 +442,8 @@ stays a relying party: it validates the token and forwards the request, and it n
               "ClaimMappings": {
                 "sub": "github_id",
                 "preferred_username": "github_login"
-              }
+              },
+              "IgnoreDeploymentRequiredClaims": true
             }
           ]
         }
@@ -452,6 +459,21 @@ and `https://cratis.direct/v1`. The claim mappings make a token-authenticated re
 browser session signed in through Direct's GitHub provider, so Direct resolves the same user either way. The
 Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:bearer:subject` claim.
 
+Direct's deployment also requires the `urn:github:team` claim. A browser session gets it from Direct's GitHub
+sign-in, which reads team membership from the GitHub API; a Cratis Identity access token does not carry it. Claim
+requirements apply to bearer routes by default, so without `IgnoreDeploymentRequiredClaims` every token on these
+routes would be refused with `403`. With it, the proxy-wide and service requirements are left out on the route,
+AuthProxy logs a warning at startup naming them, and Direct's backend is what decides whether the caller is a member
+of the tenant. When Cratis Identity mints a team or membership claim, either remove
+`IgnoreDeploymentRequiredClaims` (if the claim is `urn:github:team` itself), or keep it and require the new claim
+on the route:
+
+```json
+"RequiredClaims": [
+  { "Claim": "urn:cratis:membership", "AnyOf": [ "direct" ] }
+]
+```
+
 ### BearerRouteConfig properties
 
 | Property | Type | Default | Description |
@@ -466,6 +488,8 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
 | `IdentityProvider` | `string` | `bearer` | The identity provider named in the forwarded principal. |
 | `ForwardAuthorizationHeader` | `bool` | `false` | Whether the backend also receives the `Authorization` header. |
 | `ClockSkew` | `TimeSpan` | `00:00:30` | Allowed clock skew for `exp` and `nbf`. At most `00:05:00`. |
+| `RequiredClaims` | `{ Claim, AnyOf }[]` | `[]` | Claim requirements of the route's own, checked against the token's principal after `ClaimMappings`, in addition to the deployment's. Same shape and rules as [`Authorization:RequiredClaims`](authorization.md); a requirement on a role claim is refused at startup, because a token never carries a role. |
+| `IgnoreDeploymentRequiredClaims` | `bool` | `false` | Leave the deployment's claim requirements — proxy-wide and the service's — out on this route. For a deployment whose requirements name a claim the token issuer does not mint. Logged as a warning at startup. |
 | `AcceptWithoutIdentityVerification` | `bool` | `false` | Accept this route's callers in a deployment where a service declares `IdentityVerification: Required`. See [What a bearer route changes](#what-a-bearer-route-changes). |
 
 ### BearerIssuerConfig properties
@@ -482,7 +506,9 @@ Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:
   selection and identity enrichment — none of them apply. [Admission](admission.md) and the trusted-proxy
   boundary run first and apply as to any request.
 - The deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
-  the token's principal after `ClaimMappings`. A token that does not satisfy them is refused with `403`.
+  the token's principal after `ClaimMappings`, unless the route sets `IgnoreDeploymentRequiredClaims`. The
+  route's own `RequiredClaims` apply on top either way. A token that does not satisfy them is refused with `403`.
+  A requirement on a role can never be met: roles are dropped from every token.
 - A bearer route never calls `/.cratis/me`, so it cannot obtain the verdict `IdentityVerification: Required`
   asks for. When any service declares `Required`, AuthProxy **refuses to start** with a bearer route unless the
   route sets `AcceptWithoutIdentityVerification: true` — the operator's statement that, on this route, the

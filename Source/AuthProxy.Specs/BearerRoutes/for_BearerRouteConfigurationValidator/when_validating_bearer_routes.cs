@@ -31,6 +31,9 @@ public class when_validating_bearer_routes : Specification
     ValidateOptionsResult _verificationRequiredByAnotherService;
     ValidateOptionsResult _verificationRequiredAndAcceptedWithout;
     ValidateOptionsResult _verificationRequiredOfANonParticipant;
+    ValidateOptionsResult _withRouteRequirement;
+    ValidateOptionsResult _withRouteRequirementNamingNoClaim;
+    ValidateOptionsResult _withRouteRequirementOnARole;
 
     void Because()
     {
@@ -56,6 +59,13 @@ public class when_validating_bearer_routes : Specification
         _verificationRequired = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
         _verificationRequiredByAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" } })));
         _verificationRequiredAndAcceptedWithout = validator.Validate(null, Configuration(_ => _.AcceptWithoutIdentityVerification = true, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
+        _withRouteRequirement = validator.Validate(null, Configuration(_ =>
+        {
+            _.IgnoreDeploymentRequiredClaims = true;
+            _.RequiredClaims = [new C.ClaimRequirement { Claim = "urn:cratis:membership", AnyOf = ["direct"] }];
+        }));
+        _withRouteRequirementNamingNoClaim = validator.Validate(null, Configuration(_ => _.RequiredClaims = [new C.ClaimRequirement { Claim = " ", AnyOf = ["direct"] }]));
+        _withRouteRequirementOnARole = validator.Validate(null, Configuration(_ => _.RequiredClaims = [new C.ClaimRequirement { Claim = "roles", AnyOf = ["admin"] }]));
         _verificationRequiredOfANonParticipant = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" }, ResolveIdentityDetails = false })));
     }
 
@@ -80,6 +90,9 @@ public class when_validating_bearer_routes : Specification
     [Fact] void should_name_the_setting_that_accepts_it() => _verificationRequired.FailureMessage.ShouldContain(nameof(C.BearerRoute.AcceptWithoutIdentityVerification));
     [Fact] void should_refuse_a_route_when_another_service_requires_identity_verification() => _verificationRequiredByAnotherService.Failed.ShouldBeTrue();
     [Fact] void should_accept_a_route_that_accepts_callers_without_identity_verification() => _verificationRequiredAndAcceptedWithout.Succeeded.ShouldBeTrue();
+    [Fact] void should_accept_a_route_declaring_its_own_claim_requirements() => _withRouteRequirement.Succeeded.ShouldBeTrue();
+    [Fact] void should_refuse_a_route_requirement_naming_no_claim() => _withRouteRequirementNamingNoClaim.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_route_requirement_on_a_role_a_token_never_carries() => _withRouteRequirementOnARole.Failed.ShouldBeTrue();
     [Fact] void should_ignore_a_verification_requirement_of_a_service_that_resolves_no_identity() => _verificationRequiredOfANonParticipant.Succeeded.ShouldBeTrue();
 
     static C.AuthProxy Configuration(

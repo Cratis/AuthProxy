@@ -28,7 +28,9 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// cannot authenticate a browser-only surface through any other bearer support the deployment has configured.
 /// <para>
 /// The deployment's claim requirements (<see cref="C.AuthProxy.Authorization"/> and the route's service's own)
-/// apply here as they do to a browser session, to the principal after the route's claim mappings. Identity
+/// apply here as they do to a browser session, to the principal after the route's claim mappings, unless the route
+/// sets <see cref="C.BearerRoute.IgnoreDeploymentRequiredClaims"/>; the route's own
+/// <see cref="C.BearerRoute.RequiredClaims"/> apply on top. Identity
 /// verification through <c language="text">/.cratis/me</c> does not run here; a deployment that requires it may declare a
 /// bearer route only when the route says it accepts callers without it
 /// (<see cref="C.BearerRoute.AcceptWithoutIdentityVerification"/>), which startup validation enforces.
@@ -107,15 +109,12 @@ public class BearerRouteMiddleware(
             return;
         }
 
-        if (accessPolicy.IsConfigured(current))
+        var decision = accessPolicy.Evaluate(validation.Principal!, current, route.ServiceName, route.Route);
+        if (!decision.IsGranted)
         {
-            var decision = accessPolicy.Evaluate(validation.Principal!, current, route.ServiceName);
-            if (!decision.IsGranted)
-            {
-                logger.BearerAccessDenied(route.Prefix, route.ServiceName, decision.UnsatisfiedClaim);
-                BearerChallenge.Forbidden(context);
-                return;
-            }
+            logger.BearerAccessDenied(route.Prefix, route.ServiceName, decision.UnsatisfiedClaim);
+            BearerChallenge.Forbidden(context);
+            return;
         }
 
         if (!await tenantVerifier.VerifyAsync(validation.TenantId!))

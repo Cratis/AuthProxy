@@ -4,11 +4,10 @@
 namespace Cratis.AuthProxy.Authorization.for_AccessPolicy;
 
 /// <summary>
-/// A request whose service is known without reading the request — a bearer route belongs to one service — is held
-/// to the root requirements and that service's, never to another service's, and never to fewer because the
-/// request names some other service.
+/// A bearer route belongs to one service, so a token presented on it is held to the root requirements and that
+/// service's, never to another service's, and never to fewer because the request names some other service.
 /// </summary>
-public class when_evaluating_for_a_named_service : given.an_access_policy
+public class when_evaluating_for_a_bearer_route : given.an_access_policy
 {
     C.AuthProxy _config;
     AccessDecision _qualified;
@@ -40,13 +39,13 @@ public class when_evaluating_for_a_named_service : given.an_access_policy
         var orgOnly = Principal(new Claim("org", "Cratis"));
         var teamOnly = Principal(new Claim("team", "operations"));
 
-        _qualified = _policy.Evaluate(qualified, _config, "admin");
-        _missingTheServiceClaim = _policy.Evaluate(orgOnly, _config, "admin");
-        _missingTheRootClaim = _policy.Evaluate(teamOnly, _config, "portal");
-        _forAnotherService = _policy.Evaluate(orgOnly, _config, "portal");
+        _qualified = _policy.Evaluate(qualified, _config, "admin", new C.BearerRoute());
+        _missingTheServiceClaim = _policy.Evaluate(orgOnly, _config, "admin", new C.BearerRoute());
+        _missingTheRootClaim = _policy.Evaluate(teamOnly, _config, "portal", new C.BearerRoute());
+        _forAnotherService = _policy.Evaluate(orgOnly, _config, "portal", new C.BearerRoute());
 
         _context.Request.Headers[Headers.ServiceId] = "portal";
-        _namingAnotherServiceInTheRequest = _policy.Evaluate(orgOnly, _config, "ADMIN");
+        _namingAnotherServiceInTheRequest = _policy.Evaluate(orgOnly, _config, "ADMIN", new C.BearerRoute());
     }
 
     [Fact] void should_grant_a_caller_satisfying_the_root_and_the_service() => _qualified.IsGranted.ShouldBeTrue();

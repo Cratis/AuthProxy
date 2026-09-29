@@ -32,15 +32,18 @@ public interface IAccessPolicy
     AccessDecision Evaluate(HttpContext context, C.AuthProxy config);
 
     /// <summary>
-    /// Evaluates the configured claim requirements against a principal for a request known to target a service.
+    /// Evaluates the claim requirements of a bearer route against the principal of the token presented on it.
     /// </summary>
-    /// <param name="user">The authenticated principal.</param>
+    /// <param name="user">The token's principal, after the route's claim mappings.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
-    /// <param name="serviceName">The name of the service the request targets.</param>
-    /// <returns>The <see cref="AccessDecision"/> for this principal and service.</returns>
+    /// <param name="serviceName">The name of the service the route belongs to.</param>
+    /// <param name="route">The bearer route the token was presented on.</param>
+    /// <returns>The <see cref="AccessDecision"/> for this principal on this route.</returns>
     /// <remarks>
-    /// For a request whose target is not worked out from the request itself — a bearer route belongs to exactly
-    /// one service, whatever the request names. The root requirements and the service's are applied the same way.
+    /// A bearer route belongs to exactly one service, whatever the request names, so its target is not worked out
+    /// from the request. The root requirements and the service's apply as they do to a browser session, unless the
+    /// route sets <see cref="C.BearerRoute.IgnoreDeploymentRequiredClaims"/>; the route's own
+    /// <see cref="C.BearerRoute.RequiredClaims"/> always apply on top.
     /// </remarks>
-    AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName);
+    AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName, C.BearerRoute route);
 }
