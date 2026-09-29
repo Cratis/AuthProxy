@@ -618,10 +618,23 @@ claim, and role claims in the token are not forwarded: a token never grants a ro
 
 Every inbound copy of these headers is removed on every route, bearer or not. The `Cookie` header is not
 forwarded on a bearer route, and neither is `Authorization` unless the route sets `ForwardAuthorizationHeader`.
-Identity enrichment (`/.cratis/me`) is not called on a bearer route; the backend enforces tenant membership and
-what the user may do with the scopes the client was granted. A deployment where a service declares
-`IdentityVerification: Required` therefore refuses to start with a bearer route unless the route sets
-`AcceptWithoutIdentityVerification` — see [Bearer routes](services.md#bearer-routes).
+### Identity verification is not applied
+
+A bearer route **never calls `/.cratis/me`**, whatever `IdentityVerification` says. That endpoint answers for
+browser sessions, and a product cannot be assumed to answer it correctly for a principal authenticated by a token.
+The consequences:
+
+- Under the default `IdentityVerification: BestEffort`, a service answering `403` on `/.cratis/me` refuses a
+  browser session — but not a token on a bearer route. A user whose browser session a service refuses there can
+  still reach the service with a token. **The backend must enforce tenant membership** and what the user may do
+  with the scopes the client was granted. AuthProxy logs a warning at startup for every bearer route in a
+  deployment where some service answers `/.cratis/me`, unless the route sets `AcceptWithoutIdentityVerification`
+  to state that this is intended.
+- Under `IdentityVerification: Required`, AuthProxy refuses to start with a bearer route unless the route sets
+  `AcceptWithoutIdentityVerification`.
+- No identity details are resolved, so no `.cratis-identity` cookie is written.
+
+See [Bearer routes](services.md#bearer-routes).
 
 ---
 

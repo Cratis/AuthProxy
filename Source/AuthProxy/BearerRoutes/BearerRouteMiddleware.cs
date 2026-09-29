@@ -31,9 +31,11 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// apply here as they do to a browser session, to the principal after the route's claim mappings, unless the route
 /// sets <see cref="C.BearerRoute.IgnoreDeploymentRequiredClaims"/>; the route's own
 /// <see cref="C.BearerRoute.RequiredClaims"/> apply on top. Identity
-/// verification through <c language="text">/.cratis/me</c> does not run here; a deployment that requires it may declare a
-/// bearer route only when the route says it accepts callers without it
-/// (<see cref="C.BearerRoute.AcceptWithoutIdentityVerification"/>), which startup validation enforces.
+/// verification through <c language="text">/.cratis/me</c> does not run here in either mode — not even the
+/// <c language="text">403</c> veto <see cref="C.IdentityVerificationMode.BestEffort"/> applies to a browser session. A
+/// deployment that requires verification may declare a bearer route only when the route says it accepts callers
+/// without it (<see cref="C.BearerRoute.AcceptWithoutIdentityVerification"/>), which startup validation enforces;
+/// otherwise a route that does not say so is reported at startup (<see cref="BearerRouteStartupReport"/>).
 /// </para>
 /// <para>
 /// With no bearer route configured it hands every request on untouched.

@@ -431,7 +431,8 @@ stays a relying party: it validates the token and forwards the request, and it n
                 "sub": "github_id",
                 "preferred_username": "github_login"
               },
-              "IgnoreDeploymentRequiredClaims": true
+              "IgnoreDeploymentRequiredClaims": true,
+              "AcceptWithoutIdentityVerification": true
             },
             {
               "PathPrefix": "/v1",
@@ -443,7 +444,8 @@ stays a relying party: it validates the token and forwards the request, and it n
                 "sub": "github_id",
                 "preferred_username": "github_login"
               },
-              "IgnoreDeploymentRequiredClaims": true
+              "IgnoreDeploymentRequiredClaims": true,
+              "AcceptWithoutIdentityVerification": true
             }
           ]
         }
@@ -474,6 +476,10 @@ on the route:
 ]
 ```
 
+`AcceptWithoutIdentityVerification` states the same thing for `/.cratis/me`: Direct answers it for browser
+sessions, a bearer route never calls it, and Direct's backend checks the caller's membership of the tenant on
+every token-authenticated request instead.
+
 ### BearerRouteConfig properties
 
 | Property | Type | Default | Description |
@@ -490,7 +496,7 @@ on the route:
 | `ClockSkew` | `TimeSpan` | `00:00:30` | Allowed clock skew for `exp` and `nbf`. At most `00:05:00`. |
 | `RequiredClaims` | `{ Claim, AnyOf }[]` | `[]` | Claim requirements of the route's own, checked against the token's principal after `ClaimMappings`, in addition to the deployment's. Same shape and rules as [`Authorization:RequiredClaims`](authorization.md); a requirement on a role claim is refused at startup, because a token never carries a role. |
 | `IgnoreDeploymentRequiredClaims` | `bool` | `false` | Leave the deployment's claim requirements — proxy-wide and the service's — out on this route. For a deployment whose requirements name a claim the token issuer does not mint. Logged as a warning at startup. |
-| `AcceptWithoutIdentityVerification` | `bool` | `false` | Accept this route's callers in a deployment where a service declares `IdentityVerification: Required`. See [What a bearer route changes](#what-a-bearer-route-changes). |
+| `AcceptWithoutIdentityVerification` | `bool` | `false` | State that this route's callers are accepted without any service's `/.cratis/me` being asked about them. Required when a service declares `IdentityVerification: Required`; under `BestEffort` it silences the startup warning. See [What a bearer route changes](#what-a-bearer-route-changes). |
 
 ### BearerIssuerConfig properties
 
@@ -509,11 +515,16 @@ on the route:
   the token's principal after `ClaimMappings`, unless the route sets `IgnoreDeploymentRequiredClaims`. The
   route's own `RequiredClaims` apply on top either way. A token that does not satisfy them is refused with `403`.
   A requirement on a role can never be met: roles are dropped from every token.
-- A bearer route never calls `/.cratis/me`, so it cannot obtain the verdict `IdentityVerification: Required`
-  asks for. When any service declares `Required`, AuthProxy **refuses to start** with a bearer route unless the
-  route sets `AcceptWithoutIdentityVerification: true` — the operator's statement that, on this route, the
-  validated token, its scopes and the claim requirements are the whole decision at the edge and the backend
-  answers for the rest. It is forwarded straight to the service **backend**,
+- A bearer route **never calls `/.cratis/me`**, in either identity-verification mode: the endpoint answers for
+  browser sessions, not for principals authenticated by a token. The backend must enforce tenant membership.
+  - Under the default `BestEffort`, a `403` from a service's `/.cratis/me` refuses a browser session but not a
+    token. AuthProxy starts, and logs a warning for each bearer route in a deployment where some service answers
+    `/.cratis/me`, unless the route sets `AcceptWithoutIdentityVerification: true`.
+  - Under `Required`, AuthProxy **refuses to start** with a bearer route unless the route sets
+    `AcceptWithoutIdentityVerification: true`.
+
+  Setting it is the operator's statement that, on this route, the validated token, its scopes and the claim
+  requirements are the whole decision at the edge and the backend answers for the rest. It is forwarded straight to the service **backend**,
   whichever of the service's endpoints would otherwise serve that path, and without a `Service-ID` header.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
 - A request whose path on the route still carries percent-encoding after the server has decoded it (such as an

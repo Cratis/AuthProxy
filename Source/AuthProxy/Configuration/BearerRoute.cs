@@ -120,15 +120,22 @@ public class BearerRoute
     public bool IgnoreDeploymentRequiredClaims { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether this route accepts callers although the deployment requires identity
-    /// verification. Defaults to <see langword="false"/>.
+    /// Gets or sets a value indicating whether this route accepts callers without asking any service's
+    /// <c language="text">/.cratis/me</c> about them. Defaults to <see langword="false"/>.
     /// </summary>
     /// <remarks>
-    /// A bearer route never calls <c language="text">/.cratis/me</c>: it has no browser session to verify. When any service
-    /// declares <see cref="IdentityVerificationMode.Required"/>, every forwarded request is meant to carry a positive
-    /// verdict, so a bearer route in that deployment is refused at startup unless it sets this — stating that for
-    /// this route the validated token, its scopes and the claim requirements are the whole decision, and that the
-    /// backend answers for everything else.
+    /// A bearer route never calls <c language="text">/.cratis/me</c>, in either <see cref="IdentityVerificationMode"/>: the
+    /// endpoint answers for browser sessions, and a product cannot be assumed to answer it correctly for a principal
+    /// authenticated by a token. Setting this states that for this route the validated token, its scopes and the
+    /// claim requirements are the whole decision at the edge, and that the backend decides tenant membership and
+    /// everything else.
+    /// <para>
+    /// When any service declares <see cref="IdentityVerificationMode.Required"/>, every forwarded request is meant to
+    /// carry a positive verdict, so a bearer route in that deployment is refused at startup unless it sets this.
+    /// Under <see cref="IdentityVerificationMode.BestEffort"/>, where an HTTP <c language="text">403</c> from
+    /// <c language="text">/.cratis/me</c> refuses a browser session, a route that does not set this is started with a
+    /// warning that the refusal does not apply to its tokens.
+    /// </para>
     /// </remarks>
     public bool AcceptWithoutIdentityVerification { get; set; }
 }

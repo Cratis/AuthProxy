@@ -14,4 +14,12 @@ public enum BearerRouteWarningKind
     /// requirements the deployment declares.
     /// </summary>
     DeploymentRequirementsIgnored = 0,
+
+    /// <summary>
+    /// Services answer <c language="text">/.cratis/me</c> for browser sessions, and an HTTP <c language="text">403</c> from one
+    /// refuses a browser session even under <see cref="Configuration.IdentityVerificationMode.BestEffort"/>. A
+    /// bearer route never calls it, so that refusal never happens there, and the route does not say it accepts
+    /// that through <see cref="Configuration.BearerRoute.AcceptWithoutIdentityVerification"/>.
+    /// </summary>
+    IdentityVerificationNotConsulted = 1,
 }

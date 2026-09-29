@@ -24,6 +24,10 @@ public sealed class BearerRouteStartupReport(IOptionsMonitor<C.AuthProxy> config
                 case BearerRouteWarningKind.DeploymentRequirementsIgnored:
                     logger.BearerRouteIgnoresDeploymentRequirements(warning.Prefix, warning.ServiceName, subjects);
                     break;
+
+                case BearerRouteWarningKind.IdentityVerificationNotConsulted:
+                    logger.BearerRouteDoesNotConsultIdentityVerification(warning.Prefix, warning.ServiceName, subjects);
+                    break;
             }
         }
 
