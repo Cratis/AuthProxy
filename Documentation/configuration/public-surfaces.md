@@ -58,12 +58,12 @@ there.
 
 What the proxy still does:
 
-- Strips inbound `x-ms-client-principal`, `x-ms-client-principal-id`, `x-ms-client-principal-name` and
-  `Tenant-ID` headers, so a caller cannot assert an identity on the way in.
+- Strips every inbound `x-ms-client-principal*` header and the tenant header (`x-cratis-tenant-id`, and the
+  legacy `Tenant-ID`), so a caller cannot assert an identity on the way in.
 - Injects no principal headers, because there is no session.
 - Leaves an authenticated visitor authenticated. A declared path is identity-*optional*, not
   identity-free: someone who happens to be signed in still arrives with their identity headers, though
-  **without** a `Tenant-ID` if they have not selected a tenant. Handle a declared path as tenant-optional.
+  **without** an `x-cratis-tenant-id` if they have not selected a tenant. Handle a declared path as tenant-optional.
 
 ---
 
@@ -73,7 +73,7 @@ The alternative is an ingress rule above AuthProxy sending those paths straight 
 and it costs two things worth understanding before choosing it.
 
 **It moves the identity-trust boundary.** Bypassing the proxy makes the service directly reachable, so the
-ingress rule must strip inbound `x-ms-client-principal*` and `Tenant-ID` headers itself. Stripping and
+ingress rule must strip inbound `x-ms-client-principal*`, `x-cratis-tenant-id` and `Tenant-ID` headers itself. Stripping and
 re-injecting those headers is precisely AuthProxy's job; a carve-out that forwards them unfiltered is an
 authentication bypass. The rule now has to be as correct as the proxy, and it is maintained somewhere
 else, by someone else.

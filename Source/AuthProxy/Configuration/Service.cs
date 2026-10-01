@@ -70,7 +70,7 @@ public class Service
     /// </para>
     /// <para>
     /// This does not weaken the identity boundary. Requests still flow through AuthProxy, so
-    /// <c language="text">TenancyMiddleware</c> strips inbound <c language="text">x-ms-client-principal*</c> and <c language="text">Tenant-ID</c> headers
+    /// <c language="text">TenancyMiddleware</c> strips inbound <c language="text">x-ms-client-principal*</c> and <c language="text">x-cratis-tenant-id</c> (and legacy <c language="text">Tenant-ID</c>) headers
     /// as it does for every request, and no principal headers are injected for a caller with no session.
     /// The application stays responsible for authorizing these paths — this only stops the proxy from
     /// demanding a login before the application is ever reached.
@@ -86,7 +86,7 @@ public class Service
     /// in, never widen it. Leave unset to require only what the root requires.
     /// <para>
     /// The service a request targets is resolved the way the route table resolves it: the single
-    /// configured service when there is only one, otherwise the <c language="text">Service-ID</c> header or the
+    /// configured service when there is only one, otherwise the <c language="text">x-cratis-microservice</c> header (or the legacy <c language="text">Service-ID</c>) or the
     /// <c language="text">service</c> query parameter. A request in a multi-service deployment that names no service
     /// matches no service route either, so only the root requirements apply to it.
     /// </para>

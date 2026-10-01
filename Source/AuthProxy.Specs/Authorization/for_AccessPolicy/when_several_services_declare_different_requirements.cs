@@ -7,10 +7,9 @@ namespace Cratis.AuthProxy.Authorization.for_AccessPolicy;
 /// The service a request targets is worked out the way the route table works it out, so a service's
 /// requirements apply to that service's traffic and to nothing else.
 /// <para>
-/// The gate runs before endpoint selection — it has to refuse a caller before a tenant is resolved or a
-/// backend is called, and long before YARP picks a route — so it cannot ask which route was chosen and has
-/// to read the request the same way the route table will. That is the <c language="text">Service-ID</c> header, then the
-/// <c language="text">service</c> query parameter. If the two ever disagreed, one service's requirements would guard
+/// Endpoint selection runs before the gate, so it resolves the service from the matched route's metadata.
+/// Only when no proxy endpoint was selected does it fall back to the service header, then the
+/// <c language="text">service</c> query parameter. This keeps one service's requirements from guarding
 /// another service's traffic.
 /// </para>
 /// </summary>
