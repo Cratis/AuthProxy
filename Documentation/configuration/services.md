@@ -77,9 +77,14 @@ With more than one service, clients must indicate the target using one of:
 | `x-cratis-microservice` request header | `x-cratis-microservice: portal` |
 | `service` query parameter | `?service=portal` |
 
-`x-cratis-microservice` is the header an Arc frontend sends when it sets a microservice, so an Arc
-application behind AuthProxy needs no extra configuration. The `Service-ID` header earlier releases used is
-still accepted inbound and means the same thing; `x-cratis-microservice` wins when both are sent.
+`x-cratis-microservice` is the header an Arc frontend sends for HTTP requests when it sets a microservice.
+The `Service-ID` header earlier releases used is still accepted inbound and means the same thing;
+`x-cratis-microservice` wins when both are sent. A header naming an unknown service does not match a route,
+so a valid `?service=` can still select the target and its authorization requirements.
+
+Arc's WebSocket and SSE observable connections instead send `?x-cratis-microservice=` by default.
+AuthProxy does not route on that query argument yet. In a multi-service deployment, configure Arc with
+`Globals.microserviceWSQueryArgument = 'service';` so observable connections use `?service=`.
 The selected identifier is forwarded under both header names, including when selected by `?service=`.
 Forwarding `Service-ID` is deprecated and will be removed in a future major release; move backends to
 `x-cratis-microservice`.

@@ -76,40 +76,34 @@ public class AccessPolicy : IAccessPolicy
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <returns>The targeted service, or <see langword="null"/> when the request names none.</returns>
     /// <remarks>
-    /// This runs before endpoint selection — the gate has to refuse a caller before anything reads a
-    /// backend, and long before YARP picks a route — so the target is worked out from the request rather
-    /// than from a selected endpoint. It mirrors <c language="text">MicroserviceReverseProxyConfigProvider</c> exactly: a
-    /// single-service deployment routes everything to that service, and beyond that a service is named by
-    /// the <c language="text">x-cratis-microservice</c> header (or the legacy <c language="text">Service-ID</c>) or the <c language="text">service</c> query parameter, header first.
-    /// <para>
-    /// A request in a multi-service deployment that names no service reaches no service route either, so
-    /// answering <see langword="null"/> costs nothing: the root requirements still apply, and the request
-    /// goes on to match nothing.
-    /// </para>
+    /// Endpoint selection runs before the gate, so route metadata is authoritative when present. For
+    /// callers evaluating a request without a selected endpoint, a single-service deployment selects its
+    /// only service; otherwise a configured header target wins, with the <c language="text">service</c> query
+    /// parameter as the fallback. An unknown header must not hide a query-selected service's requirements.
     /// </remarks>
     static C.Service? ResolveService(HttpContext context, C.AuthProxy config)
     {
+        if (ServiceSelection.FromRoute(context) is { } selectedService)
+        {
+            return FindService(config, selectedService);
+        }
+
         if (config.Services.Count == 1)
         {
             return config.Services.Values.First();
         }
 
-        var serviceId = ServiceSelection.FromHeaders(context.Request.Headers);
-        if (string.IsNullOrWhiteSpace(serviceId))
-        {
-            serviceId = context.Request.Query[ServiceQueryParameter].FirstOrDefault();
-        }
-
-        if (string.IsNullOrWhiteSpace(serviceId))
-        {
-            return null;
-        }
-
-        return config.Services
-            .Where(_ => string.Equals(_.Key, serviceId.Trim(), StringComparison.OrdinalIgnoreCase))
-            .Select(_ => _.Value)
-            .FirstOrDefault();
+        return FindService(config, ServiceSelection.FromHeaders(context.Request.Headers))
+            ?? FindService(config, context.Request.Query[ServiceQueryParameter].FirstOrDefault());
     }
+
+    static C.Service? FindService(C.AuthProxy config, string? serviceId) =>
+        string.IsNullOrWhiteSpace(serviceId)
+            ? null
+            : config.Services
+                .Where(_ => string.Equals(_.Key, serviceId.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Select(_ => _.Value)
+                .FirstOrDefault();
 
     /// <summary>
     /// Determines whether a principal satisfies a single requirement.

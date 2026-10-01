@@ -124,6 +124,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                 routes.Add(new RouteConfig
                 {
                     RouteId = $"{key}-frontend-catchall-default",
+                    Metadata = ServiceMetadata(key),
                     ClusterId = FrontendClusterId(key),
                     AuthorizationPolicy = "default",
                     Match = new RouteMatch { Path = "/{**catch-all}" },
@@ -135,6 +136,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                 routes.Add(new RouteConfig
                 {
                     RouteId = $"{key}-backend-catchall-default",
+                    Metadata = ServiceMetadata(key),
                     ClusterId = BackendClusterId(key),
                     AuthorizationPolicy = "default",
                     Match = new RouteMatch { Path = "/{**catch-all}" },
@@ -243,6 +245,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             yield return new RouteConfig
             {
                 RouteId = $"{microserviceKey}-anonymous-{index}",
+                Metadata = ServiceMetadata(microserviceKey),
                 ClusterId = clusterId,
                 AuthorizationPolicy = AnonymousAuthorizationPolicy,
                 Match = new RouteMatch { Path = $"{path}/{{**catch-all}}" },
@@ -259,6 +262,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-backend-header-api",
+            Metadata = ServiceMetadata(microserviceKey),
             ClusterId = BackendClusterId(microserviceKey),
             AuthorizationPolicy = "default",
             Match = new RouteMatch
@@ -287,6 +291,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-backend-query-api",
+            Metadata = ServiceMetadata(microserviceKey),
             ClusterId = BackendClusterId(microserviceKey),
             AuthorizationPolicy = "default",
             Match = new RouteMatch
@@ -312,6 +317,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             yield return new RouteConfig
             {
                 RouteId = $"{microserviceKey}-backend-api-default",
+                Metadata = ServiceMetadata(microserviceKey),
                 ClusterId = BackendClusterId(microserviceKey),
                 AuthorizationPolicy = "default",
                 Match = new RouteMatch { Path = "/api/{**catch-all}" },
@@ -326,6 +332,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-frontend-header",
+            Metadata = ServiceMetadata(microserviceKey),
             ClusterId = FrontendClusterId(microserviceKey),
             AuthorizationPolicy = "default",
             Match = new RouteMatch
@@ -350,6 +357,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         yield return new RouteConfig
         {
             RouteId = $"{microserviceKey}-frontend-query",
+            Metadata = ServiceMetadata(microserviceKey),
             ClusterId = FrontendClusterId(microserviceKey),
             AuthorizationPolicy = "default",
             Match = new RouteMatch
@@ -404,6 +412,8 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
         return clusters;
     }
+
+    static Dictionary<string, string> ServiceMetadata(string key) => new() { [ServiceSelection.RouteMetadataKey] = key };
 
     static string BackendClusterId(string key) => $"{key}-backend-cluster";
     static string FrontendClusterId(string key) => $"{key}-frontend-cluster";

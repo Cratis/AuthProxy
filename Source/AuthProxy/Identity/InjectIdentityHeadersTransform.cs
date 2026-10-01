@@ -43,10 +43,9 @@ public class InjectIdentityHeadersTransform : RequestTransform
             context.ProxyRequest.Headers.Add(Headers.LegacyTenantId, tenant);
         }
 
-        // Both backend contracts must agree with the service selected by the proxy, even if a caller
-        // supplied conflicting names. The query remains the fallback when neither header names a service.
-        var service = ServiceSelection.FromHeaders(httpContext.Request.Headers)
-            ?? httpContext.Request.Query["service"].FirstOrDefault();
+        // Both backend contracts identify the destination, not a caller-supplied selector that may have
+        // lost to an anonymous-path, query, or single-service catch-all route.
+        var service = ServiceSelection.FromRoute(httpContext);
         context.ProxyRequest.Headers.Remove(Headers.ServiceId);
         context.ProxyRequest.Headers.Remove(Headers.LegacyServiceId);
         if (!string.IsNullOrWhiteSpace(service))

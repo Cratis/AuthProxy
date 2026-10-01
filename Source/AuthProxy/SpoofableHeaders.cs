@@ -41,7 +41,7 @@ static class SpoofableHeaders
     /// <param name="headers">The outbound request headers.</param>
     public static void Strip(HttpRequestHeaders headers)
     {
-        foreach (var name in headers.Select(_ => _.Key).Where(IsSpoofable).ToArray())
+        foreach (var name in headers.NonValidated.Select(_ => _.Key).Where(IsSpoofable).ToArray())
         {
             headers.Remove(name);
         }

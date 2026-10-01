@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Yarp.ReverseProxy.Model;
+
 namespace Cratis.AuthProxy;
 
 /// <summary>
@@ -14,6 +16,20 @@ namespace Cratis.AuthProxy;
 /// </remarks>
 static class ServiceSelection
 {
+    /// <summary>
+    /// The route metadata entry identifying the configured service.
+    /// </summary>
+    internal const string RouteMetadataKey = "Cratis.AuthProxy.Service";
+
+    /// <summary>
+    /// Gets the service selected by the reverse-proxy route, independent of caller-supplied selectors.
+    /// </summary>
+    /// <param name="context">The routed request.</param>
+    /// <returns>The selected service, or <see langword="null"/> for a non-proxy endpoint.</returns>
+    public static string? FromRoute(HttpContext context) =>
+        context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>()?.Config.Metadata is { } metadata
+        && metadata.TryGetValue(RouteMetadataKey, out var service) ? service : null;
+
     /// <summary>
     /// Gets the service named by the request headers.
     /// </summary>

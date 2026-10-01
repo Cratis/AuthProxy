@@ -1,6 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Forwarder;
+using Yarp.ReverseProxy.Model;
 using Yarp.ReverseProxy.Transforms;
 
 namespace Cratis.AuthProxy.Identity.for_InjectIdentityHeadersTransform;
@@ -20,7 +23,11 @@ public class when_the_request_selects_a_service : Specification
         _conflicting = ContextFor("portal", "other");
         _query = ContextFor(null, null);
         _query.HttpContext.Request.QueryString = new QueryString("?service=portal");
-        _none = ContextFor(null, null);
+        _none = new RequestTransformContext
+        {
+            HttpContext = new DefaultHttpContext(),
+            ProxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://service.local/api/test")
+        };
     }
 
     async Task Because()
@@ -52,6 +59,18 @@ public class when_the_request_selects_a_service : Specification
             HttpContext = new DefaultHttpContext(),
             ProxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://service.local/api/test")
         };
+        var route = new RouteModel(
+            new RouteConfig
+            {
+                RouteId = "portal-route",
+                ClusterId = "portal-cluster",
+                Metadata = new Dictionary<string, string> { [ServiceSelection.RouteMetadataKey] = "portal" },
+                Match = new RouteMatch { Path = "/{**catch-all}" }
+            },
+            new ClusterState("portal-cluster"),
+            HttpTransformer.Default);
+        context.HttpContext.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(route), "proxied"));
+
         if (current is not null)
         {
             context.HttpContext.Request.Headers[Headers.ServiceId] = current;

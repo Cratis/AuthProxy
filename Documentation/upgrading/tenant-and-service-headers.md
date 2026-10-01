@@ -10,7 +10,7 @@ AuthProxy now also forwards the header names Arc uses by default. Existing backe
 |---|--------|-----|
 | Tenant forwarded to the backend, and sent to `/.cratis/me` | `Tenant-ID` | Both `x-cratis-tenant-id` and `Tenant-ID`, with the same resolved value |
 | Service selection headers | `Service-ID` | Both `x-cratis-microservice` and `Service-ID` accepted; the current name wins |
-| Service identifier forwarded to the backend when selected by a header or query | The supplied service header | Both `x-cratis-microservice` and `Service-ID`, with the same selected value |
+| Service identifier forwarded to the backend | The supplied service header, if any | Both `x-cratis-microservice` and `Service-ID`, identifying the service selected by the route |
 | Service selection query parameter | `?service=` | `?service=` (unchanged) |
 
 ## Compatibility and deprecation
@@ -21,7 +21,7 @@ both tenant names too.
 
 Forwarding `Tenant-ID` and `Service-ID` is deprecated and will be removed in a future major release.
 Move backends to `x-cratis-tenant-id` and `x-cratis-microservice` before that release. This deprecation
-concerns forwarding; both service headers remain accepted inbound during this transition.
+concerns forwarding; `Service-ID` is still accepted inbound, and `x-cratis-microservice` is now accepted too.
 
 Arc applications on their default tenancy settings now work without extra configuration. If you set
 `options.UseHeaderTenancy("Tenant-ID")` as a workaround, you can remove that one line. Keeping it also
@@ -31,9 +31,17 @@ continues to work during the transition.
 
 `Service-ID` is still accepted inbound for routing and per-service authorization.
 `x-cratis-microservice` wins when a request carries both. The `?service=` query parameter remains the
-fallback when neither header names a service. Both forwarded headers carry the selected identifier,
-even when the client supplied conflicting values. No service headers are added when the request names
-no service.
+fallback when no header route matches, including when the header names an unknown service. Per-service
+authorization follows the matched route too, so an unknown header cannot bypass a query-selected service's
+claim requirements. Both forwarded headers carry the actual destination's identifier, even when a caller's
+selector loses to an anonymous-path route or the single-service catch-all. Query-only requests also receive
+both headers. Requests to the single-service catch-all now receive both headers even with no selector.
+
+Arc's default WebSocket and SSE observable connections use `?x-cratis-microservice=`, which AuthProxy does
+not route on yet. For multi-service deployments, set `Globals.microserviceWSQueryArgument = 'service';`
+in the Arc frontend to use the supported `?service=` query parameter. HTTP requests already use the
+supported `x-cratis-microservice` header. This query-argument mismatch remains tracked in
+[issue #154](https://github.com/Cratis/AuthProxy/issues/154).
 
 ## Inbound tenant headers are stripped
 
@@ -57,7 +65,8 @@ from client requests.
 
 1. Move backends that read `Tenant-ID` or `Service-ID` to the matching `x-cratis-*` names before the future major release.
 2. Remove `UseHeaderTenancy("Tenant-ID")` from Arc applications behind AuthProxy if you want to use Arc's defaults.
-3. Optionally, change clients and Arc frontends to send `x-cratis-microservice` instead of `Service-ID`.
+3. Optionally, change HTTP clients and Arc frontends to send `x-cratis-microservice` instead of `Service-ID`.
+4. In multi-service deployments using Arc observable connections, set `Globals.microserviceWSQueryArgument = 'service';`.
 
 See [Tenancy](../configuration/tenancy.md), [Services](../configuration/services.md#multiple-services) and
 [Forwarded identity headers](../configuration/authentication.md#forwarded-identity-headers).
