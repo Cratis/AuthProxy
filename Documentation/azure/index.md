@@ -172,9 +172,17 @@ Cratis__AuthProxy__Ingress__TrustedProxies__0=...
 Cratis__AuthProxy__Ingress__ForwardLimit=1
 ```
 
-The values differ per platform and are given on each platform's page. Add one to `ForwardLimit`, and trust
-the extra hop, for every proxy you put in front of the platform's own ingress, such as Azure Front Door or
-Application Gateway. See [Trusted proxies](../configuration/trusted-proxies.md). Do **not** set
+The values differ per platform and are given on each platform's page. In `Configured` mode, verify and trust
+every hop before adding one to `ForwardLimit` for a proxy in front of the platform's own ingress, such as
+Azure Front Door or Application Gateway. Restrict the origin to the intended upstream proxy so callers cannot
+bypass it.
+
+**For the Container Apps recipe's `Mode=TrustAny`, keep `ForwardLimit=1` unless access to AuthProxy's origin
+is restricted to the intended upstream proxy.** Adding upstream ranges to `TrustedProxies` does not help:
+`TrustAny` ignores that list. Alternatively, use `Configured` mode with verified trusted hops, including the
+platform ingress peer, before increasing the limit. In either case, complete the
+[direct-origin spoofed-header check](container-apps.md#adding-an-upstream-proxy) before increasing it.
+See [Trusted proxies](../configuration/trusted-proxies.md). Do **not** set
 `ASPNETCORE_FORWARDEDHEADERS_ENABLED`.
 
 ### Data Protection keys

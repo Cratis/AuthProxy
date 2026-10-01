@@ -84,8 +84,36 @@ The address AuthProxy sees as the peer is the environment's ingress proxy, and t
 range for it. The settings above therefore use `Mode=TrustAny`, which is right **only because nothing other
 than the platform's ingress can connect to the container's port 8080**: the platform routes every request
 between apps through its proxy layer, not directly to a replica. If you also run
-something that can open a connection straight to the replica, name the real peers with `TrustedProxies`
-instead. See [Trusted proxies](../configuration/trusted-proxies.md#modes).
+something that can open a connection straight to the replica, switch to `Mode=Configured` and name the real
+peers with `TrustedProxies` instead. `TrustAny` ignores `TrustedProxies` even when you populate it.
+See [Trusted proxies](../configuration/trusted-proxies.md#modes).
+
+### Adding an upstream proxy
+
+Putting Azure Front Door or Application Gateway in front of AuthProxy does not make the Container Apps
+origin private. With external ingress, a caller can still bypass that upstream proxy and call the ACA origin
+hostname directly. **Keep `ForwardLimit=1` while that origin is publicly reachable in `Mode=TrustAny`.**
+If you raise it to `2`, a direct caller can send `X-Forwarded-For: 203.0.113.123`; Container Apps appends the
+real caller address, and AuthProxy consumes both entries and records the forged address in sign-in
+notifications. Adding upstream ranges to `TrustedProxies` cannot prevent this in `TrustAny` mode.
+
+Before increasing the limit, choose one of these boundaries:
+
+- Restrict access to AuthProxy's origin to the intended upstream proxy, including any routes from other apps
+  in the environment. Use a network restriction that prevents bypass; an upstream hostname alone is not an
+  access restriction. Then set the limit to the number of verified forwarded hops.
+- Use `Mode=Configured` with verified trusted hops in `TrustedProxies`, including the actual Container Apps
+  ingress peer and the upstream proxy. Container Apps publishes no ingress peer range, so do not guess one
+  or use a catch-all range. If you cannot verify every trusted hop, keep `ForwardLimit=1`.
+
+**Require a direct-origin spoofed-header check before increasing `ForwardLimit`:** from outside the intended
+upstream proxy, send `X-Forwarded-For: 203.0.113.123` directly to AuthProxy's ACA origin hostname, not the
+Front Door or Application Gateway hostname. With an origin restriction, the platform must refuse that request
+before it reaches AuthProxy. With `Configured` mode, complete a test sign-in carrying the spoofed header and
+confirm that the sign-in notification records the actual caller address, never `203.0.113.123`. Also confirm
+that a normal sign-in through the upstream proxy records the real client address. Test the proposed higher
+limit in a non-production deployment with the same boundary before applying it in production; do not increase
+it if the check fails or the recorded address cannot be observed.
 
 ### Health probes
 
