@@ -542,9 +542,16 @@ instance re-resolves identity for callers whose record it did not issue.
 
 ## Forwarded identity headers
 
-Once a request is authenticated, AuthProxy tells the backend who is calling. It does that with four
-headers, written on every proxied request and on every `/.cratis/me` call — and it strips any inbound copy
+Once a request is authenticated, AuthProxy tells the backend who is calling. It does that with identity
+headers and both tenant headers, written on proxied requests and on `/.cratis/me` calls — and it strips any inbound copy
 first, so a backend can treat them as proof rather than as a claim.
+
+What is stripped is wider than what is written. Every inbound header whose name begins
+`x-ms-client-principal` is removed whatever it ends in, so a header AuthProxy never writes but a backend
+might read — `x-ms-client-principal-idp`, say — cannot be used to smuggle a claim. The tenant is removed
+under both `x-cratis-tenant-id` and the legacy `Tenant-ID`, before and again after the proxy resolves its
+own, so the only tenant a backend can receive is the one AuthProxy resolved. A request with no resolved
+tenant reaches the backend with no tenant header at all.
 
 | Header | Carries | Encoding |
 | -------- | --------- | ---------- |
@@ -552,7 +559,8 @@ first, so a backend can treat them as proof rather than as a claim.
 | `x-ms-client-principal-id` | The provider-local subject | Verbatim, or RFC 8187 — no sibling announces which |
 | `x-ms-client-principal-name` | The display name (`userDetails`) | Verbatim, or RFC 8187 when it cannot travel verbatim |
 | `x-ms-client-principal-name*` | The RFC 8187 form of the display name | Present **exactly** when the plain header carries an encoded value |
-| `Tenant-ID` | The resolved tenant | Verbatim, or RFC 8187 — no sibling announces which |
+| `x-cratis-tenant-id` | The resolved tenant | Verbatim, or RFC 8187 — no sibling announces which |
+| `Tenant-ID` | The same resolved tenant; forwarding deprecated until a future major release | Same as `x-cratis-tenant-id` |
 
 ### Every header value is US-ASCII
 
@@ -598,7 +606,7 @@ No realistic display name begins with `UTF-8''`, so nothing about ordinary traff
 
 > [!IMPORTANT]
 > The sibling header exists only for `x-ms-client-principal-name`. `x-ms-client-principal-id` and
-> `Tenant-ID` go through the same encoder — a value outside US-ASCII on either is sent as an `ext-value` —
+> `x-cratis-tenant-id` go through the same encoder — a value outside US-ASCII on either is sent as an `ext-value` —
 > but nothing announces it, so for those two headers the `UTF-8''` prefix is the only signal there is. That
 > is deliberate: a subject and a tenant identifier are values your identity provider and your configuration
 > issue, not values a person types, so treat them as opaque and forward them rather than decoding them. If
@@ -708,7 +716,7 @@ When present, AuthProxy embeds that value in the minted access token (and any re
 alongside it) as a `cratis/tenant` claim. The claim travels with the token for its entire lifetime, so
 every subsequent request authenticated with that token carries it.
 
-To have AuthProxy resolve the tenant and set the `Tenant-ID` header on proxied requests, add a `Claim`
+To have AuthProxy resolve the tenant and set the `x-cratis-tenant-id` header on proxied requests, add a `Claim`
 [tenant resolution strategy](tenancy.md#claim-strategy-options) pointing at that claim type:
 
 ```json

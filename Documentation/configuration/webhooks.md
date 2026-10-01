@@ -39,8 +39,8 @@ Declare the specific path the provider posts to:
 ### What AuthProxy does
 
 - Forwards the request to the service instead of answering it with a sign-in page.
-- Strips inbound `x-ms-client-principal`, `x-ms-client-principal-id`, `x-ms-client-principal-name` and
-  `Tenant-ID` headers, exactly as it does for every other request. A caller cannot assert an identity.
+- Strips every inbound `x-ms-client-principal*` header and the tenant header (`x-cratis-tenant-id`, and the
+  legacy `Tenant-ID`), exactly as it does for every other request. A caller cannot assert an identity.
 - Injects no principal headers, because there is no session.
 
 ### What AuthProxy does not do
