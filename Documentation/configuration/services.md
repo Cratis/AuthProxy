@@ -38,8 +38,8 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `Backend` | `ServiceEndpointConfig` | `null` | API backend endpoint. |
 | `Frontend` | `ServiceEndpointConfig` | `null` | SPA / static-asset frontend endpoint. |
 | `ResolveIdentityDetails` | `bool?` | `true` when Backend is set | Whether to call `/.cratis/me` on this service **at all**. See [Identity enrichment](#identity-enrichment). |
-| `IdentityVerification` | `BestEffort` \| `Required` | `BestEffort` | What that call's answer **means**. See [Identity enrichment](#identity-enrichment). |
-| `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required`, unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
+| `IdentityVerification` | `Required` \| `BestEffort` | `Required` | What that call's answer **means**. `Required` fails closed; `BestEffort` is the explicit opt-in for an endpoint that only enriches. See [Identity enrichment](#identity-enrichment). |
+| `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
 
@@ -214,15 +214,21 @@ the mode is per service.
 
 | Mode | Meaning | Use for |
 |------|---------|---------|
-| `BestEffort` (default) | The endpoint enriches. Only an explicit `403` denies. | A service that contributes display details — profile, preferences, feature flags. |
-| `Required` | The endpoint decides. Only an explicit positive admits. | The one service that genuinely answers with an authorization verdict. |
+| `Required` (default) | The endpoint decides. Only an explicit positive admits. | Any service that answers `/.cratis/me` with an authorization verdict. |
+| `BestEffort` | The endpoint enriches. Only an explicit `403` denies. | A service that contributes display details — profile, preferences, feature flags — and that you accept being asked in vain. |
 
-`BestEffort` is the released behavior and stays the default, so an existing deployment is unaffected. That
-is meant exactly: the released proxy read no verdict out of a successful response body at all, it took
-`details` and forwarded the caller. So under `BestEffort` a body saying `"isAuthorized": false` is **not** a
-refusal — the caller is admitted and those details are merged, the same as before. Plenty of services answer
-that for reasons that are not about access at all: an account mid-onboarding, a lapsed trial, a profile the
-frontend renders a banner for. If your service means it as a decision, say so with `Required`.
+`Required` is the default for every service that has a `Backend` and has not set `ResolveIdentityDetails`
+to `false`: a proxy that does not know whether its identity service is up must not assume the answer is
+yes. A service that is never called — no `Backend`, or `ResolveIdentityDetails: false` — has no answer to
+fail, so the setting has no effect on it.
+
+`BestEffort` is an explicit opt-in. Under it the proxy reads no verdict out of a successful response body at
+all, it takes `details` and forwards the caller, so a body saying `"isAuthorized": false` is **not** a
+refusal — the caller is admitted and those details are merged. Plenty of services answer that for reasons
+that are not about access at all: an account mid-onboarding, a lapsed trial, a profile the frontend renders
+a banner for. Opt in only when that is what you mean. Earlier releases defaulted to `BestEffort`; see
+[Upgrading](../upgrading/identity-verification-required-by-default.md) for what changed and how to keep the
+old behavior.
 
 `Required` also decides how long the call may take. See [What each outcome does](#what-each-outcome-does)
 for the timeout that follows from it.
@@ -249,8 +255,8 @@ which is exactly right for a service being asked only to enrich, and never enoug
 decide. Property names are matched without regard to casing; a quoted `"true"` is not a verdict.
 
 Read the `BestEffort` column as one sentence: **`403` denies, everything else is forwarded and whatever
-details arrived are merged.** That is the released behavior, unchanged, and it is what makes the mode safe
-to leave alone.
+details arrived are merged.** That is what earlier releases did for every service, and it is why it is now an
+opt-in rather than the default: it admits a caller exactly when the proxy has learned the least.
 
 ### How long the call may take
 
@@ -259,8 +265,8 @@ wait is a property of a decision, not of enrichment:
 
 | Mode | Unset timeout means |
 |------|---------------------|
-| `BestEffort` | Unbounded — the ambient 100-second HTTP client default, exactly as released. A slow enrichment service still gets to answer, because cutting it off would not refuse anybody, it would admit them with that service's details silently missing. |
-| `Required` | Ten seconds. A service standing between a caller and a decision has to fail in bounded time — otherwise a service that accepts connections and then stops answering holds every authenticated request open for a minute and a half each. |
+| `Required` (default) | Ten seconds. A service standing between a caller and a decision has to fail in bounded time — otherwise a service that accepts connections and then stops answering holds every authenticated request open for a minute and a half each. |
+| `BestEffort` | Unbounded — the ambient 100-second HTTP client default. A slow enrichment service still gets to answer, because cutting it off would not refuse anybody, it would admit them with that service's details silently missing. |
 
 A timeout you **do** state is honored in both modes. The wait is also bound to the caller's own request
 lifetime either way, so a client that disconnects stops occupying the proxy.
@@ -323,11 +329,11 @@ deliberately: the cost is one identity-endpoint call per request per user.
       "Services": {
         "portal": {
           "Backend": { "BaseUrl": "http://portal-api:8080/" },
-          "IdentityVerification": "Required",
           "IdentityVerificationTimeout": "00:00:10"
         },
         "reporting": {
-          "Backend": { "BaseUrl": "http://reporting-api:8080/" }
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "IdentityVerification": "BestEffort"
         }
       }
     }
@@ -335,16 +341,19 @@ deliberately: the cost is one identity-endpoint call per request per user.
 }
 ```
 
-From Aspire:
+`portal` states no mode, so it is `Required`; `reporting` only enriches and says so.
+
+From Aspire, `Required` needs no call. Opt a service out explicitly:
 
 ```csharp
-authProxy.WithIdentityVerification("portal", IdentityVerificationMode.Required);
+authProxy.WithIdentityVerification("reporting", IdentityVerificationMode.BestEffort);
 authProxy.WithSessionTerminationOnIdentityDenial();
 ```
 
 > **Requiring verification makes that service a single point of failure, on purpose.** While it is down,
 > nothing behind the proxy is served, because nobody can confirm who is allowed in. That is the trade the
-> mode exists to make — take it only for a service that really does answer `/.cratis/me` with a verdict.
+> default makes — and a backend that does not implement `/.cratis/me` with a verdict must either say
+> `BestEffort` or set `ResolveIdentityDetails` to `false`.
 
 ### `Required` needs a tenant resolution
 
@@ -352,8 +361,9 @@ Identity is resolved per **user and tenant**, so a verdict is always a verdict a
 tenant. A deployment with no [tenant resolution](tenancy.md) configured resolves no tenant for anybody — so
 there is nothing to verify against, on every request, for everyone.
 
-AuthProxy therefore **refuses to start** when a service declares `Required` and `TenantResolutions` is
-empty, and the message names the key. Nothing about the alternative looks broken from the outside: the
+AuthProxy therefore **refuses to start** when a service is `Required` — which includes a service that states no
+mode, since `Required` is the default — and `TenantResolutions` is empty, and the message names the key and
+the two ways out for a service that only enriches. Nothing about the alternative looks broken from the outside: the
 proxy starts, people sign in, requests are forwarded, and the only thing that does not happen is the check
 you asked for. A single-tenant deployment satisfies this with the `Specified` strategy:
 

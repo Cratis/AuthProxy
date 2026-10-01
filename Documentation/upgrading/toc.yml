@@ -1,0 +1,4 @@
+- name: Upgrading
+  href: index.md
+- name: Identity verification is required by default
+  href: identity-verification-required-by-default.md
