@@ -1,8 +1,12 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.AccessTokens;
 using Cratis.AuthProxy.Identity;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ReverseProxy;
 
@@ -20,6 +24,12 @@ public static class ReverseProxyExtensions
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<MicroserviceReverseProxyConfigProvider>();
+        builder.Services.AddDistributedMemoryCache();
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<IUserTokenStore, UserTokenStore>();
+        builder.Services.AddSingleton<IUserAccessTokens, UserAccessTokens>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, AccessTokenConfigurationValidator>();
+        builder.Services.AddHttpClient(UserAccessTokens.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(10));
         builder.Services.AddSingleton<IProxyConfigProvider>(
             sp => sp.GetRequiredService<MicroserviceReverseProxyConfigProvider>());
 
@@ -44,7 +54,15 @@ public static class ReverseProxyExtensions
     /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>
     public static WebApplication UseReverseProxy(this WebApplication app)
     {
-        app.MapReverseProxy();
+        app.MapReverseProxy(proxy =>
+        {
+            proxy.UseMiddleware<AccessTokenForwardingMiddleware>();
+
+            // The stages MapReverseProxy() runs when it is given no pipeline of its own.
+            proxy.UseSessionAffinity();
+            proxy.UseLoadBalancing();
+            proxy.UsePassiveHealthChecks();
+        });
         return app;
     }
 }

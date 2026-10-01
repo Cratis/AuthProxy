@@ -1,0 +1,13 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+namespace Cratis.AuthProxy.AccessTokens.for_AccessTokenConfigurationValidator;
+
+public class when_the_service_has_no_backend : given.an_access_token_validator
+{
+    void Establish() => _service.Backend = null;
+
+    void Because() => Validate();
+
+    [Fact] void should_fail() => _result.Failed.ShouldBeTrue();
+}

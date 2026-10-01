@@ -38,6 +38,26 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     internal const string AnonymousAuthorizationPolicy = "anonymous";
 
     /// <summary>
+    /// The cluster metadata key naming the service a cluster belongs to.
+    /// </summary>
+    internal const string ServiceMetadataKey = "Cratis.AuthProxy.Service";
+
+    /// <summary>
+    /// The cluster metadata key naming which endpoint of the service a cluster is.
+    /// </summary>
+    internal const string EndpointMetadataKey = "Cratis.AuthProxy.Endpoint";
+
+    /// <summary>
+    /// The <see cref="EndpointMetadataKey"/> value of a service's backend cluster.
+    /// </summary>
+    internal const string BackendEndpoint = "Backend";
+
+    /// <summary>
+    /// The <see cref="EndpointMetadataKey"/> value of a service's frontend cluster.
+    /// </summary>
+    internal const string FrontendEndpoint = "Frontend";
+
+    /// <summary>
     /// The path prefix served by a service's backend rather than its frontend.
     /// </summary>
     const string ApiPathPrefix = "/api";
@@ -386,6 +406,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     {
                         ["destination1"] = new() { Address = ms.Backend.BaseUrl }
                     },
+                    Metadata = ClusterMetadata(key, BackendEndpoint),
                 });
             }
 
@@ -398,12 +419,19 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     {
                         ["destination1"] = new() { Address = ms.Frontend.BaseUrl }
                     },
+                    Metadata = ClusterMetadata(key, FrontendEndpoint),
                 });
             }
         }
 
         return clusters;
     }
+
+    static Dictionary<string, string> ClusterMetadata(string key, string endpoint) => new()
+    {
+        [ServiceMetadataKey] = key,
+        [EndpointMetadataKey] = endpoint,
+    };
 
     static string BackendClusterId(string key) => $"{key}-backend-cluster";
     static string FrontendClusterId(string key) => $"{key}-frontend-cluster";

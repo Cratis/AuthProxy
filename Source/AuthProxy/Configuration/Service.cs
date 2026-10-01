@@ -162,6 +162,17 @@ public class Service
     public bool ParticipatesInIdentityResolution => Backend is not null && (ResolveIdentityDetails ?? true);
 
     /// <summary>
+    /// Gets or sets the access token AuthProxy obtains for the signed-in user and forwards to this service's
+    /// backend as <c language="text">Authorization: Bearer</c>. When absent, no user token is forwarded.
+    /// </summary>
+    /// <remarks>
+    /// Only requests authenticated by the AuthProxy session get a token, and only on the routes to
+    /// <see cref="Backend"/>. When no token can be obtained, the request is refused with
+    /// <c language="text">401</c> rather than forwarded without one.
+    /// </remarks>
+    public ServiceAccessToken? AccessToken { get; set; }
+
+    /// <summary>
     /// Gets or sets the back-channel client-credentials configuration for this service.
     /// When configured, AuthProxy can verify client credentials against the service and mint scoped bearer tokens.
     /// </summary>
