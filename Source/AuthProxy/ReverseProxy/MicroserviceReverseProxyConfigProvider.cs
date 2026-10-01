@@ -280,7 +280,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
         // Query-parameter–matched API route (adds the header for downstream).
         // Ordered behind the header-matched route rather than beside it: a caller that sends both a
-        // Service-ID header and a ?service= parameter satisfies both, and two candidates at the same order
+        // x-cratis-microservice header and a ?service= parameter satisfies both, and two candidates at the same order
         // with the same template are an AmbiguousMatchException. Endpoint selection runs ahead of
         // authentication, so that surfaces to an unauthenticated caller as a bare 500 — trivially
         // reachable, and in Development a stack trace. A distinct order makes the header win instead.

@@ -80,7 +80,7 @@ public class AccessPolicy : IAccessPolicy
     /// backend, and long before YARP picks a route — so the target is worked out from the request rather
     /// than from a selected endpoint. It mirrors <c language="text">MicroserviceReverseProxyConfigProvider</c> exactly: a
     /// single-service deployment routes everything to that service, and beyond that a service is named by
-    /// the <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, header first.
+    /// the <c language="text">x-cratis-microservice</c> header (or the legacy <c language="text">Service-ID</c>) or the <c language="text">service</c> query parameter, header first.
     /// <para>
     /// A request in a multi-service deployment that names no service reaches no service route either, so
     /// answering <see langword="null"/> costs nothing: the root requirements still apply, and the request
@@ -94,7 +94,7 @@ public class AccessPolicy : IAccessPolicy
             return config.Services.Values.First();
         }
 
-        var serviceId = context.Request.Headers[Headers.ServiceId].FirstOrDefault();
+        var serviceId = ServiceSelection.FromHeaders(context.Request.Headers);
         if (string.IsNullOrWhiteSpace(serviceId))
         {
             serviceId = context.Request.Query[ServiceQueryParameter].FirstOrDefault();

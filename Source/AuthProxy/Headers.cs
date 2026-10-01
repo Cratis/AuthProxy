@@ -37,12 +37,44 @@ public static class Headers
     public const string PrincipalNameExtended = "x-ms-client-principal-name*";
 
     /// <summary>
-    /// Cratis tenant identifier.
+    /// The prefix shared by every Microsoft Identity Platform client principal header, including ones this
+    /// proxy never writes, such as <c language="text">x-ms-client-principal-idp</c>.
     /// </summary>
-    public const string TenantId = "Tenant-ID";
+    /// <remarks>
+    /// A caller must not be able to hand a backend any header that begins with this, so inbound headers are
+    /// matched by prefix rather than against the short list of names the proxy itself writes.
+    /// </remarks>
+    public const string PrincipalPrefix = "x-ms-client-principal";
+
+    /// <summary>
+    /// Cratis tenant identifier, the tenant AuthProxy resolved for the request.
+    /// </summary>
+    /// <remarks>
+    /// This is the name Arc resolves the tenant from by default, so an Arc application behind AuthProxy needs
+    /// no tenancy configuration to read it. It is the only header AuthProxy forwards a tenant in.
+    /// </remarks>
+    public const string TenantId = "x-cratis-tenant-id";
+
+    /// <summary>
+    /// The tenant header earlier releases forwarded the resolved tenant in.
+    /// </summary>
+    /// <remarks>
+    /// AuthProxy no longer writes it. It is still named here because a client must not be able to send it:
+    /// any backend that was configured to read it would otherwise take its tenant from the caller.
+    /// </remarks>
+    public const string LegacyTenantId = "Tenant-ID";
 
     /// <summary>
     /// Service identifier used to route requests to the appropriate service.
     /// </summary>
-    public const string ServiceId = "Service-ID";
+    /// <remarks>
+    /// This is the name Arc's frontend sends by default when a microservice is set.
+    /// </remarks>
+    public const string ServiceId = "x-cratis-microservice";
+
+    /// <summary>
+    /// The service header earlier releases routed on. It is still accepted inbound and means the same as
+    /// <see cref="ServiceId"/>; <see cref="ServiceId"/> wins when both are sent.
+    /// </summary>
+    public const string LegacyServiceId = "Service-ID";
 }

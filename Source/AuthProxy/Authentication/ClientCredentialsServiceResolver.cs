@@ -88,7 +88,7 @@ public class ClientCredentialsServiceResolver(
             return false;
         }
 
-        var requestedService = request.Headers[Headers.ServiceId].FirstOrDefault();
+        var requestedService = ServiceSelection.FromHeaders(request.Headers);
         if (string.IsNullOrWhiteSpace(requestedService))
         {
             requestedService = request.Query["service"].FirstOrDefault();
