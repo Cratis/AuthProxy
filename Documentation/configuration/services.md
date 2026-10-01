@@ -509,4 +509,3 @@ restart and are not shared between replicas. With several replicas, route each s
 (sticky sessions). Otherwise a request that lands on another replica is refused with `401` until the user
 signs in again. Sessions that began before `AccessToken` was configured hold no refresh token either, so
 their users sign in again once.
-
