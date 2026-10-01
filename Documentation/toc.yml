@@ -4,3 +4,5 @@
   href: configuration/toc.yml
 - name: Aspire Hosting
   href: aspire/toc.yml
+- name: Deploying on Azure
+  href: azure/toc.yml
