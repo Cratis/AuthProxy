@@ -131,6 +131,20 @@ identity headers on these paths and the application remains responsible for auth
 See [Anonymous paths](../configuration/services.md#anonymous-paths) for the full matching rules
 and what the flag does and does not change.
 
+### Activity timeout
+
+A proxied request that sits idle — no bytes in either direction — for five minutes is cancelled, which
+also ends a quiet WebSocket or Server-Sent Events stream. Raise the limit for every service, or for one:
+
+```csharp
+authproxy.WithActivityTimeout(TimeSpan.FromMinutes(10));
+authproxy.WithServiceActivityTimeout("reporting", TimeSpan.FromMinutes(2));
+```
+
+The service value wins over the global one. See
+[Timeouts and streaming](../configuration/services.md#timeouts-and-streaming) for what a stream needs
+beyond the timeout.
+
 ### Trusted proxies
 
 Declare the peers directly in front of AuthProxy, so their `X-Forwarded-For` and `X-Forwarded-Proto`
