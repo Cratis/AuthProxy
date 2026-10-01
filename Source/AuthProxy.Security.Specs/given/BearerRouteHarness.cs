@@ -189,6 +189,7 @@ public class BearerRouteHarness : WebApplicationFactory<Program>
         {
             [$"{C.AuthProxy.SectionKey}:Services:app:Backend:BaseUrl"] = Origin.BaseUrl,
             [$"{C.AuthProxy.SectionKey}:Services:app:Frontend:BaseUrl"] = Origin.BaseUrl,
+            [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
 
             [$"{route}:PathPrefix"] = RoutePrefix,
             [$"{route}:Issuers:0:Issuer"] = Issuer.Issuer,

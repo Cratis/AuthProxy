@@ -6,13 +6,13 @@ using Microsoft.AspNetCore.Http;
 namespace Cratis.AuthProxy.Security.for_BearerRoutes;
 
 /// <summary>
-/// Under the default best-effort identity verification, a service answering <c language="text">403</c> on
+/// Under explicitly configured best-effort identity verification, a service answering <c language="text">403</c> on
 /// <c language="text">/.cratis/me</c> refuses a browser session. A bearer route never calls that endpoint — it answers for
 /// browser sessions, not for principals authenticated by a token — so the refusal does not apply there: the token is
 /// forwarded, and the backend decides membership. This is the documented behavior, reported at startup, not an
 /// oversight a token can exploit without the operator knowing.
 /// </summary>
-/// <param name="harness">The running proxy, with the default best-effort identity verification.</param>
+/// <param name="harness">The running proxy, with explicitly configured best-effort identity verification.</param>
 [Collection(BearerRouteSpecCollection.Name)]
 public class when_a_service_would_refuse_the_caller_through_its_identity_endpoint(BearerRouteHarness harness) : IAsyncLifetime
 {

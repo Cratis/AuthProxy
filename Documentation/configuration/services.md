@@ -727,10 +727,10 @@ every token-authenticated request instead.
   A requirement on a role can never be met: roles are dropped from every token.
 - A bearer route **never calls `/.cratis/me`**, in either identity-verification mode: the endpoint answers for
   browser sessions, not for principals authenticated by a token. The backend must enforce tenant membership.
-  - Under the default `BestEffort`, a `403` from a service's `/.cratis/me` refuses a browser session but not a
+  - Under explicitly configured `BestEffort`, a `403` from a service's `/.cratis/me` refuses a browser session but not a
     token. AuthProxy starts, and logs a warning for each bearer route in a deployment where some service answers
     `/.cratis/me`, unless the route sets `AcceptWithoutIdentityVerification: true`.
-  - Under `Required`, AuthProxy **refuses to start** with a bearer route unless the route sets
+  - Under `Required` (the default), AuthProxy **refuses to start** with a bearer route unless the route sets
     `AcceptWithoutIdentityVerification: true`.
 
   Setting it is the operator's statement that, on this route, the validated token, its scopes and the claim

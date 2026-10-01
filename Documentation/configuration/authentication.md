@@ -644,13 +644,13 @@ A bearer route **never calls `/.cratis/me`**, whatever `IdentityVerification` sa
 browser sessions, and a product cannot be assumed to answer it correctly for a principal authenticated by a token.
 The consequences:
 
-- Under the default `IdentityVerification: BestEffort`, a service answering `403` on `/.cratis/me` refuses a
+- Under explicitly configured `IdentityVerification: BestEffort`, a service answering `403` on `/.cratis/me` refuses a
   browser session — but not a token on a bearer route. A user whose browser session a service refuses there can
   still reach the service with a token. **The backend must enforce tenant membership** and what the user may do
   with the scopes the client was granted. AuthProxy logs a warning at startup for every bearer route in a
   deployment where some service answers `/.cratis/me`, unless the route sets `AcceptWithoutIdentityVerification`
   to state that this is intended.
-- Under `IdentityVerification: Required`, AuthProxy refuses to start with a bearer route unless the route sets
+- Under `IdentityVerification: Required` (the default), AuthProxy refuses to start with a bearer route unless the route sets
   `AcceptWithoutIdentityVerification`.
 - No identity details are resolved, so no `.cratis-identity` cookie is written.
 

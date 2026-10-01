@@ -42,6 +42,8 @@ public class when_validating_bearer_routes : Specification
     ValidateOptionsResult _metadataUnderBearerPrefix;
     ValidateOptionsResult _metadataUnderLaterBearerPrefix;
     ValidateOptionsResult _metadataAtSimilarPrefix;
+    ValidateOptionsResult _verificationRequiredByDefault;
+    ValidateOptionsResult _verificationRequiredByDefaultAndAcceptedWithout;
 
     void Because()
     {
@@ -84,6 +86,22 @@ public class when_validating_bearer_routes : Specification
             ["sub"] = "github_id",
             ["SUB"] = "another_id",
         }));
+        _verificationRequiredByDefault = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["main"] = new C.Service
+        {
+            Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.test" },
+            BearerRoutes = [Route()],
+        }));
+        _verificationRequiredByDefaultAndAcceptedWithout = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["main"] = new C.Service
+        {
+            Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.test" },
+            BearerRoutes = [new C.BearerRoute
+            {
+                PathPrefix = "/mcp",
+                Issuers = [new C.BearerIssuer { Issuer = "https://auth.example.test/" }],
+                Audiences = ["direct-api"],
+                AcceptWithoutIdentityVerification = true,
+            }],
+        }));
         _verificationRequired = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
         _verificationRequiredByAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" } })));
         _verificationRequiredAndAcceptedWithout = validator.Validate(null, Configuration(_ => _.AcceptWithoutIdentityVerification = true, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
@@ -118,6 +136,8 @@ public class when_validating_bearer_routes : Specification
     [Fact] void should_refuse_a_resource_metadata_path_another_service_already_serves() => _resourceMetadataOfAnotherService.Failed.ShouldBeTrue();
     [Fact] void should_refuse_a_mapping_with_an_empty_claim_type() => _withEmptyMapping.Failed.ShouldBeTrue();
     [Fact] void should_refuse_a_mapping_into_a_role_claim() => _mappingIntoRoles.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_route_when_its_service_requires_identity_verification_by_default() => _verificationRequiredByDefault.Failed.ShouldBeTrue();
+    [Fact] void should_accept_a_route_accepting_callers_without_the_default_identity_verification() => _verificationRequiredByDefaultAndAcceptedWithout.Succeeded.ShouldBeTrue();
     [Fact] void should_refuse_a_route_when_its_service_requires_identity_verification() => _verificationRequired.Failed.ShouldBeTrue();
     [Fact] void should_name_the_setting_that_accepts_it() => _verificationRequired.FailureMessage.ShouldContain(nameof(C.BearerRoute.AcceptWithoutIdentityVerification));
     [Fact] void should_refuse_a_route_when_another_service_requires_identity_verification() => _verificationRequiredByAnotherService.Failed.ShouldBeTrue();
@@ -169,6 +189,7 @@ public class when_validating_bearer_routes : Specification
     static C.Service Service(C.BearerRoute? route) => new()
     {
         Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.test" },
+        IdentityVerification = C.IdentityVerificationMode.BestEffort,
         BearerRoutes = route is null ? [] : [route],
     };
 

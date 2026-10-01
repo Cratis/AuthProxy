@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// Each also means a caller can reach the service through the route who would be refused through a browser
 /// session, which is why none of them is allowed to be silent either.
 /// <para>
-/// A bearer route does not call <c language="text">/.cratis/me</c> — not even for the <c language="text">403</c> veto the default
+/// A bearer route does not call <c language="text">/.cratis/me</c> — not even for the <c language="text">403</c> veto
 /// <see cref="C.IdentityVerificationMode.BestEffort"/> applies to a browser session. The endpoint is written for
 /// browser sessions, and a product cannot be assumed to answer it correctly for a principal authenticated by a
 /// token: one that answered <c language="text">403</c> to every principal it did not recognize would lock out every token,
