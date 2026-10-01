@@ -44,9 +44,21 @@ public sealed class OidcClientAssertions(
         try
         {
             var description = state.Description;
-            await Load(description, provider);
-
             var now = timeProvider.GetUtcNow();
+            if (description.Certificate is null && state.NextCertificateReload != default)
+            {
+                // An expiry-triggered reload can return no certificate or fail. Throttle those retries too.
+                if (now < state.NextCertificateReload)
+                {
+                    throw new OidcClientCredentialUnavailable(
+                        $"The {credential.Source} client credential of OIDC provider '{provider.Name}' could not be loaded.");
+                }
+
+                state.NextCertificateReload = now.AddMinutes(1);
+            }
+
+            await Load(description, provider);
+            now = timeProvider.GetUtcNow();
             var certificate = description.Certificate;
             if (certificate is not null && certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime && now >= state.NextCertificateReload)
             {
