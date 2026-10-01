@@ -35,6 +35,11 @@ public class KeyRingConfigurationValidator : IValidateOptions<C.AuthProxy>
         var failures = new List<string>();
         var store = $"{C.DataProtection.SectionKey}:{nameof(C.DataProtection.Store)}";
 
+        if (!Enum.IsDefined(settings.Store))
+        {
+            failures.Add($"{store} is '{settings.Store}', which is not a supported store. Set it to '{nameof(C.DataProtectionStore.FileSystem)}', '{nameof(C.DataProtectionStore.AzureBlob)}' or '{nameof(C.DataProtectionStore.Redis)}'.");
+        }
+
         if (settings.Store != C.DataProtectionStore.FileSystem && !string.IsNullOrWhiteSpace(keysPath))
         {
             failures.Add($"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.DataProtectionKeysPath)} is set, but {store} is '{settings.Store}', so the key ring would not be stored there. Remove the path, or set {store} to '{nameof(C.DataProtectionStore.FileSystem)}'.");

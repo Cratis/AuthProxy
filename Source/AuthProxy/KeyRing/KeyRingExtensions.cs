@@ -60,7 +60,7 @@ public static class KeyRingExtensions
                 PersistToRedis(dataProtection, settings.Redis!);
                 break;
 
-            default:
+            case C.DataProtectionStore.FileSystem:
                 if (!string.IsNullOrWhiteSpace(keysPath))
                 {
                     dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
