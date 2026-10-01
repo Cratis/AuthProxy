@@ -16,7 +16,13 @@ public class when_loading_managed_identity_credentials_for_sovereign_clouds : Sp
         {
             ("https://login.microsoftonline.us/tenant/v2.0", ""),
             ("https://login.chinacloudapi.cn/tenant/v2.0", ""),
+            ("https://login.partner.microsoftonline.cn/tenant/v2.0", ""),
+            ("https://login.usgovcloudapi.net/tenant/v2.0", ""),
+            ("https://login.sovcloud-identity.fr/tenant/v2.0", ""),
+            ("https://login.sovcloud-identity.de/tenant/v2.0", ""),
+            ("https://login.sovcloud-identity.sg/tenant/v2.0", ""),
             ("https://login.microsoftonline.com/tenant/v2.0", ""),
+            ("https://login.example.com/tenant/v2.0", ""),
             ("https://login.microsoftonline.us/tenant/v2.0", "api://custom-exchange")
         })
         {
@@ -51,6 +57,12 @@ public class when_loading_managed_identity_credentials_for_sovereign_clouds : Sp
     {
         "api://AzureADTokenExchangeUSGov", "api://AzureADTokenExchangeUSGov",
         "api://AzureADTokenExchangeChina", "api://AzureADTokenExchangeChina",
+        "api://AzureADTokenExchangeChina", "api://AzureADTokenExchangeChina",
+        "api://AzureADTokenExchangeUSGov", "api://AzureADTokenExchangeUSGov",
+        "api://AzureADTokenExchangeFrance", "api://AzureADTokenExchangeFrance",
+        "api://AzureADTokenExchangeGermany", "api://AzureADTokenExchangeGermany",
+        "api://AzureADTokenExchangeGovSG", "api://AzureADTokenExchangeGovSG",
+        "api://AzureADTokenExchange", "api://AzureADTokenExchange",
         "api://AzureADTokenExchange", "api://AzureADTokenExchange",
         "api://custom-exchange", "api://custom-exchange"
     });

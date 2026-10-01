@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Identity.Abstractions;
+using Microsoft.Identity.Client.Instance.Discovery;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -57,14 +58,12 @@ static class OidcClientCredentialDescription
         _ => throw new OidcClientCredentialUnavailable($"The client credential source '{credential.Source}' does not use a client assertion.")
     };
 
-    static string TokenExchangeAudienceOf(string authority) => Uri.TryCreate(authority, UriKind.Absolute, out var uri)
-        ? uri.Host.ToLowerInvariant() switch
-        {
-            "login.microsoftonline.us" => "api://AzureADTokenExchangeUSGov",
-            "login.chinacloudapi.cn" => "api://AzureADTokenExchangeChina",
-            _ => "api://AzureADTokenExchange"
-        }
-        : "api://AzureADTokenExchange";
+    static string TokenExchangeAudienceOf(string authority) =>
+        Uri.TryCreate(authority, UriKind.Absolute, out var uri) &&
+        KnownCloudMetadata.Default.GetByAuthorityHost(uri.Host) is { } metadata &&
+        metadata.TryGetValue(Microsoft.Identity.Client.Instance.Discovery.CloudMetadataKeyNames.FederatedCredentialAudience, out var audience)
+            ? audience
+            : "api://AzureADTokenExchange";
 
     static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }
