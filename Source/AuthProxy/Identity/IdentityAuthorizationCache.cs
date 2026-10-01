@@ -65,8 +65,8 @@ public class IdentityAuthorizationCache(
     /// contradiction while the record only saves a round-trip, and a serious one once it carries an
     /// authorization decision: a deployment that asked for no remembered authorization would be handed the
     /// most permissive one. So where the identity endpoint is a verifier, "no bound" is honored by
-    /// recording nothing; everywhere else the released fallback is kept, because changing it unconditionally
-    /// would multiply identity-endpoint traffic for deployments that set zero for its documented meaning.
+    /// recording nothing; deployments with no Required services keep the released fallback. Removing it
+    /// can increase identity-endpoint traffic, although the independent in-memory result cache still applies.
     /// </remarks>
     TimeSpan? Lifetime
     {
@@ -100,6 +100,7 @@ public class IdentityAuthorizationCache(
         var payload = JsonSerializer.Serialize(new IdentityAuthorizationRecord
         {
             Version = IdentityAuthorizationRecord.CurrentVersion,
+            RequiredVerificationSucceeded = config.CurrentValue.RequiresIdentityVerification,
             ExpiresAt = expires.ToUnixTimeSeconds(),
             TenantId = tenantId,
             Account = account
@@ -134,12 +135,13 @@ public class IdentityAuthorizationCache(
             var payload = _protector.Unprotect(sealedRecord);
             var record = JsonSerializer.Deserialize<IdentityAuthorizationRecord>(payload);
             return record?.Version == IdentityAuthorizationRecord.CurrentVersion
+                && (!config.CurrentValue.RequiresIdentityVerification || record.RequiredVerificationSucceeded)
                 && record.Account is not null
                 && record.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                 && string.Equals(record.TenantId, tenantId, StringComparison.OrdinalIgnoreCase)
                 && record.Account == account;
         }
-        catch (System.Security.Cryptography.CryptographicException) when (!account.IsCanonical)
+        catch (System.Security.Cryptography.CryptographicException) when (!account.IsCanonical && !config.CurrentValue.RequiresIdentityVerification)
         {
             return IsAuthorizedByLegacyRecord(sealedRecord, account, tenantId);
         }

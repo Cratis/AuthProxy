@@ -19,6 +19,12 @@ internal sealed record IdentityAuthorizationRecord
     public int Version { get; init; }
 
     /// <summary>
+    /// Gets or initializes whether the record was issued after Required verification succeeded.
+    /// Missing in older records, which must not bypass Required verification after an upgrade.
+    /// </summary>
+    public bool RequiredVerificationSucceeded { get; init; }
+
+    /// <summary>
     /// Gets or initializes the expiry as Unix time seconds.
     /// </summary>
     public long ExpiresAt { get; init; }

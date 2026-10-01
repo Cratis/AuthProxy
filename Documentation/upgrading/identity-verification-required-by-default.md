@@ -38,7 +38,7 @@ page instead of forwarding the request:
 | answers `403` | denied | denied |
 | answers `200` with `"isAuthorized": true` | forwarded | forwarded |
 
-Three consequences follow from the same change:
+Four consequences follow from the same change:
 
 - **A bounded wait.** An unstated `IdentityVerificationTimeout` is now ten seconds instead of the ambient
   100-second HTTP client default. State a value to change it.
@@ -48,11 +48,28 @@ Three consequences follow from the same change:
 - **Callers with no resolved tenant are refused.** An authenticated request whose tenant does not resolve is
   denied rather than forwarded, except on [anonymous paths](../configuration/services.md#anonymous-paths)
   and AuthProxy's own sign-in, invite and registration surfaces.
+- **A non-positive revalidation interval no longer remembers authorization in a cookie.** Previously,
+  `Session.IdentityRevalidationInterval` set to zero or a negative value still produced a sealed record
+  valid for ten minutes. With any `Required` service, no such record is written or reused. The independent
+  `Session.IdentityResultCacheDuration` still applies (30 seconds by default); after that cache expires,
+  AuthProxy asks the endpoints again. Set a positive `IdentityRevalidationInterval` to remember verified
+  authorization, or explicitly select `BestEffort` for every affected service to keep the old fallback.
 
 An affected service also stops being served while its identity endpoint is down. That is the intent.
-Every denial under `Required` logs a warning naming the service, a bounded reason for the denial, and the
-exact opt-out: `Cratis__AuthProxy__Services__<name>__IdentityVerification=BestEffort`. This includes a
-missing resolved tenant and an exhausted or canceled identity-resolution wait, not only endpoint failures.
+Denials under `Required` log a warning naming the service, a bounded reason for the denial, and the
+exact opt-out: `Cratis__AuthProxy__Services__<name>__IdentityVerification=BestEffort`. A missing resolved
+tenant or exhausted identity-resolution wait produces one warning listing the Required services and
+their opt-outs. A canceled request is an ordinary client disconnect and logs only a debug denial,
+without an opt-out warning.
+
+## Authorization cookies during upgrade
+
+Required verification now accepts a sealed authorization cookie only if it was issued after Required
+verification succeeded. Older cookies and cookies issued under `BestEffort` cannot bypass verification,
+including when Data Protection keys are preserved or older instances keep issuing cookies during a rolling
+upgrade. The first request carrying such a cookie is checked again, rather than trusting its previous
+revalidation window (ten minutes by default). This does not sign the user out unless verification denies
+access and session termination is enabled. Explicit `BestEffort` deployments can still reuse older cookies.
 
 ## What to do
 
