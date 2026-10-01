@@ -84,7 +84,10 @@ public class IdentityAuthorizationCache(
     }
 
     /// <inheritdoc/>
-    public void Record(HttpContext context, ClientPrincipal principal, string tenantId)
+    public void Record(HttpContext context, ClientPrincipal principal, string tenantId) => Record(context, principal, tenantId, []);
+
+    /// <inheritdoc/>
+    public void Record(HttpContext context, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices)
     {
         if (!IdentityAccountBinding.TryCreate(principal, out var account))
         {
@@ -100,7 +103,8 @@ public class IdentityAuthorizationCache(
         var payload = JsonSerializer.Serialize(new IdentityAuthorizationRecord
         {
             Version = IdentityAuthorizationRecord.CurrentVersion,
-            RequiredVerificationSucceeded = config.CurrentValue.RequiresIdentityVerification,
+            RequiredVerificationSucceeded = verifiedRequiredServices.Count > 0,
+            RequiredVerificationServices = verifiedRequiredServices.Order(StringComparer.Ordinal).ToArray(),
             ExpiresAt = expires.ToUnixTimeSeconds(),
             TenantId = tenantId,
             Account = account
@@ -134,8 +138,10 @@ public class IdentityAuthorizationCache(
         {
             var payload = _protector.Unprotect(sealedRecord);
             var record = JsonSerializer.Deserialize<IdentityAuthorizationRecord>(payload);
+            var requiredServices = IdentityVerificationServices.Required(config.CurrentValue);
             return record?.Version == IdentityAuthorizationRecord.CurrentVersion
-                && (!config.CurrentValue.RequiresIdentityVerification || record.RequiredVerificationSucceeded)
+                && (requiredServices.Length == 0 || (record.RequiredVerificationSucceeded
+                    && record.RequiredVerificationServices?.SequenceEqual(requiredServices, StringComparer.Ordinal) == true))
                 && record.Account is not null
                 && record.ExpiresAt > DateTimeOffset.UtcNow.ToUnixTimeSeconds()
                 && string.Equals(record.TenantId, tenantId, StringComparison.OrdinalIgnoreCase)

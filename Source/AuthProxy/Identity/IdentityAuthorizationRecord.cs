@@ -25,6 +25,12 @@ internal sealed record IdentityAuthorizationRecord
     public bool RequiredVerificationSucceeded { get; init; }
 
     /// <summary>
+    /// Gets or initializes the Required services that actually verified the caller.
+    /// Missing in older records, which cannot establish verification for the current services.
+    /// </summary>
+    public string[]? RequiredVerificationServices { get; init; }
+
+    /// <summary>
     /// Gets or initializes the expiry as Unix time seconds.
     /// </summary>
     public long ExpiresAt { get; init; }

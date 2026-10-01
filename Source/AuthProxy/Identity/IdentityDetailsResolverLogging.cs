@@ -17,17 +17,17 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Debug, "Calling identity endpoint for service '{Service}' with UserId={UserId}")]
     internal static partial void CallingIdentityEndpointWithPrincipal(this ILogger logger, string service, string userId);
 
-    [LoggerMessage(LogLevel.Error, "Error calling identity endpoint for service '{Service}'")]
-    internal static partial void ErrorCallingIdentityEndpoint(this ILogger logger, Exception exception, string service);
+    [LoggerMessage(Message = "Error calling identity endpoint for service '{Service}'")]
+    internal static partial void ErrorCallingIdentityEndpoint(this ILogger logger, Exception exception, string service, LogLevel level);
 
     [LoggerMessage(LogLevel.Debug, "Service '{Service}' returned 403 for user {UserId} - access denied")]
     internal static partial void IdentityEndpointForbidden(this ILogger logger, string service, string userId);
 
-    [LoggerMessage(LogLevel.Warning, "Identity endpoint for '{Service}' returned {StatusCode}. Identity details skipped.")]
-    internal static partial void IdentityEndpointUnsuccessful(this ILogger logger, string service, int statusCode);
+    [LoggerMessage(Message = "Identity endpoint for '{Service}' returned {StatusCode}. Identity details skipped.")]
+    internal static partial void IdentityEndpointUnsuccessful(this ILogger logger, string service, int statusCode, LogLevel level);
 
-    [LoggerMessage(LogLevel.Warning, "Could not parse identity response from '{Service}'")]
-    internal static partial void CouldNotParseIdentityResponse(this ILogger logger, Exception exception, string service);
+    [LoggerMessage(Message = "Could not parse identity response from '{Service}'")]
+    internal static partial void CouldNotParseIdentityResponse(this ILogger logger, Exception exception, string service, LogLevel level);
 
     // The reason is an enumeration value rather than anything the service said. A denial has to be
     // diagnosable, and the tempting way to make it so is to log the answer that produced it — which is a

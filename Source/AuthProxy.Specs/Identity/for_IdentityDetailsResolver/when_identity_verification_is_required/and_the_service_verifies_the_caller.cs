@@ -18,7 +18,7 @@ public class and_the_service_verifies_the_caller : given.a_required_verification
 
     [Fact] void should_be_authorized() => _result.IsAuthorized.ShouldBeTrue();
     [Fact] void should_write_the_identity_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.Identity);
-    [Fact] void should_record_the_authorization() => _authorizationCache.Received(1).Record(_context, Arg.Any<ClientPrincipal>(), TenantId);
+    [Fact] void should_record_the_authorization() => _authorizationCache.Received(1).Record(_context, Arg.Any<ClientPrincipal>(), TenantId, Arg.Is<IReadOnlyCollection<string>>(_ => _.SequenceEqual(new[] { "main" })));
     [Fact] void should_not_clear_the_authorization() => _authorizationCache.DidNotReceive().Clear(Arg.Any<HttpContext>());
     [Fact] void should_leave_the_response_status_alone() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status200OK);
 }

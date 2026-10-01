@@ -64,8 +64,11 @@ without an opt-out warning.
 
 ## Authorization cookies during upgrade
 
-Required verification now accepts a sealed authorization cookie only if it was issued after Required
-verification succeeded. Older cookies and cookies issued under `BestEffort` cannot bypass verification,
+Required verification now accepts a sealed authorization cookie only if it was issued after every currently
+Required participating service verified the caller. The cookie is bound to that service set; adding a
+Required service or switching a service from `BestEffort` to `Required` forces verification again. The
+in-memory result cache is also scoped to that set, so a cached `BestEffort` admission cannot become proof
+of Required verification after a configuration reload. Older cookies and cookies issued under `BestEffort` cannot bypass verification,
 including when Data Protection keys are preserved or older instances keep issuing cookies during a rolling
 upgrade. The first request carrying such a cookie is checked again, rather than trusting its previous
 revalidation window (ten minutes by default). This does not sign the user out unless verification denies

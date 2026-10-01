@@ -32,6 +32,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
     /// <param name="logIdentifier">The non-identifying label used when logging about this caller.</param>
     /// <param name="timeout">How long to wait for an answer. Non-positive leaves the wait unbounded.</param>
     /// <param name="cancellationToken">The caller's own request lifetime.</param>
+    /// <param name="denialWillBeLogged">Whether the resolver will log failures as Required denials.</param>
     /// <returns>What the service established, and the details it supplied.</returns>
     /// <remarks>
     /// Nothing here throws. Every way the call can fail is a fact about the service, and a fact is what the
@@ -45,7 +46,8 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         string tenantId,
         string logIdentifier,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool denialWillBeLogged = false)
     {
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
         logger.CallingIdentityEndpoint(url, serviceName);
@@ -73,7 +75,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
 
             if (!httpResponse.IsSuccessStatusCode)
             {
-                logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode);
+                logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode, denialWillBeLogged ? LogLevel.Debug : LogLevel.Warning);
                 return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnsuccessfulStatusCode);
             }
 
@@ -81,21 +83,21 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
 
             return string.IsNullOrWhiteSpace(body)
                 ? IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.EmptyResponse)
-                : ReadOutcome(body, serviceName);
+                : ReadOutcome(body, serviceName, denialWillBeLogged);
         }
         catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName);
+            logger.ErrorCallingIdentityEndpoint(ex, serviceName, LogLevel.Debug);
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.Canceled);
         }
         catch (OperationCanceledException ex)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName);
+            logger.ErrorCallingIdentityEndpoint(ex, serviceName, denialWillBeLogged ? LogLevel.Debug : LogLevel.Error);
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.TimedOut);
         }
         catch (Exception ex)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName);
+            logger.ErrorCallingIdentityEndpoint(ex, serviceName, denialWillBeLogged ? LogLevel.Debug : LogLevel.Error);
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.TransportFailure);
         }
     }
@@ -121,8 +123,9 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
     /// </summary>
     /// <param name="body">The response body.</param>
     /// <param name="serviceName">The configured name of the service being called.</param>
+    /// <param name="denialWillBeLogged">Whether the resolver will log failures as Required denials.</param>
     /// <returns>What the body established, and the details it carried.</returns>
-    IdentityVerificationOutcome ReadOutcome(string body, string serviceName)
+    IdentityVerificationOutcome ReadOutcome(string body, string serviceName, bool denialWillBeLogged)
     {
         JsonObject parsed;
         try
@@ -131,7 +134,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         }
         catch (Exception ex)
         {
-            logger.CouldNotParseIdentityResponse(ex, serviceName);
+            logger.CouldNotParseIdentityResponse(ex, serviceName, denialWillBeLogged ? LogLevel.Debug : LogLevel.Warning);
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnreadableResponse);
         }
 

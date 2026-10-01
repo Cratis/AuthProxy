@@ -33,6 +33,16 @@ public class when_reusing_records_issued_before_required_verification : Specific
                 ExpiresAt = expiresAt,
                 TenantId = "tenant-a",
                 Account = account
+            })),
+
+            // A deployment-wide flag does not establish which services verified the caller.
+            keys.CreateProtector("Cratis.AuthProxy.Identity.Authorization.v2").Protect(JsonSerializer.Serialize(new
+            {
+                Version = 2,
+                RequiredVerificationSucceeded = true,
+                ExpiresAt = expiresAt,
+                TenantId = "tenant-a",
+                Account = account
             }))
         };
 
@@ -47,6 +57,6 @@ public class when_reusing_records_issued_before_required_verification : Specific
         }
     }
 
-    [Fact] void should_reject_both_old_formats_when_verification_is_required() => _requiredResults.ShouldContainOnly([false, false]);
-    [Fact] void should_preserve_reuse_for_explicit_best_effort() => _bestEffortResults.ShouldContainOnly([true, true]);
+    [Fact] void should_reject_old_formats_without_service_verification_when_required() => _requiredResults.ShouldContainOnly([false, false, false]);
+    [Fact] void should_preserve_reuse_for_explicit_best_effort() => _bestEffortResults.ShouldContainOnly([true, true, true]);
 }

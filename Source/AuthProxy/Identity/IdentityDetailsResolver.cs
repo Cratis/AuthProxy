@@ -72,7 +72,8 @@ public class IdentityDetailsResolver(
         // is an authorization decision a deployment must be able to switch the memory off and have it
         // actually be off. A zero re-validation interval is documented as "no bound", and honoring that
         // literally means nothing may be sealed — so nothing may be believed either.
-        var verificationRequired = current.RequiresIdentityVerification;
+        var requiredServices = IdentityVerificationServices.Required(current);
+        var verificationRequired = requiredServices.Length > 0;
         var mayReuseRecord = !hasPendingInvite
             && (!verificationRequired || session.IdentityRevalidationInterval > TimeSpan.Zero);
         var mayReuseResult = !hasPendingInvite && session.IdentityResultCacheDuration > TimeSpan.Zero;
@@ -88,11 +89,14 @@ public class IdentityDetailsResolver(
             return BuildAuthorizedResult(principal, details: null);
         }
 
-        var cacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(CacheKeyPurpose, account, tenantId) : null;
+        // A remembered result proves only the Required service set it was produced under. A mode change
+        // must ask the newly Required services, never seal an earlier BestEffort admission as verification.
+        var cachePurpose = CacheKeyPurpose + JsonSerializer.Serialize(requiredServices);
+        var cacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(cachePurpose, account, tenantId) : null;
 
         if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
-            WriteIdentityState(context, cached, principal, tenantId);
+            WriteIdentityState(context, cached, principal, tenantId, requiredServices);
             logger.IdentityDetailsCacheHit(logIdentifier);
             return cached;
         }
@@ -136,9 +140,7 @@ public class IdentityDetailsResolver(
             // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
             // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
             return verificationRequired
-                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn, requiredServices: current.Services
-                    .Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required)
-                    .Select(_ => _.Key))
+                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn, requiredServices: requiredServices)
                 : BuildAuthorizedResult(principal, details: null);
         }
 
@@ -147,17 +149,19 @@ public class IdentityDetailsResolver(
             // Double-check inside the lock — another request may have populated the cache while we waited.
             if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
             {
-                WriteIdentityState(context, cached, principal, tenantId);
+                WriteIdentityState(context, cached, principal, tenantId, requiredServices);
                 logger.IdentityDetailsCacheHit(logIdentifier);
                 return cached;
             }
 
             var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
             var mergedDetails = new JsonObject();
+            var verifiedRequiredServices = new List<string>();
 
             foreach (var (name, service) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution))
             {
                 logger.CallingIdentityEndpointWithPrincipal(name, logIdentifier);
+                var mode = service.IdentityVerification;
 
                 var outcome = await _endpointCaller.Call(
                     name,
@@ -166,11 +170,17 @@ public class IdentityDetailsResolver(
                     tenantId,
                     logIdentifier,
                     service.EffectiveIdentityVerificationTimeout,
-                    context.RequestAborted);
+                    context.RequestAborted,
+                    denialWillBeLogged: mode == C.IdentityVerificationMode.Required);
 
-                if (!Admits(outcome, service.IdentityVerification))
+                if (!Admits(outcome, mode))
                 {
-                    return Deny(context, cacheKey, name, outcome.Reason, service.IdentityVerification == C.IdentityVerificationMode.Required);
+                    return Deny(context, cacheKey, name, outcome.Reason, mode == C.IdentityVerificationMode.Required);
+                }
+
+                if (mode == C.IdentityVerificationMode.Required)
+                {
+                    verifiedRequiredServices.Add(name);
                 }
 
                 foreach (var property in outcome.Details)
@@ -180,9 +190,10 @@ public class IdentityDetailsResolver(
             }
 
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
-            WriteIdentityState(context, identityResult, principal, tenantId);
+            WriteIdentityState(context, identityResult, principal, tenantId, verifiedRequiredServices);
             logger.IdentityDetailsCookieWritten(logIdentifier);
-            if (cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero)
+            if (cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero
+                && verifiedRequiredServices.Order(StringComparer.Ordinal).SequenceEqual(requiredServices, StringComparer.Ordinal))
             {
                 memoryCache.Set(cacheKey, identityResult, session.IdentityResultCacheDuration);
             }
@@ -308,12 +319,12 @@ public class IdentityDetailsResolver(
         return IdentityProviderResult.Unauthorized;
     }
 
-    void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId)
+    void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices)
     {
         // Two cookies, deliberately: the readable one the frontend renders from, and the sealed record
         // that is allowed to skip this resolution next time. They are written together so the authorized
         // outcome and the proof of it can never drift apart.
-        authorizationCache.Record(context, principal, tenantId);
+        authorizationCache.Record(context, principal, tenantId, verifiedRequiredServices);
 
         var json = JsonSerializer.Serialize(result, _cookieSerializerOptions);
         var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));

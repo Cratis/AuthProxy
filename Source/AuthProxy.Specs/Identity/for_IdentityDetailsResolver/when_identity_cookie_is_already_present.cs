@@ -36,10 +36,10 @@ public class when_identity_cookie_is_already_present : Specification
             Services = new Dictionary<string, C.Service>
             {
                 ["main"] = new()
-            {
-                Backend = new C.ServiceEndpoint { BaseUrl = "http://backend" },
-                IdentityVerification = C.IdentityVerificationMode.BestEffort
-            }
+                {
+                    Backend = new C.ServiceEndpoint { BaseUrl = "http://backend" },
+                    IdentityVerification = C.IdentityVerificationMode.BestEffort
+                }
             }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
@@ -64,6 +64,5 @@ public class when_identity_cookie_is_already_present : Specification
 
     [Fact] void should_still_call_the_identity_endpoint() => _httpClientFactory.Received().CreateClient(Arg.Any<string>());
     [Fact] void should_authorize_on_what_the_service_answered() => Assert.True(_result.IsAuthorized);
-    [Fact] void should_record_the_authorization_it_resolved() =>
-        _authorizationCache.Received(1).Record(_context, Arg.Any<ClientPrincipal>(), Arg.Any<string>());
+    [Fact] void should_record_the_authorization_it_resolved() => _authorizationCache.Received(1).Record(_context, Arg.Any<ClientPrincipal>(), Arg.Any<string>(), Arg.Any<IReadOnlyCollection<string>>());
 }
