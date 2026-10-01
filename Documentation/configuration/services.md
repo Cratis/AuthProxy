@@ -40,6 +40,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `ResolveIdentityDetails` | `bool?` | `true` when Backend is set | Whether to call `/.cratis/me` on this service **at all**. See [Identity enrichment](#identity-enrichment). |
 | `IdentityVerification` | `Required` \| `BestEffort` | `Required` | What that call's answer **means**. `Required` fails closed; `BestEffort` is the explicit opt-in for an endpoint that only enriches. See [Identity enrichment](#identity-enrichment). |
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
+| `ActivityTimeout` | `TimeSpan` | The root `ActivityTimeout`, then `00:05:00` | How long a request proxied to this service may sit idle before AuthProxy cancels it. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
 
@@ -48,6 +49,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | Property | Type | Description |
 |----------|------|-------------|
 | `BaseUrl` | `string` | Base URL of the endpoint (e.g. `http://my-service:8080/`). |
+| `ActivityTimeout` | `TimeSpan` | Idle limit for this endpoint alone (`Backend` or `Frontend`). Overrides the service and root values. See [Timeouts and streaming](#timeouts-and-streaming). |
 
 ### ServiceClientCredentialsConfig properties
 
@@ -90,6 +92,87 @@ Forwarding `Service-ID` is deprecated and will be removed in a future major rele
 `x-cratis-microservice`.
 
 Routes are matched case-insensitively.
+
+---
+
+## Timeouts and streaming
+
+Everything AuthProxy forwards — a plain request, a WebSocket session, a Server-Sent Events (SSE) stream —
+is subject to one limit, the **activity timeout**: the longest a proxied request may sit idle, with no bytes
+moving in either direction, before AuthProxy cancels it. The clock restarts whenever data is read or
+written, so it is an idle limit, not a cap on how long a connection may live. The default is five minutes.
+
+Set it in three places. The most specific one that is set wins:
+
+| Setting | Applies to |
+|---------|------------|
+| `Cratis:AuthProxy:Services:<name>:<Backend or Frontend>:ActivityTimeout` | That endpoint only. |
+| `Cratis:AuthProxy:Services:<name>:ActivityTimeout` | Both endpoints of that service. |
+| `Cratis:AuthProxy:ActivityTimeout` | Every endpoint that states nothing narrower. |
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "ActivityTimeout": "00:10:00",
+      "Services": {
+        "portal": {
+          "Backend": { "BaseUrl": "http://portal-api:8080/", "ActivityTimeout": "01:00:00" },
+          "Frontend": { "BaseUrl": "http://portal-web:3000/" }
+        },
+        "reporting": {
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "ActivityTimeout": "00:02:00"
+        }
+      }
+    }
+  }
+}
+```
+
+Here `portal`'s backend allows an hour of silence, its frontend and anything not listed allow ten minutes,
+and `reporting` allows two. As environment variables the root value is `Cratis__AuthProxy__ActivityTimeout`
+and a service's is `Cratis__AuthProxy__Services__portal__ActivityTimeout`.
+
+A value must be at least one millisecond and at most 2,147,483,647 milliseconds (about 24 days).
+AuthProxy refuses to start when a value is outside this range, and the message names the setting.
+`Registration` is not a proxied endpoint: setting `Registration:ActivityTimeout` also prevents startup.
+Remove that setting and configure the service's `Backend` or `Frontend` activity timeout instead.
+`Invite:Lobby` does not create proxy clusters: setting `ActivityTimeout` on the lobby itself or its
+`Backend`, `Frontend` or `Registration` endpoints also prevents startup with a message naming the setting.
+Remove those settings and configure the proxied service under `Services` instead.
+A change to the configuration file is applied to new requests without a restart.
+
+From Aspire:
+
+```csharp
+authproxy.WithActivityTimeout(TimeSpan.FromMinutes(10));
+authproxy.WithServiceActivityTimeout("reporting", TimeSpan.FromMinutes(2));
+```
+
+### WebSocket and Server-Sent Events
+
+AuthProxy forwards a WebSocket upgrade or an SSE response to the service as-is and does not buffer, compress
+or rewrite the stream, so each message reaches the client as soon as the service writes and flushes it. What
+to know:
+
+- **A quiet stream is cut.** If the service sends nothing for longer than the activity timeout, and the
+  client sends nothing either, AuthProxy cancels the request and the client sees the connection drop. For a
+  live-update feature such as an observable query, either send a heartbeat (an SSE comment line such as
+  `: ping`, or a WebSocket ping) more often than the timeout, or raise the timeout above the longest silence
+  you expect. A heartbeat at a third to a half of the timeout leaves room for one lost beat.
+- **A stream is authorized when it opens.** The session cookie and any access policy are evaluated on the
+  upgrade or SSE request, and the identity headers are attached to it. Nothing is re-checked while the
+  stream stays open, so a user whose access is revoked keeps a connection that is already open until it
+  closes. Keep streams bounded, or have the service close them periodically, if that window matters.
+- **Whatever sits in front of AuthProxy has its own idle limit.** A load balancer, gateway or hosting
+  platform in front of AuthProxy applies its own timeout, and the shortest limit on the path wins. Raising
+  the AuthProxy value alone does not help if the platform cuts the connection first, so align the two, or
+  rely on heartbeats that are more frequent than both.
+- **The same applies behind AuthProxy.** A service or sidecar between AuthProxy and the application may
+  have an idle limit of its own.
+- **Reconnect on the client.** Browsers reconnect an `EventSource` on their own; a WebSocket client needs
+  its own reconnect logic. A dropped stream is the normal way an idle one ends.
 
 ---
 
