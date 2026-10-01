@@ -10,8 +10,8 @@ namespace Cratis.AuthProxy.ReverseProxy;
 /// Refuses a configuration stating a proxy activity timeout the proxy cannot honor.
 /// </summary>
 /// <remarks>
-/// A zero or negative value would cancel every proxied request the moment it starts, and a value past the
-/// largest delay the platform can schedule would fail on the first request instead of at startup. Both are
+/// A value below one millisecond becomes an immediate cancellation, and a value past the
+/// signed integer millisecond limit YARP uses would silently shorten the configured timeout. Both are
 /// configuration mistakes, so they are named here, at the one moment somebody is watching, rather than
 /// surfacing as every request failing or as a silently different timeout than the one written down.
 /// </remarks>
@@ -20,7 +20,7 @@ public class ActivityTimeoutConfigurationValidator : IValidateOptions<C.AuthProx
     /// <summary>
     /// The longest activity timeout that can be scheduled.
     /// </summary>
-    internal static readonly TimeSpan Maximum = TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
+    internal static readonly TimeSpan Maximum = TimeSpan.FromMilliseconds(int.MaxValue);
 
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
@@ -52,6 +52,10 @@ public class ActivityTimeoutConfigurationValidator : IValidateOptions<C.AuthProx
         if (value <= TimeSpan.Zero)
         {
             failures.Add($"{key} is '{value}', which is not greater than zero. A proxied request would be cancelled the moment it started. Leave the setting unset for the default of {C.AuthProxy.DefaultActivityTimeout}, or state how long a request may sit idle, for example '00:15:00'.");
+        }
+        else if (value < TimeSpan.FromMilliseconds(1))
+        {
+            failures.Add($"{key} is '{value}', which is less than one millisecond. The proxy would round it down to zero and cancel the request immediately. State an idle limit of at least '00:00:00.001'.");
         }
         else if (value > Maximum)
         {

@@ -122,9 +122,9 @@ Here `portal`'s backend allows an hour of silence, its frontend and anything not
 and `reporting` allows two. As environment variables the root value is `Cratis__AuthProxy__ActivityTimeout`
 and a service's is `Cratis__AuthProxy__Services__portal__ActivityTimeout`.
 
-A value must be greater than zero. AuthProxy refuses to start when one is zero, negative or longer than the
-platform can schedule (about 49 days), and the message names the setting. A change to the configuration
-file is applied to new requests without a restart.
+A value must be at least one millisecond and at most 2,147,483,647 milliseconds (about 24 days).
+AuthProxy refuses to start when a value is outside this range, and the message names the setting.
+A change to the configuration file is applied to new requests without a restart.
 
 From Aspire:
 
