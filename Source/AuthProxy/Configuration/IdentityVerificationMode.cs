@@ -29,13 +29,13 @@ public enum IdentityVerificationMode
     /// answer lets the request through and merges whatever details came with it — an unreachable service, a
     /// timeout, a non-success status other than <c language="text">403</c>, an empty body, an unparseable body, and a
     /// well-formed body whose own <c language="text">isAuthorized</c> or <c language="text">isAuthenticated</c> verdict is negative or
-    /// self-contradicting. This is the released behavior, exactly, and remains the default.
+    /// self-contradicting. This is the behavior earlier releases had by default; it is now an explicit
+    /// opt-in for a service whose endpoint only enriches, and is no longer the default.
     /// </summary>
     /// <remarks>
-    /// The released call read no verdict out of the body at all, so a body-level negative is admitted here
+    /// The earlier call read no verdict out of the body at all, so a body-level negative is admitted here
     /// on purpose rather than by omission. A deployment whose service answers with a verdict it wants
-    /// enforced says so with <see cref="Required"/>; promoting the verdict in this mode would change what an
-    /// unchanged configuration does to an unchanged service.
+    /// enforced uses <see cref="Required"/>, which is the default.
     /// </remarks>
     BestEffort = 0,
 
@@ -43,7 +43,8 @@ public enum IdentityVerificationMode
     /// The endpoint is an authorization decision, and only an explicit positive lets the request through.
     /// Anything else — an unreachable service, a timeout, a cancellation, any non-success status, an empty
     /// or unparseable body, or a well-formed body carrying no unambiguous positive — denies the request,
-    /// clears any remembered authorization, and serves the forbidden page.
+    /// clears any remembered authorization, and serves the forbidden page. This is the default for every
+    /// service that takes part in identity resolution.
     /// </summary>
     /// <remarks>
     /// A denial expires the readable identity cookie and the sealed authorization record by asking the

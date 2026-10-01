@@ -35,7 +35,11 @@ public class when_identity_cookie_is_already_present : Specification
         {
             Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://backend" } }
+                ["main"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "http://backend" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            }
             }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();

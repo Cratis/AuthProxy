@@ -26,7 +26,8 @@ public class and_a_best_effort_service_cannot_be_reached : given.a_required_veri
     {
         _config.Services["enrichment"] = new C.Service
         {
-            Backend = new C.ServiceEndpoint { BaseUrl = $"https://{EnrichingHost}" }
+            Backend = new C.ServiceEndpoint { BaseUrl = $"https://{EnrichingHost}" },
+            IdentityVerification = C.IdentityVerificationMode.BestEffort
         };
         _handler.Respond = (request, _, _) => request.RequestUri!.Host == EnrichingHost
             ? throw new HttpRequestException("connection refused")
