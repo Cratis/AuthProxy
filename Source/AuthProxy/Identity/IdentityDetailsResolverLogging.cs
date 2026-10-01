@@ -20,7 +20,7 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Error, "Error calling identity endpoint for service '{Service}'")]
     internal static partial void ErrorCallingIdentityEndpoint(this ILogger logger, Exception exception, string service);
 
-    [LoggerMessage(LogLevel.Warning, "Service '{Service}' returned 403 for user {UserId} - access denied")]
+    [LoggerMessage(LogLevel.Debug, "Service '{Service}' returned 403 for user {UserId} - access denied")]
     internal static partial void IdentityEndpointForbidden(this ILogger logger, string service, string userId);
 
     [LoggerMessage(LogLevel.Warning, "Identity endpoint for '{Service}' returned {StatusCode}. Identity details skipped.")]

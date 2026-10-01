@@ -47,10 +47,9 @@ public class IdentityMiddleware(
             {
                 if (MustBeVerified(context, current))
                 {
-                    foreach (var (name, _) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required))
-                    {
-                        logger.RequiredIdentityVerificationDenied(name, "NoResolvedTenant");
-                    }
+                    logger.RequiredIdentityResolutionDenied(
+                        current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required).Select(_ => _.Key),
+                        "NoResolvedTenant");
 
                     await Refuse(context, current);
                     return;

@@ -26,7 +26,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <remarks>
 /// What each service's answer is worth is a per-service setting — see
 /// <see cref="C.IdentityVerificationMode"/>. Under <see cref="C.IdentityVerificationMode.BestEffort"/> only
-/// an HTTP <c language="text">403</c> denies, which is exactly what the released proxy denied on and nothing more. Under
+/// an HTTP <c language="text">403</c> denies, preserving earlier releases' behavior as an explicit opt-in. Under
 /// <see cref="C.IdentityVerificationMode.Required"/> only an explicit positive admits, and every other
 /// outcome denies and erases what an earlier positive left behind.
 /// </remarks>
@@ -127,7 +127,7 @@ public class IdentityDetailsResolver(
 
             // A caller that went away is an ordinary event and says nothing about the deployment. Running out
             // of budget while waiting is the operator's signal that the identity endpoints are the queue.
-            if (missedTurn == IdentityVerificationReason.TimedOut)
+            if (missedTurn == IdentityVerificationReason.TimedOut && !verificationRequired)
             {
                 logger.IdentityResolutionQueueExhausted(logIdentifier);
             }
@@ -135,16 +135,10 @@ public class IdentityDetailsResolver(
             // Never reaching the call establishes precisely what a call that never answers establishes, so
             // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
             // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
-            if (verificationRequired)
-            {
-                foreach (var (name, _) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required))
-                {
-                    logger.RequiredIdentityVerificationDenied(name, missedTurn.ToString());
-                }
-            }
-
             return verificationRequired
-                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn)
+                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn, requiredServices: current.Services
+                    .Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required)
+                    .Select(_ => _.Key))
                 : BuildAuthorizedResult(principal, details: null);
         }
 
@@ -176,12 +170,7 @@ public class IdentityDetailsResolver(
 
                 if (!Admits(outcome, service.IdentityVerification))
                 {
-                    if (service.IdentityVerification == C.IdentityVerificationMode.Required)
-                    {
-                        logger.RequiredIdentityVerificationDenied(name, outcome.Reason.ToString());
-                    }
-
-                    return Deny(context, cacheKey, name, outcome.Reason);
+                    return Deny(context, cacheKey, name, outcome.Reason, service.IdentityVerification == C.IdentityVerificationMode.Required);
                 }
 
                 foreach (var property in outcome.Details)
@@ -217,9 +206,8 @@ public class IdentityDetailsResolver(
     /// <see cref="C.IdentityVerificationMode.BestEffort"/> denies on the one trigger the released proxy
     /// denied on — an HTTP <c language="text">403</c> — and on nothing else. The released call never read a verdict out of
     /// the body at all: it returned <c language="text">details</c> and forwarded the caller whatever the body said about
-    /// <c language="text">isAuthorized</c>. Promoting a body-level negative to a denial here would change what the
-    /// <em>default</em> mode does to services that never opted in, and would do it silently, to the exact
-    /// response shape the documented envelope tells them to write.
+    /// <c language="text">isAuthorized</c>. Promoting a body-level negative to a denial in BestEffort would silently
+    /// change the earlier releases' behavior for services that explicitly opt into this compatibility mode.
     /// <see cref="C.IdentityVerificationMode.Required"/> is where a body-level verdict becomes a decision.
     /// </remarks>
     static bool Admits(IdentityVerificationOutcome outcome, C.IdentityVerificationMode mode) =>
@@ -280,6 +268,8 @@ public class IdentityDetailsResolver(
     /// <param name="cacheKey">The in-memory result key for this caller, when there is one.</param>
     /// <param name="serviceName">The service that refused, or that could not be verified.</param>
     /// <param name="reason">The bounded code explaining the refusal.</param>
+    /// <param name="required">Whether the refusing service requires verification.</param>
+    /// <param name="requiredServices">Required services when resolution never reached an endpoint.</param>
     /// <returns>The unauthorized result.</returns>
     /// <remarks>
     /// Refusing without erasing would be nearly useless: an earlier success leaves a sealed record, a
@@ -287,9 +277,24 @@ public class IdentityDetailsResolver(
     /// the question that was just answered no. All three go together, and they go on every refusal — the
     /// released code cleared none of them, and <c language="text">Clear</c> had no caller at all.
     /// </remarks>
-    IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason)
+    IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason, bool required = false, IEnumerable<string>? requiredServices = null)
     {
-        logger.IdentityVerificationDenied(serviceName, reason);
+        if (reason == IdentityVerificationReason.Canceled)
+        {
+            logger.IdentityVerificationCanceled(serviceName);
+        }
+        else if (requiredServices is not null)
+        {
+            logger.RequiredIdentityResolutionDenied(requiredServices, reason.ToString());
+        }
+        else if (required)
+        {
+            logger.RequiredIdentityVerificationDenied(serviceName, reason.ToString());
+        }
+        else
+        {
+            logger.IdentityVerificationDenied(serviceName, reason);
+        }
 
         authorizationCache.Clear(context);
         ExpireIdentityCookie(context);

@@ -22,7 +22,8 @@ public class and_the_caller_goes_away : given.a_required_verification_resolver
 
     async Task Because() => _result = await _resolver.Resolve(_context, Principal(), TenantId);
 
-    [Fact] void should_name_the_service_and_its_compatibility_opt_out() => _logger.Text.ShouldContain("Cratis__AuthProxy__Services__main__IdentityVerification=BestEffort");
+    [Fact] void should_not_warn_for_a_client_disconnect() => _logger.Levels.ShouldNotContain(LogLevel.Warning);
+    [Fact] void should_not_advise_changing_verification_for_a_client_disconnect() => _logger.Text.ShouldNotContain("IdentityVerification=BestEffort");
     [Fact] void should_explain_the_denial() => _logger.Text.ShouldContain(nameof(IdentityVerificationReason.Canceled));
     [Fact] void should_not_be_authorized() => _result.IsAuthorized.ShouldBeFalse();
     [Fact] void should_not_record_an_authorization() => _authorizationCache.DidNotReceive().Record(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>());
