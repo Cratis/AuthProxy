@@ -26,7 +26,7 @@ public sealed class OidcClientAssertions(
     TimeProvider timeProvider,
     ILogger<OidcClientAssertions> logger) : IOidcClientAssertions
 {
-    readonly ConcurrentDictionary<string, CredentialDescription> _descriptions = new(StringComparer.Ordinal);
+    readonly ConcurrentDictionary<string, CredentialState> _credentials = new(StringComparer.Ordinal);
 
     /// <inheritdoc/>
     public async Task<string> Create(string scheme, C.OidcProvider provider, string audience, CancellationToken cancellationToken)
@@ -36,46 +36,78 @@ public sealed class OidcClientAssertions(
             throw new OidcClientCredentialUnavailable($"The OIDC provider '{provider.Name}' is not configured with a client-assertion credential.");
         }
 
-        var description = _descriptions.GetOrAdd(scheme, static (_, configured) => OidcClientCredentialDescription.From(configured), credential);
-        await Load(description, provider);
-
-        var now = timeProvider.GetUtcNow();
-        if (description.Certificate is not null && description.Certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime)
+        var state = _credentials.GetOrAdd(
+            scheme,
+            static (_, configured) => new CredentialState(OidcClientCredentialDescription.From(configured.ClientCredential!, configured.Authority)),
+            provider);
+        await state.Semaphore.WaitAsync(cancellationToken);
+        try
         {
-            // A rotated certificate replaces the expired one in its file, store or vault; load it again rather than
-            // signing with a certificate the provider will refuse.
-            logger.ClientCertificateExpired(provider.Name);
-            loader.ResetCredentials([description]);
+            var description = state.Description;
             await Load(description, provider);
-        }
 
-        if (description.Certificate is { } certificate)
-        {
-            return CertificateClientAssertion.Create(certificate, provider.ClientId, audience, now);
-        }
-
-        if (description.CachedValue is ClientAssertionProviderBase assertionProvider)
-        {
-            try
+            var now = timeProvider.GetUtcNow();
+            var certificate = description.Certificate;
+            if (certificate is not null && certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime && now >= state.NextCertificateReload)
             {
-                return await assertionProvider.GetSignedAssertionAsync(new AssertionRequestOptions
+                // Serialize reload and signing so resetting/disposal cannot invalidate another request's key.
+                // An unchanged expired file or thumbprint must not cause a load and warning on every sign-in.
+                state.NextCertificateReload = now.AddMinutes(1);
+                logger.ClientCertificateExpired(provider.Name);
+                loader.ResetCredentials([description]);
+                try
                 {
-                    ClientID = provider.ClientId,
-                    TokenEndpoint = audience,
-                    CancellationToken = cancellationToken
-                });
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                logger.ClientCredentialUnavailable(provider.Name, credential.Source.ToString(), exception);
-                throw new OidcClientCredentialUnavailable(
-                    $"The {credential.Source} client credential of OIDC provider '{provider.Name}' produced no client assertion.",
-                    exception);
-            }
-        }
+                    await Load(description, provider);
+                }
+                finally
+                {
+                    if (!ReferenceEquals(certificate, description.Certificate))
+                    {
+                        certificate.Dispose();
+                    }
+                }
 
-        throw new OidcClientCredentialUnavailable(
-            $"The {credential.Source} client credential of OIDC provider '{provider.Name}' could not be loaded.");
+                certificate = description.Certificate;
+            }
+
+            if (certificate is not null)
+            {
+                if (certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime)
+                {
+                    throw new OidcClientCredentialUnavailable($"The client certificate of OIDC provider '{provider.Name}' has expired.");
+                }
+
+                return CertificateClientAssertion.Create(certificate, provider.ClientId, audience, now);
+            }
+
+            if (description.CachedValue is ClientAssertionProviderBase assertionProvider)
+            {
+                try
+                {
+                    return await assertionProvider.GetSignedAssertionAsync(new AssertionRequestOptions
+                    {
+                        ClientID = provider.ClientId,
+                        Authority = provider.Authority,
+                        TokenEndpoint = audience,
+                        CancellationToken = cancellationToken
+                    });
+                }
+                catch (Exception exception) when (exception is not OperationCanceledException)
+                {
+                    logger.ClientCredentialUnavailable(provider.Name, credential.Source.ToString(), exception);
+                    throw new OidcClientCredentialUnavailable(
+                        $"The {credential.Source} client credential of OIDC provider '{provider.Name}' produced no client assertion.",
+                        exception);
+                }
+            }
+
+            throw new OidcClientCredentialUnavailable(
+                $"The {credential.Source} client credential of OIDC provider '{provider.Name}' could not be loaded.");
+        }
+        finally
+        {
+            state.Semaphore.Release();
+        }
     }
 
     async Task Load(CredentialDescription description, C.OidcProvider provider)
@@ -91,5 +123,14 @@ public sealed class OidcClientAssertions(
                 $"The {provider.ClientCredential.Source} client credential of OIDC provider '{provider.Name}' could not be loaded.",
                 exception);
         }
+    }
+
+    sealed class CredentialState(CredentialDescription description)
+    {
+        internal CredentialDescription Description { get; } = description;
+
+        internal SemaphoreSlim Semaphore { get; } = new(1, 1);
+
+        internal DateTimeOffset NextCertificateReload { get; set; }
     }
 }

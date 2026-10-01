@@ -129,8 +129,8 @@ Microsoft Entra ID confidential clients. Set `ClientCredential` on the provider 
 `client_assertion` ([RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)) instead. Leave `ClientSecret`
 empty: AuthProxy refuses to start when both are configured.
 
-AuthProxy presents the credential every time it calls the provider's token endpoint, including pushed
-authorization requests when the provider supports them. The credential loaders come from
+AuthProxy presents the credential during authorization-code redemption at the provider's token endpoint and
+in pushed authorization requests at the provider's PAR endpoint when the provider supports them. The credential loaders come from
 [Microsoft.Identity.Web](https://github.com/AzureAD/microsoft-identity-web/wiki/Certificates),
 so certificate stores, Key Vault, workload identity and managed identity behave as they do in any other
 Microsoft.Identity.Web application.
@@ -144,15 +144,22 @@ Microsoft.Identity.Web application.
 | `FederatedTokenFile` | A platform-issued federated token read from a file is the assertion (Kubernetes workload identity). | `TokenFilePath`, or the `AZURE_FEDERATED_TOKEN_FILE` environment variable. |
 | `ManagedIdentity` | An Azure managed identity token for the token-exchange audience is the assertion. | None. `ManagedIdentityClientId` selects a user-assigned identity. |
 
-A certificate assertion is a short-lived JWT signed with `RS256` (RSA keys) or `ES256` (ECDSA keys). Its issuer
-and subject are `ClientId`, its audience is the provider's token endpoint, and its header carries the
-certificate thumbprint (`x5t`). Upload the certificate's public part to the app registration. AuthProxy
-loads a certificate once and loads it again after it expires, so put the renewed certificate in the same
-file, store or vault entry before the old one expires, or restart AuthProxy to pick it up straight away.
+A certificate assertion is a short-lived JWT signed with `RS256` (RSA keys), or `ES256`, `ES384` or `ES512`
+(ECDSA P-256, P-384 or P-521 keys respectively). Its issuer and subject are `ClientId`, its audience is the
+provider's token endpoint, and its header carries the certificate thumbprint (`x5t`). Upload the
+certificate's public part to the app registration. AuthProxy loads a certificate once and loads it again
+after it expires. For `CertificateFile` or `KeyVaultCertificate`, put the renewed certificate in the same
+file or vault entry before the old one expires, or restart AuthProxy to pick it up straight away. If the
+replacement is still expired, sign-in fails and AuthProxy retries loading at most once per minute.
+For `CertificateStore`, renewal changes the thumbprint: update `CertificateThumbprint` to the new
+certificate's thumbprint and restart AuthProxy.
 
 `KeyVaultCertificate` authenticates to Key Vault with the default Azure credential chain. Set
 `ManagedIdentityClientId` (or `AZURE_CLIENT_ID`) to use a user-assigned managed identity. The identity needs
-permission to read the certificate's secret, because the private key is stored there.
+both certificate-get and secret-get permissions (for example, the Key Vault Certificate User and Key Vault
+Secrets User roles), because the loader reads the certificate and the secret containing its private key.
+The certificate must have an exportable private key; a non-exportable Key Vault certificate cannot sign
+client assertions in AuthProxy.
 
 `FederatedTokenFile` and `ManagedIdentity` need a federated identity credential on the app registration
 that trusts the platform issuer: the cluster's OIDC issuer and service account for workload identity, or the
@@ -213,9 +220,12 @@ equivalent resolved from `Authority`). Set `TokenExchangeAudience` to override i
 With environment variables, the same settings are
 `Cratis__AuthProxy__Authentication__OidcProviders__0__ClientCredential__Source=ManagedIdentity` and so on.
 
-If the credential cannot be loaded or produces no assertion, the sign-in fails and is handled as a
-[failed sign-in](failed-sign-ins.md), and AuthProxy logs an error that names the provider and credential
-source. OAuth 2.0 providers (below) still authenticate with `ClientSecret` only.
+If the credential cannot be loaded or produces no assertion during authorization-code redemption, the
+sign-in is handled as a [failed sign-in](failed-sign-ins.md). AuthProxy logs credential-loading and
+assertion-provider errors with the provider and credential source. A credential failure during a pushed
+authorization request happens while starting the sign-in challenge, outside the callback's failed-sign-in
+handling, and returns an HTTP 500 response instead. OAuth 2.0 providers (below) still authenticate with
+`ClientSecret` only.
 
 ### Canonical federated identity
 

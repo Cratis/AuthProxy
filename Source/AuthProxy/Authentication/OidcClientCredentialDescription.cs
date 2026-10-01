@@ -17,9 +17,10 @@ static class OidcClientCredentialDescription
     /// Creates the credential description for a client-assertion credential.
     /// </summary>
     /// <param name="credential">The configured credential. Its source must use a client assertion.</param>
+    /// <param name="authority">The provider authority used to resolve the managed-identity token-exchange audience.</param>
     /// <returns>The <see cref="CredentialDescription"/> the credential loader loads.</returns>
     /// <exception cref="OidcClientCredentialUnavailable">The source does not use a client assertion.</exception>
-    internal static CredentialDescription From(C.OidcClientCredential credential) => credential.Source switch
+    internal static CredentialDescription From(C.OidcClientCredential credential, string authority) => credential.Source switch
     {
         C.OidcClientCredentialSource.CertificateFile => new()
         {
@@ -51,10 +52,19 @@ static class OidcClientCredentialDescription
         {
             SourceType = CredentialSource.SignedAssertionFromManagedIdentity,
             ManagedIdentityClientId = NullIfEmpty(credential.ManagedIdentityClientId),
-            TokenExchangeUrl = NullIfEmpty(credential.TokenExchangeAudience)
+            TokenExchangeUrl = NullIfEmpty(credential.TokenExchangeAudience) ?? TokenExchangeAudienceOf(authority)
         },
         _ => throw new OidcClientCredentialUnavailable($"The client credential source '{credential.Source}' does not use a client assertion.")
     };
+
+    static string TokenExchangeAudienceOf(string authority) => Uri.TryCreate(authority, UriKind.Absolute, out var uri)
+        ? uri.Host.ToLowerInvariant() switch
+        {
+            "login.microsoftonline.us" => "api://AzureADTokenExchangeUSGov",
+            "login.chinacloudapi.cn" => "api://AzureADTokenExchangeChina",
+            _ => "api://AzureADTokenExchange"
+        }
+        : "api://AzureADTokenExchange";
 
     static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }
