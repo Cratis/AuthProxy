@@ -11,6 +11,8 @@ public class when_a_host_entry_cannot_be_parsed_by_endpoint_routing : given.a_se
     [InlineData("[::1]")]
     [InlineData("[::1]:8443")]
     [InlineData("::1")]
+    [InlineData("xn--a.example")]
+    [InlineData("xn--.example")]
     public void should_refuse_the_configuration_at_startup(string host)
     {
         _services["one"] = Routable(host);

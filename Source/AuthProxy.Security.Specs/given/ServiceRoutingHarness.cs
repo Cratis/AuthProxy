@@ -160,6 +160,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Authorization:RequiredClaims:0:AnyOf:0"] = AdminClaimValue,
 
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:0"] = "portal.example.test",
+                [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:1"] = "xn--bcher-kva.example.test",
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Backend:BaseUrl"] = Portal.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Frontend:BaseUrl"] = Portal.BaseUrl,
 

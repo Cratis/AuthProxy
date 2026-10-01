@@ -81,7 +81,17 @@ public static class ServiceRoutes
             return false;
         }
 
-        var parsed = new HostString(trimmed.ToLowerInvariant());
+        HostString parsed;
+        try
+        {
+            // ASP.NET decodes IDNs when reading the Host header; route declarations must use the same form.
+            parsed = HostString.FromUriComponent(trimmed.ToLowerInvariant());
+        }
+        catch (ArgumentException)
+        {
+            // Invalid punycode is an unusable declaration, not a startup exception outside validation.
+            return false;
+        }
         if (Uri.CheckHostName(parsed.Host.Trim('[', ']')) == UriHostNameType.Unknown
             || parsed.Port is <= 0 or > 65535
             || (parsed.Port is null && trimmed.Contains(':')))
@@ -89,7 +99,7 @@ public static class ServiceRoutes
             return false;
         }
 
-        host = parsed;
+        host = new HostString(parsed.Value!.ToLowerInvariant());
         return true;
     }
 
