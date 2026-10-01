@@ -190,7 +190,7 @@ startup**, naming the setting, rather than resolved by picking one:
 | `Store` is not `FileSystem`, `AzureBlob` or `Redis` (including an undefined numeric value) | The chosen store is not supported. |
 | `Store` is `AzureBlob` without `AzureBlob:BlobUri`, or `Redis` without `Redis:ConnectionString` | The chosen store has nowhere to write. |
 | `DataProtectionKeysPath` set while `Store` is `AzureBlob` or `Redis` | The path would be ignored and the key ring written somewhere else. |
-| An `AzureBlob` or `Redis` section present while `Store` names the other store | The section would be ignored. |
+| An `AzureBlob` or `Redis` section present while `Store` is anything other than that store (including the default `FileSystem`) | The section would be ignored. |
 | A blob URI or Key Vault identifier that is not an absolute `https` URI | It could never authenticate. |
 
 ---
