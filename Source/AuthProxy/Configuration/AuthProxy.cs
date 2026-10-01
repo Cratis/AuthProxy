@@ -14,6 +14,12 @@ public class AuthProxy
     public const string SectionKey = "Cratis:AuthProxy";
 
     /// <summary>
+    /// The activity timeout applied to a proxied request when neither the endpoint, its service nor the
+    /// root states one.
+    /// </summary>
+    public static readonly TimeSpan DefaultActivityTimeout = TimeSpan.FromMinutes(5);
+
+    /// <summary>
     /// Gets or sets the authentication configuration.
     /// </summary>
     public Authentication Authentication { get; set; } = new();
@@ -114,6 +120,19 @@ public class AuthProxy
     /// Gets or sets the tenant resolution strategies applied in order until one resolves.
     /// </summary>
     public IList<TenantResolution> TenantResolutions { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets how long a proxied request may sit idle — with no bytes moving in either direction —
+    /// before the proxy cancels it. Applies to every endpoint that states no timeout of its own and whose
+    /// service states none. Leave unset for <see cref="DefaultActivityTimeout"/> (five minutes).
+    /// </summary>
+    /// <remarks>
+    /// The clock restarts every time data is read or written, so this is an idle limit rather than a limit on
+    /// the total duration. It is what ends a quiet WebSocket or Server-Sent Events stream. Must be greater
+    /// than zero. See <see cref="Service.ActivityTimeout"/> and <see cref="ServiceEndpoint.ActivityTimeout"/>
+    /// for the narrower settings.
+    /// </remarks>
+    public TimeSpan? ActivityTimeout { get; set; }
 
     /// <summary>
     /// Gets or sets the services configuration.
