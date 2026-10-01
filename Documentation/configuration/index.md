@@ -17,6 +17,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
       "Ingress": { ... },
       "Invite": { ... },
       "Management": { ... },
+      "ActivityTimeout": "00:05:00",
       "PagesPath": "",
       "DataProtectionKeysPath": ""
     }
@@ -32,7 +33,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Tenancy](tenancy.md) | How the auth proxy resolves the current tenant from each request, and how to verify tenant existence. |
 | [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
 | [Trusted Proxies](trusted-proxies.md) | Which callers may speak for the client through `X-Forwarded-For` and `X-Forwarded-Proto`, and how many hops to follow. |
-| [Services](services.md) | Routing requests to backend and frontend services. |
+| [Services](services.md) | Routing requests to backend and frontend services, and the idle timeout that applies to proxied requests, WebSockets and SSE streams. |
 | [Management Listener](management-listener.md) | An opt-in private listener carrying liveness and readiness endpoints, so a probe tests more than "a process accepted a socket". |
 | [Lobby](lobby/index.md) | Invite and registration flows that hand users off to the lobby experience. |
 | [Well-Known Pages](well-known-pages.md) | Built-in HTML pages (provider selection, errors, tenant not found) and how to override them via a mounted volume. |

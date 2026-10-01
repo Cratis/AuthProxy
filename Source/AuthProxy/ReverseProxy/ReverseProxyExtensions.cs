@@ -23,6 +23,7 @@ public static class ReverseProxyExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ActivityTimeoutConfigurationValidator>();
         builder.Services.AddSingleton<MicroserviceReverseProxyConfigProvider>();
         builder.Services.AddDistributedMemoryCache();
         builder.Services.TryAddSingleton(TimeProvider.System);

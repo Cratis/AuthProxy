@@ -62,11 +62,6 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// </summary>
     const string ApiPathPrefix = "/api";
 
-    static readonly ClusterConfig _baseCluster = new()
-    {
-        HttpRequest = new() { ActivityTimeout = TimeSpan.FromMinutes(5) },
-    };
-
     readonly InMemoryConfigProvider _inner;
     readonly ILogger<MicroserviceReverseProxyConfigProvider> _logger;
     readonly Lock _rebuilding = new();
@@ -412,7 +407,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             if (ms.Backend is not null)
             {
-                clusters.Add(_baseCluster with
+                clusters.Add(ClusterFor(config, ms, ms.Backend) with
                 {
                     ClusterId = BackendClusterId(key),
                     Destinations = new Dictionary<string, DestinationConfig>
@@ -425,7 +420,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             if (ms.Frontend is not null)
             {
-                clusters.Add(_baseCluster with
+                clusters.Add(ClusterFor(config, ms, ms.Frontend) with
                 {
                     ClusterId = FrontendClusterId(key),
                     Destinations = new Dictionary<string, DestinationConfig>
@@ -444,6 +439,30 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     {
         [ServiceMetadataKey] = key,
         [EndpointMetadataKey] = endpoint,
+    };
+
+    /// <summary>
+    /// Creates the cluster skeleton for an endpoint, carrying the activity timeout that applies to it.
+    /// </summary>
+    /// <param name="config">The root configuration.</param>
+    /// <param name="service">The service the endpoint belongs to.</param>
+    /// <param name="endpoint">The endpoint.</param>
+    /// <returns>A cluster with its request settings filled in.</returns>
+    /// <remarks>
+    /// The most specific statement wins: the endpoint's own, then its service's, then the root's, then
+    /// <see cref="C.AuthProxy.DefaultActivityTimeout"/>. The same value governs plain requests, WebSocket
+    /// sessions and Server-Sent Events streams, because YARP measures all of them as time since data last
+    /// moved in either direction.
+    /// </remarks>
+    static ClusterConfig ClusterFor(C.AuthProxy config, C.Service service, C.ServiceEndpoint endpoint) => new()
+    {
+        HttpRequest = new()
+        {
+            ActivityTimeout = endpoint.ActivityTimeout
+                ?? service.ActivityTimeout
+                ?? config.ActivityTimeout
+                ?? C.AuthProxy.DefaultActivityTimeout,
+        },
     };
 
     static Dictionary<string, string> ServiceMetadata(string serviceName) => new() { [ServiceSelection.RouteMetadataKey] = serviceName };
