@@ -54,6 +54,8 @@ public sealed class UserAccessTokens(
     /// </summary>
     public static readonly TimeSpan DefaultLifetime = TimeSpan.FromMinutes(5);
 
+    static readonly TimeSpan _refreshRejectionBackoff = TimeSpan.FromSeconds(30);
+
     readonly SemaphoreSlim[] _refreshLocks = [.. Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1))];
 
     /// <inheritdoc/>
@@ -72,9 +74,9 @@ public sealed class UserAccessTokens(
         }
 
         var audience = AudienceKey(session.Scheme, accessToken);
-        if (await UsableCachedToken(sessionId, audience, cancellationToken) is { } cached)
+        if (await CachedResult(sessionId, audience, cancellationToken) is { } cached)
         {
-            return UserAccessTokenResult.Success(cached);
+            return cached;
         }
 
         // The caller may stop waiting, but a started redemption must finish and persist any rotation.
@@ -113,9 +115,9 @@ public sealed class UserAccessTokens(
             acquired = true;
 
             // Another request for this session may have refreshed while this one waited.
-            if (await UsableCachedToken(sessionId, audience, cancellationToken) is { } refreshed)
+            if (await CachedResult(sessionId, audience, cancellationToken) is { } refreshed)
             {
-                return UserAccessTokenResult.Success(refreshed);
+                return refreshed;
             }
 
             var session = await store.Get(sessionId, cancellationToken);
@@ -136,11 +138,18 @@ public sealed class UserAccessTokens(
         }
     }
 
-    async Task<string?> UsableCachedToken(string sessionId, string audience, CancellationToken cancellationToken) =>
-        await store.GetAccessToken(sessionId, audience, cancellationToken) is { } cached
-        && cached.RenewAt > timeProvider.GetUtcNow()
-            ? cached.Value
+    async Task<UserAccessTokenResult?> CachedResult(string sessionId, string audience, CancellationToken cancellationToken)
+    {
+        if (await store.GetAccessToken(sessionId, audience, cancellationToken) is { } cached
+            && cached.RenewAt > timeProvider.GetUtcNow())
+        {
+            return UserAccessTokenResult.Success(cached.Value);
+        }
+
+        return await store.IsRefreshRejected(sessionId, audience, cancellationToken)
+            ? UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected)
             : null;
+    }
 
     async Task<UserAccessTokenResult> Refresh(
         string sessionId,
@@ -178,6 +187,7 @@ public sealed class UserAccessTokens(
                 if (string.Equals(error, "invalid_grant", StringComparison.Ordinal))
                 {
                     // invalid_grant may mean missing consent or resource-specific policy, not a dead session.
+                    await store.SetRefreshRejected(sessionId, audience, timeProvider.GetUtcNow() + _refreshRejectionBackoff, CancellationToken.None);
                     return UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected);
                 }
 

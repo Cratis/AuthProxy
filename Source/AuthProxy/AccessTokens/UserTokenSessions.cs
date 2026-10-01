@@ -122,6 +122,19 @@ public static class UserTokenSessions
     }
 
     /// <summary>
+    /// Keeps sliding token retention aligned with a successfully validated cookie, even on non-forwarding routes.
+    /// </summary>
+    /// <param name="context">The cookie validation context.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    internal static async Task RenewRetention(CookieValidatePrincipalContext context)
+    {
+        if (context.Principal is not null && context.Options.SlidingExpiration && Of(context.HttpContext) is { } sessionId)
+        {
+            await context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>().Get(sessionId, context.HttpContext.RequestAborted);
+        }
+    }
+
+    /// <summary>
     /// Removes the token session of a session that is being signed out.
     /// </summary>
     /// <param name="context">The cookie sign-out context.</param>

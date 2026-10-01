@@ -163,6 +163,8 @@ public static class AuthenticationServiceCollectionExtensions
             {
                 await ValidateCanonicalSession(context);
             }
+
+            await UserTokenSessions.RenewRetention(context);
         };
 
         var existingSigningIn = options.Events.OnSigningIn;

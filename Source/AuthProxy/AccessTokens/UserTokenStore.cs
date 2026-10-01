@@ -79,6 +79,7 @@ public sealed class UserTokenStore(
             foreach (var audience in stored?.Audiences ?? [])
             {
                 await cache.RemoveAsync(AccessTokenKey(sessionId, audience), cancellationToken);
+                await cache.RemoveAsync(RefreshRejectionKey(sessionId, audience), cancellationToken);
             }
 
             await cache.RemoveAsync(SessionKey(sessionId), cancellationToken);
@@ -96,7 +97,34 @@ public sealed class UserTokenStore(
             : null;
 
     /// <inheritdoc/>
-    public async Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken)
+    public Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken) =>
+        SetAudienceEntry(sessionId, audience, AccessTokenKey(sessionId, audience), token, renewAt, cancellationToken);
+
+    /// <inheritdoc/>
+    public async Task<bool> IsRefreshRejected(string sessionId, string audience, CancellationToken cancellationToken) =>
+        await Get(sessionId, cancellationToken) is not null
+        && await Read<RefreshRejection>(RefreshRejectionKey(sessionId, audience), cancellationToken) is { } rejection
+        && rejection.RetryAt > timeProvider.GetUtcNow();
+
+    /// <inheritdoc/>
+    public Task SetRefreshRejected(string sessionId, string audience, DateTimeOffset retryAt, CancellationToken cancellationToken) =>
+        SetAudienceEntry(sessionId, audience, RefreshRejectionKey(sessionId, audience), new RefreshRejection(retryAt), retryAt, cancellationToken);
+
+    static string SessionKey(string sessionId) => $"{KeyPrefix}{Hash(sessionId)}";
+
+    static string AccessTokenKey(string sessionId, string audience) => $"{KeyPrefix}{Hash(sessionId)}:{audience}";
+
+    static string RefreshRejectionKey(string sessionId, string audience) => $"{AccessTokenKey(sessionId, audience)}:rejected";
+
+    /// <summary>
+    /// Derives the cache key from the identifier rather than using it, so a cache that can be listed does not hand
+    /// out the value the cookie proves possession with.
+    /// </summary>
+    /// <param name="value">The identifier.</param>
+    /// <returns>The derived key.</returns>
+    static string Hash(string value) => WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    async Task SetAudienceEntry<T>(string sessionId, string audience, string key, T value, DateTimeOffset expiresAt, CancellationToken cancellationToken)
     {
         var mutationLock = MutationLock(sessionId);
         await mutationLock.WaitAsync(cancellationToken);
@@ -114,11 +142,11 @@ public sealed class UserTokenStore(
                 await Write(SessionKey(sessionId), stored with { Audiences = [.. stored.Audiences, audience] }, SessionEntryOptions(stored.ExpiresAt), cancellationToken);
             }
 
-            var expiresAt = stored.ExpiresAt is { } sessionExpiry && sessionExpiry < renewAt ? sessionExpiry : renewAt;
+            var expiry = stored.ExpiresAt is { } sessionExpiry && sessionExpiry < expiresAt ? sessionExpiry : expiresAt;
             await Write(
-                AccessTokenKey(sessionId, audience),
-                token,
-                new DistributedCacheEntryOptions { AbsoluteExpiration = expiresAt },
+                key,
+                value,
+                new DistributedCacheEntryOptions { AbsoluteExpiration = expiry },
                 cancellationToken);
         }
         finally
@@ -126,18 +154,6 @@ public sealed class UserTokenStore(
             mutationLock.Release();
         }
     }
-
-    static string SessionKey(string sessionId) => $"{KeyPrefix}{Hash(sessionId)}";
-
-    static string AccessTokenKey(string sessionId, string audience) => $"{KeyPrefix}{Hash(sessionId)}:{audience}";
-
-    /// <summary>
-    /// Derives the cache key from the identifier rather than using it, so a cache that can be listed does not hand
-    /// out the value the cookie proves possession with.
-    /// </summary>
-    /// <param name="value">The identifier.</param>
-    /// <returns>The derived key.</returns>
-    static string Hash(string value) => WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
     SemaphoreSlim MutationLock(string sessionId) => _mutationLocks[(uint)StringComparer.Ordinal.GetHashCode(sessionId) % (uint)_mutationLocks.Length];
 
@@ -179,4 +195,6 @@ public sealed class UserTokenStore(
     }
 
     sealed record StoredSession(string Scheme, string RefreshToken, string[] Audiences, DateTimeOffset? ExpiresAt);
+
+    sealed record RefreshRejection(DateTimeOffset RetryAt);
 }

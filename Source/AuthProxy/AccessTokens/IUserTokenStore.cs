@@ -64,4 +64,23 @@ public interface IUserTokenStore
     /// <param name="cancellationToken">The <see cref="CancellationToken"/> for the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Gets whether a refresh for this session and audience was recently rejected.
+    /// </summary>
+    /// <param name="sessionId">The session identifier.</param>
+    /// <param name="audience">The audience key.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> for the operation.</param>
+    /// <returns>Whether the audience must wait before retrying its refresh.</returns>
+    Task<bool> IsRefreshRejected(string sessionId, string audience, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Records a refused refresh for a session and audience until it may be retried.
+    /// </summary>
+    /// <param name="sessionId">The session identifier.</param>
+    /// <param name="audience">The audience key.</param>
+    /// <param name="retryAt">When a refresh may be retried.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> for the operation.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    Task SetRefreshRejected(string sessionId, string audience, DateTimeOffset retryAt, CancellationToken cancellationToken);
 }

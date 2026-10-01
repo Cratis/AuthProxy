@@ -468,7 +468,8 @@ provider must be configured. AuthProxy refuses to start otherwise.
   token AuthProxy cannot get access tokens, and logs a warning at each such sign-in.
 - Signing out removes the refresh token and every access token kept for the session, even when a refresh
   is in flight. Signing in again replaces the previous token session. Rotation and new audiences do not
-  extend an absolute session's original retention deadline.
+  extend an absolute session's original retention deadline. When `Session.SlidingExpiration` is enabled,
+  authenticated cookie activity renews token retention even on frontend or non-forwarding routes.
 
 ### What is forwarded, and when it is refused
 
@@ -481,7 +482,9 @@ provider must be configured. AuthProxy refuses to start otherwise.
   This happens when the session has no refresh token, the provider rejects the refresh token, the provider
   cannot be reached, or the user signed in with another provider than `Provider`. An `invalid_grant` error
   refuses that audience without discarding the session or other audiences: it can mean missing consent
-  or a resource-specific policy rather than an expired refresh token. The frontend should treat the `401`
+  or a resource-specific policy rather than an expired refresh token. Rejections are cached for 30 seconds
+  per session and audience to avoid repeatedly redeeming the same refused refresh token. Signing in again
+  clears the previous session's rejections. The frontend should treat the `401`
   as a signal to sign in again through `/.cratis/login/{scheme}`; a missing consent or policy requirement
   may also need to be addressed at the provider.
 
