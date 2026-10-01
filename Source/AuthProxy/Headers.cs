@@ -51,16 +51,16 @@ public static class Headers
     /// </summary>
     /// <remarks>
     /// This is the name Arc resolves the tenant from by default, so an Arc application behind AuthProxy needs
-    /// no tenancy configuration to read it. It is the only header AuthProxy forwards a tenant in.
+    /// no tenancy configuration to read it. The same value is also forwarded in <see cref="LegacyTenantId"/>.
     /// </remarks>
     public const string TenantId = "x-cratis-tenant-id";
 
     /// <summary>
-    /// The tenant header earlier releases forwarded the resolved tenant in.
+    /// The legacy tenant header, forwarded alongside <see cref="TenantId"/> during the transition.
     /// </summary>
     /// <remarks>
-    /// AuthProxy no longer writes it. It is still named here because a client must not be able to send it:
-    /// any backend that was configured to read it would otherwise take its tenant from the caller.
+    /// Forwarding this name is deprecated and will be removed in a future major release. Both inbound
+    /// tenant headers are stripped before the resolved tenant is written back.
     /// </remarks>
     public const string LegacyTenantId = "Tenant-ID";
 
@@ -68,13 +68,15 @@ public static class Headers
     /// Service identifier used to route requests to the appropriate service.
     /// </summary>
     /// <remarks>
-    /// This is the name Arc's frontend sends by default when a microservice is set.
+    /// This is the name Arc's frontend sends by default when a microservice is set. The selected identifier
+    /// is forwarded under this name and <see cref="LegacyServiceId"/>.
     /// </remarks>
     public const string ServiceId = "x-cratis-microservice";
 
     /// <summary>
     /// The service header earlier releases routed on. It is still accepted inbound and means the same as
-    /// <see cref="ServiceId"/>; <see cref="ServiceId"/> wins when both are sent.
+    /// <see cref="ServiceId"/>; <see cref="ServiceId"/> wins when both are sent. Forwarding the legacy name is
+    /// deprecated and will be removed in a future major release.
     /// </summary>
     public const string LegacyServiceId = "Service-ID";
 }

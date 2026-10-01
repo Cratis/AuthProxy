@@ -9,8 +9,8 @@ namespace Cratis.AuthProxy.Identity.for_InjectIdentityHeadersTransform;
 /// The proxy request begins as a copy of the inbound one, so the transform is the last place a header the
 /// caller sent can be removed before it reaches a backend. It removes the tenant under both names whether
 /// or not the proxy resolved one: a request with no resolved tenant must reach the backend with none, not
-/// with the caller's, and a request with one must carry it only as <c language="text">x-cratis-tenant-id</c> and not also under
-/// the legacy name earlier releases used.
+/// with the caller's, and a request with one must carry the resolved value under both
+/// <c language="text">x-cratis-tenant-id</c> and the legacy name earlier releases used.
 /// </summary>
 public class when_the_inbound_request_carries_a_tenant_under_either_name : Specification
 {
@@ -40,8 +40,8 @@ public class when_the_inbound_request_carries_a_tenant_under_either_name : Speci
         _withoutResolvedTenant.ProxyRequest.Headers.Contains("x-ms-client-principal-idp").ShouldBeFalse();
     [Fact] void should_send_only_the_resolved_tenant() =>
         _withResolvedTenant.ProxyRequest.Headers.GetValues(Headers.TenantId).Single().ShouldEqual(ResolvedTenant);
-    [Fact] void should_not_also_send_the_legacy_tenant() =>
-        _withResolvedTenant.ProxyRequest.Headers.Contains(Headers.LegacyTenantId).ShouldBeFalse();
+    [Fact] void should_also_send_only_the_resolved_tenant_under_the_legacy_name() =>
+        _withResolvedTenant.ProxyRequest.Headers.GetValues(Headers.LegacyTenantId).Single().ShouldEqual(ResolvedTenant);
     [Fact] void should_send_no_unknown_principal_header_when_a_tenant_was_resolved() =>
         _withResolvedTenant.ProxyRequest.Headers.Contains("x-ms-client-principal-idp").ShouldBeFalse();
 
@@ -58,8 +58,8 @@ public class when_the_inbound_request_carries_a_tenant_under_either_name : Speci
             HttpContext = httpContext,
             ProxyRequest = new HttpRequestMessage(HttpMethod.Get, "https://service.local/api/test")
         };
-        context.ProxyRequest.Headers.TryAddWithoutValidation("x-cratis-tenant-id", "victim-tenant");
-        context.ProxyRequest.Headers.TryAddWithoutValidation("Tenant-ID", "victim-tenant-legacy");
+        context.ProxyRequest.Headers.TryAddWithoutValidation("X-CrAtIs-TeNaNt-Id", "victim-tenant");
+        context.ProxyRequest.Headers.TryAddWithoutValidation("tEnAnT-iD", "victim-tenant-legacy");
         context.ProxyRequest.Headers.TryAddWithoutValidation("x-ms-client-principal-idp", "aad");
 
         return context;

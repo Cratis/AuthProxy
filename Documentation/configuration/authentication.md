@@ -435,8 +435,8 @@ instance re-resolves identity for callers whose record it did not issue.
 
 ## Forwarded identity headers
 
-Once a request is authenticated, AuthProxy tells the backend who is calling. It does that with four
-headers, written on every proxied request and on every `/.cratis/me` call — and it strips any inbound copy
+Once a request is authenticated, AuthProxy tells the backend who is calling. It does that with identity
+headers and both tenant headers, written on proxied requests and on `/.cratis/me` calls — and it strips any inbound copy
 first, so a backend can treat them as proof rather than as a claim.
 
 What is stripped is wider than what is written. Every inbound header whose name begins
@@ -453,6 +453,7 @@ tenant reaches the backend with no tenant header at all.
 | `x-ms-client-principal-name` | The display name (`userDetails`) | Verbatim, or RFC 8187 when it cannot travel verbatim |
 | `x-ms-client-principal-name*` | The RFC 8187 form of the display name | Present **exactly** when the plain header carries an encoded value |
 | `x-cratis-tenant-id` | The resolved tenant | Verbatim, or RFC 8187 — no sibling announces which |
+| `Tenant-ID` | The same resolved tenant; forwarding deprecated until a future major release | Same as `x-cratis-tenant-id` |
 
 ### Every header value is US-ASCII
 

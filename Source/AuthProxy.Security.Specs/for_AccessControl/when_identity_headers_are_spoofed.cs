@@ -81,21 +81,21 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
     /// <summary>
     /// Arc resolves its tenant from <c language="text">x-cratis-tenant-id</c> by default, and the tenant picks the Chronicle
     /// namespace and the tenant-scoped read models. Whatever tenant the origin sees must be the one the proxy
-    /// resolved, and nothing is sent under the legacy name at all.
+    /// resolved, under both names during the transition.
     /// </summary>
     [Fact]
-    public void should_not_forward_the_legacy_tenant_name_to_an_anonymous_caller() =>
-        Assert.False(_anonymousOnAnonymousPath!.Has(Headers.LegacyTenantId));
+    public void should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name() =>
+        Assert.Equal(SecurityHarness.TenantId, _anonymousOnAnonymousPath!.Value(Headers.LegacyTenantId), StringComparer.Ordinal);
 
-    /// <inheritdoc cref="should_not_forward_the_legacy_tenant_name_to_an_anonymous_caller"/>
+    /// <inheritdoc cref="should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name"/>
     [Fact]
     public void should_give_an_authenticated_caller_only_the_tenant_the_proxy_resolved() =>
         Assert.Equal(SecurityHarness.TenantId, _authenticatedOnProtectedPath!.Value(Headers.TenantId), StringComparer.Ordinal);
 
-    /// <inheritdoc cref="should_not_forward_the_legacy_tenant_name_to_an_anonymous_caller"/>
+    /// <inheritdoc cref="should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name"/>
     [Fact]
-    public void should_not_forward_the_legacy_tenant_name_to_an_authenticated_caller() =>
-        Assert.False(_authenticatedOnProtectedPath!.Has(Headers.LegacyTenantId));
+    public void should_give_an_authenticated_caller_the_resolved_tenant_under_the_legacy_name() =>
+        Assert.Equal(SecurityHarness.TenantId, _authenticatedOnProtectedPath!.Value(Headers.LegacyTenantId), StringComparer.Ordinal);
 
     /// <summary>
     /// The proxy writes three identity headers and the sibling; a platform adds more, such as the identity

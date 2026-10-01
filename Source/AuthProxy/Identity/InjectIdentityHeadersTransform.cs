@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <summary>
 /// A YARP <see cref="RequestTransform"/> that injects the three Microsoft Identity Platform
 /// headers (<c language="text">x-ms-client-principal</c>, <c language="text">x-ms-client-principal-id</c>,
-/// <c language="text">x-ms-client-principal-name</c>) and the <c language="text">x-cratis-tenant-id</c> header into every
+/// <c language="text">x-ms-client-principal-name</c>) and both tenant headers into every
 /// proxied request, based on the authenticated user and the resolved tenant.
 /// </summary>
 /// <remarks>
@@ -38,7 +38,22 @@ public class InjectIdentityHeadersTransform : RequestTransform
         if (httpContext.Items.TryGetValue(TenancyMiddleware.TenantIdItemKey, out var tenantId)
             && tenantId is string tid && !string.IsNullOrWhiteSpace(tid))
         {
-            context.ProxyRequest.Headers.Add(Headers.TenantId, HeaderValue.ToTransportValue(tid));
+            var tenant = HeaderValue.ToTransportValue(tid);
+            context.ProxyRequest.Headers.Add(Headers.TenantId, tenant);
+            context.ProxyRequest.Headers.Add(Headers.LegacyTenantId, tenant);
+        }
+
+        // Both backend contracts must agree with the service selected by the proxy, even if a caller
+        // supplied conflicting names. The query remains the fallback when neither header names a service.
+        var service = ServiceSelection.FromHeaders(httpContext.Request.Headers)
+            ?? httpContext.Request.Query["service"].FirstOrDefault();
+        context.ProxyRequest.Headers.Remove(Headers.ServiceId);
+        context.ProxyRequest.Headers.Remove(Headers.LegacyServiceId);
+        if (!string.IsNullOrWhiteSpace(service))
+        {
+            var serviceId = HeaderValue.ToTransportValue(service);
+            context.ProxyRequest.Headers.Add(Headers.ServiceId, serviceId);
+            context.ProxyRequest.Headers.Add(Headers.LegacyServiceId, serviceId);
         }
 
         return ValueTask.CompletedTask;

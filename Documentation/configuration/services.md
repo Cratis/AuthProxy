@@ -80,6 +80,9 @@ With more than one service, clients must indicate the target using one of:
 `x-cratis-microservice` is the header an Arc frontend sends when it sets a microservice, so an Arc
 application behind AuthProxy needs no extra configuration. The `Service-ID` header earlier releases used is
 still accepted inbound and means the same thing; `x-cratis-microservice` wins when both are sent.
+The selected identifier is forwarded under both header names, including when selected by `?service=`.
+Forwarding `Service-ID` is deprecated and will be removed in a future major release; move backends to
+`x-cratis-microservice`.
 
 Routes are matched case-insensitively.
 
