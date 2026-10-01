@@ -74,8 +74,20 @@ With more than one service, clients must indicate the target using one of:
 
 | Mechanism | Example |
 |-----------|---------|
-| `Service-ID` request header | `Service-ID: portal` |
+| `x-cratis-microservice` request header | `x-cratis-microservice: portal` |
 | `service` query parameter | `?service=portal` |
+
+`x-cratis-microservice` is the header an Arc frontend sends for HTTP requests when it sets a microservice.
+The `Service-ID` header earlier releases used is still accepted inbound and means the same thing;
+`x-cratis-microservice` wins when both are sent. A header naming an unknown service does not match a route,
+so a valid `?service=` can still select the target and its authorization requirements.
+
+Arc's WebSocket and SSE observable connections instead send `?x-cratis-microservice=` by default.
+AuthProxy does not route on that query argument yet. In a multi-service deployment, configure Arc with
+`Globals.microserviceWSQueryArgument = 'service';` so observable connections use `?service=`.
+The selected identifier is forwarded under both header names, including when selected by `?service=`.
+Forwarding `Service-ID` is deprecated and will be removed in a future major release; move backends to
+`x-cratis-microservice`.
 
 Routes are matched case-insensitively.
 
@@ -166,18 +178,19 @@ actually declares.
 ### What it does and does not change
 
 - The request still travels through AuthProxy. Inbound `x-ms-client-principal`,
-  `x-ms-client-principal-id`, `x-ms-client-principal-name` and `Tenant-ID` headers are stripped as they
+  `x-ms-client-principal-id`, `x-ms-client-principal-name` and `x-cratis-tenant-id` (and the legacy
+  `Tenant-ID`) headers are stripped as they
   are for every other request, so a caller cannot assert an identity on an anonymous path.
 - No principal headers are injected for a caller with no session. A caller that *does* present a valid
   session is still authenticated normally and still gets its identity headers — the path is
   identity-*optional*, not identity-free.
-- A signed-in caller reaches a declared path **without a `Tenant-ID` header** when they have not chosen a
+- A signed-in caller reaches a declared path **without an `x-cratis-tenant-id` header** when they have not chosen a
   tenant, because tenant selection is skipped along with everything else. Handle a declared path as
   tenant-optional: it already has to work for a caller with no identity at all, so identity without a
   tenant is a strictly better-informed case of the same thing.
 - The application remains responsible for authorizing these paths. This only stops the proxy from
   demanding a login before the application is ever reached.
-- A declared prefix is claimed for the whole proxy. An anonymous caller cannot send a `Service-ID`
+- A declared prefix is claimed for the whole proxy. An anonymous caller cannot send an `x-cratis-microservice`
   header, so the path itself identifies the service — in a multi-service deployment no other service can
   serve anything under a declared prefix. If two services declare the same prefix, the first one in
   configuration order serves it; the path stays anonymous, which is what both asked for.
@@ -403,6 +416,6 @@ This creates a one-to-one relationship between:
 - the downstream endpoint that verifies the client credentials
 
 The verification endpoint's response can optionally include a `tenant` property, which AuthProxy then
-carries on the issued tokens and can resolve into the `Tenant-ID` header on proxied requests.
+carries on the issued tokens and can resolve into the `x-cratis-tenant-id` header on proxied requests.
 See [Back-channel client credentials](authentication.md#back-channel-client-credentials) for the full
 token, tenant-resolution, and refresh-token flow.

@@ -2,3 +2,5 @@
   href: index.md
 - name: Identity verification is required by default
   href: identity-verification-required-by-default.md
+- name: Tenant and service headers follow Arc
+  href: tenant-and-service-headers.md
