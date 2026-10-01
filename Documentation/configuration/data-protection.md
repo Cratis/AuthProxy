@@ -160,9 +160,11 @@ keys. Existing plaintext keys are not retroactively encrypted.
 What the deployment has to provide:
 
 - An **RSA** key in the vault. AuthProxy wraps and unwraps the key ring with it (RSA-OAEP).
-- The identity AuthProxy runs as needs permission to wrap and unwrap with that key — the `Key Vault Crypto User`
-  role, or an access policy granting `wrapKey` and `unwrapKey`. It authenticates the same way as the blob
-  store, including `ManagedIdentityClientId`.
+- The identity AuthProxy runs as needs permission to get the key and wrap and unwrap with it — the
+  `Key Vault Crypto User` role, or an access policy granting `get`, `wrapKey` and `unwrapKey`. The `get`
+  permission resolves a versionless identifier to a specific key version so encrypted keys remain
+  decryptable after vault-key rotation. It authenticates the same way as the blob store, including
+  `ManagedIdentityClientId`.
 
 > [!IMPORTANT]
 > Enabling Key Vault protection does not replace the existing key ring or sign callers out. Existing
