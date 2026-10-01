@@ -152,17 +152,20 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
                 [$"{C.AuthProxy.SectionKey}:Services:reports:Backend:BaseUrl"] = Reports.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:Frontend:BaseUrl"] = ReportsFrontend.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:AnonymousPaths:0"] = $"{ReportsPrefix}/api/health",
+                [$"{C.AuthProxy.SectionKey}:Services:reports:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
 
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Hosts:0"] = AdminHost,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Backend:BaseUrl"] = Admin.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Frontend:BaseUrl"] = Admin.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Authorization:RequiredClaims:0:Claim"] = AdminClaim,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Authorization:RequiredClaims:0:AnyOf:0"] = AdminClaimValue,
+                [$"{C.AuthProxy.SectionKey}:Services:admin:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
 
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:0"] = "portal.example.test",
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:1"] = "xn--bcher-kva.example.test",
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Backend:BaseUrl"] = Portal.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Frontend:BaseUrl"] = Portal.BaseUrl,
+                [$"{C.AuthProxy.SectionKey}:Services:portal:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
 
                 [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
 
