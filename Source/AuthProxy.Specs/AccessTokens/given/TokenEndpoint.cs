@@ -22,6 +22,11 @@ public class TokenEndpoint : HttpMessageHandler
     public Func<HttpResponseMessage> Answer { get; set; } = () => Bearer("access-token", 3600);
 
     /// <summary>
+    /// Gets or sets an asynchronous response for concurrency specs.
+    /// </summary>
+    public Func<CancellationToken, Task<HttpResponseMessage>>? AnswerAsync { get; set; }
+
+    /// <summary>
     /// Builds a successful bearer token answer.
     /// </summary>
     /// <param name="accessToken">The access token.</param>
@@ -55,6 +60,6 @@ public class TokenEndpoint : HttpMessageHandler
     {
         var form = await request.Content!.ReadAsStringAsync(cancellationToken);
         Received.Add(Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(form).ToDictionary(_ => _.Key, _ => _.Value.ToString(), StringComparer.Ordinal));
-        return Answer();
+        return AnswerAsync is { } answer ? await answer(cancellationToken) : Answer();
     }
 }

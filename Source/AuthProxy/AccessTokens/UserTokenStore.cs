@@ -32,13 +32,15 @@ public sealed class UserTokenStore(
 {
     const string KeyPrefix = "Cratis.AuthProxy.UserTokens:";
 
+    readonly SemaphoreSlim[] _mutationLocks = [.. Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1))];
     readonly IDataProtector _protector = dataProtection.CreateProtector("Cratis.AuthProxy.UserTokens.v1");
 
     /// <inheritdoc/>
     public async Task<string> Create(UserTokenSession session, CancellationToken cancellationToken)
     {
         var sessionId = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-        await Write(SessionKey(sessionId), new StoredSession(session.Scheme, session.RefreshToken, []), SessionEntryOptions(), cancellationToken);
+        var options = SessionEntryOptions();
+        await Write(SessionKey(sessionId), new StoredSession(session.Scheme, session.RefreshToken, [], options.AbsoluteExpiration), options, cancellationToken);
         return sessionId;
     }
 
@@ -51,46 +53,78 @@ public sealed class UserTokenStore(
     /// <inheritdoc/>
     public async Task Update(string sessionId, UserTokenSession session, CancellationToken cancellationToken)
     {
-        var audiences = (await Read<StoredSession>(SessionKey(sessionId), cancellationToken))?.Audiences ?? [];
-        await Write(SessionKey(sessionId), new StoredSession(session.Scheme, session.RefreshToken, audiences), SessionEntryOptions(), cancellationToken);
+        var mutationLock = MutationLock(sessionId);
+        await mutationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (await Read<StoredSession>(SessionKey(sessionId), cancellationToken) is { } stored)
+            {
+                await Write(SessionKey(sessionId), stored with { Scheme = session.Scheme, RefreshToken = session.RefreshToken }, SessionEntryOptions(stored.ExpiresAt), cancellationToken);
+            }
+        }
+        finally
+        {
+            mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
     public async Task Remove(string sessionId, CancellationToken cancellationToken)
     {
-        var stored = await Read<StoredSession>(SessionKey(sessionId), cancellationToken);
-        foreach (var audience in stored?.Audiences ?? [])
+        var mutationLock = MutationLock(sessionId);
+        await mutationLock.WaitAsync(cancellationToken);
+        try
         {
-            await cache.RemoveAsync(AccessTokenKey(sessionId, audience), cancellationToken);
-        }
+            var stored = await Read<StoredSession>(SessionKey(sessionId), cancellationToken);
+            foreach (var audience in stored?.Audiences ?? [])
+            {
+                await cache.RemoveAsync(AccessTokenKey(sessionId, audience), cancellationToken);
+            }
 
-        await cache.RemoveAsync(SessionKey(sessionId), cancellationToken);
+            await cache.RemoveAsync(SessionKey(sessionId), cancellationToken);
+        }
+        finally
+        {
+            mutationLock.Release();
+        }
     }
 
     /// <inheritdoc/>
-    public Task<CachedUserAccessToken?> GetAccessToken(string sessionId, string audience, CancellationToken cancellationToken) =>
-        Read<CachedUserAccessToken>(AccessTokenKey(sessionId, audience), cancellationToken);
+    public async Task<CachedUserAccessToken?> GetAccessToken(string sessionId, string audience, CancellationToken cancellationToken) =>
+        await Get(sessionId, cancellationToken) is not null
+            ? await Read<CachedUserAccessToken>(AccessTokenKey(sessionId, audience), cancellationToken)
+            : null;
 
     /// <inheritdoc/>
     public async Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken)
     {
-        var stored = await Read<StoredSession>(SessionKey(sessionId), cancellationToken);
-        if (stored is null)
+        var mutationLock = MutationLock(sessionId);
+        await mutationLock.WaitAsync(cancellationToken);
+        try
         {
-            // The session ended while the token was being obtained; keep nothing for it.
-            return;
-        }
+            var stored = await Read<StoredSession>(SessionKey(sessionId), cancellationToken);
+            if (stored is null)
+            {
+                // The session ended while the token was being obtained; keep nothing for it.
+                return;
+            }
 
-        if (!stored.Audiences.Contains(audience, StringComparer.Ordinal))
+            if (!stored.Audiences.Contains(audience, StringComparer.Ordinal))
+            {
+                await Write(SessionKey(sessionId), stored with { Audiences = [.. stored.Audiences, audience] }, SessionEntryOptions(stored.ExpiresAt), cancellationToken);
+            }
+
+            var expiresAt = stored.ExpiresAt is { } sessionExpiry && sessionExpiry < renewAt ? sessionExpiry : renewAt;
+            await Write(
+                AccessTokenKey(sessionId, audience),
+                token,
+                new DistributedCacheEntryOptions { AbsoluteExpiration = expiresAt },
+                cancellationToken);
+        }
+        finally
         {
-            await Write(SessionKey(sessionId), stored with { Audiences = [.. stored.Audiences, audience] }, SessionEntryOptions(), cancellationToken);
+            mutationLock.Release();
         }
-
-        await Write(
-            AccessTokenKey(sessionId, audience),
-            token,
-            new DistributedCacheEntryOptions { AbsoluteExpiration = renewAt },
-            cancellationToken);
     }
 
     static string SessionKey(string sessionId) => $"{KeyPrefix}{Hash(sessionId)}";
@@ -105,8 +139,15 @@ public sealed class UserTokenStore(
     /// <returns>The derived key.</returns>
     static string Hash(string value) => WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
-    DistributedCacheEntryOptions SessionEntryOptions()
+    SemaphoreSlim MutationLock(string sessionId) => _mutationLocks[(uint)StringComparer.Ordinal.GetHashCode(sessionId) % (uint)_mutationLocks.Length];
+
+    DistributedCacheEntryOptions SessionEntryOptions(DateTimeOffset? expiresAt = null)
     {
+        if (expiresAt is not null)
+        {
+            return new DistributedCacheEntryOptions { AbsoluteExpiration = expiresAt };
+        }
+
         var current = session.CurrentValue.Session;
         var lifetime = current.Lifetime > TimeSpan.Zero ? current.Lifetime : C.Session.DefaultLifetime;
         return current.SlidingExpiration
@@ -137,5 +178,5 @@ public sealed class UserTokenStore(
         }
     }
 
-    sealed record StoredSession(string Scheme, string RefreshToken, string[] Audiences);
+    sealed record StoredSession(string Scheme, string RefreshToken, string[] Audiences, DateTimeOffset? ExpiresAt);
 }

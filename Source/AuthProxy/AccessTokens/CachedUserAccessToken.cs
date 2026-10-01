@@ -8,4 +8,5 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// </summary>
 /// <param name="Value">The access token.</param>
 /// <param name="ExpiresAt">When the provider said the token expires.</param>
-public sealed record CachedUserAccessToken(string Value, DateTimeOffset ExpiresAt);
+/// <param name="RenewAt">When the token must be renewed.</param>
+public sealed record CachedUserAccessToken(string Value, DateTimeOffset ExpiresAt, DateTimeOffset RenewAt);

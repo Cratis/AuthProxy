@@ -453,17 +453,22 @@ provider must be configured. AuthProxy refuses to start otherwise.
 
 ### How the token is obtained
 
-- At sign-in, AuthProxy keeps the refresh token the OIDC provider issues **server-side**. The session cookie
-  carries only an unguessable reference to it, inside its encrypted ticket. The refresh token, the access
-  tokens and the ID token never reach the browser.
+- After an OIDC sign-in passes validation, AuthProxy keeps the refresh token the provider issues
+  **server-side** when issuing the session cookie. The cookie carries only an unguessable reference to it,
+  inside its encrypted ticket. In this OIDC flow, the refresh token, access tokens and ID token never reach
+  the browser. Failed sign-ins and identity-link callbacks create no stored token session.
 - For each request to the backend, AuthProxy uses that refresh token at the provider's token endpoint
   (`grant_type=refresh_token`) to get a token for the service's scopes. The token is cached per session and
   audience, and renewed shortly before it expires. AuthProxy authenticates to the token endpoint with the
   provider's `ClientSecret` or [client credential](authentication.md#client-credentials-certificates-and-federated-credentials),
-  and stores a rotated refresh token when the provider issues one.
+  and stores a rotated refresh token when the provider issues one. Once a refresh starts, it finishes under
+  a ten-second operation timeout independently of browser cancellation, so navigation does not discard
+  a received rotation.
 - Request `offline_access` (or your provider's equivalent) in the provider's `Scopes`. Without a refresh
   token AuthProxy cannot get access tokens, and logs a warning at each such sign-in.
-- Signing out removes the refresh token and every access token kept for the session.
+- Signing out removes the refresh token and every access token kept for the session, even when a refresh
+  is in flight. Signing in again replaces the previous token session. Rotation and new audiences do not
+  extend an absolute session's original retention deadline.
 
 ### What is forwarded, and when it is refused
 
@@ -474,9 +479,11 @@ provider must be configured. AuthProxy refuses to start otherwise.
   forwarded as before.
 - When no token can be obtained, the request is refused with `401` instead of being forwarded without one.
   This happens when the session has no refresh token, the provider rejects the refresh token, the provider
-  cannot be reached, or the user signed in with another provider than `Provider`. A rejected refresh token
-  is discarded. The frontend should treat the `401` as a signal to sign in again through
-  `/.cratis/login/{scheme}`.
+  cannot be reached, or the user signed in with another provider than `Provider`. An `invalid_grant` error
+  refuses that audience without discarding the session or other audiences: it can mean missing consent
+  or a resource-specific policy rather than an expired refresh token. The frontend should treat the `401`
+  as a signal to sign in again through `/.cratis/login/{scheme}`; a missing consent or policy requirement
+  may also need to be addressed at the provider.
 
 ### Running more than one instance
 

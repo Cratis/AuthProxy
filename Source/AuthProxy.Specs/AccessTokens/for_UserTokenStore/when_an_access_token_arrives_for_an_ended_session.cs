@@ -9,7 +9,7 @@ public class when_an_access_token_arrives_for_an_ended_session : given.a_user_to
 
     async Task Because()
     {
-        await _store.SetAccessToken("ended-session", "audience", new("access-token", _time.GetUtcNow().AddHours(1)), _time.GetUtcNow().AddMinutes(59), CancellationToken.None);
+        await _store.SetAccessToken("ended-session", "audience", new("access-token", _time.GetUtcNow().AddHours(1), _time.GetUtcNow().AddMinutes(59)), _time.GetUtcNow().AddMinutes(59), CancellationToken.None);
         _accessToken = await _store.GetAccessToken("ended-session", "audience", CancellationToken.None);
     }
 

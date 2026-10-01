@@ -77,25 +77,8 @@ public sealed class UserAccessTokens(
             return UserAccessTokenResult.Success(cached);
         }
 
-        var refreshLock = _refreshLocks[(uint)StringComparer.Ordinal.GetHashCode(sessionId) % (uint)_refreshLocks.Length];
-        await refreshLock.WaitAsync(cancellationToken);
-        try
-        {
-            // Another request for this session may have refreshed while this one waited.
-            if (await UsableCachedToken(sessionId, audience, cancellationToken) is { } refreshed)
-            {
-                return UserAccessTokenResult.Success(refreshed);
-            }
-
-            session = await store.Get(sessionId, cancellationToken);
-            return session is null
-                ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
-                : await Refresh(sessionId, session, audience, accessToken, cancellationToken);
-        }
-        finally
-        {
-            refreshLock.Release();
-        }
+        // The caller may stop waiting, but a started redemption must finish and persist any rotation.
+        return await RefreshUnderLock(sessionId, audience, accessToken).WaitAsync(cancellationToken);
     }
 
     static string AudienceKey(string scheme, C.ServiceAccessToken accessToken)
@@ -118,9 +101,44 @@ public sealed class UserAccessTokens(
             ? lifetime
             : DefaultLifetime;
 
+    async Task<UserAccessTokenResult> RefreshUnderLock(string sessionId, string audience, C.ServiceAccessToken accessToken)
+    {
+        using var operation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var cancellationToken = operation.Token;
+        var refreshLock = _refreshLocks[(uint)StringComparer.Ordinal.GetHashCode(sessionId) % (uint)_refreshLocks.Length];
+        var acquired = false;
+        try
+        {
+            await refreshLock.WaitAsync(cancellationToken);
+            acquired = true;
+
+            // Another request for this session may have refreshed while this one waited.
+            if (await UsableCachedToken(sessionId, audience, cancellationToken) is { } refreshed)
+            {
+                return UserAccessTokenResult.Success(refreshed);
+            }
+
+            var session = await store.Get(sessionId, cancellationToken);
+            return session is null
+                ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
+                : await Refresh(sessionId, session, audience, accessToken, cancellationToken);
+        }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested)
+        {
+            return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
+        }
+        finally
+        {
+            if (acquired)
+            {
+                refreshLock.Release();
+            }
+        }
+    }
+
     async Task<string?> UsableCachedToken(string sessionId, string audience, CancellationToken cancellationToken) =>
         await store.GetAccessToken(sessionId, audience, cancellationToken) is { } cached
-        && cached.ExpiresAt - RenewalMargin > timeProvider.GetUtcNow()
+        && cached.RenewAt > timeProvider.GetUtcNow()
             ? cached.Value
             : null;
 
@@ -159,7 +177,7 @@ public sealed class UserAccessTokens(
                 logger.RefreshRefused(session.Scheme, (int)response.StatusCode, error ?? "(none)");
                 if (string.Equals(error, "invalid_grant", StringComparison.Ordinal))
                 {
-                    await store.Remove(sessionId, cancellationToken);
+                    // invalid_grant may mean missing consent or resource-specific policy, not a dead session.
                     return UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected);
                 }
 
@@ -176,19 +194,22 @@ public sealed class UserAccessTokens(
 
             if (StringProperty(root, "refresh_token") is { Length: > 0 } rotated && rotated != session.RefreshToken)
             {
-                await store.Update(sessionId, session with { RefreshToken = rotated }, cancellationToken);
+                await store.Update(sessionId, session with { RefreshToken = rotated }, CancellationToken.None);
             }
 
             var now = timeProvider.GetUtcNow();
             var lifetime = Lifetime(root);
             var renewAt = now + lifetime - (lifetime > RenewalMargin * 2 ? RenewalMargin : lifetime / 2);
-            await store.SetAccessToken(sessionId, audience, new CachedUserAccessToken(token, now + lifetime), renewAt, cancellationToken);
+            await store.SetAccessToken(sessionId, audience, new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
 
-            return UserAccessTokenResult.Success(token);
+            // A logout during redemption must also prevent this request from forwarding the new token.
+            return await store.Get(sessionId, CancellationToken.None) is null
+                ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
+                : UserAccessTokenResult.Success(token);
         }
         catch (Exception exception) when (
             exception is HttpRequestException or JsonException or OidcClientCredentialUnavailable or InvalidOperationException or IOException
-            || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+            || exception is OperationCanceledException)
         {
             logger.RefreshFailed(session.Scheme, exception);
             return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
