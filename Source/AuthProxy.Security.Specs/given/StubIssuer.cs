@@ -56,6 +56,11 @@ public sealed class StubIssuer : IAsyncDisposable
     public bool MetadataUnavailable { get; set; }
 
     /// <summary>
+    /// Gets or sets a callback that can hold a discovery response until a spec releases it.
+    /// </summary>
+    public Func<Task>? BeforeMetadataResponse { get; set; }
+
+    /// <summary>
     /// Starts a new stub issuer.
     /// </summary>
     /// <returns>The started issuer.</returns>
@@ -69,9 +74,14 @@ public sealed class StubIssuer : IAsyncDisposable
         string? issuer = null;
         StubIssuer? stub = null;
 
-        app.MapGet("/.well-known/oauth-authorization-server", () =>
+        app.MapGet("/.well-known/oauth-authorization-server", async () =>
         {
             Interlocked.Increment(ref stub!._metadataRequests);
+            if (stub.BeforeMetadataResponse is { } beforeResponse)
+            {
+                await beforeResponse();
+            }
+
             return stub.MetadataUnavailable
                 ? Results.NotFound()
                 : Results.Json(new Dictionary<string, object>

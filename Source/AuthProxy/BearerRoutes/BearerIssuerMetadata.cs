@@ -16,7 +16,8 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <remarks>
 /// Each issuer keeps its last good keys. Requested refreshes finish before keys are returned, so a token naming
 /// a newly rotated key can be retried in the same request. Retrievals are serialized per issuer and failed
-/// retrievals back off, including before the first success. An outage does not discard previously trusted keys.
+/// retrievals back off, including before the first success. Ordinary lookups use previously trusted keys without
+/// waiting for an in-progress retrieval. An outage does not discard previously trusted keys.
 /// Metadata naming another issuer is never cached or trusted.
 /// </remarks>
 public sealed class BearerIssuerMetadata(
@@ -34,11 +35,22 @@ public sealed class BearerIssuerMetadata(
     public async Task<IReadOnlyCollection<SecurityKey>?> GetSigningKeys(ResolvedBearerIssuer issuer, CancellationToken cancellationToken)
     {
         var cache = CacheFor(issuer);
-        await cache.Gate.WaitAsync(cancellationToken);
+        var requested = cache.TakeRefreshRequest();
+        if (!requested && cache.Configuration is { } available)
+        {
+            if (!cache.Gate.Wait(0))
+            {
+                return [.. available.SigningKeys];
+            }
+        }
+        else
+        {
+            await cache.Gate.WaitAsync(cancellationToken);
+        }
+
         try
         {
             var now = DateTimeOffset.UtcNow;
-            var requested = cache.TakeRefreshRequest();
             if (now >= cache.RetryAfter &&
                 (cache.Configuration is null || now >= cache.AutomaticRefreshAfter || (requested && now >= cache.RequestedRefreshAfter)))
             {

@@ -13,9 +13,10 @@ namespace Cratis.AuthProxy.BearerRoutes;
 internal sealed class BearerIssuerMetadataCache(IDocumentRetriever retriever) : IDisposable
 {
     int _refreshRequested;
+    OpenIdConnectConfiguration? _configuration;
 
     /// <summary>
-    /// Gets the gate serializing retrievals and cache access.
+    /// Gets the gate serializing retrievals and deadline access.
     /// </summary>
     internal SemaphoreSlim Gate { get; } = new(1, 1);
 
@@ -27,7 +28,11 @@ internal sealed class BearerIssuerMetadataCache(IDocumentRetriever retriever) : 
     /// <summary>
     /// Gets or sets the last configuration naming the expected issuer.
     /// </summary>
-    internal OpenIdConnectConfiguration? Configuration { get; set; }
+    internal OpenIdConnectConfiguration? Configuration
+    {
+        get => Volatile.Read(ref _configuration);
+        set => Volatile.Write(ref _configuration, value);
+    }
 
     /// <summary>
     /// Gets or sets the next periodic retrieval deadline.
