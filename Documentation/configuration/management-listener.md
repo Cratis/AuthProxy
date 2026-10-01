@@ -95,7 +95,8 @@ working.
 
 **Readiness verifies local capability only.** Today that means one thing: a `Protect`/`Unprotect`
 round-trip through Data Protection, which is the only mechanism that forces the key ring to initialize and
-proves it against the configured [`DataProtectionKeysPath`](authentication.md). It is re-run on every call
+proves it against the configured [key store](data-protection.md) — a `DataProtectionKeysPath` directory,
+Azure Blob Storage or Redis. It is re-run on every call
 and no answer is cached, so a key ring that becomes unusable — a volume unmounted, a permission revoked —
 changes the answer.
 

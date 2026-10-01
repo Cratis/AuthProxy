@@ -428,7 +428,7 @@ subjects and tenant IDs that do not contain that delimiter. A delimiter-bearing 
 is re-authorized. Current version-two records use structured fields and do not inherit this legacy restriction.
 
 Deployments running more than one AuthProxy instance should configure a shared
-`DataProtectionKeysPath` so a record sealed by one instance can be read by the others; without it each
+[Data Protection key store](data-protection.md) so a record sealed by one instance can be read by the others; without it each
 instance re-resolves identity for callers whose record it did not issue.
 
 ---
@@ -657,8 +657,9 @@ protected separately, so presenting one where the other is expected is always re
 The authentication cookie and AuthProxy-issued client-credentials access and refresh tokens are all
 encrypted using ASP.NET Core Data Protection. By default, keys are not shared across instances. Running
 more than one AuthProxy replica, or needing sessions and client-credentials tokens to survive a restart,
-requires mounting a persistent, shared volume and pointing `Cratis:AuthProxy:DataProtectionKeysPath`
-at it:
+requires a shared key store. The simplest is a persistent, shared volume that
+`Cratis:AuthProxy:DataProtectionKeysPath` points at; Azure Blob Storage and Redis are also supported, see
+[Data Protection keys](data-protection.md):
 
 ```json
 {
