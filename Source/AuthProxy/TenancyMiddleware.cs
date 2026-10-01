@@ -47,11 +47,9 @@ public class TenancyMiddleware(
     public async Task InvokeAsync(HttpContext context)
     {
         // 1. Always strip inbound spoofable headers before any downstream sees them.
-        context.Request.Headers.Remove(Headers.Principal);
-        context.Request.Headers.Remove(Headers.PrincipalId);
-        context.Request.Headers.Remove(Headers.PrincipalName);
-        context.Request.Headers.Remove(Headers.PrincipalNameExtended);
-        context.Request.Headers.Remove(Headers.TenantId);
+        // Every x-ms-client-principal* header and the tenant under both of its names; only the tenant this
+        // middleware resolves below is ever forwarded.
+        SpoofableHeaders.Strip(context.Request.Headers);
 
         // 2. Resolve tenant.
         if (!tenantResolver.TryResolve(context, out string tenantId))

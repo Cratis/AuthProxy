@@ -7,8 +7,10 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 /// OWASP A01 — Broken Access Control. A caller must not be able to tell the origin who they are.
 /// <para>
 /// AuthProxy's entire value is that a backend can trust <c language="text">x-ms-client-principal</c>,
-/// <c language="text">x-ms-client-principal-id</c>, <c language="text">x-ms-client-principal-name</c> and <c language="text">Tenant-ID</c> as proof of
-/// identity, because the proxy is the only thing that writes them. If an inbound copy survived to the
+/// <c language="text">x-ms-client-principal-id</c>, <c language="text">x-ms-client-principal-name</c> and <c language="text">x-cratis-tenant-id</c> as proof
+/// of identity, because the proxy is the only thing that writes them. The tenant is also stripped under the
+/// legacy name <c language="text">Tenant-ID</c>, and every header beginning <c language="text">x-ms-client-principal</c> is stripped whatever
+/// it ends in. If an inbound copy survived to the
 /// origin, every backend behind the proxy would be authenticating whoever asked — the single worst failure
 /// this component can have, and one no client-facing response would reveal. So the assertion is made
 /// against a real origin that records what it actually received.
@@ -76,6 +78,38 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
     public void should_not_carry_a_spoofed_tenant_for_an_authenticated_caller() =>
         Assert.NotEqual("victim-tenant", _authenticatedOnProtectedPath!.Value(Headers.TenantId), StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Arc resolves its tenant from <c language="text">x-cratis-tenant-id</c> by default, and the tenant picks the Chronicle
+    /// namespace and the tenant-scoped read models. Whatever tenant the origin sees must be the one the proxy
+    /// resolved, under both names during the transition.
+    /// </summary>
+    [Fact]
+    public void should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name() =>
+        Assert.Equal(SecurityHarness.TenantId, _anonymousOnAnonymousPath!.Value(Headers.LegacyTenantId), StringComparer.Ordinal);
+
+    /// <inheritdoc cref="should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name"/>
+    [Fact]
+    public void should_give_an_authenticated_caller_only_the_tenant_the_proxy_resolved() =>
+        Assert.Equal(SecurityHarness.TenantId, _authenticatedOnProtectedPath!.Value(Headers.TenantId), StringComparer.Ordinal);
+
+    /// <inheritdoc cref="should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name"/>
+    [Fact]
+    public void should_give_an_authenticated_caller_the_resolved_tenant_under_the_legacy_name() =>
+        Assert.Equal(SecurityHarness.TenantId, _authenticatedOnProtectedPath!.Value(Headers.LegacyTenantId), StringComparer.Ordinal);
+
+    /// <summary>
+    /// The proxy writes three identity headers and the sibling; a platform adds more, such as the identity
+    /// provider name. None of them may be carried from the caller to the origin.
+    /// </summary>
+    [Fact]
+    public void should_not_carry_any_other_principal_header_for_an_anonymous_caller() =>
+        Assert.DoesNotContain(_anonymousOnAnonymousPath!.Headers.Keys, IsUnexpectedPrincipalHeader);
+
+    /// <inheritdoc cref="should_not_carry_any_other_principal_header_for_an_anonymous_caller"/>
+    [Fact]
+    public void should_not_carry_any_other_principal_header_for_an_authenticated_caller() =>
+        Assert.DoesNotContain(_authenticatedOnProtectedPath!.Headers.Keys, IsUnexpectedPrincipalHeader);
+
     [Fact]
     public void should_give_an_anonymous_caller_no_principal_at_all() =>
         Assert.False(_anonymousOnAnonymousPath!.Has(Headers.Principal));
@@ -105,7 +139,16 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
         request.Headers.TryAddWithoutValidation(Headers.PrincipalName, "attacker");
         request.Headers.TryAddWithoutValidation(Headers.PrincipalNameExtended, "UTF-8''attacker");
         request.Headers.TryAddWithoutValidation(Headers.TenantId, "victim-tenant");
+        request.Headers.TryAddWithoutValidation(Headers.LegacyTenantId, "victim-tenant");
+        request.Headers.TryAddWithoutValidation("x-ms-client-principal-idp", "attacker-idp");
+        request.Headers.TryAddWithoutValidation("x-ms-client-principal-roles", "Administrator");
 
         return request;
     }
+
+    static bool IsUnexpectedPrincipalHeader(string name) =>
+        name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(name, Headers.Principal, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(name, Headers.PrincipalId, StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(name, Headers.PrincipalName, StringComparison.OrdinalIgnoreCase);
 }
