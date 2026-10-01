@@ -1,8 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -14,7 +15,6 @@ namespace Cratis.AuthProxy.Authentication;
 static class CertificateClientAssertion
 {
     const string RsaKeyAlgorithm = "1.2.840.113549.1.1.1";
-    const string EcKeyAlgorithm = "1.2.840.10045.2.1";
 
     /// <summary>
     /// The lifetime of each assertion. It is presented once, immediately, so it only needs to survive clock skew.
@@ -32,7 +32,8 @@ static class CertificateClientAssertion
     /// <exception cref="OidcClientCredentialUnavailable">The certificate has no usable private key.</exception>
     internal static string Create(X509Certificate2 certificate, string clientId, string audience, DateTimeOffset now)
     {
-        var signingCredentials = SigningCredentialsFor(certificate);
+        using var ecKey = certificate.HasPrivateKey ? certificate.GetECDsaPrivateKey() : null;
+        var signingCredentials = SigningCredentialsFor(certificate, ecKey);
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = clientId,
@@ -47,15 +48,41 @@ static class CertificateClientAssertion
             },
             SigningCredentials = signingCredentials
         };
+        var handler = new JwtSecurityTokenHandler { SetDefaultTimesOnTokenCreation = false };
+        var token = handler.CreateJwtSecurityToken(descriptor);
+        if (ecKey is not null)
+        {
+            token.Header[JwtHeaderParameterNames.X5t] = Base64UrlEncoder.Encode(certificate.GetCertHash());
+        }
 
-        return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false }.CreateToken(descriptor);
+        return handler.WriteToken(token);
     }
 
-    static X509SigningCredentials SigningCredentialsFor(X509Certificate2 certificate) => (certificate.HasPrivateKey, certificate.PublicKey.Oid.Value) switch
+    static SigningCredentials SigningCredentialsFor(X509Certificate2 certificate, ECDsa? ecKey)
     {
-        (true, RsaKeyAlgorithm) => new X509SigningCredentials(certificate, SecurityAlgorithms.RsaSha256),
-        (true, EcKeyAlgorithm) => new X509SigningCredentials(certificate, SecurityAlgorithms.EcdsaSha256),
-        _ => throw new OidcClientCredentialUnavailable(
-            $"The client certificate '{certificate.Subject}' has no RSA or ECDSA private key to sign a client assertion with.")
-    };
+        if (ecKey is not null)
+        {
+            var algorithm = ecKey.KeySize switch
+            {
+                256 => SecurityAlgorithms.EcdsaSha256,
+                384 => SecurityAlgorithms.EcdsaSha384,
+                521 => SecurityAlgorithms.EcdsaSha512,
+                _ => throw new OidcClientCredentialUnavailable($"The client certificate '{certificate.Subject}' has an unsupported ECDSA key size.")
+            };
+            var key = new ECDsaSecurityKey(ecKey)
+            {
+                KeyId = certificate.Thumbprint,
+
+                // The private-key handle belongs to this call, not to the signature-provider cache.
+                CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false }
+            };
+
+            return new SigningCredentials(key, algorithm);
+        }
+
+        return certificate.HasPrivateKey && certificate.PublicKey.Oid.Value == RsaKeyAlgorithm
+            ? new X509SigningCredentials(certificate, SecurityAlgorithms.RsaSha256)
+            : throw new OidcClientCredentialUnavailable(
+                $"The client certificate '{certificate.Subject}' has no RSA or ECDSA private key to sign a client assertion with.");
+    }
 }

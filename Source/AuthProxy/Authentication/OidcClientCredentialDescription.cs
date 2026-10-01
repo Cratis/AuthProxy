@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Identity.Abstractions;
+using Microsoft.Identity.Client.Instance.Discovery;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -17,15 +18,16 @@ static class OidcClientCredentialDescription
     /// Creates the credential description for a client-assertion credential.
     /// </summary>
     /// <param name="credential">The configured credential. Its source must use a client assertion.</param>
+    /// <param name="authority">The provider authority used to resolve the managed-identity token-exchange audience.</param>
     /// <returns>The <see cref="CredentialDescription"/> the credential loader loads.</returns>
     /// <exception cref="OidcClientCredentialUnavailable">The source does not use a client assertion.</exception>
-    internal static CredentialDescription From(C.OidcClientCredential credential) => credential.Source switch
+    internal static CredentialDescription From(C.OidcClientCredential credential, string authority) => credential.Source switch
     {
         C.OidcClientCredentialSource.CertificateFile => new()
         {
             SourceType = CredentialSource.Path,
             CertificateDiskPath = credential.CertificatePath,
-            CertificatePassword = NullIfEmpty(credential.CertificatePassword)
+            CertificatePassword = string.IsNullOrEmpty(credential.CertificatePassword) ? null : credential.CertificatePassword
         },
         C.OidcClientCredentialSource.CertificateStore => new()
         {
@@ -51,10 +53,17 @@ static class OidcClientCredentialDescription
         {
             SourceType = CredentialSource.SignedAssertionFromManagedIdentity,
             ManagedIdentityClientId = NullIfEmpty(credential.ManagedIdentityClientId),
-            TokenExchangeUrl = NullIfEmpty(credential.TokenExchangeAudience)
+            TokenExchangeUrl = NullIfEmpty(credential.TokenExchangeAudience) ?? TokenExchangeAudienceOf(authority)
         },
         _ => throw new OidcClientCredentialUnavailable($"The client credential source '{credential.Source}' does not use a client assertion.")
     };
+
+    static string TokenExchangeAudienceOf(string authority) =>
+        Uri.TryCreate(authority, UriKind.Absolute, out var uri) &&
+        KnownCloudMetadata.Default.GetByAuthorityHost(uri.Host) is { } metadata &&
+        metadata.TryGetValue(Microsoft.Identity.Client.Instance.Discovery.CloudMetadataKeyNames.FederatedCredentialAudience, out var audience)
+            ? audience
+            : "api://AzureADTokenExchange";
 
     static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }
