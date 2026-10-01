@@ -141,6 +141,8 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             }
         }
 
+        var mappingTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var tenantClaim = string.IsNullOrWhiteSpace(route.TenantClaimType) ? C.BearerRoute.DefaultTenantClaimType : route.TenantClaimType.Trim();
         foreach (var (target, source) in route.ClaimMappings)
         {
             if (string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(source))
@@ -150,6 +152,15 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             else if (CanonicalIdentityClaims.IsReserved(target) || BearerRouteClaims.IsReserved(target) || RoleClaims.Is(target))
             {
                 failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} may not write '{target}': AuthProxy owns that claim type.");
+            }
+            else if (string.Equals(target, tenantClaim, StringComparison.OrdinalIgnoreCase))
+            {
+                failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} may not write '{target}': the tenant must remain the token's original tenant claim.");
+            }
+
+            if (!mappingTargets.Add(target))
+            {
+                failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} has conflicting targets differing only by case: '{target}'.");
             }
         }
     }

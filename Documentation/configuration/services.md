@@ -490,7 +490,7 @@ every token-authenticated request instead.
 | `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
 | `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication. |
 | `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |
-| `ClaimMappings` | `map<string, string>` | `{}` | Forwarded claim type → token claim it is read from. A mapped source claim missing from the token refuses the token. Claim types containing `:` cannot be keys, because `:` separates configuration sections. |
+| `ClaimMappings` | `map<string, string>` | `{}` | Forwarded claim type → token claim it is read from, replacing all case variants of the target. A missing source refuses the token; mapped `sub`, `preferred_username` and `name` require one usable source value. Targets may not differ only by case or overwrite the route's tenant claim. Claim types containing `:` cannot be keys, because `:` separates configuration sections. |
 | `IdentityProvider` | `string` | `bearer` | The identity provider named in the forwarded principal. |
 | `ForwardAuthorizationHeader` | `bool` | `false` | Whether the backend also receives the `Authorization` header. |
 | `ClockSkew` | `TimeSpan` | `00:00:30` | Allowed clock skew for `exp` and `nbf`. At most `00:05:00`. |

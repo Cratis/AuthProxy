@@ -30,6 +30,8 @@ public sealed class StubIssuer : IAsyncDisposable
 
     readonly WebApplication _app;
     readonly RSA _rsa;
+    string _keyId = KeyId;
+    int _metadataRequests;
 
     StubIssuer(WebApplication app, RSA rsa, string issuer)
     {
@@ -44,6 +46,16 @@ public sealed class StubIssuer : IAsyncDisposable
     public string Issuer { get; }
 
     /// <summary>
+    /// Gets the number of discovery requests received.
+    /// </summary>
+    public int MetadataRequests => Volatile.Read(ref _metadataRequests);
+
+    /// <summary>
+    /// Gets or sets whether discovery returns an unavailable document.
+    /// </summary>
+    public bool MetadataUnavailable { get; set; }
+
+    /// <summary>
     /// Starts a new stub issuer.
     /// </summary>
     /// <returns>The started issuer.</returns>
@@ -55,14 +67,21 @@ public sealed class StubIssuer : IAsyncDisposable
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         var app = builder.Build();
         string? issuer = null;
+        StubIssuer? stub = null;
 
-        app.MapGet("/.well-known/oauth-authorization-server", () => Results.Json(new Dictionary<string, object>
+        app.MapGet("/.well-known/oauth-authorization-server", () =>
         {
-            ["issuer"] = issuer!,
-            ["jwks_uri"] = $"{issuer}.well-known/jwks",
-            ["authorization_endpoint"] = $"{issuer}connect/authorize",
-            ["token_endpoint"] = $"{issuer}connect/token",
-        }));
+            Interlocked.Increment(ref stub!._metadataRequests);
+            return stub.MetadataUnavailable
+                ? Results.NotFound()
+                : Results.Json(new Dictionary<string, object>
+                {
+                    ["issuer"] = issuer!,
+                    ["jwks_uri"] = $"{issuer}.well-known/jwks",
+                    ["authorization_endpoint"] = $"{issuer}connect/authorize",
+                    ["token_endpoint"] = $"{issuer}connect/token",
+                });
+        });
 
         app.MapGet("/.well-known/jwks", () =>
         {
@@ -76,7 +95,7 @@ public sealed class StubIssuer : IAsyncDisposable
                         ["kty"] = "RSA",
                         ["use"] = "sig",
                         ["alg"] = SecurityAlgorithms.RsaSha256,
-                        ["kid"] = KeyId,
+                        ["kid"] = stub!._keyId,
                         ["n"] = Base64UrlEncoder.Encode(parameters.Modulus),
                         ["e"] = Base64UrlEncoder.Encode(parameters.Exponent),
                     },
@@ -92,7 +111,7 @@ public sealed class StubIssuer : IAsyncDisposable
             .First();
         issuer = $"{address.TrimEnd('/')}/";
 
-        return new StubIssuer(app, rsa, issuer);
+        return stub = new StubIssuer(app, rsa, issuer);
     }
 
     /// <summary>
@@ -110,7 +129,17 @@ public sealed class StubIssuer : IAsyncDisposable
         DateTime? expires = null,
         string? issuer = null,
         params string[] without) =>
-        Sign(new RsaSecurityKey(_rsa) { KeyId = KeyId }, claims, audience, expires, issuer, without);
+        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, claims, audience, expires, issuer, without);
+
+    /// <summary>
+    /// Replaces the published signing key and its identifier.
+    /// </summary>
+    public void RotateKey()
+    {
+        using var replacement = RSA.Create(2048);
+        _rsa.ImportParameters(replacement.ExportParameters(includePrivateParameters: true));
+        _keyId = Guid.NewGuid().ToString("N");
+    }
 
     /// <summary>
     /// Signs an access token with the published key, then lets the caller reshape it before it is written.
@@ -119,7 +148,7 @@ public sealed class StubIssuer : IAsyncDisposable
     /// <param name="setDefaultTimes">Whether the handler fills in lifetimes the descriptor leaves unset.</param>
     /// <returns>The token.</returns>
     public string TokenShaped(Action<SecurityTokenDescriptor> shape, bool setDefaultTimes = true) =>
-        Sign(new RsaSecurityKey(_rsa) { KeyId = KeyId }, null, BearerRouteHarness.Audience, null, null, [], shape, setDefaultTimes);
+        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, null, BearerRouteHarness.Audience, null, null, [], shape, setDefaultTimes);
 
     /// <summary>
     /// Signs a token with HMAC, keyed with this issuer's published public key — the algorithm-confusion attack on

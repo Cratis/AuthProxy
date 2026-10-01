@@ -93,6 +93,7 @@ public class BearerRouteMiddleware(
     {
         if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
+            BearerChallenge.NoStore(context);
             context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
             context.Response.Headers[HeaderNames.Allow] = "GET, HEAD";
             return;

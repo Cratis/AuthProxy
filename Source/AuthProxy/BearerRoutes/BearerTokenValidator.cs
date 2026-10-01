@@ -189,6 +189,11 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
                 $"The token carries no '{missingSource}' claim for a configured claim mapping.");
         }
 
+        if (!TryGetSingleValue(forwarded, SubjectClaimType, out _))
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "The token carries no single subject.");
+        }
+
         forwarded.Add(new Claim(BearerRouteClaims.Issuer, issuer.Issuer));
         forwarded.Add(new Claim(BearerRouteClaims.Subject, subject));
         if (TryGetSingleValue(claims, "azp", out var clientId) || TryGetSingleValue(claims, "client_id", out clientId))
@@ -299,6 +304,11 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     static bool IsUsableTenantId(string tenantId) =>
         tenantId.Length <= MaximumTenantIdLength && tenantId.AsSpan().IndexOfAnyExcept(_tenantCharacters) < 0;
 
+    static bool IsSingleValueIdentityClaim(string type) =>
+        string.Equals(type, SubjectClaimType, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(type, "preferred_username", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(type, "name", StringComparison.OrdinalIgnoreCase);
+
     static bool TryBuildForwardedClaims(ResolvedBearerRoute route, Claim[] tokenClaims, out List<Claim> forwarded, out string missingSource)
     {
         missingSource = string.Empty;
@@ -319,13 +329,14 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
                 .Select(_ => _.Value)
                 .Where(_ => !string.IsNullOrWhiteSpace(_))
                 .ToArray();
-            if (values.Length == 0)
+            if (values.Length == 0 || (IsSingleValueIdentityClaim(target) && values.Length != 1))
             {
                 missingSource = source;
                 return false;
             }
 
-            forwarded.RemoveAll(_ => string.Equals(_.Type, target, StringComparison.Ordinal));
+            // ClaimsPrincipal authorization lookups ignore case; no variant of an overwritten target may survive.
+            forwarded.RemoveAll(_ => string.Equals(_.Type, target, StringComparison.OrdinalIgnoreCase));
             forwarded.AddRange(values.Select(_ => new Claim(target, _)));
         }
 

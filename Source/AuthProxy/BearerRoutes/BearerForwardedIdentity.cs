@@ -36,9 +36,9 @@ public sealed record BearerForwardedIdentity(
     public static BearerForwardedIdentity From(BearerTokenValidation validation, ResolvedBearerRoute route)
     {
         var user = validation.Principal!;
-        var subject = user.FindFirst("sub")?.Value ?? string.Empty;
-        var details = user.FindFirst("preferred_username")?.Value
-            ?? user.FindFirst("name")?.Value
+        var subject = user.Claims.FirstOrDefault(_ => string.Equals(_.Type, "sub", StringComparison.Ordinal))?.Value ?? string.Empty;
+        var details = user.Claims.FirstOrDefault(_ => string.Equals(_.Type, "preferred_username", StringComparison.Ordinal))?.Value
+            ?? user.Claims.FirstOrDefault(_ => string.Equals(_.Type, "name", StringComparison.Ordinal))?.Value
             ?? subject;
 
         var principal = new ClientPrincipal

@@ -34,6 +34,10 @@ public class when_validating_bearer_routes : Specification
     ValidateOptionsResult _withRouteRequirement;
     ValidateOptionsResult _withRouteRequirementNamingNoClaim;
     ValidateOptionsResult _withRouteRequirementOnARole;
+    ValidateOptionsResult _mappingIntoTenant;
+    ValidateOptionsResult _mappingIntoCustomTenant;
+    ValidateOptionsResult _mappingIntoDefaultTenant;
+    ValidateOptionsResult _conflictingMappingTargets;
 
     void Because()
     {
@@ -56,6 +60,22 @@ public class when_validating_bearer_routes : Specification
         _resourceMetadataOfAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = Service(Route(prefix: "/v1"))));
         _withEmptyMapping = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string> { ["sub"] = " " }));
         _mappingIntoRoles = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string> { ["roles"] = "groups" }));
+        _mappingIntoTenant = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string> { ["TID"] = "another_tenant" }));
+        _mappingIntoCustomTenant = validator.Validate(null, Configuration(_ =>
+        {
+            _.TenantClaimType = " tenant ";
+            _.ClaimMappings = new Dictionary<string, string> { ["tenant"] = "another_tenant" };
+        }));
+        _mappingIntoDefaultTenant = validator.Validate(null, Configuration(_ =>
+        {
+            _.TenantClaimType = " ";
+            _.ClaimMappings = new Dictionary<string, string> { ["tid"] = "another_tenant" };
+        }));
+        _conflictingMappingTargets = validator.Validate(null, Configuration(_ => _.ClaimMappings = new Dictionary<string, string>
+        {
+            ["sub"] = "github_id",
+            ["SUB"] = "another_id",
+        }));
         _verificationRequired = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
         _verificationRequiredByAnotherService = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" } })));
         _verificationRequiredAndAcceptedWithout = validator.Validate(null, Configuration(_ => _.AcceptWithoutIdentityVerification = true, adjustConfiguration: _ => _.Services["main"].IdentityVerification = C.IdentityVerificationMode.Required));
@@ -94,6 +114,11 @@ public class when_validating_bearer_routes : Specification
     [Fact] void should_refuse_a_route_requirement_naming_no_claim() => _withRouteRequirementNamingNoClaim.Failed.ShouldBeTrue();
     [Fact] void should_refuse_a_route_requirement_on_a_role_a_token_never_carries() => _withRouteRequirementOnARole.Failed.ShouldBeTrue();
     [Fact] void should_ignore_a_verification_requirement_of_a_service_that_resolves_no_identity() => _verificationRequiredOfANonParticipant.Succeeded.ShouldBeTrue();
+
+    [Fact] void should_refuse_a_mapping_into_a_case_variant_of_the_tenant_claim() => _mappingIntoTenant.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_mapping_into_the_effective_custom_tenant_claim() => _mappingIntoCustomTenant.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_a_mapping_into_the_default_tenant_when_unset() => _mappingIntoDefaultTenant.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_mapping_targets_differing_only_by_case() => _conflictingMappingTargets.Failed.ShouldBeTrue();
 
     static C.AuthProxy Configuration(
         Action<C.BearerRoute> adjust,

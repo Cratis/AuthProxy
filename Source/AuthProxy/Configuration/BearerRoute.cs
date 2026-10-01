@@ -72,7 +72,9 @@ public class BearerRoute
 
     /// <summary>
     /// Gets or sets the claims to rewrite before the principal is forwarded: forwarded claim type to the token claim
-    /// it is read from. A mapped source claim the token does not carry refuses the token.
+    /// it is read from, replacing all case variants of the target. A missing source refuses the token, as do
+    /// multiple usable source values for mapped sub, preferred_username or name. Targets may not differ only
+    /// by case or overwrite the tenant claim.
     /// </summary>
     public IDictionary<string, string> ClaimMappings { get; set; } = new Dictionary<string, string>();
 

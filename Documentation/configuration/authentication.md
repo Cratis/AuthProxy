@@ -566,8 +566,10 @@ A token is accepted only when all of these hold:
 - Its signature verifies against a key in the issuer's JWKS. The metadata document (RFC 8414, or OpenID Connect
   discovery) must name exactly the configured issuer. Metadata and keys are cached and refreshed periodically,
   and a token naming an unknown key triggers a refresh at most every 30 seconds per issuer, so key rotation needs
-  no restart. A failed refresh keeps the last keys that were retrieved in use. Only when no keys have been
-  retrieved yet, or the metadata names another issuer, are tokens refused — with `503`, not as invalid.
+  no restart. An allowed refresh completes before validation is retried in the same request. A failed refresh
+  keeps the last trusted keys in use and backs off retrieval for 30 seconds, including before the first success.
+  Metadata naming another issuer is never trusted. When no trusted keys have been retrieved, tokens are refused
+  with `503`, not as invalid.
 - Its `typ` header is an access-token type: the issuer's `TokenTypes`, `at+jwt` or `application/at+jwt` by
   default.
 - Its `aud` names one of the route's audiences.
@@ -579,7 +581,10 @@ the route's service's own — to the principal after the route's `ClaimMappings`
 browser session, together with the route's own `RequiredClaims`. A route that sets
 `IgnoreDeploymentRequiredClaims` is held to its own requirements only, for a deployment whose requirements name a
 claim the issuer does not mint; AuthProxy logs a warning at startup for it. Role claims are dropped from the token
-first, so a requirement on a role can never be met by a bearer token.
+first, so a requirement on a role can never be met by a bearer token. A mapping replaces every case variant of
+its target. Mapped `sub`, `preferred_username` and `name` must each have one usable source value; multiple values
+refuse the token. Mapping into the route's tenant claim, or declaring targets differing only by case, is refused
+at startup.
 
 ### Responses
 
@@ -600,7 +605,7 @@ carries `Cache-Control: no-store` and an empty body; the reason is logged, not r
 The path of `ResourceMetadataUrl` (for example `/.well-known/oauth-protected-resource/mcp`) is forwarded to the
 service backend for `GET` and `HEAD` without authentication and without any identity headers, `Cookie` or
 `Authorization`, so a client can discover the authorization server before it has a token. The backend serves the
-document. Any other method on that path is answered `405` with `Allow: GET, HEAD`.
+document. Any other method on that path is answered `405` with `Allow: GET, HEAD` and `Cache-Control: no-store`.
 
 ### Forwarded headers
 

@@ -126,16 +126,20 @@ public static class BearerChallenge
         return parameters.Count == 0 ? "Bearer" : $"Bearer {string.Join(", ", parameters)}";
     }
 
+    /// <summary>
+    /// Prevents caching a bearer-route refusal.
+    /// </summary>
+    /// <param name="context">The current HTTP context.</param>
+    internal static void NoStore(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers[HeaderNames.Pragma] = "no-cache";
+    }
+
     static void Challenge(HttpContext context, int statusCode, Uri? resourceMetadataUrl, string? error, string? scope)
     {
         NoStore(context);
         context.Response.StatusCode = statusCode;
         context.Response.Headers.WWWAuthenticate = ChallengeValue(resourceMetadataUrl, error, scope);
-    }
-
-    static void NoStore(HttpContext context)
-    {
-        context.Response.Headers.CacheControl = "no-store";
-        context.Response.Headers[HeaderNames.Pragma] = "no-cache";
     }
 }

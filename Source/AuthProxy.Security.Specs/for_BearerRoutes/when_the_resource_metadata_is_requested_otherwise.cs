@@ -66,6 +66,9 @@ public class when_the_resource_metadata_is_requested_otherwise(BearerRouteHarnes
     [Fact] public void should_refuse_delete() => Assert.Equal(HttpStatusCode.MethodNotAllowed, _delete!.StatusCode);
     [Fact] public void should_refuse_options() => Assert.Equal(HttpStatusCode.MethodNotAllowed, _options!.StatusCode);
     [Fact] public void should_name_the_methods_it_allows() => Assert.Equal("GET, HEAD", _put!.Content.Headers.Allow.Count > 0 ? string.Join(", ", _put.Content.Headers.Allow) : string.Empty);
+    [Fact] public void should_not_cache_put_refusals() => Assert.True(_put!.Headers.CacheControl?.NoStore);
+    [Fact] public void should_not_cache_delete_refusals() => Assert.True(_delete!.Headers.CacheControl?.NoStore);
+    [Fact] public void should_not_cache_options_refusals() => Assert.True(_options!.Headers.CacheControl?.NoStore);
     [Fact] public void should_not_forward_other_methods() => Assert.False(_writesForwarded);
     [Fact] public void should_match_case_insensitively() => Assert.Equal(HttpStatusCode.OK, _upperCase!.StatusCode);
     [Fact] public void should_match_with_a_trailing_separator() => Assert.Equal(HttpStatusCode.OK, _trailingSeparator!.StatusCode);

@@ -24,6 +24,7 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
     HttpResponseMessage? _otherOrganization;
     HttpResponseMessage? _mapped;
     HttpResponseMessage? _unmapped;
+    HttpResponseMessage? _caseVariant;
 
     public async Task InitializeAsync()
     {
@@ -41,6 +42,11 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
 
         // The token's own preferred_username qualifies, but the route replaces it with github_login.
         _unmapped = await Send(client, UnmappedPath, harness.Issuer.Token(new Dictionary<string, object>(organization) { ["github_login"] = "mallory" }));
+        _caseVariant = await Send(client, $"{UnmappedPath}-case-variant", harness.Issuer.Token(new Dictionary<string, object>(organization)
+        {
+            ["github_login"] = "mallory",
+            ["PREFERRED_USERNAME"] = BearerRouteHarness.GitHubLogin,
+        }));
     }
 
     public Task DisposeAsync()
@@ -50,6 +56,7 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
         _otherOrganization?.Dispose();
         _mapped?.Dispose();
         _unmapped?.Dispose();
+        _caseVariant?.Dispose();
         return Task.CompletedTask;
     }
 
@@ -60,6 +67,9 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
     [Fact] public void should_not_forward_a_refused_token() => Assert.False(harness.Origin.ReceivedAnythingFor(WithoutOrganizationPath) || harness.Origin.ReceivedAnythingFor(OtherOrganizationPath));
     [Fact] public void should_check_the_service_requirement_after_the_claim_mappings() => Assert.Equal(HttpStatusCode.OK, _mapped!.StatusCode);
     [Fact] public void should_not_let_a_mapped_away_claim_satisfy_the_service_requirement() => Assert.Equal(HttpStatusCode.Forbidden, _unmapped!.StatusCode);
+
+    [Fact] public void should_not_let_a_case_variant_of_a_mapped_claim_satisfy_the_service_requirement() => Assert.Equal(HttpStatusCode.Forbidden, _caseVariant!.StatusCode);
+    [Fact] public void should_not_forward_a_token_qualifying_only_through_a_case_variant() => Assert.False(harness.Origin.ReceivedAnythingFor($"{UnmappedPath}-case-variant"));
 
     static Task<HttpResponseMessage> Send(HttpClient client, string path, string token) =>
         client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, token));
