@@ -182,7 +182,7 @@ public static class BearerRouteTable
 
         var tokenTypes = issuer.TokenTypes.Where(_ => !string.IsNullOrWhiteSpace(_)).Select(_ => _.Trim()).ToArray();
         resolved = new ResolvedBearerIssuer(
-            issuer.Issuer,
+            issuer.Issuer.Trim(),
             metadataAddress,
             tokenTypes.Length > 0 ? tokenTypes : C.BearerIssuer.DefaultTokenTypes,
             RequireHttps: !isLoopbackHttp);

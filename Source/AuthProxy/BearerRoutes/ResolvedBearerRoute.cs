@@ -41,7 +41,7 @@ public sealed record ResolvedBearerRoute(
     /// </summary>
     public string TenantClaimType => string.IsNullOrWhiteSpace(Route.TenantClaimType)
         ? C.BearerRoute.DefaultTenantClaimType
-        : Route.TenantClaimType;
+        : Route.TenantClaimType.Trim();
 
     /// <summary>
     /// Gets the identity provider label of the forwarded principal.
