@@ -74,6 +74,20 @@ public class Service
     public ServiceEndpoint? Registration { get; set; }
 
     /// <summary>
+    /// Gets or sets how long a request proxied to this service's backend or frontend may sit idle — with no
+    /// bytes moving in either direction — before the proxy cancels it. Leave unset to use the root
+    /// <see cref="AuthProxy.ActivityTimeout"/>, which itself defaults to
+    /// <see cref="AuthProxy.DefaultActivityTimeout"/>.
+    /// </summary>
+    /// <remarks>
+    /// A long-lived stream (WebSocket, Server-Sent Events) is cut once it has been quiet for longer than this,
+    /// so set it above the longest silence the backend can leave between messages — or have the backend send a
+    /// heartbeat more often than that. <see cref="ServiceEndpoint.ActivityTimeout"/> narrows it to the backend
+    /// or the frontend alone. Must be greater than zero.
+    /// </remarks>
+    public TimeSpan? ActivityTimeout { get; set; }
+
+    /// <summary>
     /// Gets or sets the request paths on this service that are served to unauthenticated callers.
     /// </summary>
     /// <remarks>

@@ -127,6 +127,46 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Sets how long a proxied request may sit idle before AuthProxy cancels it, for every service.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="timeout">The longest a request may go with no bytes moving in either direction. Must be greater than zero.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// The limit applies to WebSocket and Server-Sent Events streams as much as to plain requests, so a stream
+    /// whose backend can stay quiet for longer than this is cut. Leave it alone to keep the five-minute default.
+    /// Use <see cref="WithServiceActivityTimeout{T}"/> to give one service a different limit.
+    /// </remarks>
+    public static IResourceBuilder<T> WithActivityTimeout<T>(
+        this IResourceBuilder<T> builder,
+        TimeSpan timeout)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment(
+            $"{ConfigPrefix}__ActivityTimeout",
+            timeout.ToString("c", CultureInfo.InvariantCulture));
+
+    /// <summary>
+    /// Sets how long a request proxied to one service may sit idle before AuthProxy cancels it.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">The service the limit applies to.</param>
+    /// <param name="timeout">The longest a request may go with no bytes moving in either direction. Must be greater than zero.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Takes precedence over <see cref="WithActivityTimeout{T}"/> for that service's backend and frontend.
+    /// </remarks>
+    public static IResourceBuilder<T> WithServiceActivityTimeout<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        TimeSpan timeout)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment(
+            $"{ConfigPrefix}__Services__{serviceName}__ActivityTimeout",
+            timeout.ToString("c", CultureInfo.InvariantCulture));
+
+    /// <summary>
     /// Terminates the local AuthProxy session whenever identity verification refuses a caller.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
