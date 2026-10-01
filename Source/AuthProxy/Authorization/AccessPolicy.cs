@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using Cratis.AuthProxy.ReverseProxy;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authorization;
@@ -29,7 +30,16 @@ public class AccessPolicy : IAccessPolicy
     /// <inheritdoc/>
     public AccessDecision Evaluate(HttpContext context, C.AuthProxy config)
     {
-        foreach (var requirement in RequirementsFor(context, config))
+        var service = ServiceRoutes.Resolve(context.Request, config)?.Service;
+        if (service is null && context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is not null)
+        {
+            // A selected proxy endpoint can still forward the request. Never apply only root requirements
+            // or a named service's requirements when its authoritative cluster cannot be resolved.
+            return AccessDecision.Denied(string.Empty);
+        }
+
+        service ??= NamedService(context, config);
+        foreach (var requirement in RequirementsFor(service, config))
         {
             if (!IsSatisfied(requirement, context.User))
             {
@@ -43,17 +53,16 @@ public class AccessPolicy : IAccessPolicy
     /// <summary>
     /// Gets every requirement that applies to a request: the root's, then the target service's.
     /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="service">The targeted service, if any.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <returns>The applicable requirements, root-first.</returns>
-    static IEnumerable<C.ClaimRequirement> RequirementsFor(HttpContext context, C.AuthProxy config)
+    static IEnumerable<C.ClaimRequirement> RequirementsFor(C.Service? service, C.AuthProxy config)
     {
         foreach (var requirement in config.Authorization.RequiredClaims)
         {
             yield return requirement;
         }
 
-        var service = ResolveService(context, config);
         if (service?.Authorization is null)
         {
             yield break;
@@ -66,26 +75,17 @@ public class AccessPolicy : IAccessPolicy
     }
 
     /// <summary>
-    /// Resolves the service a request targets, the same way the route table does.
+    /// Resolves a service named by a request without a selected proxy endpoint.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <returns>The targeted service, or <see langword="null"/> when the request matches no service route.</returns>
     /// <remarks>
-    /// This runs after endpoint selection but before forwarding. <see cref="ServiceRoutes"/> resolves the
-    /// selected proxy route's cluster first, so YARP's interpretation of service-selection headers cannot
-    /// forward a request to a service other than the one whose requirements apply. Without a selected proxy
-    /// endpoint, it falls back to the request's routing declarations.
-    /// <para>
     /// A request that matches no service route is not forwarded at all. When it still names a service in the
     /// <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, that service's requirements
     /// apply anyway — the stricter answer costs nothing for a request that goes nowhere. A request that names
     /// none gets only the root requirements.
-    /// </para>
     /// </remarks>
-    static C.Service? ResolveService(HttpContext context, C.AuthProxy config) =>
-        ServiceRoutes.Resolve(context.Request, config)?.Service ?? NamedService(context, config);
-
     static C.Service? NamedService(HttpContext context, C.AuthProxy config)
     {
         var serviceId = context.Request.Headers[Headers.ServiceId].FirstOrDefault();

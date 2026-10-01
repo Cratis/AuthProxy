@@ -160,8 +160,8 @@ public static class ServiceRoutes
         if (request.HttpContext.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is { } route)
         {
             return config.Services
-                .Where(_ => string.Equals(route.Config.ClusterId, $"{_.Key}-backend-cluster", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(route.Config.ClusterId, $"{_.Key}-frontend-cluster", StringComparison.OrdinalIgnoreCase))
+                .Where(_ => string.Equals(route.Config.ClusterId, $"{_.Key.ToLowerInvariant()}-backend-cluster", StringComparison.Ordinal)
+                    || string.Equals(route.Config.ClusterId, $"{_.Key.ToLowerInvariant()}-frontend-cluster", StringComparison.Ordinal))
                 .Select(_ => new RoutedService(_.Key, _.Value))
                 .FirstOrDefault();
         }
