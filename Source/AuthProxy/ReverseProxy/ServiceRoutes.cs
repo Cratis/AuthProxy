@@ -18,7 +18,7 @@ namespace Cratis.AuthProxy.ReverseProxy;
 ///   <item>Anonymous paths (<see cref="C.Service.AnonymousPaths"/>), which do not require service authentication and are resolved only from a selected proxy endpoint.</item>
 ///   <item>Host and path prefix together (<see cref="C.Service.Hosts"/> and <see cref="C.Service.PathPrefix"/>).</item>
 ///   <item>Path prefix alone.</item>
-///   <item>The <c language="text">Service-ID</c> header, then the <c language="text">service</c> query parameter.</item>
+///   <item>The <c language="text">x-cratis-microservice</c> header (or legacy <c language="text">Service-ID</c>), then the <c language="text">service</c> query parameter.</item>
 ///   <item>Host alone.</item>
 ///   <item>The single configured service, when it declares neither hosts nor a path prefix.</item>
 /// </list>
@@ -178,10 +178,13 @@ public static class ServiceRoutes
             .Select(_ => new RoutedService(_.Key, _.Value))
             .ToArray();
         var path = request.Path;
+        var header = !string.IsNullOrWhiteSpace(request.Headers[Headers.ServiceId].FirstOrDefault())
+            ? request.Headers[Headers.ServiceId]
+            : request.Headers[Headers.LegacyServiceId];
 
         return ByPathPrefix(services, path, _ => HostsOf(_).Any(host => Matches(host, request)))
             ?? ByPathPrefix(services, path, _ => _.Hosts.Count == 0)
-            ?? ByName(services, path, request.Headers[Headers.ServiceId], request.Query[ServiceQueryParameter])
+            ?? ByName(services, path, header, request.Query[ServiceQueryParameter])
             ?? services.FirstOrDefault(_ => PathPrefixOf(_.Service) is null && HostsOf(_.Service).Any(host => Matches(host, request)));
     }
 

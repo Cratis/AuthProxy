@@ -133,10 +133,11 @@ would be the way in.
 
 Which service a request targets is worked out the same way the [route table](services.md) works it out: the
 service whose [host or path prefix](services.md#routing-by-host-or-path-prefix) the request matches, the
-service named by the `Service-ID` header or the `service` query parameter, or the single configured service
-when there is only one, in the precedence the route table uses. A request in a multi-service deployment that
-matches no service reaches no service route either. When such a request still names a service, that
-service's requirements apply anyway. Otherwise only the root requirements apply.
+service named by the `x-cratis-microservice` header (or the legacy `Service-ID`) or the `service` query
+parameter, or the single configured service when there is only one, in the precedence the route table uses.
+A request in a multi-service deployment that matches no service reaches no service route either. When such
+a request still names a configured service, that service's requirements apply anyway. An unknown header
+does not hide a query-selected service's requirements. Otherwise only the root requirements apply.
 
 ---
 

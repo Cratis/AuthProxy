@@ -82,25 +82,24 @@ public class AccessPolicy : IAccessPolicy
     /// <returns>The targeted service, or <see langword="null"/> when the request matches no service route.</returns>
     /// <remarks>
     /// A request that matches no service route is not forwarded at all. When it still names a service in the
-    /// <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, that service's requirements
-    /// apply anyway — the stricter answer costs nothing for a request that goes nowhere. A request that names
-    /// none gets only the root requirements.
+    /// <c language="text">x-cratis-microservice</c> header (or legacy <c language="text">Service-ID</c>) or the
+    /// <c language="text">service</c> query parameter, that service's requirements apply anyway — the stricter
+    /// answer costs nothing for a request that goes nowhere. An unknown header does not hide a query-selected
+    /// service's requirements. A request that names none gets only the root requirements.
     /// </remarks>
     static C.Service? NamedService(HttpContext context, C.AuthProxy config)
     {
-        var serviceId = context.Request.Headers[Headers.ServiceId].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(serviceId))
-        {
-            serviceId = context.Request.Query[ServiceRoutes.ServiceQueryParameter].FirstOrDefault();
-        }
+        return FindService(config, ServiceSelection.FromHeaders(context.Request.Headers))
+            ?? FindService(config, context.Request.Query[ServiceRoutes.ServiceQueryParameter].FirstOrDefault());
+    }
 
-        return string.IsNullOrWhiteSpace(serviceId)
+    static C.Service? FindService(C.AuthProxy config, string? serviceId) =>
+        string.IsNullOrWhiteSpace(serviceId)
             ? null
             : config.Services
                 .Where(_ => string.Equals(_.Key, serviceId.Trim(), StringComparison.OrdinalIgnoreCase))
                 .Select(_ => _.Value)
                 .FirstOrDefault();
-    }
 
     /// <summary>
     /// Determines whether a principal satisfies a single requirement.
