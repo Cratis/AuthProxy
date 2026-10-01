@@ -641,4 +641,3 @@ every token-authenticated request instead.
   belongs to a service without a backend is refused at startup, as is one that does not accept callers without
   identity verification in a deployment that requires it.
 - With no bearer route configured, nothing changes.
-
