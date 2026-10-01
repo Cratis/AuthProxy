@@ -138,6 +138,9 @@ A value must be at least one millisecond and at most 2,147,483,647 milliseconds 
 AuthProxy refuses to start when a value is outside this range, and the message names the setting.
 `Registration` is not a proxied endpoint: setting `Registration:ActivityTimeout` also prevents startup.
 Remove that setting and configure the service's `Backend` or `Frontend` activity timeout instead.
+`Invite:Lobby` does not create proxy clusters: setting `ActivityTimeout` on the lobby itself or its
+`Backend`, `Frontend` or `Registration` endpoints also prevents startup with a message naming the setting.
+Remove those settings and configure the proxied service under `Services` instead.
 A change to the configuration file is applied to new requests without a restart.
 
 From Aspire:

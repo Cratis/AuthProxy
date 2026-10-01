@@ -41,9 +41,26 @@ public class ActivityTimeoutConfigurationValidator : IValidateOptions<C.AuthProx
             }
         }
 
+        if (options.Invite?.Lobby is { } lobby)
+        {
+            var prefix = $"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.Invite)}:{nameof(C.Invite.Lobby)}";
+            CheckLobby($"{prefix}:{nameof(C.Service.ActivityTimeout)}", lobby.ActivityTimeout, failures);
+            CheckLobby($"{prefix}:{nameof(C.Service.Backend)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", lobby.Backend?.ActivityTimeout, failures);
+            CheckLobby($"{prefix}:{nameof(C.Service.Frontend)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", lobby.Frontend?.ActivityTimeout, failures);
+            CheckLobby($"{prefix}:{nameof(C.Service.Registration)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", lobby.Registration?.ActivityTimeout, failures);
+        }
+
         return failures.Count > 0
             ? ValidateOptionsResult.Fail(failures)
             : ValidateOptionsResult.Success;
+    }
+
+    static void CheckLobby(string key, TimeSpan? value, List<string> failures)
+    {
+        if (value is not null)
+        {
+            failures.Add($"{key} is not supported. Invite:Lobby does not create proxy clusters, so ActivityTimeout cannot apply. Remove this setting and configure the proxied service under Services instead.");
+        }
     }
 
     static void Check(string key, TimeSpan? value, List<string> failures)
