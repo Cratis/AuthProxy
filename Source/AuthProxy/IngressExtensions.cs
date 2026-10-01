@@ -161,6 +161,10 @@ public static class IngressExtensions
         // untouched when no bearer route is configured.
         app.UseMiddleware<BearerRouteMiddleware>();
 
+        // Routes match one service header, so a client still sending the legacy one is given the current one
+        // before any endpoint is selected.
+        app.UseMiddleware<LegacyServiceHeaderMiddleware>();
+
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
 

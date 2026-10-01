@@ -18,7 +18,7 @@ Without a gateway, every service re-implements the same boilerplate: an OIDC han
 
 - **Authentication** — OpenID Connect (single or multiple providers with a built-in provider-selection page; Microsoft Entra ID, Google, GitHub, Apple, or any custom OIDC provider), OAuth 2.0, JWT Bearer for machine-to-machine calls, back-channel client credentials exchanged at `/.cratis/token`, and per-service bearer routes that accept access tokens from an external authorization server such as Cratis Identity.
 - **Authorization** — require a claim (a role, a group, a GitHub organization or team) before any request is forwarded.
-- **Multi-tenancy** — resolve the current tenant per request from the host, a subdomain, a claim, the route, a selection page, or a fixed value, with optional remote tenant verification. Downstream services receive the tenant on a `Tenant-ID` header.
+- **Multi-tenancy** — resolve the current tenant per request from the host, a subdomain, a claim, the route, a selection page, or a fixed value, with optional remote tenant verification. Downstream services receive the tenant on an `x-cratis-tenant-id` header, the name Arc resolves by default.
 - **Identity enrichment** — calls a `/.cratis/me` endpoint on your service and attaches the enriched identity to forwarded requests as a trusted header.
 - **Invites, registration, and lobby** — invite-based onboarding with signed JWT tokens, self-serve registration, signed attestations, and an optional lobby service for users who are not yet assigned to a tenant.
 - **Credential linking** — let an already signed-in user prove control of an additional identity-provider login and associate it with their existing account.
