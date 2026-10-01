@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Identity;
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ReverseProxy;
 
@@ -32,7 +34,13 @@ public static class ReverseProxyExtensions
                 handler.KeepAlivePingTimeout = TimeSpan.FromMinutes(2);
                 handler.ConnectTimeout = TimeSpan.FromMinutes(3);
             })
-            .AddTransforms(ctx => ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform()));
+            .AddTransforms(ctx =>
+            {
+                ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
+                PathPrefixTransform.Apply(ctx);
+            });
+
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();
 
         return builder;
     }

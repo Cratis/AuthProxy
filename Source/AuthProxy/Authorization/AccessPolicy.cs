@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using Cratis.AuthProxy.ReverseProxy;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authorization;
@@ -20,11 +21,6 @@ namespace Cratis.AuthProxy.Authorization;
 /// </remarks>
 public class AccessPolicy : IAccessPolicy
 {
-    /// <summary>
-    /// The query-string parameter naming the target service, mirrored from the reverse-proxy route table.
-    /// </summary>
-    const string ServiceQueryParameter = "service";
-
     /// <inheritdoc/>
     public bool IsConfigured(C.AuthProxy config) =>
         config.Authorization.HasRequirements
@@ -74,41 +70,37 @@ public class AccessPolicy : IAccessPolicy
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
-    /// <returns>The targeted service, or <see langword="null"/> when the request names none.</returns>
+    /// <returns>The targeted service, or <see langword="null"/> when the request matches no service route.</returns>
     /// <remarks>
     /// This runs before endpoint selection — the gate has to refuse a caller before anything reads a
     /// backend, and long before YARP picks a route — so the target is worked out from the request rather
-    /// than from a selected endpoint. It mirrors <c language="text">MicroserviceReverseProxyConfigProvider</c> exactly: a
-    /// single-service deployment routes everything to that service, and beyond that a service is named by
-    /// the <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, header first.
+    /// than from a selected endpoint. <see cref="ServiceRoutes"/> states the route table's precedence once, so
+    /// the service whose requirements apply is always the service the request is forwarded to: a host or path
+    /// prefix that routes a request to a service also subjects it to that service's requirements.
     /// <para>
-    /// A request in a multi-service deployment that names no service reaches no service route either, so
-    /// answering <see langword="null"/> costs nothing: the root requirements still apply, and the request
-    /// goes on to match nothing.
+    /// A request that matches no service route is not forwarded at all. When it still names a service in the
+    /// <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, that service's requirements
+    /// apply anyway — the stricter answer costs nothing for a request that goes nowhere. A request that names
+    /// none gets only the root requirements.
     /// </para>
     /// </remarks>
-    static C.Service? ResolveService(HttpContext context, C.AuthProxy config)
-    {
-        if (config.Services.Count == 1)
-        {
-            return config.Services.Values.First();
-        }
+    static C.Service? ResolveService(HttpContext context, C.AuthProxy config) =>
+        ServiceRoutes.Resolve(context.Request, config)?.Service ?? NamedService(context, config);
 
+    static C.Service? NamedService(HttpContext context, C.AuthProxy config)
+    {
         var serviceId = context.Request.Headers[Headers.ServiceId].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(serviceId))
         {
-            serviceId = context.Request.Query[ServiceQueryParameter].FirstOrDefault();
+            serviceId = context.Request.Query[ServiceRoutes.ServiceQueryParameter].FirstOrDefault();
         }
 
-        if (string.IsNullOrWhiteSpace(serviceId))
-        {
-            return null;
-        }
-
-        return config.Services
-            .Where(_ => string.Equals(_.Key, serviceId.Trim(), StringComparison.OrdinalIgnoreCase))
-            .Select(_ => _.Value)
-            .FirstOrDefault();
+        return string.IsNullOrWhiteSpace(serviceId)
+            ? null
+            : config.Services
+                .Where(_ => string.Equals(_.Key, serviceId.Trim(), StringComparison.OrdinalIgnoreCase))
+                .Select(_ => _.Value)
+                .FirstOrDefault();
     }
 
     /// <summary>

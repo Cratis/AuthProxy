@@ -29,6 +29,44 @@ public class Service
     public ServiceEndpoint? Frontend { get; set; }
 
     /// <summary>
+    /// Gets or sets the host names that route requests to this service, without a <c language="text">Service-ID</c> header
+    /// or <c language="text">service</c> query parameter. An entry is a host name with an optional port
+    /// (<c language="text">reporting.example.com</c> or <c language="text">reporting.example.com:8443</c>); an entry without a
+    /// port matches every port. Matching is case-insensitive.
+    /// </summary>
+    /// <remarks>
+    /// A host match is the default for that host: an explicit <c language="text">Service-ID</c> header or
+    /// <c language="text">service</c> query parameter still selects another service, so a frontend can keep naming the
+    /// backend it calls. Combined with <see cref="PathPrefix"/>, the service only answers for the prefix on these
+    /// hosts. No two services may claim the same host without a path prefix telling them apart.
+    /// </remarks>
+    public IList<string> Hosts { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the path prefix that routes requests to this service, for example <c language="text">/reporting</c>.
+    /// Every request under the prefix goes to this service: <c language="text">{PathPrefix}/api/...</c> to the backend, and
+    /// everything else under the prefix to the frontend.
+    /// </summary>
+    /// <remarks>
+    /// A path prefix claims its part of the URL: it takes precedence over the <c language="text">Service-ID</c> header and
+    /// the <c language="text">service</c> query parameter. It must be a rooted path of literal segments, must not overlap
+    /// another service's prefix on the same hosts, and must not cover AuthProxy's own paths or <c language="text">/api</c>.
+    /// </remarks>
+    public string PathPrefix { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether <see cref="PathPrefix"/> is removed from the forwarded path.
+    /// Defaults to <see langword="false"/>: the service receives the path exactly as requested and serves itself
+    /// under the prefix (for example with <c language="text">UsePathBase</c>).
+    /// </summary>
+    /// <remarks>
+    /// When <see langword="true"/>, <c language="text">/reporting/api/orders</c> is forwarded as <c language="text">/api/orders</c> and
+    /// the removed prefix is sent in <c language="text">X-Forwarded-Prefix</c>, so a backend that honors forwarded headers
+    /// can restore it as its path base.
+    /// </remarks>
+    public bool StripPathPrefix { get; set; }
+
+    /// <summary>
     /// Gets or sets the registration endpoint for this service.
     /// This is currently used by the lobby configuration to identify where new users should be sent
     /// after the AuthProxy registration flow completes.
@@ -71,10 +109,11 @@ public class Service
     /// These are applied <em>in addition to</em> any declared at the root — a service can narrow who gets
     /// in, never widen it. Leave unset to require only what the root requires.
     /// <para>
-    /// The service a request targets is resolved the way the route table resolves it: the single
-    /// configured service when there is only one, otherwise the <c language="text">Service-ID</c> header or the
-    /// <c language="text">service</c> query parameter. A request in a multi-service deployment that names no service
-    /// matches no service route either, so only the root requirements apply to it.
+    /// The service a request targets is resolved the way the route table resolves it: by
+    /// <see cref="PathPrefix"/> and <see cref="Hosts"/>, by the <c language="text">Service-ID</c> header or the
+    /// <c language="text">service</c> query parameter, or as the single configured service. A request in a
+    /// multi-service deployment that matches no service matches no service route either, so only the root
+    /// requirements apply to it.
     /// </para>
     /// </remarks>
     public Authorization? Authorization { get; set; }
