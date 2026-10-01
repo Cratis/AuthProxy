@@ -33,8 +33,9 @@ continues to work during the transition.
 `x-cratis-microservice` wins when a request carries both. The `?service=` query parameter remains the
 fallback when no header route matches, including when the header names an unknown service. Per-service
 authorization follows the matched route too, so an unknown header cannot bypass a query-selected service's
-claim requirements. Both forwarded headers carry the actual destination's identifier, even when a caller's
-selector loses to an anonymous-path route or the single-service catch-all. Query-only requests also receive
+claim requirements. Both forwarded headers carry the configured destination name with its original casing
+(for example, `Studio`, not `studio`), even when a caller's selector loses to an anonymous-path route or the
+single-service catch-all. Query-only requests also receive
 both headers. Requests to the single-service catch-all now receive both headers even with no selector.
 
 Arc's default WebSocket and SSE observable connections use `?x-cratis-microservice=`, which AuthProxy does
