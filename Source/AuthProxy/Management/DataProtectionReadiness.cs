@@ -16,7 +16,8 @@ namespace Cratis.AuthProxy.Management;
 /// tokens, so an instance whose key ring will not initialize cannot serve a single authenticated request —
 /// yet it accepts sockets perfectly well, which is exactly why a TCP probe reports it healthy and sends it
 /// traffic. A <c language="text">Protect</c>/<c language="text">Unprotect</c> round-trip is the only thing that forces initialization and
-/// proves it against the configured <c language="text">DataProtectionKeysPath</c> rather than against a cached opinion.
+/// proves the loaded key ring usable with the configured Data Protection key store (file system, Azure Blob
+/// Storage or Redis, and the Key Vault key if set) rather than against a cached opinion.
 /// <para>
 /// It is re-run on every call, and no answer is remembered. A key ring that becomes unusable — a volume
 /// unmounted, a permission revoked — has to change the answer, and a cached "ready" would keep an instance
