@@ -1,7 +1,13 @@
 # Tenancy
 
 AuthProxy resolves a **tenant ID** string from each incoming request and stores it in the request context.
-Downstream services receive the resolved tenant ID via the `Tenant-ID` header.
+Downstream services receive the resolved tenant ID via the `x-cratis-tenant-id` header. That is the header
+[Arc](/arc/) resolves its tenant from by default, so an Arc application behind AuthProxy needs no tenancy
+configuration to read it.
+
+A client cannot choose the tenant a backend sees. AuthProxy strips an inbound `x-cratis-tenant-id` and
+the `Tenant-ID` header earlier releases forwarded, and writes back only the tenant it resolved itself. Earlier
+releases sent the tenant as `Tenant-ID`; see [Upgrading](../upgrading/tenant-and-service-headers.md).
 
 ---
 
