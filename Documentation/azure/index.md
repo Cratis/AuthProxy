@@ -29,8 +29,9 @@ that did not, except by the network it arrived on. See
 So a backend that anyone other than AuthProxy can open a connection to is a backend anyone can impersonate any
 user on, by sending the header. The platform features that prevent this differ, and getting them wrong is
 easy because the failure is silent: the application works perfectly, for everybody, including the person
-forging the header. Each platform page ends with an isolation recipe and the [direct-access
-test](#test-that-a-backend-cannot-be-reached-directly) below proves it.
+forging the header. Each platform page ends with an isolation recipe. The [direct-access
+test](#test-that-a-backend-cannot-be-reached-directly) below checks the routes you probe; it does not prove
+that no other route to the backend exists.
 
 ---
 
@@ -141,12 +142,14 @@ Cratis__AuthProxy__Authorization__RequiredClaims__0__AnyOf__0=AuthProxy.User
 
 ## Point AuthProxy at your services
 
-Name each backend and frontend by the address AuthProxy reaches it on. These are the private addresses of
-the [isolation recipe](#test-that-a-backend-cannot-be-reached-directly), not public ones:
+Name each backend and frontend by the address AuthProxy reaches it on from inside your network, following
+the isolation recipe for [App Service](app-service.md#isolating-backends) or
+[Container Apps](container-apps.md#isolating-backends). On App Service this can be the normal
+`*.azurewebsites.net` name, resolved privately or protected by service-endpoint access restrictions:
 
 ```bash
-Cratis__AuthProxy__Services__portal__Backend__BaseUrl=https://portal-api.<private-address>/
-Cratis__AuthProxy__Services__portal__Frontend__BaseUrl=https://portal-web.<private-address>/
+Cratis__AuthProxy__Services__portal__Backend__BaseUrl=https://<backend-address-reachable-by-authproxy>/
+Cratis__AuthProxy__Services__portal__Frontend__BaseUrl=https://<frontend-address-reachable-by-authproxy>/
 ```
 
 With one service, `/api/**` goes to the backend and everything else to the frontend. With several, a
@@ -216,40 +219,84 @@ AuthProxy. AuthProxy does the sign-in; leave the platform feature off for the Au
 
 ## Test that a backend cannot be reached directly
 
-The recipes on the platform pages are configuration. This is the proof, and it belongs in your pipeline so a
-later change that opens a backend fails the build.
+Put this check in your pipeline to detect unexpected responses on the routes you probe. It sends a request
+that **claims to be a signed-in user** straight to the backend's own address. It fails on every HTTP response
+unless you explicitly identify an expected platform refusal, and on indeterminate transport failures.
 
-It sends a request that **claims to be a signed-in user** straight to the backend's own address, and fails if
-the backend serves it. Aim it at an endpoint that answers `200` when it trusts a principal. `/.cratis/me` is
-the one AuthProxy itself calls on a backend:
+Choose an endpoint that returns `2xx` for **any authenticated principal**, including the exact `forged`
+fixture below. Arc's `/.cratis/me` qualifies with its default identity-details provider, or a custom provider
+that accepts any user. A custom provider that denies the forged user returns an application `403`; an app
+without that endpoint returns `404`. Neither proves isolation. Before using the probe, send the same three
+headers and principal below from an allowed location inside the trust boundary and confirm that the chosen
+endpoint returns `2xx`. Also check the endpoint through AuthProxy with a signed-in user.
+
+Save this as `assert-backend-isolated.sh` (requires Bash, curl, base64 and grep):
 
 ```bash
 #!/usr/bin/env bash
-# Usage: ./assert-backend-isolated.sh https://portal-api.example.net/.cratis/me [...]
-# Exits non-zero if any backend answers a request that did not come through AuthProxy.
+# Usage: ./assert-backend-isolated.sh URL ['URL|403|platform-specific-body-marker'] [...]
+# Only DNS/connection refusal, or an explicitly matched platform refusal, passes.
+set -u
+if [ "$#" -eq 0 ]; then
+  echo "Usage: $0 URL ['URL|403|platform-specific-body-marker'] [...]" >&2
+  exit 1
+fi
+body=$(mktemp) || exit 1
+trap 'rm -f "$body"' EXIT
 fail=0
 principal=$(printf '{"userId":"forged","userDetails":"forged","claims":[]}' | base64 | tr -d '\n')
 
-for url in "$@"; do
-  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+for target in "$@"; do
+  url=$target
+  expected=000
+  marker=
+  if [[ "$target" == *'|'* ]]; then
+    url=${target%%|*}
+    refusal=${target#*|}
+    expected=${refusal%%|*}
+    marker=${refusal#*|}
+    if [[ "$refusal" != *'|'* || -z "$marker" || "$marker" == *'|'* ]] ||
+       [[ "$expected" != 401 && "$expected" != 403 && "$expected" != 404 ]]; then
+      echo "FAIL  invalid target: $target" >&2
+      fail=1
+      continue
+    fi
+  fi
+
+  curl_exit=0
+  code=$(curl -sS -o "$body" -w '%{http_code}' --max-time 15 \
     -H "x-ms-client-principal: ${principal}" \
     -H "x-ms-client-principal-id: forged" \
     -H "x-ms-client-principal-name: forged" \
-    "$url" 2>/dev/null) || code=000
+    -- "$url") || curl_exit=$?
 
-  case "$code" in
-    2??|3??) echo "FAIL  $url answered $code to a forged identity"; fail=1 ;;
-    *)       echo "ok    $url -> $code" ;;
-  esac
+  if [[ "$code" == 000 && ( "$curl_exit" == 6 || "$curl_exit" == 7 ) ]]; then
+    echo "ok    $url -> no connection (curl $curl_exit)"
+  elif [[ "$curl_exit" == 0 && "$code" == "$expected" && "$expected" != 000 ]] &&
+       grep -Fq -- "$marker" "$body"; then
+    echo "ok    $url -> expected platform refusal $code"
+  else
+    echo "FAIL  $url -> HTTP $code, curl $curl_exit; no expected platform refusal" >&2
+    fail=1
+  fi
 done
 
-exit $fail
+exit "$fail"
 ```
 
-`000` means the request never connected: DNS does not resolve, the address is private, or the connection was
-refused. That is a pass. A `401`, `403` or `404` is a pass **only** if it is the platform refusing the
-caller; a `404` for a path that does not exist proves nothing, which is why the script needs an address that
-exists.
+A plain URL passes only when curl reports `000` with DNS resolution failure (`6`) or connection failure
+(`7`). `000` alone is not proof that a request never connected: timeouts, TLS failures and other transport
+errors fail the check. If curl received an HTTP status before a transfer failed, that status is preserved and
+the check fails.
+
+To accept a platform-generated `401`, `403` or `404`, pass a quoted argument such as
+`'https://portal-api.example.net/.cratis/me|403|<platform-specific-body-marker>'`. Replace the marker with a
+literal, distinctive substring of the platform's refusal body, established on your deployment; do not use a
+generic word such as `Forbidden` or `Not Found`, or an application error message. Both the status and marker
+must match, and the transfer must complete. There is no universal marker across Azure platforms. If you cannot
+distinguish the platform refusal from an application response, leave that response failing and investigate;
+do not whitelist the status alone. A matching response checks only that observed refusal, not every possible
+route or identity.
 
 Run it from two places:
 

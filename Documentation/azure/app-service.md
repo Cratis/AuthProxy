@@ -73,8 +73,12 @@ with a `ForwardLimit` of `1` for the App Service front end alone.
 
 Two consequences:
 
-- Those ranges include your own virtual network. A resource in it that can reach AuthProxy directly can
-  therefore also set `X-Forwarded-For`. With the access restrictions below, only the front ends can.
+- In multitenant App Service, only the platform front ends connect to the container. The private ranges
+  also include your own virtual network, so do not assume that boundary in an App Service Environment or
+  when AuthProxy has a private endpoint: a peer that can reach the worker directly may supply trusted
+  forwarded headers. Restrict access to the **AuthProxy app**, not just its backends. Use access restrictions
+  for its public ingress; private-endpoint traffic bypasses those rules and needs network controls such as
+  a subnet network security group with private-endpoint network policies enabled.
 - Put Azure Front Door or Application Gateway in front of the app and you have a second hop. Raise
   `ForwardLimit` to `2` and add that service's own address ranges to `TrustedProxies`, because every hop
   that is consumed has to be trusted. For Front Door, also allow only your instance to reach AuthProxy, with an
@@ -117,22 +121,23 @@ stream as normal on the client. See
 Each backend and frontend is its own App Service app, and **each one must refuse everything except
 AuthProxy.** There are two ways; pick one per app. The first is the stronger.
 
+**Prerequisite for both alternatives:** put AuthProxy on a **virtual network integration subnet** before
+configuring any backend. This is outbound-only; it does not make AuthProxy private.
+
+```bash
+az webapp vnet-integration add --resource-group $rg --name $authproxy \
+  --vnet $vnet --subnet integration-subnet
+```
+
+The subnet must be delegated to `Microsoft.Web/serverFarms` (the command applies the delegation if it is
+missing) and cannot be the subnet that holds a private endpoint.
+
 ### Private endpoint (recommended)
 
 The backend gets a private IP in your virtual network and no public address. AuthProxy reaches it over its
 own virtual network integration.
 
-1. Put AuthProxy on a **virtual network integration subnet**. This is outbound-only; it does not make
-   AuthProxy private.
-
-   ```bash
-   az webapp vnet-integration add --resource-group $rg --name $authproxy \
-     --vnet $vnet --subnet integration-subnet
-   ```
-
-   The subnet must be delegated to `Microsoft.Web/serverFarms` (the command applies the delegation if it
-   is missing) and cannot be the subnet that holds the private endpoint.
-2. Create a **private endpoint** for each backend in a separate subnet, and a private DNS zone
+1. Create a **private endpoint** for each backend in a separate subnet, and a private DNS zone
    `privatelink.azurewebsites.net` linked to the virtual network, so that
    `$backend.azurewebsites.net` resolves to the private address from inside the network:
 
@@ -150,7 +155,7 @@ own virtual network integration.
      --endpoint-name $backend-pe --name default \
      --private-dns-zone privatelink.azurewebsites.net --zone-name privatelink.azurewebsites.net
    ```
-3. **Disable public network access** on the backend. This is the step that makes it isolated; without it the
+2. **Disable public network access** on the backend. This is the step that makes it isolated; without it the
    backend keeps answering on its public name as well.
 
    ```bash
@@ -197,9 +202,12 @@ that subnet is allowed through, so keep untrusted apps off it.
 
 ### Prove it
 
-Run the [direct-access test](index.md#test-that-a-backend-cannot-be-reached-directly) against
-`https://$backend.azurewebsites.net/.cratis/me` from a machine outside the network: it must be refused. Run it
-again from a virtual machine or app in the virtual network that is not AuthProxy. With access restrictions it
-is refused. With a private endpoint it is refused only if you restricted the endpoint as described above;
-otherwise it is answered, and so would be an attacker's request from that network. Then sign in through
+First confirm that your chosen endpoint returns `2xx` for the probe's forged principal from an allowed
+location, as the [direct-access test](index.md#test-that-a-backend-cannot-be-reached-directly) explains. Then
+run it against that endpoint at `https://$backend.azurewebsites.net/` from a machine outside the network:
+it must be refused. Identify any expected platform HTTP refusal with both its status and distinctive body
+marker; an application `403` or `404` is not a pass. Run it again from a virtual machine or app in the virtual
+network that is not AuthProxy. With access restrictions it is refused. With a private endpoint it is refused
+only if you restricted the endpoint as described above; otherwise it is answered, and so would be an
+attacker's request from that network. Then sign in through
 AuthProxy and confirm the application works.

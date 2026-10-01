@@ -164,10 +164,14 @@ membership irrelevant, is tracked in [Cratis/AuthProxy#139](https://github.com/C
 
 ### Prove it
 
-Run the [direct-access test](index.md#test-that-a-backend-cannot-be-reached-directly) twice:
+First confirm that your chosen endpoint returns `2xx` for the probe's forged principal from an allowed
+location, as the [direct-access test](index.md#test-that-a-backend-cannot-be-reached-directly) explains. Then
+run it twice:
 
-- Against `https://portal-api.internal.<environment-id>.<region>.azurecontainerapps.io/.cratis/me` from outside
-  the environment, such as your pipeline runner. It must be refused (`404`).
+- Against that endpoint at `https://portal-api.internal.<environment-id>.<region>.azurecontainerapps.io/`
+  from outside the environment, such as your pipeline runner. It must be refused. To accept the platform's
+  `404`, configure both that status and a distinctive platform-refusal body marker; an application's own
+  `404` must not pass.
 - Against the same address from a **container app in the same environment that is not AuthProxy**. It will be
   answered. That is not a bug in your configuration; it is the boundary described above. If that second app
   is not supposed to be able to impersonate users, it belongs in another environment.
