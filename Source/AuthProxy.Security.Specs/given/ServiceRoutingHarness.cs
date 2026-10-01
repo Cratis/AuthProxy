@@ -143,17 +143,20 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // These origins record routing, not identity verdicts. Keep service claim authorization enabled.
         builder
             .UseEnvironment("Production")
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"{C.AuthProxy.SectionKey}:Services:reports:PathPrefix"] = ReportsPrefix,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:StripPathPrefix"] = "true",
+                [$"{C.AuthProxy.SectionKey}:Services:reports:ResolveIdentityDetails"] = "false",
                 [$"{C.AuthProxy.SectionKey}:Services:reports:Backend:BaseUrl"] = Reports.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:Frontend:BaseUrl"] = ReportsFrontend.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:AnonymousPaths:0"] = $"{ReportsPrefix}/api/health",
 
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Hosts:0"] = AdminHost,
+                [$"{C.AuthProxy.SectionKey}:Services:admin:ResolveIdentityDetails"] = "false",
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Backend:BaseUrl"] = Admin.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Frontend:BaseUrl"] = Admin.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Authorization:RequiredClaims:0:Claim"] = AdminClaim,
@@ -161,6 +164,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
 
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:0"] = "portal.example.test",
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:1"] = "xn--bcher-kva.example.test",
+                [$"{C.AuthProxy.SectionKey}:Services:portal:ResolveIdentityDetails"] = "false",
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Backend:BaseUrl"] = Portal.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Frontend:BaseUrl"] = Portal.BaseUrl,
 
