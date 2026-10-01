@@ -147,6 +147,8 @@ public class Invite
     /// Gets or sets the lobby service configuration.
     /// When set, requests from users without a resolved tenant are forwarded to this service's frontend,
     /// invite exchanges return here, and registrations can redirect to its configured registration endpoint.
+    /// This configuration does not create proxy clusters. Setting ActivityTimeout on the lobby or any of its
+    /// endpoints fails configuration validation; configure the proxied service under AuthProxy.Services instead.
     /// </summary>
     public Service? Lobby { get; set; }
 }
