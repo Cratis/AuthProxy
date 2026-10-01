@@ -6,8 +6,8 @@ description: Service.IdentityVerification now defaults to Required, which fails 
 `IdentityVerification` on a [service](../configuration/services.md) now defaults to `Required`. It used to
 default to `BestEffort`.
 
-This is a breaking change for configurations that never set the option, which is why it ships as a major
-release.
+This secure-default fix ships in a minor release. Services that need the previous enrichment-only behavior
+can opt out explicitly without changing their endpoint.
 
 ## Why
 
@@ -50,6 +50,9 @@ Three consequences follow from the same change:
   and AuthProxy's own sign-in, invite and registration surfaces.
 
 An affected service also stops being served while its identity endpoint is down. That is the intent.
+Every denial under `Required` logs a warning naming the service, a bounded reason for the denial, and the
+exact opt-out: `Cratis__AuthProxy__Services__<name>__IdentityVerification=BestEffort`. This includes a
+missing resolved tenant and an exhausted or canceled identity-resolution wait, not only endpoint failures.
 
 ## What to do
 
@@ -74,7 +77,13 @@ for that service explicitly:
 }
 ```
 
-The environment variable form is `Cratis__AuthProxy__Services__reporting__IdentityVerification=BestEffort`.
+The exact one-line environment setting is (replace `<name>` with the configured service name):
+
+```bash
+Cratis__AuthProxy__Services__<name>__IdentityVerification=BestEffort
+```
+
+For example: `Cratis__AuthProxy__Services__reporting__IdentityVerification=BestEffort`.
 From an Aspire app host:
 
 ```csharp

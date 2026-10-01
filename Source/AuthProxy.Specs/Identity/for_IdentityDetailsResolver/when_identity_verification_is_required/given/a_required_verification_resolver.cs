@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
+using Cratis.AuthProxy.given;
 
 namespace Cratis.AuthProxy.Identity.for_IdentityDetailsResolver.when_identity_verification_is_required.given;
 
@@ -39,6 +40,7 @@ public class a_required_verification_resolver : Specification
     protected IIdentityAuthorizationCache _authorizationCache;
     protected IMemoryCache _memoryCache;
     protected IdentityDetailsResolver _resolver;
+    protected RecordingLogger<IdentityDetailsResolver> _logger;
     protected DefaultHttpContext _context;
 
     void Establish()
@@ -62,13 +64,14 @@ public class a_required_verification_resolver : Specification
 
         _authorizationCache = Substitute.For<IIdentityAuthorizationCache>();
         _memoryCache = new MemoryCache(new MemoryCacheOptions());
+        _logger = new RecordingLogger<IdentityDetailsResolver>();
         _resolver = new IdentityDetailsResolver(
             configuration,
             clients,
             [],
             _memoryCache,
             _authorizationCache,
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            _logger);
         _context = new DefaultHttpContext();
     }
 

@@ -20,6 +20,8 @@ public class and_verification_is_required : given.an_identity_middleware
 {
     async Task Because() => await _middleware.InvokeAsync(_context);
 
+    [Fact] void should_name_the_service_and_its_compatibility_opt_out() => _logger.Text.ShouldContain("Cratis__AuthProxy__Services__main__IdentityVerification=BestEffort");
+    [Fact] void should_explain_the_denial() => _logger.Text.ShouldContain("NoResolvedTenant");
     [Fact] void should_refuse_the_request() => ShouldHaveBeenRefused();
     [Fact] void should_not_forward_the_request() => _nextCalled.ShouldBeFalse();
     [Fact] void should_preserve_the_session_by_default() => ShouldHavePreservedSession();

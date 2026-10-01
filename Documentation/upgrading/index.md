@@ -1,6 +1,6 @@
 ---
 title: Upgrading
-description: Breaking changes between AuthProxy releases, what each one now denies or changes, and how to keep the previous behavior.
+description: Changes between AuthProxy releases, what each one now denies or changes, and how to keep the previous behavior.
 ---
 
 Notes on releases that change what an unchanged configuration does.

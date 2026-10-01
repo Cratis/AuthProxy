@@ -135,6 +135,14 @@ public class IdentityDetailsResolver(
             // Never reaching the call establishes precisely what a call that never answers establishes, so
             // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
             // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
+            if (verificationRequired)
+            {
+                foreach (var (name, _) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required))
+                {
+                    logger.RequiredIdentityVerificationDenied(name, missedTurn.ToString());
+                }
+            }
+
             return verificationRequired
                 ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn)
                 : BuildAuthorizedResult(principal, details: null);
@@ -168,6 +176,11 @@ public class IdentityDetailsResolver(
 
                 if (!Admits(outcome, service.IdentityVerification))
                 {
+                    if (service.IdentityVerification == C.IdentityVerificationMode.Required)
+                    {
+                        logger.RequiredIdentityVerificationDenied(name, outcome.Reason.ToString());
+                    }
+
                     return Deny(context, cacheKey, name, outcome.Reason);
                 }
 

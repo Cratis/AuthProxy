@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Arc.Identity;
+using Cratis.AuthProxy.given;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 
@@ -32,6 +33,7 @@ public class an_identity_middleware : Specification
     protected IAuthenticationService _authenticationService;
     protected DefaultHttpContext _context;
     protected IdentityMiddleware _middleware;
+    protected RecordingLogger<IdentityMiddleware> _logger;
     protected bool _nextCalled;
 
     void Establish()
@@ -72,6 +74,7 @@ public class an_identity_middleware : Specification
         serviceProvider.GetService(typeof(IAuthenticationService)).Returns(_authenticationService);
         _context.RequestServices = serviceProvider;
 
+        _logger = new RecordingLogger<IdentityMiddleware>();
         _middleware = new IdentityMiddleware(
             _ =>
             {
@@ -80,7 +83,8 @@ public class an_identity_middleware : Specification
             },
             options,
             _resolver,
-            _errorPages);
+            _errorPages,
+            _logger);
     }
 
     /// <summary>

@@ -26,6 +26,7 @@ public class and_the_service_states_no_mode : given.a_required_verification_reso
 
     async Task Because() => _result = await _resolver.Resolve(_context, Principal(), TenantId);
 
+    [Fact] void should_name_the_service_and_its_compatibility_opt_out() => _logger.Text.ShouldContain("Cratis__AuthProxy__Services__main__IdentityVerification=BestEffort");
     [Fact] void should_not_be_authorized() => _result.IsAuthorized.ShouldBeFalse();
     [Fact] void should_serve_the_forbidden_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
     [Fact] void should_clear_any_recorded_authorization() => _authorizationCache.Received(1).Clear(_context);

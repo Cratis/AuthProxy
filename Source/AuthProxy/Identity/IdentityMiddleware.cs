@@ -17,6 +17,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="identityDetailsResolver">The identity details resolver.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
+/// <param name="logger">The logger.</param>
 /// <remarks>
 /// Resolution is keyed by principal <em>and</em> tenant, so it needs both. While the call was enrichment
 /// only, having no tenant to ask about meant there was nothing to enrich with and skipping was harmless.
@@ -29,7 +30,8 @@ public class IdentityMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
     IIdentityDetailsResolver identityDetailsResolver,
-    IErrorPageProvider errorPageProvider)
+    IErrorPageProvider errorPageProvider,
+    ILogger<IdentityMiddleware> logger)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -45,6 +47,11 @@ public class IdentityMiddleware(
             {
                 if (MustBeVerified(context, current))
                 {
+                    foreach (var (name, _) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && _.Value.IdentityVerification == C.IdentityVerificationMode.Required))
+                    {
+                        logger.RequiredIdentityVerificationDenied(name, "NoResolvedTenant");
+                    }
+
                     await Refuse(context, current);
                     return;
                 }
