@@ -15,16 +15,7 @@ public interface IBearerIssuerMetadata
     /// </summary>
     /// <param name="issuer">The issuer.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <param name="refresh">Whether this caller needs to await a rate-limited unknown-key refresh before receiving keys.</param>
     /// <returns>The signing keys, or <see langword="null"/> when they could not be retrieved or the metadata names another issuer.</returns>
-    Task<IReadOnlyCollection<SecurityKey>?> GetSigningKeys(ResolvedBearerIssuer issuer, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Asks for the issuer's metadata and keys to be retrieved again, because a token names a key that is not known.
-    /// </summary>
-    /// <param name="issuer">The issuer.</param>
-    /// <remarks>
-    /// Refreshes are rate limited, so a flood of tokens naming unknown keys cannot turn into a flood of requests to
-    /// the issuer.
-    /// </remarks>
-    void RequestRefresh(ResolvedBearerIssuer issuer);
+    Task<IReadOnlyCollection<SecurityKey>?> GetSigningKeys(ResolvedBearerIssuer issuer, CancellationToken cancellationToken, bool refresh = false);
 }

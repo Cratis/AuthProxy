@@ -30,8 +30,7 @@ public class when_initial_metadata_retrieval_fails : Specification
         var waiting = Enumerable.Range(0, 8).Select(_ => _metadata.GetSigningKeys(_issuer, CancellationToken.None)).ToArray();
         _handler.Complete.SetResult();
         _results = await Task.WhenAll(waiting.Prepend(first));
-        _metadata.RequestRefresh(_issuer);
-        await _metadata.GetSigningKeys(_issuer, CancellationToken.None);
+        await _metadata.GetSigningKeys(_issuer, CancellationToken.None, refresh: true);
     }
 
     void Destroy()

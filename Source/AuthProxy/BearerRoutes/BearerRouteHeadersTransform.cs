@@ -23,11 +23,7 @@ public class BearerRouteHeadersTransform : RequestTransform
     public override ValueTask ApplyAsync(RequestTransformContext context)
     {
         var headers = context.ProxyRequest.Headers;
-        headers.Remove(Headers.Principal);
-        headers.Remove(Headers.PrincipalId);
-        headers.Remove(Headers.PrincipalName);
-        headers.Remove(Headers.PrincipalNameExtended);
-        headers.Remove(Headers.TenantId);
+        SpoofableHeaders.Strip(headers);
         headers.Remove(Headers.TokenClientId);
         headers.Remove(Headers.TokenScope);
         headers.Remove(HeaderNames.Cookie);
@@ -47,7 +43,9 @@ public class BearerRouteHeadersTransform : RequestTransform
         }
 
         context.ProxyRequest.SetMicrosoftIdentityHeaders(identity.Principal);
-        headers.TryAddWithoutValidation(Headers.TenantId, HeaderValue.ToTransportValue(identity.TenantId));
+        var tenantId = HeaderValue.ToTransportValue(identity.TenantId);
+        headers.TryAddWithoutValidation(Headers.TenantId, tenantId);
+        headers.TryAddWithoutValidation(Headers.LegacyTenantId, tenantId);
         if (identity.Scopes.Count > 0)
         {
             headers.TryAddWithoutValidation(Headers.TokenScope, HeaderValue.ToTransportValue(string.Join(' ', identity.Scopes)));

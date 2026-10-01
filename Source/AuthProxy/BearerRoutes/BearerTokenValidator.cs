@@ -138,8 +138,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         {
             // The token names a key this proxy has not seen — the issuer may have rotated. Ask for fresh keys once;
             // refreshes are rate limited, so this cannot be turned into a flood of requests to the issuer.
-            metadata.RequestRefresh(issuer);
-            keys = await metadata.GetSigningKeys(issuer, cancellationToken);
+            keys = await metadata.GetSigningKeys(issuer, cancellationToken, refresh: true);
             if (keys is null)
             {
                 return BearerTokenValidation.Refused(BearerTokenValidationStatus.IssuerUnavailable, "The issuer's signing keys are unavailable.");

@@ -88,8 +88,9 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// <summary>
     /// Starts a new recording origin.
     /// </summary>
+    /// <param name="normalizeRepeatedSeparators">Whether to collapse repeated path separators like a slash-normalizing backend.</param>
     /// <returns>The started origin.</returns>
-    public static async Task<RecordingBackend> Start()
+    public static async Task<RecordingBackend> Start(bool normalizeRepeatedSeparators = false)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
@@ -103,6 +104,16 @@ public sealed class RecordingBackend : IAsyncDisposable
 
         app.Use(async (context, next) =>
         {
+            if (normalizeRepeatedSeparators)
+            {
+                var path = context.Request.Path.Value ?? string.Empty;
+                while (path.Contains("//", StringComparison.Ordinal))
+                {
+                    path = path.Replace("//", "/", StringComparison.Ordinal);
+                }
+                context.Request.Path = path;
+            }
+
             state.Record(context);
             await next();
         });

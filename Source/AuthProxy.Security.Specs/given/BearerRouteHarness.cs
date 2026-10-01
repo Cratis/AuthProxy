@@ -70,13 +70,21 @@ public class BearerRouteHarness : WebApplicationFactory<Program>
     /// <summary>
     /// Initializes a new instance of the <see cref="BearerRouteHarness"/> class.
     /// </summary>
-    public BearerRouteHarness()
+    public BearerRouteHarness() : this(false)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="BearerRouteHarness"/> class with backend path normalization.
+    /// </summary>
+    /// <param name="normalizeRepeatedSeparators">Whether the backend collapses repeated path separators.</param>
+    protected BearerRouteHarness(bool normalizeRepeatedSeparators)
     {
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, "select-provider.html"), "<html><body>Select Provider</body></html>");
         File.WriteAllText(Path.Combine(_pagesPath, "forbidden.html"), "<html><body>Forbidden</body></html>");
 
-        Origin = RecordingBackend.Start().GetAwaiter().GetResult();
+        Origin = RecordingBackend.Start(normalizeRepeatedSeparators).GetAwaiter().GetResult();
         Issuer = StubIssuer.Start().GetAwaiter().GetResult();
     }
 

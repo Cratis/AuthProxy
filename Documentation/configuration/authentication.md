@@ -574,7 +574,9 @@ A token is accepted only when all of these hold:
 - Its signature verifies against a key in the issuer's JWKS. The metadata document (RFC 8414, or OpenID Connect
   discovery) must name exactly the configured issuer. Metadata and keys are cached and refreshed periodically,
   and a token naming an unknown key triggers a refresh at most every 30 seconds per issuer, so key rotation needs
-  no restart. An allowed refresh completes before validation is retried in the same request. A failed refresh
+  no restart. An allowed refresh completes before validation is retried in the same request. Known-key lookups
+  use cached keys without waiting for retrieval; due automatic refreshes and their retries run in the background.
+  A failed refresh
   keeps the last trusted keys in use and backs off retrieval for 30 seconds, including before the first success.
   Metadata naming another issuer is never trusted. When no trusted keys have been retrieved, tokens are refused
   with `503`, not as invalid.
@@ -598,7 +600,7 @@ at startup.
 
 | Situation | Response |
 |-----------|----------|
-| Path on the route still percent-encoded after decoding, or containing a backslash, a `;` (path parameter, as in `/mcp/..;/api`) or a `.`/`..` segment | `400`, no challenge |
+| Path on the route still percent-encoded after decoding, or containing a backslash, repeated `/` separators, a `;` (path parameter, as in `/mcp/..;/api`) or a `.`/`..` segment | `400`, no challenge |
 | No bearer token (a browser session does not count) | `401`, `WWW-Authenticate: Bearer resource_metadata="<ResourceMetadataUrl>"` |
 | Token invalid, expired, wrongly signed, from another issuer or for another audience; without a single `sub`; or without a claim a `ClaimMappings` entry reads | `401`, `WWW-Authenticate: Bearer error="invalid_token", resource_metadata="…"` |
 | Token lacks a required scope | `403`, `WWW-Authenticate: Bearer error="insufficient_scope", scope="<required scopes>", resource_metadata="…"` |

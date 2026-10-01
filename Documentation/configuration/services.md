@@ -501,7 +501,7 @@ every token-authenticated request instead.
 | `Issuers` | `BearerIssuerConfig[]` | — | The authorization servers whose tokens are accepted. At least one. |
 | `Audiences` | `string[]` | — | The token's `aud` must name at least one of these. At least one. |
 | `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
-| `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication. |
+| `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication and must be outside every bearer-route prefix. |
 | `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |
 | `ClaimMappings` | `map<string, string>` | `{}` | Forwarded claim type → token claim it is read from, replacing all case variants of the target. A missing source refuses the token; mapped `sub`, `preferred_username` and `name` require one usable source value. Targets may not differ only by case or overwrite the route's tenant claim. Claim types containing `:` cannot be keys, because `:` separates configuration sections. |
 | `IdentityProvider` | `string` | `bearer` | The identity provider named in the forwarded principal. |
@@ -543,10 +543,11 @@ every token-authenticated request instead.
   the caller sent is passed through like any other request header that is not an identity header.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
 - A request whose path on the route still carries percent-encoding after the server has decoded it (such as an
-  encoded `/`), a backslash, a `;` anywhere in it, or a `.` or `..` segment is refused with `400` before its token
+  encoded `/`), a backslash, a `;` anywhere in it, repeated `/` separators, or a `.` or `..` segment is refused with `400` before its token
   is read: a backend that decoded or normalized it differently would receive a principal vouched for at a path
   that is not a bearer route. The `;` starts a path parameter, which Tomcat, Jetty and Spring strip before
-  resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`.
+  resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`. Repeated separators can hide a
+  stricter nested route from AuthProxy while a backend collapses them, so `/v1//admin` is refused too.
 - Every refusal is an API-style `400`, `401`, `403` or `503` — or `405` for a method other than `GET` or `HEAD`
   on the `ResourceMetadataUrl` path — never a redirect or a page. See
   [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).

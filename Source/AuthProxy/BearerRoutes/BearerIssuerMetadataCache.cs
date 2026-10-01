@@ -12,7 +12,6 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="retriever">The issuer's document retriever.</param>
 internal sealed class BearerIssuerMetadataCache(IDocumentRetriever retriever) : IDisposable
 {
-    int _refreshRequested;
     OpenIdConnectConfiguration? _configuration;
 
     /// <summary>
@@ -49,17 +48,15 @@ internal sealed class BearerIssuerMetadataCache(IDocumentRetriever retriever) : 
     /// </summary>
     internal DateTimeOffset RetryAfter { get; set; }
 
+    /// <summary>
+    /// Gets or sets the background retrieval to join before disposing its gate.
+    /// </summary>
+    internal Task? BackgroundRefresh { get; set; }
+
     /// <inheritdoc/>
-    public void Dispose() => Gate.Dispose();
-
-    /// <summary>
-    /// Marks an unknown-key refresh for the next signing-key lookup.
-    /// </summary>
-    internal void RequestRefresh() => Interlocked.Exchange(ref _refreshRequested, 1);
-
-    /// <summary>
-    /// Consumes any pending refresh request.
-    /// </summary>
-    /// <returns>Whether a refresh was requested.</returns>
-    internal bool TakeRefreshRequest() => Interlocked.Exchange(ref _refreshRequested, 0) != 0;
+    public void Dispose()
+    {
+        BackgroundRefresh?.GetAwaiter().GetResult();
+        Gate.Dispose();
+    }
 }

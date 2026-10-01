@@ -52,6 +52,16 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             }
         }
 
+        // Check after collecting every prefix so declaration order and service ownership cannot hide a conflict.
+        foreach (var metadataPath in metadataPaths.Keys)
+        {
+            var conflictingPrefix = prefixes.Keys.FirstOrDefault(_ => new PathString(metadataPath).StartsWithSegments(_, StringComparison.OrdinalIgnoreCase));
+            if (conflictingPrefix is not null)
+            {
+                failures.Add($"{nameof(C.BearerRoute.ResourceMetadataUrl)} path '{metadataPath}' is under bearer route '{conflictingPrefix}'. Resource metadata is forwarded without authentication and must be outside every bearer route.");
+            }
+        }
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 

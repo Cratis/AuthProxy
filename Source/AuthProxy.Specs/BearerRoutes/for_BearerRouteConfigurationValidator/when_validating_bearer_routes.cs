@@ -38,11 +38,19 @@ public class when_validating_bearer_routes : Specification
     ValidateOptionsResult _mappingIntoCustomTenant;
     ValidateOptionsResult _mappingIntoDefaultTenant;
     ValidateOptionsResult _conflictingMappingTargets;
+    ValidateOptionsResult _metadataAtBearerPrefix;
+    ValidateOptionsResult _metadataUnderBearerPrefix;
+    ValidateOptionsResult _metadataUnderLaterBearerPrefix;
+    ValidateOptionsResult _metadataAtSimilarPrefix;
 
     void Because()
     {
         var validator = new BearerRouteConfigurationValidator();
 
+        _metadataAtBearerPrefix = validator.Validate(null, Configuration(_ => _.ResourceMetadataUrl = "https://direct.example.test/MCP"));
+        _metadataUnderBearerPrefix = validator.Validate(null, Configuration(_ => _.ResourceMetadataUrl = "https://direct.example.test/mcp/metadata"));
+        _metadataUnderLaterBearerPrefix = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = Service(Route(prefix: "/.well-known"))));
+        _metadataAtSimilarPrefix = validator.Validate(null, Configuration(_ => _.ResourceMetadataUrl = "https://direct.example.test/mcpx/metadata"));
         _valid = validator.Validate(null, Configuration(_ => { }));
         _withoutRoutes = validator.Validate(null, Configuration(_ => _.PathPrefix = string.Empty, declareRoute: false));
         _withoutAudience = validator.Validate(null, Configuration(_ => _.Audiences = []));
@@ -89,6 +97,10 @@ public class when_validating_bearer_routes : Specification
         _verificationRequiredOfANonParticipant = validator.Validate(null, Configuration(_ => { }, adjustConfiguration: _ => _.Services["other"] = RequiringVerification(new C.Service { Backend = new C.ServiceEndpoint { BaseUrl = "https://other.example.test" }, ResolveIdentityDetails = false })));
     }
 
+    [Fact] void should_refuse_metadata_at_a_case_variant_of_the_bearer_prefix() => _metadataAtBearerPrefix.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_metadata_under_a_bearer_prefix() => _metadataUnderBearerPrefix.Failed.ShouldBeTrue();
+    [Fact] void should_refuse_metadata_under_a_later_declared_route_of_another_service() => _metadataUnderLaterBearerPrefix.Failed.ShouldBeTrue();
+    [Fact] void should_allow_metadata_on_a_similar_but_distinct_segment() => _metadataAtSimilarPrefix.Succeeded.ShouldBeTrue();
     [Fact] void should_accept_a_complete_route() => _valid.Succeeded.ShouldBeTrue();
     [Fact] void should_leave_a_deployment_without_bearer_routes_alone() => _withoutRoutes.Succeeded.ShouldBeTrue();
     [Fact] void should_refuse_a_route_without_an_audience() => _withoutAudience.Failed.ShouldBeTrue();

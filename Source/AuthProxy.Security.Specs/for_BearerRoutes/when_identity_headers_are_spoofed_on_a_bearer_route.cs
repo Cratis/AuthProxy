@@ -30,6 +30,8 @@ public class when_identity_headers_are_spoofed_on_a_bearer_route(BearerRouteHarn
         request.Headers.TryAddWithoutValidation(Headers.PrincipalName, "attacker");
         request.Headers.TryAddWithoutValidation(Headers.PrincipalNameExtended, "UTF-8''attacker");
         request.Headers.TryAddWithoutValidation(Headers.TenantId, "victim-tenant");
+        request.Headers.TryAddWithoutValidation(Headers.LegacyTenantId, "another-victim-tenant");
+        request.Headers.TryAddWithoutValidation("x-ms-client-principal-idp", "forged-provider");
         request.Headers.TryAddWithoutValidation(Headers.TokenScope, "direct:admin");
         request.Headers.TryAddWithoutValidation(Headers.TokenClientId, "trusted-client");
 
@@ -45,6 +47,8 @@ public class when_identity_headers_are_spoofed_on_a_bearer_route(BearerRouteHarn
     [Fact] public void should_replace_the_principal_name() => Assert.Equal(BearerRouteHarness.GitHubLogin, _forwarded!.Value(Headers.PrincipalName));
     [Fact] public void should_drop_the_extended_principal_name() => Assert.False(_forwarded!.Has(Headers.PrincipalNameExtended));
     [Fact] public void should_replace_the_tenant() => Assert.Equal(BearerRouteHarness.TenantId, _forwarded!.Value(Headers.TenantId));
+    [Fact] public void should_replace_the_legacy_tenant() => Assert.Equal(BearerRouteHarness.TenantId, _forwarded!.Value(Headers.LegacyTenantId));
+    [Fact] public void should_drop_a_principal_header_the_proxy_never_writes() => Assert.False(_forwarded!.Has("x-ms-client-principal-idp"));
     [Fact] public void should_replace_the_scopes() => Assert.Equal("direct:read direct:work", _forwarded!.Value(Headers.TokenScope));
     [Fact] public void should_take_the_client_from_the_token_alone() => Assert.Equal(BearerRouteHarness.ClientId, _forwarded!.Value(Headers.TokenClientId));
 }

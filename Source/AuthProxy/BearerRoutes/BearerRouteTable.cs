@@ -90,14 +90,16 @@ public static class BearerRouteTable
     /// Jetty and Spring read <c language="text">/mcp/..;/api</c> as <c language="text">/api</c> — and others keep, the same
     /// rule <see cref="AnonymousPathPolicy"/> applies to a declared prefix. A backend that decoded
     /// <c language="text">/mcp/..%2Fapi</c> into <c language="text">/api</c> would receive a principal vouched for on a bearer route
-    /// at a path that is not one, so a bearer route accepts none of these.
+    /// at a path that is not one. Repeated separators are also refused because a backend may collapse them and
+    /// select a narrower route whose policy was not checked. A bearer route accepts none of these.
     /// </remarks>
     public static bool IsUnambiguous(PathString path)
     {
         var value = path.Value ?? string.Empty;
         if (value.Contains('%', StringComparison.Ordinal)
             || value.Contains('\\', StringComparison.Ordinal)
-            || value.Contains(';', StringComparison.Ordinal))
+            || value.Contains(';', StringComparison.Ordinal)
+            || value.Contains("//", StringComparison.Ordinal))
         {
             return false;
         }
