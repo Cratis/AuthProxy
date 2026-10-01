@@ -164,9 +164,9 @@ prefix. In ASP.NET Core that is `app.UsePathBase("/reporting")`, and a single-pa
 same base path.
 
 With `StripPathPrefix` the prefix is removed: the service receives `/api/sales`, and AuthProxy sends the
-removed prefix in `X-Forwarded-Prefix`. AuthProxy does not consume an upstream proxy's
-`X-Forwarded-Prefix` header. A backend that honors forwarded headers restores it as its path base, so links and redirects it
-generates still point under `/reporting`. [Anonymous paths](#anonymous-paths) below a stripped prefix are
+removed prefix in `X-Forwarded-Prefix`. A backend that honors forwarded headers restores the removed prefix
+as its path base, so links and redirects it generates still point under `/reporting`. An `X-Forwarded-Prefix`
+sent by a proxy in front of AuthProxy is replaced, not combined. [Anonymous paths](#anonymous-paths) below a stripped prefix are
 stripped too. Declare them with the full path, for example `/reporting/public`.
 
 AuthProxy's own endpoints (`/.cratis/login`, `/.cratis/select-provider`, `/.cratis/logout` and the other
