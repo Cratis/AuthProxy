@@ -25,7 +25,11 @@ public class when_resolving_concurrent_canonical_identity_details : Specificatio
         {
             Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" } }
+                ["main"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            }
             }
         });
         _resolver = new IdentityDetailsResolver(

@@ -19,6 +19,7 @@ public class when_token_matches_the_target_service_and_route : Specification
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"{C.AuthProxy.SectionKey}:Services:portal:Backend:BaseUrl"] = "http://portal.test/",
+            [$"{C.AuthProxy.SectionKey}:Services:portal:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
             [$"{C.AuthProxy.SectionKey}:Services:portal:ClientCredentials:RoutePrefix"] = "/api",
             [$"{C.AuthProxy.SectionKey}:Services:portal:ClientCredentials:VerificationPath"] = "/.cratis/client-credentials/verify",
         });

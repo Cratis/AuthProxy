@@ -35,5 +35,5 @@ public class and_one_of_several_services_cannot_be_verified : given.a_required_v
 
     [Fact] void should_not_be_authorized() => _result.IsAuthorized.ShouldBeFalse();
     [Fact] void should_serve_the_forbidden_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
-    [Fact] void should_not_record_an_authorization() => _authorizationCache.DidNotReceive().Record(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>());
+    [Fact] void should_not_record_an_authorization() => _authorizationCache.DidNotReceive().Record(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>(), Arg.Any<IReadOnlyCollection<string>>());
 }

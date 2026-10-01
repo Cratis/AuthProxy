@@ -43,7 +43,13 @@ public static class ReverseProxyExtensions
                 handler.KeepAlivePingTimeout = TimeSpan.FromMinutes(2);
                 handler.ConnectTimeout = TimeSpan.FromMinutes(3);
             })
-            .AddTransforms(ctx => ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform()));
+            .AddTransforms(ctx =>
+            {
+                ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
+                PathPrefixTransform.Apply(ctx);
+            });
+
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();
 
         return builder;
     }

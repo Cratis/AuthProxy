@@ -77,10 +77,11 @@ public static class AuthProxyExtensions
     /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"main"</c>).
     /// </param>
     /// <param name="mode">
-    /// What the answer is worth. <see cref="IdentityVerificationMode.BestEffort"/> — the default when this
-    /// is never called — treats the endpoint as enrichment, so only an explicit <c language="text">403</c> denies.
-    /// <see cref="IdentityVerificationMode.Required"/> treats it as an authorization decision, so only an
-    /// explicit positive admits and every failure to obtain one denies.
+    /// What the answer is worth. <see cref="IdentityVerificationMode.Required"/> — the default when this
+    /// is never called — treats the endpoint as an authorization decision, so only an explicit positive
+    /// admits and every failure to obtain one denies.
+    /// <see cref="IdentityVerificationMode.BestEffort"/> treats it as enrichment, so only an explicit
+    /// <c language="text">403</c> denies; pass it for a service that does not answer with a verdict.
     /// </param>
     /// <param name="timeout">
     /// How long to wait for the answer. Defaults to <see langword="null"/> (AuthProxy's own default of ten
@@ -100,9 +101,9 @@ public static class AuthProxyExtensions
     /// does not take part.
     /// </para>
     /// <para>
-    /// Requiring verification means an outage of that service refuses every proxied request rather than
-    /// serving callers whose access nobody could confirm. That is the point of the setting, and it is worth
-    /// stating plainly before turning it on.
+    /// Requiring verification, which is what AuthProxy does unless told otherwise, means an outage of that
+    /// service refuses every proxied request rather than serving callers whose access nobody could confirm.
+    /// That is the point of the setting, and it is worth stating plainly.
     /// </para>
     /// </remarks>
     public static IResourceBuilder<T> WithIdentityVerification<T>(

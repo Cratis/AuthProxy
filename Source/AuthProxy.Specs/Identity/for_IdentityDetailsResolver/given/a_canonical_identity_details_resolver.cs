@@ -27,7 +27,11 @@ public class a_canonical_identity_details_resolver : Specification
         {
             Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" } }
+                ["main"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            }
             }
         };
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();

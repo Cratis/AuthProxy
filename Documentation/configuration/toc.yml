@@ -20,6 +20,8 @@
   href: link.md
 - name: Sign-in Notifications
   href: sign-in.md
+- name: Data Protection Keys
+  href: data-protection.md
 - name: Trusted Proxies
   href: trusted-proxies.md
 - name: Management Listener

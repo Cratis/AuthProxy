@@ -18,6 +18,12 @@ namespace Cratis.AuthProxy.given;
 public sealed class RecordingLogger<TCategoryName> : ILogger<TCategoryName>
 {
     readonly List<string> _messages = [];
+    readonly List<LogLevel> _levels = [];
+
+    /// <summary>
+    /// Gets the levels of the recorded messages.
+    /// </summary>
+    public IReadOnlyList<LogLevel> Levels => _levels;
 
     /// <summary>
     /// Gets the formatted messages recorded by the logger.
@@ -42,8 +48,11 @@ public sealed class RecordingLogger<TCategoryName> : ILogger<TCategoryName>
         EventId eventId,
         TState state,
         Exception? exception,
-        Func<TState, Exception?, string> formatter) =>
+        Func<TState, Exception?, string> formatter)
+    {
         _messages.Add(formatter(state, exception));
+        _levels.Add(logLevel);
+    }
 
     sealed class EmptyScope : IDisposable
     {

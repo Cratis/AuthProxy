@@ -18,8 +18,16 @@ public class when_multiple_microservices_return_details : Specification
         {
             Services = new Dictionary<string, C.Service>
             {
-                ["service-a"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://service-a/" } },
-                ["service-b"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://service-b/" } }
+                ["service-a"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "http://service-a/" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            },
+                ["service-b"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "http://service-b/" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            }
             }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();

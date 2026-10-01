@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -76,45 +77,24 @@ public class ClientCredentialsServiceResolver(
     /// <param name="request">The incoming HTTP request.</param>
     /// <param name="service">The resolved service configuration.</param>
     /// <returns><see langword="true"/> if a service was resolved; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// The routed service must enable client credentials and permit the incoming path. A host or path prefix
+    /// can route a request to a different service than the one its <c language="text">Service-ID</c> header names,
+    /// and only a token scoped to the routed service can authenticate that request.
+    /// </remarks>
     public bool TryResolveForRequest(HttpRequest request, out ConfiguredClientCredentialsService service)
     {
-        var candidates = GetConfiguredServices()
-            .Where(_ => request.Path.StartsWithSegments(new PathString(_.RoutePrefix), StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        if (candidates.Length == 0)
+        var routed = ServiceRoutes.Resolve(request, config.CurrentValue);
+        if (routed is null)
         {
-            service = default!;
-            return false;
+            return TryResolveCandidate(request, out service);
         }
 
-        var requestedService = ServiceSelection.FromHeaders(request.Headers);
-        if (string.IsNullOrWhiteSpace(requestedService))
-        {
-            requestedService = request.Query["service"].FirstOrDefault();
-        }
+        service = GetConfiguredServices().FirstOrDefault(_ =>
+            string.Equals(_.Name, routed.Name, StringComparison.OrdinalIgnoreCase)
+            && request.Path.StartsWithSegments(new PathString(_.RoutePrefix), StringComparison.OrdinalIgnoreCase))!;
 
-        if (!string.IsNullOrWhiteSpace(requestedService))
-        {
-            var namedService = candidates.FirstOrDefault(_ => string.Equals(_.Name, requestedService, StringComparison.OrdinalIgnoreCase));
-            if (namedService is not null)
-            {
-                service = namedService;
-                return true;
-            }
-
-            service = default!;
-            return false;
-        }
-
-        if (candidates.Length == 1)
-        {
-            service = candidates[0];
-            return true;
-        }
-
-        service = default!;
-        return false;
+        return service is not null;
     }
 
     static Uri? CreateVerificationUri(string baseUrl, string verificationPath)
@@ -163,5 +143,46 @@ public class ClientCredentialsServiceResolver(
 
             yield return new ConfiguredClientCredentialsService(name, routePrefix, verificationUri);
         }
+    }
+
+    bool TryResolveCandidate(HttpRequest request, out ConfiguredClientCredentialsService service)
+    {
+        var candidates = GetConfiguredServices()
+            .Where(_ => request.Path.StartsWithSegments(new PathString(_.RoutePrefix), StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        if (candidates.Length == 0)
+        {
+            service = default!;
+            return false;
+        }
+
+        var requestedService = ServiceSelection.FromHeaders(request.Headers);
+        if (string.IsNullOrWhiteSpace(requestedService))
+        {
+            requestedService = request.Query["service"].FirstOrDefault();
+        }
+
+        if (!string.IsNullOrWhiteSpace(requestedService))
+        {
+            var namedService = candidates.FirstOrDefault(_ => string.Equals(_.Name, requestedService, StringComparison.OrdinalIgnoreCase));
+            if (namedService is not null)
+            {
+                service = namedService;
+                return true;
+            }
+
+            service = default!;
+            return false;
+        }
+
+        if (candidates.Length == 1)
+        {
+            service = candidates[0];
+            return true;
+        }
+
+        service = default!;
+        return false;
     }
 }

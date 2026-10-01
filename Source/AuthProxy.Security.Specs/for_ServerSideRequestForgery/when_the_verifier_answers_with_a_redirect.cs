@@ -57,6 +57,7 @@ public class when_the_verifier_answers_with_a_redirect : IAsyncLifetime
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"{C.AuthProxy.SectionKey}:Services:app:Backend:BaseUrl"] = "https://backend.example.test",
+            [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
             [$"{C.Admission.SectionKey}:Mode"] = nameof(C.AdmissionMode.CapabilityOnly),
             [$"{C.Admission.SectionKey}:Capability:VerifierUrl"] = $"{_baseUrl}/admit",
         });

@@ -494,7 +494,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 | `Lifetime` | `12:00:00` | Absolute lifetime of the authentication ticket. When it elapses the user must re-authenticate with the identity provider, even in a browser session that never closed. |
 | `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
 | `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. |
-| `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative falls back to ten minutes. |
+| `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative means no bound: with any Required service (the default) no authorization record is written; when every participating service is BestEffort it falls back to ten minutes. The independent in-memory result cache still applies. |
 | `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative disables re-validation. |
 
 The authentication cookie itself carries no persistent `Expires` — the browser drops it when the session
@@ -525,7 +525,7 @@ subjects and tenant IDs that do not contain that delimiter. A delimiter-bearing 
 is re-authorized. Current version-two records use structured fields and do not inherit this legacy restriction.
 
 Deployments running more than one AuthProxy instance should configure a shared
-`DataProtectionKeysPath` so a record sealed by one instance can be read by the others; without it each
+[Data Protection key store](data-protection.md) so a record sealed by one instance can be read by the others; without it each
 instance re-resolves identity for callers whose record it did not issue.
 
 ---
@@ -754,8 +754,9 @@ protected separately, so presenting one where the other is expected is always re
 The authentication cookie and AuthProxy-issued client-credentials access and refresh tokens are all
 encrypted using ASP.NET Core Data Protection. By default, keys are not shared across instances. Running
 more than one AuthProxy replica, or needing sessions and client-credentials tokens to survive a restart,
-requires mounting a persistent, shared volume and pointing `Cratis:AuthProxy:DataProtectionKeysPath`
-at it:
+requires a shared key store. The simplest is a persistent, shared volume that
+`Cratis:AuthProxy:DataProtectionKeysPath` points at; Azure Blob Storage and Redis are also supported, see
+[Data Protection keys](data-protection.md):
 
 ```json
 {
