@@ -29,7 +29,7 @@ flowchart LR
         AUTH --> TEN --> ID
     end
 
-    AP -->|"/api/** + Tenant-ID + identity"| BE["Backend service"]
+    AP -->|"/api/** + x-cratis-tenant-id + identity"| BE["Backend service"]
     AP -->|"/** "| FE["Frontend SPA"]
 ```
 
