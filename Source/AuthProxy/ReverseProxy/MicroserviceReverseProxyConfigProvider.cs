@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using C = Cratis.AuthProxy.Configuration;
@@ -51,6 +53,11 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     internal const string EndpointMetadataKey = "Cratis.AuthProxy.Endpoint";
 
     /// <summary>
+    /// The cluster metadata key holding the access token policy selected with its destination.
+    /// </summary>
+    internal const string AccessTokenMetadataKey = "Cratis.AuthProxy.AccessToken";
+
+    /// <summary>
     /// The <see cref="EndpointMetadataKey"/> value of a service's backend cluster.
     /// </summary>
     internal const string BackendEndpoint = "Backend";
@@ -95,9 +102,10 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         ILogger<MicroserviceReverseProxyConfigProvider> logger)
     {
         _logger = logger;
+        var snapshot = config.CurrentValue;
         _inner = new InMemoryConfigProvider(
-            BuildRoutes(config.CurrentValue, logger),
-            BuildClusters(config.CurrentValue));
+            BuildRoutes(snapshot, logger),
+            BuildClusters(snapshot));
         _configurationChanged = config.OnChange(Rebuild);
     }
 
@@ -181,7 +189,16 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             }
         }
 
-        return routes;
+        // Version token-forwarding clusters with their destination and policy. YARP must not reuse a
+        // destination state whose address can change while a request awaits a token for the old audience.
+        var backendVersions = services.ToDictionary(
+            _ => BackendClusterId(_.Key.ToLowerInvariant()),
+            _ => VersionedBackendClusterId(_.Key.ToLowerInvariant(), _.Value),
+            StringComparer.Ordinal);
+
+        return routes.ConvertAll(route => backendVersions.TryGetValue(route.ClusterId!, out var version)
+            ? route with { ClusterId = version }
+            : route);
     }
 
     /// <summary>
@@ -545,12 +562,12 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             {
                 clusters.Add(ClusterFor(config, ms, ms.Backend) with
                 {
-                    ClusterId = BackendClusterId(key),
+                    ClusterId = VersionedBackendClusterId(key, ms),
                     Destinations = new Dictionary<string, DestinationConfig>
                     {
-                        ["destination1"] = new() { Address = ms.Backend.BaseUrl }
+                        [ms.AccessToken is null ? "destination1" : VersionedBackendClusterId(key, ms)] = new() { Address = ms.Backend.BaseUrl }
                     },
-                    Metadata = ClusterMetadata(key, BackendEndpoint),
+                    Metadata = ClusterMetadata(key, BackendEndpoint, ms.AccessToken),
                 });
             }
 
@@ -571,11 +588,33 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         return clusters;
     }
 
-    static Dictionary<string, string> ClusterMetadata(string key, string endpoint) => new()
+    static Dictionary<string, string> ClusterMetadata(string key, string endpoint, C.ServiceAccessToken? accessToken = null)
     {
-        [ServiceMetadataKey] = key,
-        [EndpointMetadataKey] = endpoint,
-    };
+        var metadata = new Dictionary<string, string>
+        {
+            [ServiceMetadataKey] = key,
+            [EndpointMetadataKey] = endpoint,
+        };
+        if (accessToken is not null)
+        {
+            metadata[AccessTokenMetadataKey] = JsonSerializer.Serialize(accessToken);
+        }
+
+        return metadata;
+    }
+
+    static string VersionedBackendClusterId(string key, C.Service service)
+    {
+        if (service.AccessToken is null)
+        {
+            return BackendClusterId(key);
+        }
+
+        var binding = JsonSerializer.Serialize(new { Address = service.Backend?.BaseUrl, Policy = service.AccessToken });
+        var version = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(binding)));
+
+        return $"{BackendClusterId(key)}-{version}";
+    }
 
     /// <summary>
     /// Creates the cluster skeleton for an endpoint, carrying the activity timeout that applies to it.

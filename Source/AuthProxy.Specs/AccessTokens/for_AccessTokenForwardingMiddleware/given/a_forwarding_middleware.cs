@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text.Json;
 using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,17 +28,8 @@ public class a_forwarding_middleware : Specification
     void Establish()
     {
         _accessToken = new() { Scopes = ["api://reporting/access_as_user"] };
-        var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        config.CurrentValue.Returns(new C.AuthProxy
-        {
-            Services = new Dictionary<string, C.Service>
-            {
-                ["Reporting"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://reporting/" }, AccessToken = _accessToken },
-            },
-        });
-
         _tokens = Substitute.For<IUserAccessTokens>();
-        _tokens.GetFor("session-id", _accessToken, Arg.Any<CancellationToken>()).Returns(UserAccessTokenResult.Success("user-access-token"));
+        _tokens.GetFor("session-id", Arg.Any<C.ServiceAccessToken>(), Arg.Any<CancellationToken>()).Returns(UserAccessTokenResult.Success("user-access-token"));
 
         _context = new DefaultHttpContext
         {
@@ -53,7 +45,6 @@ public class a_forwarding_middleware : Specification
                 _forwarded = true;
                 return Task.CompletedTask;
             },
-            config,
             NullLogger<AccessTokenForwardingMiddleware>.Instance);
     }
 
@@ -67,6 +58,7 @@ public class a_forwarding_middleware : Specification
                 {
                     [ReverseProxy.MicroserviceReverseProxyConfigProvider.ServiceMetadataKey] = "reporting",
                     [ReverseProxy.MicroserviceReverseProxyConfigProvider.EndpointMetadataKey] = _endpoint,
+                    [ReverseProxy.MicroserviceReverseProxyConfigProvider.AccessTokenMetadataKey] = JsonSerializer.Serialize(_accessToken),
                 },
             },
             new HttpMessageInvoker(new SocketsHttpHandler()));

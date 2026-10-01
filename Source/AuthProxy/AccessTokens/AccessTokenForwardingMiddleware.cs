@@ -3,7 +3,6 @@
 
 using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -21,11 +20,9 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// the backend expects.
 /// </remarks>
 /// <param name="next">The next middleware in the proxy pipeline.</param>
-/// <param name="config">The configuration.</param>
 /// <param name="logger">The <see cref="ILogger"/> for diagnostics.</param>
 public class AccessTokenForwardingMiddleware(
     RequestDelegate next,
-    IOptionsMonitor<C.AuthProxy> config,
     ILogger<AccessTokenForwardingMiddleware> logger)
 {
     /// <summary>
@@ -39,7 +36,7 @@ public class AccessTokenForwardingMiddleware(
         var proxy = context.Features.Get<IReverseProxyFeature>();
         if (proxy is null
             || proxy.Route.Config.AuthorizationPolicy == MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy
-            || !TryGetAccessToken(proxy, config.CurrentValue, out var serviceName, out var accessToken)
+            || !TryGetAccessToken(proxy, out var serviceName, out var accessToken)
             || !IsSessionRequest(context))
         {
             await next(context);
@@ -61,7 +58,7 @@ public class AccessTokenForwardingMiddleware(
         await next(context);
     }
 
-    static bool TryGetAccessToken(IReverseProxyFeature proxy, C.AuthProxy config, out string serviceName, out C.ServiceAccessToken accessToken)
+    static bool TryGetAccessToken(IReverseProxyFeature proxy, out string serviceName, out C.ServiceAccessToken accessToken)
     {
         serviceName = string.Empty;
         accessToken = default!;
@@ -70,19 +67,14 @@ public class AccessTokenForwardingMiddleware(
         if (metadata is null
             || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.ServiceMetadataKey, out var key)
             || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.EndpointMetadataKey, out var endpoint)
-            || endpoint != MicroserviceReverseProxyConfigProvider.BackendEndpoint)
+            || endpoint != MicroserviceReverseProxyConfigProvider.BackendEndpoint
+            || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.AccessTokenMetadataKey, out var policy))
         {
             return false;
         }
 
-        var service = config.Services.FirstOrDefault(_ => string.Equals(_.Key, key, StringComparison.OrdinalIgnoreCase));
-        if (service.Value?.AccessToken is null)
-        {
-            return false;
-        }
-
-        serviceName = service.Key;
-        accessToken = service.Value.AccessToken;
+        serviceName = key;
+        accessToken = JsonSerializer.Deserialize<C.ServiceAccessToken>(policy)!;
         return true;
     }
 

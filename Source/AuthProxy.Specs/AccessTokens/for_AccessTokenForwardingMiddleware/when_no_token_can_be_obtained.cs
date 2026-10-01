@@ -5,7 +5,7 @@ namespace Cratis.AuthProxy.AccessTokens.for_AccessTokenForwardingMiddleware;
 
 public class when_no_token_can_be_obtained : given.a_forwarding_middleware
 {
-    void Establish() => _tokens.GetFor("session-id", _accessToken, Arg.Any<CancellationToken>()).Returns(UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected));
+    void Establish() => _tokens.GetFor("session-id", Arg.Any<C.ServiceAccessToken>(), Arg.Any<CancellationToken>()).Returns(UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected));
 
     Task Because() => Invoke();
 
