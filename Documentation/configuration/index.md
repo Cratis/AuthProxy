@@ -18,7 +18,8 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
       "Invite": { ... },
       "Management": { ... },
       "PagesPath": "",
-      "DataProtectionKeysPath": ""
+      "DataProtectionKeysPath": "",
+      "DataProtection": { ... }
     }
   }
 }
@@ -31,6 +32,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Admission](admission.md) | Answering nothing at all until a caller presents a capability your own verifier admits, for a deployment whose existence is not meant to be discoverable. |
 | [Tenancy](tenancy.md) | How the auth proxy resolves the current tenant from each request, and how to verify tenant existence. |
 | [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
+| [Data Protection Keys](data-protection.md) | Sharing the key ring that encrypts sessions and tokens between replicas: a file system, Azure Blob Storage or Redis, with optional Azure Key Vault key protection. |
 | [Trusted Proxies](trusted-proxies.md) | Which callers may speak for the client through `X-Forwarded-For` and `X-Forwarded-Proto`, and how many hops to follow. |
 | [Services](services.md) | Routing requests to backend and frontend services. |
 | [Management Listener](management-listener.md) | An opt-in private listener carrying liveness and readiness endpoints, so a probe tests more than "a process accepted a socket". |
