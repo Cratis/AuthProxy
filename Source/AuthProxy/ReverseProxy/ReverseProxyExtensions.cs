@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Identity;
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ReverseProxy;
 
@@ -19,6 +21,7 @@ public static class ReverseProxyExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ActivityTimeoutConfigurationValidator>();
         builder.Services.AddSingleton<MicroserviceReverseProxyConfigProvider>();
         builder.Services.AddSingleton<IProxyConfigProvider>(
             sp => sp.GetRequiredService<MicroserviceReverseProxyConfigProvider>());
