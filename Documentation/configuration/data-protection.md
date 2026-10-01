@@ -135,8 +135,9 @@ What the deployment has to provide:
 
 ## Protecting the key ring with Azure Key Vault
 
-Setting a Key Vault key encrypts the key ring before it is written to **whichever store you chose**, so
-whoever can read the file, blob or Redis key still cannot read the keys.
+Setting a Key Vault key encrypts **newly generated Data Protection keys** before they are written to
+**whichever store you chose**, so whoever can read the file, blob or Redis key cannot read those encrypted
+keys. Existing plaintext keys are not retroactively encrypted.
 
 ```json
 {
@@ -164,9 +165,16 @@ What the deployment has to provide:
   store, including `ManagedIdentityClientId`.
 
 > [!IMPORTANT]
-> Turning this on, off, or pointing it at a different key does not convert an existing key ring. AuthProxy
-> starts a new one, and everyone is signed out. Do it once, when you adopt a shared store, not as routine
-> maintenance.
+> Enabling Key Vault protection does not replace the existing key ring or sign callers out. Existing
+> plaintext keys remain readable and usable; only newly generated keys are encrypted. Changing the vault
+> key identifier also leaves the ring in place: existing encrypted keys still depend on their original
+> vault keys and versions. Keep those keys available and grant the identity access to them for as long as
+> their Data Protection keys are needed. Do not remove the Key Vault protection setting while retaining
+> encrypted keys: without its decryptor registration, those keys cannot be read.
+>
+> If you require a fresh encrypted ring and invalidation of existing sessions and tokens, deliberately
+> configure a new, empty repository (a different directory, blob or Redis key) on every replica with Key
+> Vault protection enabled. Do not copy the old plaintext keys into it.
 
 ---
 
@@ -177,6 +185,7 @@ startup**, naming the setting, rather than resolved by picking one:
 
 | Configuration | Why it is refused |
 |---------------|-------------------|
+| `Store` is not `FileSystem`, `AzureBlob` or `Redis` (including an undefined numeric value) | The chosen store is not supported. |
 | `Store` is `AzureBlob` without `AzureBlob:BlobUri`, or `Redis` without `Redis:ConnectionString` | The chosen store has nowhere to write. |
 | `DataProtectionKeysPath` set while `Store` is `AzureBlob` or `Redis` | The path would be ignored and the key ring written somewhere else. |
 | An `AzureBlob` or `Redis` section present while `Store` names the other store | The section would be ignored. |

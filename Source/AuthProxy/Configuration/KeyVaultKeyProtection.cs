@@ -4,13 +4,15 @@
 namespace Cratis.AuthProxy.Configuration;
 
 /// <summary>
-/// Represents the Azure Key Vault key the Data Protection key ring is encrypted with before it is stored.
+/// Represents the Azure Key Vault key newly generated Data Protection keys are encrypted with before they are stored.
 /// </summary>
 /// <remarks>
-/// Applies to every <see cref="DataProtectionStore"/>, so a key ring on a shared volume or in Redis is not
-/// readable by whoever can read the store. The identity AuthProxy runs as needs to wrap and unwrap with the
-/// key — for example the <c language="text">Key Vault Crypto User</c> role. A key ring written without this setting is not
-/// readable once it is turned on, and the reverse: changing it starts a new key ring and signs everyone out.
+/// Applies to every <see cref="DataProtectionStore"/>. The identity AuthProxy runs as needs to wrap and unwrap
+/// with the key — for example the <c language="text">Key Vault Crypto User</c> role. Existing plaintext keys remain
+/// readable and are not retroactively encrypted. Existing encrypted keys still require their original vault
+/// keys and versions, even after this identifier changes. Keep those keys available and this protection
+/// configured while using the existing ring. To start a new ring and invalidate sessions and tokens,
+/// deliberately configure a fresh key repository on every replica.
 /// </remarks>
 public class KeyVaultKeyProtection
 {
