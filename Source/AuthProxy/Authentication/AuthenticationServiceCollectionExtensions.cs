@@ -3,6 +3,7 @@
 
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Cratis.AuthProxy.AccessTokens;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.SignIns;
@@ -31,6 +32,12 @@ public static class AuthenticationServiceCollectionExtensions
     /// resolve the correct identity provider's end-session endpoint.
     /// </summary>
     public const string AuthenticationSchemeStateKey = "Cratis.AuthProxy.AuthenticationScheme";
+
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key recording which authentication scheme the default scheme selected for
+    /// the request: the session cookie, a client-credentials token, or a JWT bearer token.
+    /// </summary>
+    public const string SelectedSchemeItemKey = "Cratis.AuthProxy.SelectedAuthenticationScheme";
 
     const string ValidatedIssuerStateKey = "Cratis.AuthProxy.ValidatedIssuer";
 
@@ -102,6 +109,13 @@ public static class AuthenticationServiceCollectionExtensions
 
     static string ResolveAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
+        var scheme = SelectAuthenticationScheme(context, hasJwtBearer);
+        context.Items[SelectedSchemeItemKey] = scheme;
+        return scheme;
+    }
+
+    static string SelectAuthenticationScheme(HttpContext context, bool hasJwtBearer)
+    {
         var authorization = context.Request.Headers.Authorization.ToString();
         if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
@@ -143,11 +157,19 @@ public static class AuthenticationServiceCollectionExtensions
         var existingValidatePrincipal = options.Events.OnValidatePrincipal;
         options.Events.OnValidatePrincipal = async context =>
         {
+            UserTokenSessions.Remember(context);
             await existingValidatePrincipal(context);
             if (context.Principal is not null)
             {
                 await ValidateCanonicalSession(context);
             }
+        };
+
+        var existingSigningOut = options.Events.OnSigningOut;
+        options.Events.OnSigningOut = async context =>
+        {
+            await UserTokenSessions.Forget(context);
+            await existingSigningOut(context);
         };
 
         // Redirect unauthenticated users to the provider selection page (multiple providers)
@@ -287,6 +309,7 @@ public static class AuthenticationServiceCollectionExtensions
                         context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
                         return Task.CompletedTask;
                     },
+                    OnTokenResponseReceived = UserTokenSessions.Capture,
                     OnAuthorizationCodeReceived = context => capturedProvider.UsesClientAssertion
                         ? OidcClientAuthentication.Apply(context.HttpContext, scheme, capturedProvider, context.Options, context.TokenEndpointRequest!)
                         : Task.CompletedTask,

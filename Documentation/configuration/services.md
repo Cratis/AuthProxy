@@ -42,6 +42,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required`, unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
+| `AccessToken` | `ServiceAccessTokenConfig` | `null` | Forwards the signed-in user's access token for this service's audience to its backend. See [Forwarding the user's access token](#forwarding-the-users-access-token). |
 
 ### ServiceEndpointConfig properties
 
@@ -396,3 +397,93 @@ The verification endpoint's response can optionally include a `tenant` property,
 carries on the issued tokens and can resolve into the `Tenant-ID` header on proxied requests.
 See [Back-channel client credentials](authentication.md#back-channel-client-credentials) for the full
 token, tenant-resolution, and refresh-token flow.
+
+---
+
+## Forwarding the user's access token
+
+By default a backend learns who the user is from the identity headers only. A backend that has to call another
+API on the user's behalf, such as Microsoft Graph or a downstream domain API through the on-behalf-of flow,
+needs a real access token issued for it. With `AccessToken`, AuthProxy works as a backend for frontend (BFF).
+It obtains an access token for the backend's audience for the signed-in user and forwards it as
+`Authorization: Bearer <token>`:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "reporting": {
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "Frontend": { "BaseUrl": "http://reporting-web:3000/" },
+          "AccessToken": {
+            "Scopes": [ "api://reporting/access_as_user" ]
+          }
+        }
+      },
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Microsoft",
+            "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>",
+            "Scopes": [ "offline_access" ]
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+The backend then validates an ordinary JWT. Its audience is the backend's own app registration, so the
+backend can exchange it for downstream tokens without signing anyone in itself.
+
+### ServiceAccessTokenConfig properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Scopes` | `string[]` | Scopes to request for the backend's audience, for example `api://reporting/access_as_user` (Microsoft Entra ID). |
+| `Resource` | `string` | Optional resource indicator ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)) for identity providers that select the audience with `resource`. |
+| `Provider` | `string` | Optional OIDC provider name. When set, only users who signed in with that provider get a token. Everyone else is refused. |
+
+At least one of `Scopes` or `Resource` is required, the service needs a `Backend`, and at least one OIDC
+provider must be configured. AuthProxy refuses to start otherwise.
+
+### How the token is obtained
+
+- At sign-in, AuthProxy keeps the refresh token the OIDC provider issues **server-side**. The session cookie
+  carries only an unguessable reference to it, inside its encrypted ticket. The refresh token, the access
+  tokens and the ID token never reach the browser.
+- For each request to the backend, AuthProxy uses that refresh token at the provider's token endpoint
+  (`grant_type=refresh_token`) to get a token for the service's scopes. The token is cached per session and
+  audience, and renewed shortly before it expires. AuthProxy authenticates to the token endpoint with the
+  provider's `ClientSecret` or [client credential](authentication.md#client-credentials-certificates-and-federated-credentials),
+  and stores a rotated refresh token when the provider issues one.
+- Request `offline_access` (or your provider's equivalent) in the provider's `Scopes`. Without a refresh
+  token AuthProxy cannot get access tokens, and logs a warning at each such sign-in.
+- Signing out removes the refresh token and every access token kept for the session.
+
+### What is forwarded, and when it is refused
+
+- Only requests that are authenticated by the AuthProxy session and routed to the service's `Backend` get a
+  token. The token replaces any `Authorization` header the browser sent.
+- Requests to the `Frontend`, requests on [anonymous paths](#anonymous-paths), and machine callers that
+  authenticate with their own bearer token ([client credentials](#client-credentials) or JWT bearer) are
+  forwarded as before.
+- When no token can be obtained, the request is refused with `401` instead of being forwarded without one.
+  This happens when the session has no refresh token, the provider rejects the refresh token, the provider
+  cannot be reached, or the user signed in with another provider than `Provider`. A rejected refresh token
+  is discarded. The frontend should treat the `401` as a signal to sign in again through
+  `/.cratis/login/{scheme}`.
+
+### Running more than one instance
+
+Refresh and access tokens are kept in AuthProxy's memory, encrypted with its
+[Data Protection keys](authentication.md#data-protection-keys-and-horizontal-scaling). They do not survive a
+restart and are not shared between replicas. With several replicas, route each session to the same replica
+(sticky sessions). Otherwise a request that lands on another replica is refused with `401` until the user
+signs in again. Sessions that began before `AccessToken` was configured hold no refresh token either, so
+their users sign in again once.
+
