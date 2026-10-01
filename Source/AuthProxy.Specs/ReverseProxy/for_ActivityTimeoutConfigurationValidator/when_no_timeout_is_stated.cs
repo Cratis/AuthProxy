@@ -13,7 +13,11 @@ public class when_no_timeout_is_stated : Specification
         {
             Services = new Dictionary<string, C.Service>
             {
-                ["App"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.local/" } },
+                ["App"] = new()
+                {
+                    Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.local/" },
+                    Registration = new C.ServiceEndpoint { BaseUrl = "https://registration.local/" },
+                },
             },
         });
 

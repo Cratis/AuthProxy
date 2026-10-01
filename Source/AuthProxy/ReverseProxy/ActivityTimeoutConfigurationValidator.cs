@@ -35,6 +35,10 @@ public class ActivityTimeoutConfigurationValidator : IValidateOptions<C.AuthProx
             Check($"{prefix}:{nameof(C.Service.ActivityTimeout)}", service.ActivityTimeout, failures);
             Check($"{prefix}:{nameof(C.Service.Backend)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", service.Backend?.ActivityTimeout, failures);
             Check($"{prefix}:{nameof(C.Service.Frontend)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", service.Frontend?.ActivityTimeout, failures);
+            if (service.Registration?.ActivityTimeout is not null)
+            {
+                failures.Add($"{prefix}:{nameof(C.Service.Registration)}:{nameof(C.ServiceEndpoint.ActivityTimeout)} is not supported. ActivityTimeout only applies to Backend and Frontend endpoints, not Registration. Remove this setting.");
+            }
         }
 
         return failures.Count > 0

@@ -124,6 +124,8 @@ and a service's is `Cratis__AuthProxy__Services__portal__ActivityTimeout`.
 
 A value must be at least one millisecond and at most 2,147,483,647 milliseconds (about 24 days).
 AuthProxy refuses to start when a value is outside this range, and the message names the setting.
+`Registration` is not a proxied endpoint: setting `Registration:ActivityTimeout` also prevents startup.
+Remove that setting and configure the service's `Backend` or `Frontend` activity timeout instead.
 A change to the configuration file is applied to new requests without a restart.
 
 From Aspire:
