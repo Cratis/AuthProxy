@@ -1,0 +1,61 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
+
+namespace Cratis.AuthProxy.ReverseProxy;
+
+/// <summary>
+/// Refuses a configuration stating a proxy activity timeout the proxy cannot honor.
+/// </summary>
+/// <remarks>
+/// A zero or negative value would cancel every proxied request the moment it starts, and a value past the
+/// largest delay the platform can schedule would fail on the first request instead of at startup. Both are
+/// configuration mistakes, so they are named here, at the one moment somebody is watching, rather than
+/// surfacing as every request failing or as a silently different timeout than the one written down.
+/// </remarks>
+public class ActivityTimeoutConfigurationValidator : IValidateOptions<C.AuthProxy>
+{
+    /// <summary>
+    /// The longest activity timeout that can be scheduled.
+    /// </summary>
+    internal static readonly TimeSpan Maximum = TimeSpan.FromMilliseconds(uint.MaxValue - 1d);
+
+    /// <inheritdoc/>
+    public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
+    {
+        var failures = new List<string>();
+
+        Check($"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.ActivityTimeout)}", options.ActivityTimeout, failures);
+
+        foreach (var (serviceName, service) in options.Services)
+        {
+            var prefix = $"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.Services)}:{serviceName}";
+            Check($"{prefix}:{nameof(C.Service.ActivityTimeout)}", service.ActivityTimeout, failures);
+            Check($"{prefix}:{nameof(C.Service.Backend)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", service.Backend?.ActivityTimeout, failures);
+            Check($"{prefix}:{nameof(C.Service.Frontend)}:{nameof(C.ServiceEndpoint.ActivityTimeout)}", service.Frontend?.ActivityTimeout, failures);
+        }
+
+        return failures.Count > 0
+            ? ValidateOptionsResult.Fail(failures)
+            : ValidateOptionsResult.Success;
+    }
+
+    static void Check(string key, TimeSpan? value, List<string> failures)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        if (value <= TimeSpan.Zero)
+        {
+            failures.Add($"{key} is '{value}', which is not greater than zero. A proxied request would be cancelled the moment it started. Leave the setting unset for the default of {C.AuthProxy.DefaultActivityTimeout}, or state how long a request may sit idle, for example '00:15:00'.");
+        }
+        else if (value > Maximum)
+        {
+            failures.Add($"{key} is '{value}', which is longer than the {Maximum} the proxy can schedule. State a shorter idle limit.");
+        }
+    }
+}
