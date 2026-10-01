@@ -9,6 +9,7 @@ using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
+using Cratis.AuthProxy.KeyRing;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Registrations;
 using Cratis.AuthProxy.ReverseProxy;
@@ -109,12 +110,11 @@ public static class IngressExtensions
         // untouched for a deployment that declares no bearer route.
         builder.AddBearerRoutes();
 
-        var dataProtectionBuilder = builder.Services.AddDataProtection().SetApplicationName("Cratis.AuthProxy");
-        var dataProtectionKeysPath = builder.Configuration[$"{C.AuthProxy.SectionKey}:DataProtectionKeysPath"];
-        if (!string.IsNullOrWhiteSpace(dataProtectionKeysPath))
-        {
-            dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
-        }
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, KeyRingConfigurationValidator>();
+        builder.Services
+            .AddDataProtection()
+            .SetApplicationName("Cratis.AuthProxy")
+            .ApplyConfiguredKeyRing(builder.Configuration);
 
         return builder;
     }

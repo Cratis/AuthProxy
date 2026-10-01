@@ -10,7 +10,8 @@ namespace Cratis.AuthProxy.Configuration.for_Service;
 /// carries its own copy of this enumeration and hands the choice over as a string in an environment
 /// variable — exactly as it already does for the provider type. That string is the only thing joining the
 /// two definitions, and a rename on either side would fail in the worst possible direction: binding falls
-/// back to the default, which is the permissive mode, and nothing anywhere would say so.
+/// back to the default — which is now the fail-closed mode, so a renamed opt-out would silently turn
+/// an enrichment-only service into one that denies — and nothing anywhere would say so.
 /// <para>
 /// Both ends are therefore pinned by name. The Aspire specs assert the exact strings the builder writes;
 /// this asserts the exact strings the proxy reads. A rename on either side now breaks a spec rather than a
@@ -36,7 +37,7 @@ public class when_binding_identity_verification : Specification
 
     [Fact] void should_bind_the_required_mode() => _config.Services["required"].IdentityVerification.ShouldEqual(IdentityVerificationMode.Required);
     [Fact] void should_bind_the_best_effort_mode() => _config.Services["relaxed"].IdentityVerification.ShouldEqual(IdentityVerificationMode.BestEffort);
-    [Fact] void should_leave_an_unstated_mode_permissive() => _config.Services["unstated"].IdentityVerification.ShouldEqual(IdentityVerificationMode.BestEffort);
+    [Fact] void should_fail_closed_for_an_unstated_mode() => _config.Services["unstated"].IdentityVerification.ShouldEqual(IdentityVerificationMode.Required);
     [Fact] void should_bind_the_verification_timeout() => _config.Services["required"].IdentityVerificationTimeout.ShouldEqual(TimeSpan.FromSeconds(3));
     [Fact] void should_leave_an_unstated_timeout_unstated() => _config.Services["unstated"].IdentityVerificationTimeout.ShouldBeNull();
     [Fact] void should_treat_the_deployment_as_requiring_verification() => _config.RequiresIdentityVerification.ShouldBeTrue();

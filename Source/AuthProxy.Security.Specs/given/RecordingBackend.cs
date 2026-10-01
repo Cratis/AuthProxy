@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
+using System.Net.WebSockets;
+using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -102,6 +104,7 @@ public sealed class RecordingBackend : IAsyncDisposable
         var state = app.Services.GetRequiredService<RecordingState>();
         var identityResponder = app.Services.GetRequiredService<IdentityResponder>();
 
+        app.UseWebSockets();
         app.Use(async (context, next) =>
         {
             if (normalizeRepeatedSeparators)
@@ -129,6 +132,20 @@ public sealed class RecordingBackend : IAsyncDisposable
             recording.RecordSignIn(await reader.ReadToEndAsync());
 
             return Results.Ok();
+        });
+
+        app.MapGet("/api/routing-websocket", async context =>
+        {
+            using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            await socket.SendAsync(Encoding.UTF8.GetBytes("origin"), WebSocketMessageType.Text, true, context.RequestAborted);
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", context.RequestAborted);
+        });
+
+        app.MapGet("/api/routing-events", async context =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            await context.Response.WriteAsync("data: origin\n\n", context.RequestAborted);
+            await context.Response.Body.FlushAsync(context.RequestAborted);
         });
 
         app.MapFallback(() => Results.Text("origin", "text/plain"));

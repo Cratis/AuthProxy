@@ -29,6 +29,44 @@ public class Service
     public ServiceEndpoint? Frontend { get; set; }
 
     /// <summary>
+    /// Gets or sets the host names that route requests to this service, without a <c language="text">Service-ID</c> header
+    /// or <c language="text">service</c> query parameter. An entry is a host name with an optional port
+    /// (<c language="text">reporting.example.com</c> or <c language="text">reporting.example.com:8443</c>); an entry without a
+    /// port matches every port. Matching is case-insensitive.
+    /// </summary>
+    /// <remarks>
+    /// A host match is the default for that host: an explicit <c language="text">Service-ID</c> header or
+    /// <c language="text">service</c> query parameter still selects another service, so a frontend can keep naming the
+    /// backend it calls. Combined with <see cref="PathPrefix"/>, the service only answers for the prefix on these
+    /// hosts. No two services may claim the same host without a path prefix telling them apart.
+    /// </remarks>
+    public IList<string> Hosts { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the path prefix that routes requests to this service, for example <c language="text">/reporting</c>.
+    /// Every request under the prefix goes to this service: <c language="text">{PathPrefix}/api/...</c> to the backend, and
+    /// everything else under the prefix to the frontend.
+    /// </summary>
+    /// <remarks>
+    /// A path prefix claims its part of the URL: it takes precedence over the <c language="text">Service-ID</c> header and
+    /// the <c language="text">service</c> query parameter. It must be a rooted path of literal segments, must not overlap
+    /// another service's prefix on the same hosts, and must not cover AuthProxy's own paths or <c language="text">/api</c>.
+    /// </remarks>
+    public string PathPrefix { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether <see cref="PathPrefix"/> is removed from the forwarded path.
+    /// Defaults to <see langword="false"/>: the service receives the path exactly as requested and serves itself
+    /// under the prefix (for example with <c language="text">UsePathBase</c>).
+    /// </summary>
+    /// <remarks>
+    /// When <see langword="true"/>, <c language="text">/reporting/api/orders</c> is forwarded as <c language="text">/api/orders</c> and
+    /// the removed prefix is sent in <c language="text">X-Forwarded-Prefix</c>, so a backend that honors forwarded headers
+    /// can restore it as its path base.
+    /// </remarks>
+    public bool StripPathPrefix { get; set; }
+
+    /// <summary>
     /// Gets or sets the registration endpoint for this service.
     /// This is currently used by the lobby configuration to identify where new users should be sent
     /// after the AuthProxy registration flow completes.
@@ -85,9 +123,10 @@ public class Service
     /// These are applied <em>in addition to</em> any declared at the root — a service can narrow who gets
     /// in, never widen it. Leave unset to require only what the root requires.
     /// <para>
-    /// The service a request targets is resolved the way the route table resolves it: the single
-    /// configured service when there is only one, otherwise the <c language="text">x-cratis-microservice</c> header (or the legacy <c language="text">Service-ID</c>) or the
-    /// <c language="text">service</c> query parameter. A request in a multi-service deployment that names no service
+    /// The service a request targets is resolved the way the route table resolves it: by
+    /// <see cref="PathPrefix"/> and <see cref="Hosts"/>, by the <c language="text">x-cratis-microservice</c> header
+    /// (or the legacy <c language="text">Service-ID</c>) or the <c language="text">service</c> query parameter,
+    /// or as the single configured service. A request in a multi-service deployment that matches no service
     /// matches no service route either, so only the root requirements apply to it.
     /// </para>
     /// </remarks>
@@ -101,18 +140,22 @@ public class Service
 
     /// <summary>
     /// Gets or sets what this service's <c language="text">/.cratis/me</c> answer means. Defaults to
-    /// <see cref="IdentityVerificationMode.BestEffort"/>, the released behavior.
+    /// <see cref="IdentityVerificationMode.Required"/>, which fails closed.
     /// </summary>
     /// <remarks>
     /// <see cref="ResolveIdentityDetails"/> decides whether the endpoint is called; this decides what the
     /// answer is worth. They are deliberately separate settings because they are separate questions — a
     /// service can be asked for details it is allowed to fail to supply, or asked for a decision it is not.
     /// <para>
-    /// Set this to <see cref="IdentityVerificationMode.Required"/> only for a service that genuinely answers
-    /// <c language="text">/.cratis/me</c> with an authorization verdict. Every failure to obtain that verdict then denies
-    /// the request, which is the point — but it also means an outage of that one service takes the whole
-    /// proxied surface down with it, deliberately, rather than serving callers whose access nobody could
-    /// confirm.
+    /// The default is <see cref="IdentityVerificationMode.Required"/>: a service that takes part in identity
+    /// resolution is asked for a decision, and every failure to obtain a positive verdict denies the request.
+    /// That is the point — but it also means an outage of that one service takes the whole proxied surface
+    /// down with it, deliberately, rather than serving callers whose access nobody could confirm. A service
+    /// that does not answer <c language="text">/.cratis/me</c> with an authorization verdict, or does not answer it at
+    /// all, states <see cref="IdentityVerificationMode.BestEffort"/> to use the endpoint for enrichment only,
+    /// or sets <see cref="ResolveIdentityDetails"/> to <see langword="false"/> so the endpoint is never
+    /// called. The setting has no effect on a service that declares no backend or opts out of identity
+    /// resolution, because no endpoint is called for it.
     /// </para>
     /// <para>
     /// When several services take part, every one of them declaring
@@ -120,7 +163,7 @@ public class Service
     /// are added together and never widened, the same way service authorization requirements compose.
     /// </para>
     /// </remarks>
-    public IdentityVerificationMode IdentityVerification { get; set; } = IdentityVerificationMode.BestEffort;
+    public IdentityVerificationMode IdentityVerification { get; set; } = IdentityVerificationMode.Required;
 
     /// <summary>
     /// Gets or sets how long AuthProxy waits for this service's <c language="text">/.cratis/me</c> answer before treating
@@ -140,7 +183,8 @@ public class Service
     /// </summary>
     /// <remarks>
     /// A bound on the wait is a property of fail-closed verification, not of enrichment, so an unstated
-    /// timeout resolves per mode.
+    /// timeout resolves per mode. Because <see cref="IdentityVerificationMode.Required"/> is the default, an
+    /// unstated timeout on an unstated mode resolves to <see cref="DefaultIdentityVerificationTimeout"/>.
     /// <para>
     /// Under <see cref="IdentityVerificationMode.Required"/> the call stands between a caller and a
     /// decision. Without a bound it inherits the ambient 100-second client default, so a service that
@@ -149,8 +193,8 @@ public class Service
     /// and an unbounded hang. <see cref="DefaultIdentityVerificationTimeout"/> applies.
     /// </para>
     /// <para>
-    /// Under <see cref="IdentityVerificationMode.BestEffort"/> the call only enriches, and the released
-    /// proxy waited on the ambient client default. Imposing a shorter bound nobody asked for would not
+    /// Under <see cref="IdentityVerificationMode.BestEffort"/> the call only enriches, and earlier releases
+    /// waited on the ambient client default. Imposing a shorter bound nobody asked for would not
     /// refuse anything — it would admit the caller with that service's details silently missing, which is a
     /// worse failure than the slow answer it replaces because nothing downstream can tell the difference.
     /// The released wait is kept until a deployment states otherwise.

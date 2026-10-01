@@ -50,7 +50,8 @@ public class a_best_effort_verification_resolver : Specification
         _handler = new ScriptedIdentityHandler();
         _service = new C.Service
         {
-            Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" }
+            Backend = new C.ServiceEndpoint { BaseUrl = "https://backend.example.com" },
+            IdentityVerification = C.IdentityVerificationMode.BestEffort
         };
         _config = new C.AuthProxy
         {

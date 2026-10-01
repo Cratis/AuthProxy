@@ -7,8 +7,8 @@ using C = Cratis.AuthProxy.Configuration;
 namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
-/// Refuses a configuration that requires identity verification without a way to resolve the tenant it is
-/// verified against.
+/// Refuses a configuration that requires identity verification, which is what every service with a backend
+/// does unless it states otherwise, without a way to resolve the tenant it is verified against.
 /// </summary>
 /// <remarks>
 /// Identity resolution is keyed by principal and tenant, so a deployment with no tenant resolution
@@ -30,10 +30,12 @@ public class IdentityVerificationConfigurationValidator : IValidateOptions<C.Aut
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options) =>
         options.RequiresIdentityVerification && options.TenantResolutions.Count == 0
             ? ValidateOptionsResult.Fail(
-                $"A service declares {nameof(C.IdentityVerificationMode)}.{nameof(C.IdentityVerificationMode.Required)}, " +
-                $"but {C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.TenantResolutions)} is empty. Identity verification is " +
-                "resolved per tenant, so with no tenant resolution configured no request would ever be verified and the " +
-                $"setting would have no effect. Declare a tenant resolution — {nameof(C.TenantSourceIdentifierResolverType.Specified)} " +
-                "with a tenant ID is the single-tenant one — or stop requiring verification.")
+                $"A service requires identity verification ({nameof(C.IdentityVerificationMode)}.{nameof(C.IdentityVerificationMode.Required)}, " +
+                $"which is the default for a service with a backend), but {C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.TenantResolutions)} is empty. " +
+                "Identity verification is resolved per tenant, so with no tenant resolution configured no request would ever be " +
+                $"verified and the setting would have no effect. Declare a tenant resolution — {nameof(C.TenantSourceIdentifierResolverType.Specified)} " +
+                "with a tenant ID is the single-tenant one — or, for a service whose /.cratis/me endpoint only enriches, set " +
+                $"its {nameof(C.Service.IdentityVerification)} to {nameof(C.IdentityVerificationMode.BestEffort)} or its " +
+                $"{nameof(C.Service.ResolveIdentityDetails)} to false.")
             : ValidateOptionsResult.Success;
 }

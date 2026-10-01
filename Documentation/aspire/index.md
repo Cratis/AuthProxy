@@ -95,10 +95,24 @@ authproxy
 
 See [Services](../configuration/services.md) for the underlying configuration model.
 
+### Identity verification mode
+
+A service that takes part in identity resolution is verified by default: unless the app host says otherwise,
+AuthProxy treats the answer on `/.cratis/me` as an authorization decision, and anything other than an
+explicit positive denies the request. The Aspire package writes the setting only when you call
+`WithIdentityVerification`, so an app host that never calls it gets that default. Opt a service whose
+endpoint only enriches, or does not exist, out explicitly:
+
+```csharp
+authproxy
+    .WithBackend("reporting", reportingApi)
+    .WithIdentityVerification("reporting", IdentityVerificationMode.BestEffort);
+```
+
 ### Identity verification denials
 
-After declaring a service's identity endpoint as an authorization authority, you can make any denial end
-the caller's local AuthProxy session:
+Because a service's identity endpoint is an authorization authority unless you opt out, you can make any
+denial end the caller's local AuthProxy session:
 
 ```csharp
 authproxy

@@ -28,6 +28,7 @@ public class when_using_ingress_pipeline : Specification
         {
             [$"{C.AuthProxy.SectionKey}:PagesPath"] = pagesDirectory,
             [$"{C.AuthProxy.SectionKey}:Services:Catalog:Backend:BaseUrl"] = "https://catalog-backend.local/",
+            [$"{C.AuthProxy.SectionKey}:Services:Catalog:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
             [$"{C.Authentication.SectionKey}:OidcProviders:0:Name"] = "Microsoft"
         });
 

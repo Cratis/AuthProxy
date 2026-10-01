@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using Cratis.AuthProxy.ReverseProxy;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authorization;
@@ -20,19 +22,25 @@ namespace Cratis.AuthProxy.Authorization;
 /// </remarks>
 public class AccessPolicy : IAccessPolicy
 {
-    /// <summary>
-    /// The query-string parameter naming the target service, mirrored from the reverse-proxy route table.
-    /// </summary>
-    const string ServiceQueryParameter = "service";
-
     /// <inheritdoc/>
     public bool IsConfigured(C.AuthProxy config) =>
         config.Authorization.HasRequirements
         || config.Services.Values.Any(_ => _.Authorization?.HasRequirements == true);
 
     /// <inheritdoc/>
-    public AccessDecision Evaluate(HttpContext context, C.AuthProxy config) =>
-        Evaluate(context.User, RequirementsFor(config, ResolveService(context, config)));
+    public AccessDecision Evaluate(HttpContext context, C.AuthProxy config)
+    {
+        var service = ServiceRoutes.Resolve(context.Request, config)?.Service;
+        if (service is null && context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is not null)
+        {
+            // A selected proxy endpoint can still forward the request. Never apply only root requirements
+            // or a named service's requirements when its authoritative cluster cannot be resolved.
+            return AccessDecision.Denied(string.Empty);
+        }
+
+        service ??= NamedService(context, config);
+        return Evaluate(context.User, RequirementsFor(config, service));
+    }
 
     /// <inheritdoc/>
     public AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName, C.BearerRoute route)
@@ -82,31 +90,22 @@ public class AccessPolicy : IAccessPolicy
     }
 
     /// <summary>
-    /// Resolves the service a request targets, the same way the route table does.
+    /// Resolves a service named by a request without a selected proxy endpoint.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
-    /// <returns>The targeted service, or <see langword="null"/> when the request names none.</returns>
+    /// <returns>The targeted service, or <see langword="null"/> when the request matches no service route.</returns>
     /// <remarks>
-    /// Endpoint selection runs before the gate, so route metadata is authoritative when present. For
-    /// callers evaluating a request without a selected endpoint, a single-service deployment selects its
-    /// only service; otherwise a configured header target wins, with the <c language="text">service</c> query
-    /// parameter as the fallback. An unknown header must not hide a query-selected service's requirements.
+    /// A request that matches no service route is not forwarded at all. When it still names a service in the
+    /// <c language="text">x-cratis-microservice</c> header (or legacy <c language="text">Service-ID</c>) or the
+    /// <c language="text">service</c> query parameter, that service's requirements apply anyway — the stricter
+    /// answer costs nothing for a request that goes nowhere. An unknown header does not hide a query-selected
+    /// service's requirements. A request that names none gets only the root requirements.
     /// </remarks>
-    static C.Service? ResolveService(HttpContext context, C.AuthProxy config)
+    static C.Service? NamedService(HttpContext context, C.AuthProxy config)
     {
-        if (ServiceSelection.FromRoute(context) is { } selectedService)
-        {
-            return FindService(config, selectedService);
-        }
-
-        if (config.Services.Count == 1)
-        {
-            return config.Services.Values.First();
-        }
-
         return FindService(config, ServiceSelection.FromHeaders(context.Request.Headers))
-            ?? FindService(config, context.Request.Query[ServiceQueryParameter].FirstOrDefault());
+            ?? FindService(config, context.Request.Query[ServiceRoutes.ServiceQueryParameter].FirstOrDefault());
     }
 
     static C.Service? FindService(C.AuthProxy config, string? serviceId) =>
