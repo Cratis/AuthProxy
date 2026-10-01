@@ -37,6 +37,9 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 |----------|------|---------|-------------|
 | `Backend` | `ServiceEndpointConfig` | `null` | API backend endpoint. |
 | `Frontend` | `ServiceEndpointConfig` | `null` | SPA / static-asset frontend endpoint. |
+| `Hosts` | `string[]` | `[]` | Host names (with an optional port) that route to this service. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
+| `PathPrefix` | `string` | `""` | Path prefix that routes to this service, for example `/reporting`. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
+| `StripPathPrefix` | `bool` | `false` | Remove `PathPrefix` from the forwarded path and send it in `X-Forwarded-Prefix`. |
 | `ResolveIdentityDetails` | `bool?` | `true` when Backend is set | Whether to call `/.cratis/me` on this service **at all**. See [Identity enrichment](#identity-enrichment). |
 | `IdentityVerification` | `Required` \| `BestEffort` | `Required` | What that call's answer **means**. `Required` fails closed; `BestEffort` is the explicit opt-in for an endpoint that only enriches. See [Identity enrichment](#identity-enrichment). |
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
@@ -64,15 +67,16 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 
 ### Single service
 
-When only one service is configured, AuthProxy adds a plain catch-all route so the service
-is reachable without any special routing header or query parameter.
+When only one service is configured, and it declares neither `Hosts` nor a `PathPrefix`, AuthProxy adds a
+plain catch-all route so the service is reachable without any special routing header or query parameter.
 
 - `/{**path}` → frontend
 - `/api/{**path}` → backend
 
 ### Multiple services
 
-With more than one service, clients must indicate the target using one of:
+With more than one service, a request reaches a service when the service declares the request's host or
+path prefix (see below), or when the client names the service with one of:
 
 | Mechanism | Example |
 |-----------|---------|
@@ -91,7 +95,101 @@ The selected identifier is forwarded under both header names, including when sel
 Forwarding `Service-ID` is deprecated and will be removed in a future major release; move backends to
 `x-cratis-microservice`.
 
-Routes are matched case-insensitively.
+Routes are matched case-insensitively. Within a service, `/api/...` goes to the backend and everything else
+goes to the frontend. With host routing, path-prefix routing or the unrestricted single-service catch-all,
+a service with only a backend receives every path within that route. Header and query selection of a
+backend-only service only match `/api/...`.
+
+### Routing by host or path prefix
+
+A browser cannot put a header on a top-level navigation, and adding `?service=` to every URL (assets, deep
+links, bookmarks) is impractical. To put several applications behind one AuthProxy, and so behind one
+sign-in, give each service a host, a path prefix, or both:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "portal": {
+          "Hosts": [ "portal.example.com" ],
+          "Frontend": { "BaseUrl": "http://portal-web:3000/" },
+          "Backend": { "BaseUrl": "http://portal-api:8080/" }
+        },
+        "reporting": {
+          "PathPrefix": "/reporting",
+          "StripPathPrefix": true,
+          "Frontend": { "BaseUrl": "http://reporting-web:3000/" },
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "ClientCredentials": { "RoutePrefix": "/reporting/api" }
+        }
+      }
+    }
+  }
+}
+```
+
+Here `https://portal.example.com/orders` goes to the portal frontend, `https://portal.example.com/api/orders` to
+the portal backend, `https://portal.example.com/reporting/api/sales` to the reporting backend as `/api/sales`,
+and `https://any-host/reporting/dashboard` to the reporting frontend as `/dashboard`.
+
+#### Precedence
+
+When more than one rule could match a request, the first one in this list wins:
+
+1. [Anonymous paths](#anonymous-paths).
+2. A `PathPrefix` on one of the service's `Hosts`.
+3. A `PathPrefix` on a service without `Hosts`, which matches on every host.
+4. The `x-cratis-microservice` header (or legacy `Service-ID`), then the `service` query parameter.
+5. `Hosts` on a service without a `PathPrefix`.
+6. The single-service catch-all routes.
+
+A path prefix claims its part of the URL, so it wins over a header or query parameter naming another
+service. A host is only a default for the requests on it: a frontend served from `portal.example.com` can
+still call another service's backend by naming it in `x-cratis-microservice`, as Arc frontends do.
+
+The service a request is routed to is also the service whose [authorization requirements](authorization.md)
+apply to it, and the only service whose [client-credentials](#client-credentials) tokens it accepts. The
+checks use the selected proxy route, so a host or prefix cannot be used to reach a service without
+meeting its requirements. Client-credentials `RoutePrefix` must include the external path prefix; see
+[Client credentials](#client-credentials).
+
+#### Ambiguous matches fail at startup
+
+AuthProxy refuses to start, and names the services involved, when:
+
+- two services without a `PathPrefix` declare the same host (`example.com` without a port overlaps every
+  `example.com:port`);
+- two services declare equal or nested path prefixes (`/reports` and `/reports/archive`) on the same hosts, or
+  both on every host;
+- a `Hosts` entry is not a host name with an optional numeric port. URLs, paths, IPv6 literals and wildcards
+  (`*.example.com`) are refused;
+- a `PathPrefix` is not a rooted path of literal segments, is `/api` or below it, or covers a path AuthProxy
+  reserves for itself (`/.cratis`, `/_pages`, `/invite`, `/register`, `/signin-*`);
+- a service declares `Hosts` or a `PathPrefix` but has no `Backend` or `Frontend`, or sets `StripPathPrefix`
+  without a `PathPrefix`.
+
+A prefix on some hosts and a prefix on every host may overlap. The host-specific one wins on its hosts.
+
+#### Keeping or stripping the prefix
+
+By default the service receives the path as requested, `/reporting/api/sales`, and serves itself under the
+prefix. In ASP.NET Core that is `app.UsePathBase("/reporting")`, and a single-page frontend builds with the
+same base path.
+
+With `StripPathPrefix` the prefix is removed: the service receives `/api/sales`, and AuthProxy sends the
+removed prefix in `X-Forwarded-Prefix`. A backend that honors forwarded headers restores the removed prefix
+as its path base, so links and redirects it generates still point under `/reporting`. An `X-Forwarded-Prefix`
+sent by a proxy in front of AuthProxy is replaced, not combined. [Anonymous paths](#anonymous-paths) below a stripped prefix are
+stripped too. Declare them with the full path, for example `/reporting/public`.
+
+AuthProxy's own endpoints (`/.cratis/login`, `/.cratis/select-provider`, `/.cratis/logout` and the other
+`/.cratis/*` paths it answers itself) stay at the root on every host. A frontend served under a prefix calls
+them at the root. `/reporting/.cratis/me` is forwarded to the reporting service like any other path under
+its prefix.
+
+WebSocket upgrades and server-sent events follow the same routes as any other request.
+
 
 ---
 
@@ -256,7 +354,8 @@ that still returns the selection page can be diagnosed from the log rather than 
 
 `/api` chooses the endpoint the same way the authenticated routes do: a prefix under `/api` is served by
 the service's `Backend`, anything else by its `Frontend`, falling back to whichever endpoint the service
-actually declares.
+actually declares. Under a service's `PathPrefix`, the same split applies relative to that prefix: an
+anonymous `/reporting/api/webhook` goes to the reporting backend.
 
 ### What it does and does not change
 
@@ -491,6 +590,11 @@ When `ClientCredentials` is configured for a service, AuthProxy exposes `POST /.
 That endpoint forwards the supplied client credentials to the service's verification endpoint and,
 on success, issues a bearer token scoped to the configured `RoutePrefix`, along with a refresh token
 that can later be exchanged for a new access token without resupplying the client credentials.
+
+`RoutePrefix` defaults to `/api` and is checked against the incoming path, before `StripPathPrefix` removes
+anything. For a service with `PathPrefix: /reporting`, set `ClientCredentials.RoutePrefix` to
+`/reporting/api` to accept bearer tokens on its API routes (or another explicitly permitted external
+prefix). Host routing can distinguish services that share the same `RoutePrefix`.
 
 This creates a one-to-one relationship between:
 
