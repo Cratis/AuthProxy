@@ -37,7 +37,23 @@ public class OidcProvider
     /// <summary>
     /// Gets or sets the OAuth client secret.
     /// </summary>
+    /// <remarks>
+    /// Leave empty when <see cref="ClientCredential"/> selects a certificate or federated credential.
+    /// </remarks>
     public string ClientSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the credential AuthProxy presents to the provider's token endpoint instead of
+    /// <see cref="ClientSecret"/>: a certificate (file, certificate store or Azure Key Vault) or a federated
+    /// credential (workload identity token file or Azure managed identity).
+    /// When absent, <see cref="ClientSecret"/> is used.
+    /// </summary>
+    public OidcClientCredential? ClientCredential { get; set; }
+
+    /// <summary>
+    /// Gets a value indicating whether the provider authenticates to its token endpoint with a client assertion.
+    /// </summary>
+    public bool UsesClientAssertion => ClientCredential?.UsesClientAssertion == true;
 
     /// <summary>
     /// Gets or sets extra OAuth scopes to request (in addition to <c language="text">openid profile email</c>).

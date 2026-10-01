@@ -11,6 +11,7 @@
     <PackageReference Include="Cratis.Arc.Core" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+    <PackageReference Include="Microsoft.Identity.Web.Certificate" />
     <PackageReference Include="Yarp.ReverseProxy" />
   </ItemGroup>
 

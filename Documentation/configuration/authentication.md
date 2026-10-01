@@ -103,7 +103,8 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). |
 | `Authority` | `string` | OIDC authority URL. |
 | `ClientId` | `string` | OAuth 2.0 client ID. |
-| `ClientSecret` | `string` | OAuth 2.0 client secret. |
+| `ClientSecret` | `string` | OAuth 2.0 client secret. Leave empty when `ClientCredential` selects a certificate or federated credential. |
+| `ClientCredential` | `object` | Optional certificate or federated credential used instead of `ClientSecret`. See [Client credentials](#client-credentials-certificates-and-federated-credentials). |
 | `Scopes` | `string[]` | Additional scopes to request (beyond `openid`, `profile`, `email`). |
 | `ResponseMode` | `string` | How the provider returns the authorization code: `Query` (default) or `FormPost`. See below. |
 
@@ -119,6 +120,102 @@ Setting `ResponseMode` to `FormPost` opts that provider into it, which also swit
 correlation and nonce cookies to `SameSite=None; Secure` — a cross-site POST only ever carries `None`
 cookies, and `None` requires HTTPS. Do not choose `FormPost` for providers that support `Query`; it trades
 away the `Lax` hardening for nothing.
+
+#### Client credentials: certificates and federated credentials
+
+By default AuthProxy authenticates to a provider's token endpoint with `ClientSecret`. Many organizations
+disallow long-lived client secrets, and Microsoft recommends certificates or workload identity federation for
+Microsoft Entra ID confidential clients. Set `ClientCredential` on the provider to authenticate with a
+`client_assertion` ([RFC 7523](https://www.rfc-editor.org/rfc/rfc7523)) instead. Leave `ClientSecret`
+empty: AuthProxy refuses to start when both are configured.
+
+AuthProxy presents the credential every time it calls the provider's token endpoint, including pushed
+authorization requests when the provider supports them. The credential loaders come from
+[Microsoft.Identity.Web](https://github.com/AzureAD/microsoft-identity-web/wiki/Certificates),
+so certificate stores, Key Vault, workload identity and managed identity behave as they do in any other
+Microsoft.Identity.Web application.
+
+| `Source` | Credential | Required properties |
+| -------- | ---------- | ------------------- |
+| `ClientSecret` | `ClientSecret` sent as `client_secret` (the default). | — |
+| `CertificateFile` | A PKCS#12 (`.pfx`) file with the private key signs the assertion. | `CertificatePath`; `CertificatePassword` when the file has one. |
+| `CertificateStore` | A certificate found by thumbprint in a certificate store signs the assertion. | `CertificateThumbprint`; `CertificateStorePath` defaults to `CurrentUser/My`. |
+| `KeyVaultCertificate` | A certificate downloaded from Azure Key Vault signs the assertion. | `KeyVaultUrl` (https), `KeyVaultCertificateName`. |
+| `FederatedTokenFile` | A platform-issued federated token read from a file is the assertion (Kubernetes workload identity). | `TokenFilePath`, or the `AZURE_FEDERATED_TOKEN_FILE` environment variable. |
+| `ManagedIdentity` | An Azure managed identity token for the token-exchange audience is the assertion. | None. `ManagedIdentityClientId` selects a user-assigned identity. |
+
+A certificate assertion is a short-lived JWT signed with `RS256` (RSA keys) or `ES256` (ECDSA keys). Its issuer
+and subject are `ClientId`, its audience is the provider's token endpoint, and its header carries the
+certificate thumbprint (`x5t`). Upload the certificate's public part to the app registration. AuthProxy
+loads a certificate once and loads it again after it expires, so put the renewed certificate in the same
+file, store or vault entry before the old one expires, or restart AuthProxy to pick it up straight away.
+
+`KeyVaultCertificate` authenticates to Key Vault with the default Azure credential chain. Set
+`ManagedIdentityClientId` (or `AZURE_CLIENT_ID`) to use a user-assigned managed identity. The identity needs
+permission to read the certificate's secret, because the private key is stored there.
+
+`FederatedTokenFile` and `ManagedIdentity` need a federated identity credential on the app registration
+that trusts the platform issuer: the cluster's OIDC issuer and service account for workload identity, or the
+managed identity. `ManagedIdentity` requests its token for `api://AzureADTokenExchange` (or the national-cloud
+equivalent resolved from `Authority`). Set `TokenExchangeAudience` to override it.
+
+**Certificate from Key Vault:**
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Microsoft",
+            "Type": "Microsoft",
+            "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+            "ClientId": "<client-id>",
+            "ClientCredential": {
+              "Source": "KeyVaultCertificate",
+              "KeyVaultUrl": "https://<vault-name>.vault.azure.net",
+              "KeyVaultCertificateName": "authproxy-client"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Managed identity on Azure Container Apps or App Service:**
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Microsoft",
+            "Type": "Microsoft",
+            "Authority": "https://login.microsoftonline.com/<tenant-id>/v2.0",
+            "ClientId": "<client-id>",
+            "ClientCredential": {
+              "Source": "ManagedIdentity",
+              "ManagedIdentityClientId": "<user-assigned-identity-client-id>"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+With environment variables, the same settings are
+`Cratis__AuthProxy__Authentication__OidcProviders__0__ClientCredential__Source=ManagedIdentity` and so on.
+
+If the credential cannot be loaded or produces no assertion, the sign-in fails and is handled as a
+[failed sign-in](failed-sign-ins.md), and AuthProxy logs an error that names the provider and credential
+source. OAuth 2.0 providers (below) still authenticate with `ClientSecret` only.
 
 ### Canonical federated identity
 
