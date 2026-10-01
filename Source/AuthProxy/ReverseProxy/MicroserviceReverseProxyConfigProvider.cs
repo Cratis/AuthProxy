@@ -239,7 +239,14 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             // Mirror the authenticated split: /api goes to the backend, anything else to the frontend,
             // falling back to whichever endpoint the service actually declares.
-            var prefersBackend = new PathString(path).StartsWithSegments(ApiPathPrefix);
+            var prefix = ServiceRoutes.PathPrefixOf(service);
+            var relativePath = new PathString(path);
+            if (prefix is not null && relativePath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase, out var remaining))
+            {
+                relativePath = remaining;
+            }
+
+            var prefersBackend = relativePath.StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);
             var clusterId = (prefersBackend, service.Backend, service.Frontend) switch
             {
                 (true, not null, _) => BackendClusterId(microserviceKey),
@@ -263,7 +270,6 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             // An anonymous path below a stripped prefix is forwarded the way the rest of the prefix is, so the
             // service sees one consistent path shape whether or not the caller has a session.
-            var prefix = ServiceRoutes.PathPrefixOf(service);
             var stripsPrefix = service.StripPathPrefix
                 && prefix is not null
                 && new PathString(path).StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase);

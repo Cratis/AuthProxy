@@ -3,6 +3,8 @@
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -43,12 +45,15 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     /// </summary>
     public ServiceRoutingHarness()
     {
+        // Protocol specs need a real HTTP upgrade feature, not TestServer's in-memory WebSocket feature.
+        UseKestrel(0);
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.SelectProvider), "<html><body>Select Provider</body></html>");
 
         Reports = RecordingBackend.Start().GetAwaiter().GetResult();
         Admin = RecordingBackend.Start().GetAwaiter().GetResult();
         Portal = RecordingBackend.Start().GetAwaiter().GetResult();
+        ReportsFrontend = RecordingBackend.Start().GetAwaiter().GetResult();
     }
 
     /// <summary>Gets the origin of the service reached by <see cref="ReportsPrefix"/>.</summary>
@@ -57,7 +62,10 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     /// <summary>Gets the origin of the service reached by <see cref="AdminHost"/>.</summary>
     public RecordingBackend Admin { get; }
 
-    /// <summary>Gets the origin of the service reached only by name.</summary>
+    /// <summary>Gets the frontend origin of the reports service.</summary>
+    public RecordingBackend ReportsFrontend { get; }
+
+    /// <summary>Gets the origin of the portal service.</summary>
     public RecordingBackend Portal { get; }
 
     /// <summary>
@@ -89,6 +97,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     public void ClearOrigins()
     {
         Reports.Clear();
+        ReportsFrontend.Clear();
         Admin.Clear();
         Portal.Clear();
     }
@@ -97,8 +106,18 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     /// Creates a client that surfaces redirects as responses rather than following them.
     /// </summary>
     /// <returns>A configured <see cref="HttpClient"/>.</returns>
-    public HttpClient CreateSecurityClient() =>
-        CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+    public HttpClient CreateSecurityClient()
+    {
+        StartServer();
+        var address = Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+
+        return CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri(address),
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+        });
+    }
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
@@ -111,6 +130,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
         }
 
         Reports.DisposeAsync().AsTask().GetAwaiter().GetResult();
+        ReportsFrontend.DisposeAsync().AsTask().GetAwaiter().GetResult();
         Admin.DisposeAsync().AsTask().GetAwaiter().GetResult();
         Portal.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
@@ -130,7 +150,8 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
                 [$"{C.AuthProxy.SectionKey}:Services:reports:PathPrefix"] = ReportsPrefix,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:StripPathPrefix"] = "true",
                 [$"{C.AuthProxy.SectionKey}:Services:reports:Backend:BaseUrl"] = Reports.BaseUrl,
-                [$"{C.AuthProxy.SectionKey}:Services:reports:Frontend:BaseUrl"] = Reports.BaseUrl,
+                [$"{C.AuthProxy.SectionKey}:Services:reports:Frontend:BaseUrl"] = ReportsFrontend.BaseUrl,
+                [$"{C.AuthProxy.SectionKey}:Services:reports:AnonymousPaths:0"] = $"{ReportsPrefix}/api/health",
 
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Hosts:0"] = AdminHost,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Backend:BaseUrl"] = Admin.BaseUrl,
@@ -138,6 +159,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Authorization:RequiredClaims:0:Claim"] = AdminClaim,
                 [$"{C.AuthProxy.SectionKey}:Services:admin:Authorization:RequiredClaims:0:AnyOf:0"] = AdminClaimValue,
 
+                [$"{C.AuthProxy.SectionKey}:Services:portal:Hosts:0"] = "portal.example.test",
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Backend:BaseUrl"] = Portal.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:portal:Frontend:BaseUrl"] = Portal.BaseUrl,
 

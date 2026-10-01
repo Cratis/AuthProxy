@@ -82,7 +82,9 @@ path prefix (see below), or when the client names the service with one of:
 | `service` query parameter | `?service=portal` |
 
 Routes are matched case-insensitively. Within a service, `/api/...` goes to the backend and everything else
-goes to the frontend. A service with only a backend receives everything.
+goes to the frontend. With host routing, path-prefix routing or the unrestricted single-service catch-all,
+a service with only a backend receives every path within that route. Header and query selection of a
+backend-only service only match `/api/...`.
 
 ### Routing by host or path prefix
 
@@ -104,7 +106,8 @@ sign-in, give each service a host, a path prefix, or both:
           "PathPrefix": "/reporting",
           "StripPathPrefix": true,
           "Frontend": { "BaseUrl": "http://reporting-web:3000/" },
-          "Backend": { "BaseUrl": "http://reporting-api:8080/" }
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "ClientCredentials": { "RoutePrefix": "/reporting/api" }
         }
       }
     }
@@ -133,8 +136,9 @@ still call another service's backend by naming it in `Service-ID`, as Arc fronte
 
 The service a request is routed to is also the service whose [authorization requirements](authorization.md)
 apply to it, and the only service whose [client-credentials](#client-credentials) tokens it accepts. The
-routing rules and those checks share one implementation, so a host or prefix cannot be used to reach a
-service without meeting its requirements.
+checks use the selected proxy route, so a host or prefix cannot be used to reach a service without
+meeting its requirements. Client-credentials `RoutePrefix` must include the external path prefix; see
+[Client credentials](#client-credentials).
 
 #### Ambiguous matches fail at startup
 
@@ -144,8 +148,8 @@ AuthProxy refuses to start, and names the services involved, when:
   `example.com:port`);
 - two services declare equal or nested path prefixes (`/reports` and `/reports/archive`) on the same hosts, or
   both on every host;
-- a `Hosts` entry is not a host name with an optional port. URLs, paths and wildcards (`*.example.com`) are
-  refused;
+- a `Hosts` entry is not a host name with an optional numeric port. URLs, paths, IPv6 literals and wildcards
+  (`*.example.com`) are refused;
 - a `PathPrefix` is not a rooted path of literal segments, is `/api` or below it, or covers a path AuthProxy
   reserves for itself (`/.cratis`, `/_pages`, `/invite`, `/register`, `/signin-*`);
 - a service declares `Hosts` or a `PathPrefix` but has no `Backend` or `Frontend`, or sets `StripPathPrefix`
@@ -160,8 +164,8 @@ prefix. In ASP.NET Core that is `app.UsePathBase("/reporting")`, and a single-pa
 same base path.
 
 With `StripPathPrefix` the prefix is removed: the service receives `/api/sales`, and AuthProxy sends the
-removed prefix in `X-Forwarded-Prefix` (after any prefix a trusted proxy in front of AuthProxy already
-forwarded). A backend that honors forwarded headers restores it as its path base, so links and redirects it
+removed prefix in `X-Forwarded-Prefix`. AuthProxy does not consume an upstream proxy's
+`X-Forwarded-Prefix` header. A backend that honors forwarded headers restores it as its path base, so links and redirects it
 generates still point under `/reporting`. [Anonymous paths](#anonymous-paths) below a stripped prefix are
 stripped too. Declare them with the full path, for example `/reporting/public`.
 
@@ -254,7 +258,8 @@ that still returns the selection page can be diagnosed from the log rather than 
 
 `/api` chooses the endpoint the same way the authenticated routes do: a prefix under `/api` is served by
 the service's `Backend`, anything else by its `Frontend`, falling back to whichever endpoint the service
-actually declares.
+actually declares. Under a service's `PathPrefix`, the same split applies relative to that prefix: an
+anonymous `/reporting/api/webhook` goes to the reporting backend.
 
 ### What it does and does not change
 
@@ -478,6 +483,11 @@ When `ClientCredentials` is configured for a service, AuthProxy exposes `POST /.
 That endpoint forwards the supplied client credentials to the service's verification endpoint and,
 on success, issues a bearer token scoped to the configured `RoutePrefix`, along with a refresh token
 that can later be exchanged for a new access token without resupplying the client credentials.
+
+`RoutePrefix` defaults to `/api` and is checked against the incoming path, before `StripPathPrefix` removes
+anything. For a service with `PathPrefix: /reporting`, set `ClientCredentials.RoutePrefix` to
+`/reporting/api` to accept bearer tokens on its API routes (or another explicitly permitted external
+prefix). Host routing can distinguish services that share the same `RoutePrefix`.
 
 This creates a one-to-one relationship between:
 

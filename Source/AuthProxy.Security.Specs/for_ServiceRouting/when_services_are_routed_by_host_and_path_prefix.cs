@@ -41,7 +41,7 @@ public class when_services_are_routed_by_host_and_path_prefix(ServiceRoutingHarn
             || harness.Portal.ReceivedAnythingFor("/api/orders");
 
         await client.SendAsync(ServiceRoutingHarness.Request($"{ServiceRoutingHarness.ReportsPrefix}/assets/app.js"));
-        _prefixedAsset = harness.Reports.LastRequestTo("/assets/app.js");
+        _prefixedAsset = harness.ReportsFrontend.LastRequestTo("/assets/app.js");
 
         harness.ClearOrigins();
         _adminHostWithoutClaim = await client.SendAsync(ServiceRoutingHarness.Request("/api/users", ServiceRoutingHarness.AdminHost));

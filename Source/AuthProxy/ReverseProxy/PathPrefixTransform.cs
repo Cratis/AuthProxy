@@ -12,8 +12,8 @@ namespace Cratis.AuthProxy.ReverseProxy;
 /// </summary>
 /// <param name="prefix">The removed prefix.</param>
 /// <remarks>
-/// The announced prefix is the request's own path base followed by the removed prefix, so it stays correct when
-/// AuthProxy itself is served below a prefix by a trusted proxy in front of it.
+/// The announced prefix is the request's own path base followed by the removed prefix. An incoming
+/// <c language="text">X-Forwarded-Prefix</c> header is replaced, not consumed as a path base.
 /// </remarks>
 public sealed class PathPrefixTransform(string prefix) : RequestTransform
 {

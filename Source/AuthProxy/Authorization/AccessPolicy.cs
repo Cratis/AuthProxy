@@ -72,11 +72,10 @@ public class AccessPolicy : IAccessPolicy
     /// <param name="config">The auth proxy configuration to read.</param>
     /// <returns>The targeted service, or <see langword="null"/> when the request matches no service route.</returns>
     /// <remarks>
-    /// This runs before endpoint selection — the gate has to refuse a caller before anything reads a
-    /// backend, and long before YARP picks a route — so the target is worked out from the request rather
-    /// than from a selected endpoint. <see cref="ServiceRoutes"/> states the route table's precedence once, so
-    /// the service whose requirements apply is always the service the request is forwarded to: a host or path
-    /// prefix that routes a request to a service also subjects it to that service's requirements.
+    /// This runs after endpoint selection but before forwarding. <see cref="ServiceRoutes"/> resolves the
+    /// selected proxy route's cluster first, so YARP's interpretation of service-selection headers cannot
+    /// forward a request to a service other than the one whose requirements apply. Without a selected proxy
+    /// endpoint, it falls back to the request's routing declarations.
     /// <para>
     /// A request that matches no service route is not forwarded at all. When it still names a service in the
     /// <c language="text">Service-ID</c> header or the <c language="text">service</c> query parameter, that service's requirements

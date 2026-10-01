@@ -26,7 +26,7 @@ public class when_services_declare_hosts_and_path_prefixes : Specification
                     StripPathPrefix = true,
                     Backend = new C.ServiceEndpoint { BaseUrl = "http://reports-api/" },
                     Frontend = new C.ServiceEndpoint { BaseUrl = "http://reports-web/" },
-                    AnonymousPaths = ["/reports/public"],
+                    AnonymousPaths = ["/reports/public", "/reports/api/health"],
                 },
                 ["TenantReports"] = new()
                 {
@@ -62,6 +62,7 @@ public class when_services_declare_hosts_and_path_prefixes : Specification
     [Fact] void should_route_a_host_to_its_service() => Route("billing-host").Match.Hosts.ShouldContainOnly("billing.example.com");
     [Fact] void should_mark_a_stripped_prefix_on_its_routes() => Route("reports-prefix").Metadata![ServiceRoutes.StripPathPrefixMetadataKey].ShouldEqual("/reports");
     [Fact] void should_mark_an_anonymous_path_below_a_stripped_prefix() => Route("reports-anonymous-0").Metadata![ServiceRoutes.StripPathPrefixMetadataKey].ShouldEqual("/reports");
+    [Fact] void should_route_an_anonymous_prefixed_api_to_the_backend() => Route("reports-anonymous-1").ClusterId.ShouldEqual("reports-backend-cluster");
     [Fact] void should_not_mark_a_prefix_that_is_kept() => Route("tenantreports-prefix").Metadata.ShouldBeNull();
     [Fact] void should_keep_routing_by_service_header() => _routes.Any(_ => _.RouteId == "reports-frontend-header").ShouldBeTrue();
     [Fact] void should_leave_no_two_routes_with_the_same_template_hosts_and_order() =>

@@ -2,18 +2,20 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.Extensions.Primitives;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ReverseProxy;
 
 /// <summary>
 /// States how a request is matched to a service, once, for both the route table and every component that has to
-/// know which service a request targets before the route table runs.
+/// know which service a request targets.
 /// </summary>
 /// <remarks>
-/// The route table orders its service routes, and <see cref="Resolve"/> walks the same order:
+/// After endpoint selection, <see cref="Resolve"/> uses the selected proxy cluster. Without a proxy endpoint,
+/// it follows the declared route order:
 /// <list type="number">
-///   <item>Anonymous paths (<see cref="C.Service.AnonymousPaths"/>), which are not services' authenticated routes and are not resolved here.</item>
+///   <item>Anonymous paths (<see cref="C.Service.AnonymousPaths"/>), which do not require service authentication and are resolved only from a selected proxy endpoint.</item>
 ///   <item>Host and path prefix together (<see cref="C.Service.Hosts"/> and <see cref="C.Service.PathPrefix"/>).</item>
 ///   <item>Path prefix alone.</item>
 ///   <item>The <c language="text">Service-ID</c> header, then the <c language="text">service</c> query parameter.</item>
@@ -73,7 +75,8 @@ public static class ServiceRoutes
     {
         host = default;
         var trimmed = candidate?.Trim() ?? string.Empty;
-        if (trimmed.Length == 0 || trimmed.IndexOfAny(['/', '*', '?', '#', '@', ' ']) >= 0)
+        if (trimmed.Length == 0 || trimmed.IndexOfAny(['/', '*', '?', '#', '@', ' ', '[', ']']) >= 0
+            || trimmed.Count(_ => _ == ':') > 1)
         {
             return false;
         }
@@ -81,7 +84,7 @@ public static class ServiceRoutes
         var parsed = new HostString(trimmed.ToLowerInvariant());
         if (Uri.CheckHostName(parsed.Host.Trim('[', ']')) == UriHostNameType.Unknown
             || parsed.Port is <= 0 or > 65535
-            || (parsed.Port is null && trimmed.EndsWith(':')))
+            || (parsed.Port is null && trimmed.Contains(':')))
         {
             return false;
         }
@@ -145,13 +148,24 @@ public static class ServiceRoutes
         && string.IsNullOrWhiteSpace(service.PathPrefix);
 
     /// <summary>
-    /// Resolves the service a request targets, the same way the route table does.
+    /// Resolves the selected proxy route's service, falling back to routing declarations without a proxy endpoint.
     /// </summary>
     /// <param name="request">The request.</param>
     /// <param name="config">The configuration.</param>
     /// <returns>The targeted service, or <see langword="null"/> when the request matches no service route.</returns>
     public static RoutedService? Resolve(HttpRequest request, C.AuthProxy config)
     {
+        // Endpoint routing has already applied YARP's header parsing and route precedence. Its selected
+        // cluster is authoritative: independently comparing raw headers can authorize a different service.
+        if (request.HttpContext.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is { } route)
+        {
+            return config.Services
+                .Where(_ => string.Equals(route.Config.ClusterId, $"{_.Key}-backend-cluster", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(route.Config.ClusterId, $"{_.Key}-frontend-cluster", StringComparison.OrdinalIgnoreCase))
+                .Select(_ => new RoutedService(_.Key, _.Value))
+                .FirstOrDefault();
+        }
+
         if (config.Services.Count == 1)
         {
             // Every route in a single-service table leads to that service.

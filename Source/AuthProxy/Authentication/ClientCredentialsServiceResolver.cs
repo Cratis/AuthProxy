@@ -78,26 +78,23 @@ public class ClientCredentialsServiceResolver(
     /// <param name="service">The resolved service configuration.</param>
     /// <returns><see langword="true"/> if a service was resolved; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// A service resolved from the token's route prefix and the request's service selection must also be the
-    /// service the route table forwards the request to. A host or path prefix can route a request to a
-    /// different service than the one its <c language="text">Service-ID</c> header names, and a token scoped to the named
-    /// service must not authenticate a request that goes elsewhere.
+    /// The routed service must enable client credentials and permit the incoming path. A host or path prefix
+    /// can route a request to a different service than the one its <c language="text">Service-ID</c> header names,
+    /// and only a token scoped to the routed service can authenticate that request.
     /// </remarks>
     public bool TryResolveForRequest(HttpRequest request, out ConfiguredClientCredentialsService service)
     {
-        if (!TryResolveCandidate(request, out service))
-        {
-            return false;
-        }
-
         var routed = ServiceRoutes.Resolve(request, config.CurrentValue);
-        if (routed is not null && !string.Equals(routed.Name, service.Name, StringComparison.OrdinalIgnoreCase))
+        if (routed is null)
         {
-            service = default!;
-            return false;
+            return TryResolveCandidate(request, out service);
         }
 
-        return true;
+        service = GetConfiguredServices().FirstOrDefault(_ =>
+            string.Equals(_.Name, routed.Name, StringComparison.OrdinalIgnoreCase)
+            && request.Path.StartsWithSegments(new PathString(_.RoutePrefix), StringComparison.OrdinalIgnoreCase))!;
+
+        return service is not null;
     }
 
     static Uri? CreateVerificationUri(string baseUrl, string verificationPath)
