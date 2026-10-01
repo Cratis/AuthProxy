@@ -27,7 +27,7 @@ static class OidcClientCredentialDescription
         {
             SourceType = CredentialSource.Path,
             CertificateDiskPath = credential.CertificatePath,
-            CertificatePassword = NullIfEmpty(credential.CertificatePassword)
+            CertificatePassword = string.IsNullOrEmpty(credential.CertificatePassword) ? null : credential.CertificatePassword
         },
         C.OidcClientCredentialSource.CertificateStore => new()
         {
