@@ -77,6 +77,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
 
                 // Single identity backend
                 [$"{C.AuthProxy.SectionKey}:Services:test:Backend:BaseUrl"] = IdentityBackendBaseUrl,
+                [$"{C.AuthProxy.SectionKey}:Services:test:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
 
                 // Tenant resolution: always resolve to fixed tenant ID
                 [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Strategy"] = nameof(C.TenantSourceIdentifierResolverType.Specified),

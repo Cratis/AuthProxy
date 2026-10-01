@@ -25,7 +25,11 @@ public class when_invite_claim_forwarding_is_configured : Specification
             },
             Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://backend/" } }
+                ["main"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "http://backend/" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            }
             }
         };
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
