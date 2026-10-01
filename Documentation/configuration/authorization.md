@@ -132,7 +132,7 @@ an extra check would quietly drop the organization check, and a service added la
 would be the way in.
 
 Which service a request targets is worked out the same way the [route table](services.md) works it out: the
-single configured service when there is only one, otherwise the `Service-ID` header or the `service` query
+single configured service when there is only one, otherwise the `x-cratis-microservice` header (or the legacy `Service-ID`) or the `service` query
 parameter. A request in a multi-service deployment that names neither reaches no service route either, so
 only the root requirements apply to it.
 
