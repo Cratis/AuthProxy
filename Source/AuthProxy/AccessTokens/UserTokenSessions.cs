@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Links;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
@@ -11,7 +12,7 @@ namespace Cratis.AuthProxy.AccessTokens;
 
 /// <summary>
 /// Ties the server-side token session to the AuthProxy session cookie: created when a sign-in redeems its
-/// authorization code, found again on each authenticated request, and removed when the session ends.
+/// authorization code and issues its cookie, found again on each authenticated request, and removed when the session ends.
 /// </summary>
 /// <remarks>
 /// The session cookie carries only an unguessable identifier, inside its encrypted ticket. The refresh token stays
@@ -29,6 +30,8 @@ public static class UserTokenSessions
     /// </summary>
     internal const string HttpContextItemKey = "Cratis.AuthProxy.TokenSession";
 
+    const string PendingSessionKey = "Cratis.AuthProxy.PendingTokenSession";
+
     /// <summary>
     /// Gets whether any service forwards user access tokens, which is the only case in which refresh tokens are kept.
     /// </summary>
@@ -44,23 +47,23 @@ public static class UserTokenSessions
     public static string? Of(HttpContext context) => context.Items[HttpContextItemKey] as string;
 
     /// <summary>
-    /// Keeps the refresh token of a completed code redemption server-side and records its identifier on the session.
+    /// Holds the refresh token on the callback request until sign-in succeeds.
     /// </summary>
     /// <param name="context">The token-response context of the OIDC handler.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    internal static async Task Capture(TokenResponseReceivedContext context)
+    internal static Task Capture(TokenResponseReceivedContext context)
     {
         var services = context.HttpContext.RequestServices;
         var config = services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue;
         if (!IsForwardingConfigured(config) || context.Properties is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         // A link callback authenticates a second identity without signing it in, so it starts no session.
         if (context.Properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode) && linkMode == "true")
         {
-            return;
+            return Task.CompletedTask;
         }
 
         var refreshToken = context.TokenEndpointResponse.RefreshToken;
@@ -69,11 +72,41 @@ public static class UserTokenSessions
             services.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(typeof(UserTokenSessions))
                 .NoRefreshTokenIssued(context.Scheme.Name);
-            return;
+            return Task.CompletedTask;
         }
 
-        var store = services.GetRequiredService<IUserTokenStore>();
-        context.Properties.Items[PropertiesKey] = await store.Create(new(context.Scheme.Name, refreshToken), context.HttpContext.RequestAborted);
+        context.HttpContext.Items[PendingSessionKey] = new UserTokenSession(context.Scheme.Name, refreshToken);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Persists the pending token session only when a validated sign-in issues its cookie, replacing any old session.
+    /// </summary>
+    /// <param name="context">The cookie sign-in context.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    internal static async Task Complete(CookieSigningInContext context)
+    {
+        var previousSession = Of(context.HttpContext);
+        if (previousSession is null
+            && context.Options.Cookie.Name is { } cookieName
+            && context.HttpContext.Request.Cookies.ContainsKey(cookieName))
+        {
+            var previousTicket = await context.HttpContext.AuthenticateAsync(context.Scheme.Name);
+            previousTicket.Properties?.Items.TryGetValue(PropertiesKey, out previousSession);
+        }
+
+        if (previousSession is not null)
+        {
+            await context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>().Remove(previousSession, CancellationToken.None);
+            context.HttpContext.Items.Remove(HttpContextItemKey);
+        }
+
+        context.Properties.Items.Remove(PropertiesKey);
+        if (context.HttpContext.Items.Remove(PendingSessionKey, out var pending) && pending is UserTokenSession session)
+        {
+            var store = context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>();
+            context.Properties.Items[PropertiesKey] = await store.Create(session, CancellationToken.None);
+        }
     }
 
     /// <summary>

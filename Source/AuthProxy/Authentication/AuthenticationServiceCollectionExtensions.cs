@@ -165,6 +165,13 @@ public static class AuthenticationServiceCollectionExtensions
             }
         };
 
+        var existingSigningIn = options.Events.OnSigningIn;
+        options.Events.OnSigningIn = async context =>
+        {
+            await existingSigningIn(context);
+            await UserTokenSessions.Complete(context);
+        };
+
         var existingSigningOut = options.Events.OnSigningOut;
         options.Events.OnSigningOut = async context =>
         {

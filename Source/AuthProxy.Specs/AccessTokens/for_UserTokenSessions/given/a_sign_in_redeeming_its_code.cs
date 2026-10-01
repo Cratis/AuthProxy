@@ -16,6 +16,7 @@ public class a_sign_in_redeeming_its_code : Specification
     protected C.AuthProxy _config;
     protected IUserTokenStore _store;
     protected AuthenticationProperties _properties;
+    protected IAuthenticationService _authentication;
     protected TokenResponseReceivedContext _context;
 
     void Establish()
@@ -33,10 +34,12 @@ public class a_sign_in_redeeming_its_code : Specification
         _store = Substitute.For<IUserTokenStore>();
         _store.Create(Arg.Any<UserTokenSession>(), Arg.Any<CancellationToken>()).Returns("session-id");
 
+        _authentication = Substitute.For<IAuthenticationService>();
         var services = new ServiceCollection()
             .AddLogging()
             .AddSingleton(monitor)
             .AddSingleton(_store)
+            .AddSingleton(_authentication)
             .BuildServiceProvider();
 
         _properties = new AuthenticationProperties();

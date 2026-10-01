@@ -18,5 +18,5 @@ public class when_the_provider_rejects_the_refresh_token : given.user_access_tok
     }
 
     [Fact] void should_fail() => _result.Failure.ShouldEqual(UserAccessTokenFailure.RefreshTokenRejected);
-    [Fact] void should_forget_the_dead_refresh_token() => _session.ShouldBeNull();
+    [Fact] void should_keep_the_session_for_other_audiences() => _session.ShouldNotBeNull();
 }

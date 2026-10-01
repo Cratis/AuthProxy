@@ -12,7 +12,7 @@ public class when_a_session_is_removed : given.a_user_token_store
     async Task Establish()
     {
         _sessionId = await _store.Create(new("workforce", "refresh-token"), CancellationToken.None);
-        await _store.SetAccessToken(_sessionId, "audience", new("access-token", _time.GetUtcNow().AddHours(1)), _time.GetUtcNow().AddMinutes(59), CancellationToken.None);
+        await _store.SetAccessToken(_sessionId, "audience", new("access-token", _time.GetUtcNow().AddHours(1), _time.GetUtcNow().AddMinutes(59)), _time.GetUtcNow().AddMinutes(59), CancellationToken.None);
     }
 
     async Task Because()
