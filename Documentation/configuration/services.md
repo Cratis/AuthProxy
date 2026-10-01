@@ -37,9 +37,12 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 |----------|------|---------|-------------|
 | `Backend` | `ServiceEndpointConfig` | `null` | API backend endpoint. |
 | `Frontend` | `ServiceEndpointConfig` | `null` | SPA / static-asset frontend endpoint. |
+| `Hosts` | `string[]` | `[]` | Host names (with an optional port) that route to this service. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
+| `PathPrefix` | `string` | `""` | Path prefix that routes to this service, for example `/reporting`. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
+| `StripPathPrefix` | `bool` | `false` | Remove `PathPrefix` from the forwarded path and send it in `X-Forwarded-Prefix`. |
 | `ResolveIdentityDetails` | `bool?` | `true` when Backend is set | Whether to call `/.cratis/me` on this service **at all**. See [Identity enrichment](#identity-enrichment). |
-| `IdentityVerification` | `BestEffort` \| `Required` | `BestEffort` | What that call's answer **means**. See [Identity enrichment](#identity-enrichment). |
-| `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required`, unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
+| `IdentityVerification` | `Required` \| `BestEffort` | `Required` | What that call's answer **means**. `Required` fails closed; `BestEffort` is the explicit opt-in for an endpoint that only enriches. See [Identity enrichment](#identity-enrichment). |
+| `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `ActivityTimeout` | `TimeSpan` | The root `ActivityTimeout`, then `00:05:00` | How long a request proxied to this service may sit idle before AuthProxy cancels it. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
@@ -64,15 +67,16 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 
 ### Single service
 
-When only one service is configured, AuthProxy adds a plain catch-all route so the service
-is reachable without any special routing header or query parameter.
+When only one service is configured, and it declares neither `Hosts` nor a `PathPrefix`, AuthProxy adds a
+plain catch-all route so the service is reachable without any special routing header or query parameter.
 
 - `/{**path}` → frontend
 - `/api/{**path}` → backend
 
 ### Multiple services
 
-With more than one service, clients must indicate the target using one of:
+With more than one service, a request reaches a service when the service declares the request's host or
+path prefix (see below), or when the client names the service with one of:
 
 | Mechanism | Example |
 |-----------|---------|
@@ -91,7 +95,101 @@ The selected identifier is forwarded under both header names, including when sel
 Forwarding `Service-ID` is deprecated and will be removed in a future major release; move backends to
 `x-cratis-microservice`.
 
-Routes are matched case-insensitively.
+Routes are matched case-insensitively. Within a service, `/api/...` goes to the backend and everything else
+goes to the frontend. With host routing, path-prefix routing or the unrestricted single-service catch-all,
+a service with only a backend receives every path within that route. Header and query selection of a
+backend-only service only match `/api/...`.
+
+### Routing by host or path prefix
+
+A browser cannot put a header on a top-level navigation, and adding `?service=` to every URL (assets, deep
+links, bookmarks) is impractical. To put several applications behind one AuthProxy, and so behind one
+sign-in, give each service a host, a path prefix, or both:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "portal": {
+          "Hosts": [ "portal.example.com" ],
+          "Frontend": { "BaseUrl": "http://portal-web:3000/" },
+          "Backend": { "BaseUrl": "http://portal-api:8080/" }
+        },
+        "reporting": {
+          "PathPrefix": "/reporting",
+          "StripPathPrefix": true,
+          "Frontend": { "BaseUrl": "http://reporting-web:3000/" },
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "ClientCredentials": { "RoutePrefix": "/reporting/api" }
+        }
+      }
+    }
+  }
+}
+```
+
+Here `https://portal.example.com/orders` goes to the portal frontend, `https://portal.example.com/api/orders` to
+the portal backend, `https://portal.example.com/reporting/api/sales` to the reporting backend as `/api/sales`,
+and `https://any-host/reporting/dashboard` to the reporting frontend as `/dashboard`.
+
+#### Precedence
+
+When more than one rule could match a request, the first one in this list wins:
+
+1. [Anonymous paths](#anonymous-paths).
+2. A `PathPrefix` on one of the service's `Hosts`.
+3. A `PathPrefix` on a service without `Hosts`, which matches on every host.
+4. The `x-cratis-microservice` header (or legacy `Service-ID`), then the `service` query parameter.
+5. `Hosts` on a service without a `PathPrefix`.
+6. The single-service catch-all routes.
+
+A path prefix claims its part of the URL, so it wins over a header or query parameter naming another
+service. A host is only a default for the requests on it: a frontend served from `portal.example.com` can
+still call another service's backend by naming it in `x-cratis-microservice`, as Arc frontends do.
+
+The service a request is routed to is also the service whose [authorization requirements](authorization.md)
+apply to it, and the only service whose [client-credentials](#client-credentials) tokens it accepts. The
+checks use the selected proxy route, so a host or prefix cannot be used to reach a service without
+meeting its requirements. Client-credentials `RoutePrefix` must include the external path prefix; see
+[Client credentials](#client-credentials).
+
+#### Ambiguous matches fail at startup
+
+AuthProxy refuses to start, and names the services involved, when:
+
+- two services without a `PathPrefix` declare the same host (`example.com` without a port overlaps every
+  `example.com:port`);
+- two services declare equal or nested path prefixes (`/reports` and `/reports/archive`) on the same hosts, or
+  both on every host;
+- a `Hosts` entry is not a host name with an optional numeric port. URLs, paths, IPv6 literals and wildcards
+  (`*.example.com`) are refused;
+- a `PathPrefix` is not a rooted path of literal segments, is `/api` or below it, or covers a path AuthProxy
+  reserves for itself (`/.cratis`, `/_pages`, `/invite`, `/register`, `/signin-*`);
+- a service declares `Hosts` or a `PathPrefix` but has no `Backend` or `Frontend`, or sets `StripPathPrefix`
+  without a `PathPrefix`.
+
+A prefix on some hosts and a prefix on every host may overlap. The host-specific one wins on its hosts.
+
+#### Keeping or stripping the prefix
+
+By default the service receives the path as requested, `/reporting/api/sales`, and serves itself under the
+prefix. In ASP.NET Core that is `app.UsePathBase("/reporting")`, and a single-page frontend builds with the
+same base path.
+
+With `StripPathPrefix` the prefix is removed: the service receives `/api/sales`, and AuthProxy sends the
+removed prefix in `X-Forwarded-Prefix`. A backend that honors forwarded headers restores the removed prefix
+as its path base, so links and redirects it generates still point under `/reporting`. An `X-Forwarded-Prefix`
+sent by a proxy in front of AuthProxy is replaced, not combined. [Anonymous paths](#anonymous-paths) below a stripped prefix are
+stripped too. Declare them with the full path, for example `/reporting/public`.
+
+AuthProxy's own endpoints (`/.cratis/login`, `/.cratis/select-provider`, `/.cratis/logout` and the other
+`/.cratis/*` paths it answers itself) stay at the root on every host. A frontend served under a prefix calls
+them at the root. `/reporting/.cratis/me` is forwarded to the reporting service like any other path under
+its prefix.
+
+WebSocket upgrades and server-sent events follow the same routes as any other request.
+
 
 ---
 
@@ -256,7 +354,8 @@ that still returns the selection page can be diagnosed from the log rather than 
 
 `/api` chooses the endpoint the same way the authenticated routes do: a prefix under `/api` is served by
 the service's `Backend`, anything else by its `Frontend`, falling back to whichever endpoint the service
-actually declares.
+actually declares. Under a service's `PathPrefix`, the same split applies relative to that prefix: an
+anonymous `/reporting/api/webhook` goes to the reporting backend.
 
 ### What it does and does not change
 
@@ -310,15 +409,21 @@ the mode is per service.
 
 | Mode | Meaning | Use for |
 |------|---------|---------|
-| `BestEffort` (default) | The endpoint enriches. Only an explicit `403` denies. | A service that contributes display details — profile, preferences, feature flags. |
-| `Required` | The endpoint decides. Only an explicit positive admits. | The one service that genuinely answers with an authorization verdict. |
+| `Required` (default) | The endpoint decides. Only an explicit positive admits. | Any service that answers `/.cratis/me` with an authorization verdict. |
+| `BestEffort` | The endpoint enriches. Only an explicit `403` denies. | A service that contributes display details — profile, preferences, feature flags — and that you accept being asked in vain. |
 
-`BestEffort` is the released behavior and stays the default, so an existing deployment is unaffected. That
-is meant exactly: the released proxy read no verdict out of a successful response body at all, it took
-`details` and forwarded the caller. So under `BestEffort` a body saying `"isAuthorized": false` is **not** a
-refusal — the caller is admitted and those details are merged, the same as before. Plenty of services answer
-that for reasons that are not about access at all: an account mid-onboarding, a lapsed trial, a profile the
-frontend renders a banner for. If your service means it as a decision, say so with `Required`.
+`Required` is the default for every service that has a `Backend` and has not set `ResolveIdentityDetails`
+to `false`: a proxy that does not know whether its identity service is up must not assume the answer is
+yes. A service that is never called — no `Backend`, or `ResolveIdentityDetails: false` — has no answer to
+fail, so the setting has no effect on it.
+
+`BestEffort` is an explicit opt-in. Under it the proxy reads no verdict out of a successful response body at
+all, it takes `details` and forwards the caller, so a body saying `"isAuthorized": false` is **not** a
+refusal — the caller is admitted and those details are merged. Plenty of services answer that for reasons
+that are not about access at all: an account mid-onboarding, a lapsed trial, a profile the frontend renders
+a banner for. Opt in only when that is what you mean. Earlier releases defaulted to `BestEffort`; see
+[Upgrading](../upgrading/identity-verification-required-by-default.md) for what changed and how to keep the
+old behavior.
 
 `Required` also decides how long the call may take. See [What each outcome does](#what-each-outcome-does)
 for the timeout that follows from it.
@@ -345,8 +450,8 @@ which is exactly right for a service being asked only to enrich, and never enoug
 decide. Property names are matched without regard to casing; a quoted `"true"` is not a verdict.
 
 Read the `BestEffort` column as one sentence: **`403` denies, everything else is forwarded and whatever
-details arrived are merged.** That is the released behavior, unchanged, and it is what makes the mode safe
-to leave alone.
+details arrived are merged.** That is what earlier releases did for every service, and it is why it is now an
+opt-in rather than the default: it admits a caller exactly when the proxy has learned the least.
 
 ### How long the call may take
 
@@ -355,8 +460,8 @@ wait is a property of a decision, not of enrichment:
 
 | Mode | Unset timeout means |
 |------|---------------------|
-| `BestEffort` | Unbounded — the ambient 100-second HTTP client default, exactly as released. A slow enrichment service still gets to answer, because cutting it off would not refuse anybody, it would admit them with that service's details silently missing. |
-| `Required` | Ten seconds. A service standing between a caller and a decision has to fail in bounded time — otherwise a service that accepts connections and then stops answering holds every authenticated request open for a minute and a half each. |
+| `Required` (default) | Ten seconds. A service standing between a caller and a decision has to fail in bounded time — otherwise a service that accepts connections and then stops answering holds every authenticated request open for a minute and a half each. |
+| `BestEffort` | Unbounded — the ambient 100-second HTTP client default. A slow enrichment service still gets to answer, because cutting it off would not refuse anybody, it would admit them with that service's details silently missing. |
 
 A timeout you **do** state is honored in both modes. The wait is also bound to the caller's own request
 lifetime either way, so a client that disconnects stops occupying the proxy.
@@ -419,11 +524,11 @@ deliberately: the cost is one identity-endpoint call per request per user.
       "Services": {
         "portal": {
           "Backend": { "BaseUrl": "http://portal-api:8080/" },
-          "IdentityVerification": "Required",
           "IdentityVerificationTimeout": "00:00:10"
         },
         "reporting": {
-          "Backend": { "BaseUrl": "http://reporting-api:8080/" }
+          "Backend": { "BaseUrl": "http://reporting-api:8080/" },
+          "IdentityVerification": "BestEffort"
         }
       }
     }
@@ -431,16 +536,19 @@ deliberately: the cost is one identity-endpoint call per request per user.
 }
 ```
 
-From Aspire:
+`portal` states no mode, so it is `Required`; `reporting` only enriches and says so.
+
+From Aspire, `Required` needs no call. Opt a service out explicitly:
 
 ```csharp
-authProxy.WithIdentityVerification("portal", IdentityVerificationMode.Required);
+authProxy.WithIdentityVerification("reporting", IdentityVerificationMode.BestEffort);
 authProxy.WithSessionTerminationOnIdentityDenial();
 ```
 
 > **Requiring verification makes that service a single point of failure, on purpose.** While it is down,
 > nothing behind the proxy is served, because nobody can confirm who is allowed in. That is the trade the
-> mode exists to make — take it only for a service that really does answer `/.cratis/me` with a verdict.
+> default makes — and a backend that does not implement `/.cratis/me` with a verdict must either say
+> `BestEffort` or set `ResolveIdentityDetails` to `false`.
 
 ### `Required` needs a tenant resolution
 
@@ -448,8 +556,9 @@ Identity is resolved per **user and tenant**, so a verdict is always a verdict a
 tenant. A deployment with no [tenant resolution](tenancy.md) configured resolves no tenant for anybody — so
 there is nothing to verify against, on every request, for everyone.
 
-AuthProxy therefore **refuses to start** when a service declares `Required` and `TenantResolutions` is
-empty, and the message names the key. Nothing about the alternative looks broken from the outside: the
+AuthProxy therefore **refuses to start** when a service is `Required` — which includes a service that states no
+mode, since `Required` is the default — and `TenantResolutions` is empty, and the message names the key and
+the two ways out for a service that only enriches. Nothing about the alternative looks broken from the outside: the
 proxy starts, people sign in, requests are forwarded, and the only thing that does not happen is the check
 you asked for. A single-tenant deployment satisfies this with the `Specified` strategy:
 
@@ -481,6 +590,11 @@ When `ClientCredentials` is configured for a service, AuthProxy exposes `POST /.
 That endpoint forwards the supplied client credentials to the service's verification endpoint and,
 on success, issues a bearer token scoped to the configured `RoutePrefix`, along with a refresh token
 that can later be exchanged for a new access token without resupplying the client credentials.
+
+`RoutePrefix` defaults to `/api` and is checked against the incoming path, before `StripPathPrefix` removes
+anything. For a service with `PathPrefix: /reporting`, set `ClientCredentials.RoutePrefix` to
+`/reporting/api` to accept bearer tokens on its API routes (or another explicitly permitted external
+prefix). Host routing can distinguish services that share the same `RoutePrefix`.
 
 This creates a one-to-one relationship between:
 

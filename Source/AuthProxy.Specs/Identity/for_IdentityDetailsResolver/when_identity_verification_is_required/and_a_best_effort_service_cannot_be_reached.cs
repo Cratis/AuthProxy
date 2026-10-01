@@ -26,7 +26,8 @@ public class and_a_best_effort_service_cannot_be_reached : given.a_required_veri
     {
         _config.Services["enrichment"] = new C.Service
         {
-            Backend = new C.ServiceEndpoint { BaseUrl = $"https://{EnrichingHost}" }
+            Backend = new C.ServiceEndpoint { BaseUrl = $"https://{EnrichingHost}" },
+            IdentityVerification = C.IdentityVerificationMode.BestEffort
         };
         _handler.Respond = (request, _, _) => request.RequestUri!.Host == EnrichingHost
             ? throw new HttpRequestException("connection refused")
@@ -36,6 +37,6 @@ public class and_a_best_effort_service_cannot_be_reached : given.a_required_veri
     async Task Because() => _result = await _resolver.Resolve(_context, Principal(), TenantId);
 
     [Fact] void should_be_authorized() => _result.IsAuthorized.ShouldBeTrue();
-    [Fact] void should_record_the_authorization() => _authorizationCache.Received(1).Record(_context, Arg.Any<ClientPrincipal>(), TenantId);
+    [Fact] void should_record_the_authorization() => _authorizationCache.Received(1).Record(_context, Arg.Any<ClientPrincipal>(), TenantId, Arg.Is<IReadOnlyCollection<string>>(_ => _.SequenceEqual(new[] { "main" })));
     [Fact] void should_not_clear_the_authorization() => _authorizationCache.DidNotReceive().Clear(Arg.Any<HttpContext>());
 }

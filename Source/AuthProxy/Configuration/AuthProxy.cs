@@ -104,6 +104,13 @@ public class AuthProxy
     public string DataProtectionKeysPath { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets where the Data Protection key ring is persisted and how it is protected, for deployments
+    /// that share it through Azure Blob Storage or Redis instead of a mounted volume. Leave it out to keep
+    /// using <see cref="DataProtectionKeysPath"/>.
+    /// </summary>
+    public DataProtection DataProtection { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the <see cref="Tenants"/>.
     /// Tenants are keyed by tenant ID string.
     /// </summary>

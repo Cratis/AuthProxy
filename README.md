@@ -59,6 +59,8 @@ Run the [`cratis/authproxy`](https://hub.docker.com/r/cratis/authproxy) containe
 
 Requests to `/api/**` are forwarded to the backend; everything else goes to the frontend — authenticated, tenant-resolved, and identity-enriched.
 
+Both quickstart examples use the default `Required` identity verification: the backend must expose `/.cratis/me` and return a successful JSON response with `isAuthorized: true` before authenticated application requests are forwarded. Missing, unreachable, invalid or negative answers deny the request. To retain enrichment-only behavior instead, set `Cratis__AuthProxy__Services__main__IdentityVerification=BestEffort`. See the [upgrade note](https://github.com/Cratis/AuthProxy/blob/main/Documentation/upgrading/identity-verification-required-by-default.md) for the endpoint contract and migration details.
+
 ### .NET Aspire
 
 The `Cratis.AuthProxy.Aspire` NuGet package wires AuthProxy into a .NET Aspire AppHost with a fluent API instead of hand-written environment variables:

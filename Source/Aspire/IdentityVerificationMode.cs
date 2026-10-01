@@ -16,13 +16,15 @@ public enum IdentityVerificationMode
     /// The endpoint enriches identity details. Any answer that is not an explicit <c language="text">403</c> lets the
     /// request through and merges whatever details came with it, including an unreachable service, a
     /// timeout, another non-success status, an empty body, an unparseable body, and a body whose own
-    /// verdict is negative. This is the released behavior and the default.
+    /// verdict is negative. This is an explicit opt-in for a service whose endpoint only enriches; it is not
+    /// the default.
     /// </summary>
     BestEffort = 0,
 
     /// <summary>
     /// The endpoint is an authorization decision. Only an explicit positive lets the request through, and
-    /// every other outcome denies it and clears any remembered authorization.
+    /// every other outcome denies it and clears any remembered authorization. This is the default for every
+    /// service that takes part in identity resolution.
     /// </summary>
     Required = 1
 }

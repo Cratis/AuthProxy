@@ -24,6 +24,15 @@ public interface IIdentityAuthorizationCache
     void Record(HttpContext context, ClientPrincipal principal, string tenantId);
 
     /// <summary>
+    /// Records authorization and the Required services whose positive verdicts established it.
+    /// </summary>
+    /// <param name="context">The current response context.</param>
+    /// <param name="principal">The authorized principal.</param>
+    /// <param name="tenantId">The tenant the principal was authorized in.</param>
+    /// <param name="verifiedRequiredServices">The Required services that verified this caller, not inferred from current configuration.</param>
+    void Record(HttpContext context, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices);
+
+    /// <summary>
     /// Determines whether the current request carries proof that this principal was already authorized in
     /// this tenant.
     /// </summary>

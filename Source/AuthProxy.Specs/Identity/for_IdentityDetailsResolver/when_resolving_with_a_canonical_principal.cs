@@ -37,7 +37,11 @@ public class when_resolving_with_a_canonical_principal : Specification
             },
             Services = new Dictionary<string, C.Service>
             {
-                ["main"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://backend/" } }
+                ["main"] = new()
+            {
+                Backend = new C.ServiceEndpoint { BaseUrl = "http://backend/" },
+                IdentityVerification = C.IdentityVerificationMode.BestEffort
+            }
             }
         };
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();

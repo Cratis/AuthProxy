@@ -38,6 +38,7 @@ public class and_the_service_refuses_the_caller : given.a_required_verification_
         }
     }
 
+    [Fact] void should_warn_once_for_each_denial() => _logger.Levels.Count(_ => _ == LogLevel.Warning).ShouldEqual(2);
     [Fact] void should_authorize_for_neither_of_them() => _authorizedFor.ShouldBeEmpty();
     [Fact] void should_serve_the_forbidden_status_for_both() => _responseStatuses.Distinct().ShouldContainOnly([StatusCodes.Status403Forbidden]);
     [Fact] void should_clear_the_recorded_authorization_for_both() => _authorizationCache.Received(2).Clear(Arg.Any<HttpContext>());
