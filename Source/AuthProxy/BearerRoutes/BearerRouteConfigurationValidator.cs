@@ -41,6 +41,28 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
                 var at = $"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.Services)}:{serviceName}:{nameof(C.Service.BearerRoutes)}:{index}";
                 ValidateRoute(at, serviceName, service, route, prefixes, metadataPaths, anonymousPaths, failures);
 
+                if (service.StripPathPrefix)
+                {
+                    failures.Add(
+                        $"{at}: bearer routes cannot be used with {nameof(C.Service.StripPathPrefix)}. " +
+                        "A browser-session path with the service prefix removed could reach the same backend resource without the bearer policy. " +
+                        $"Set {nameof(C.Service.StripPathPrefix)} to false and serve the full external path at the backend, or remove the bearer routes.");
+                }
+
+                if (AnonymousPathPolicy.Evaluate(route.PathPrefix, out var prefix) == AnonymousPathRejection.None)
+                {
+                    foreach (var (otherName, otherService) in options.Services.Where(_ => !string.Equals(_.Key, serviceName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (AnonymousPathPolicy.Evaluate(otherService.PathPrefix, out var otherPrefix) == AnonymousPathRejection.None
+                            && Overlaps(prefix, otherPrefix))
+                        {
+                            failures.Add(
+                                $"{at}:{nameof(C.BearerRoute.PathPrefix)} '{prefix}' overlaps service '{otherName}' {nameof(C.Service.PathPrefix)} '{otherPrefix}'. " +
+                                "Bearer routes claim their paths on every host; use non-overlapping prefixes.");
+                        }
+                    }
+                }
+
                 if (options.RequiresIdentityVerification && !route.AcceptWithoutIdentityVerification)
                 {
                     failures.Add(

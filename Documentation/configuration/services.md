@@ -696,7 +696,7 @@ every token-authenticated request instead.
 |----------|------|---------|-------------|
 | `PathPrefix` | `string` | — | The prefix this route covers, for example `/mcp`. Matched case-insensitively on segment boundaries, with the same rules as [anonymous paths](#what-a-valid-entry-looks-like). The longest matching prefix wins. |
 | `Issuers` | `BearerIssuerConfig[]` | — | The authorization servers whose tokens are accepted. At least one. |
-| `Audiences` | `string[]` | — | The token's `aud` must name at least one of these. At least one. |
+| `Audiences` | `string[]` | — | The token's `aud` must exactly match at least one of these, including any trailing slash. At least one. |
 | `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
 | `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication and must be outside every bearer-route prefix. |
 | `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |
@@ -735,6 +735,14 @@ every token-authenticated request instead.
 
   Setting it is the operator's statement that, on this route, the validated token, its scopes and the claim
   requirements are the whole decision at the edge and the backend answers for the rest.
+- Bearer prefixes are full external paths claimed on **every host**, not relative to the owning service's
+  `PathPrefix` or restricted by its `Hosts`. They may lie under their own service's `PathPrefix`, but cannot
+  overlap another service's `PathPrefix`, even on different hosts. AuthProxy refuses such overlaps at startup.
+- A service with bearer routes cannot set `StripPathPrefix: true`: a browser request such as
+  `/app/api/mcp/tools` could otherwise be stripped to `/api/mcp/tools` and bypass the bearer policy there.
+  AuthProxy refuses this configuration at startup. Set `StripPathPrefix: false` and have the backend serve
+  the full external paths, or remove the bearer routes from that service; do not expose the same bearer-only
+  backend resource through another service that strips a prefix.
 - An accepted request is forwarded straight to the service **backend**, whichever of the service's endpoints
   would otherwise serve that path, with its path and query unchanged. AuthProxy adds no `Service-ID` header; one
   the caller sent is passed through like any other request header that is not an identity header. The backend's

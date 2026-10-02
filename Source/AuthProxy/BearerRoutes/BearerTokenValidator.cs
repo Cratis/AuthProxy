@@ -212,6 +212,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         ValidIssuer = issuer.Issuer,
         ValidateAudience = true,
         RequireAudience = true,
+        IgnoreTrailingSlashWhenValidatingAudience = false,
         ValidAudiences = route.Route.Audiences.Where(_ => !string.IsNullOrWhiteSpace(_)).Select(_ => _.Trim()).ToArray(),
         ValidateLifetime = true,
         RequireExpirationTime = true,
@@ -301,7 +302,9 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     }
 
     static bool IsUsableTenantId(string tenantId) =>
-        tenantId.Length <= MaximumTenantIdLength && tenantId.AsSpan().IndexOfAnyExcept(_tenantCharacters) < 0;
+        tenantId is not "." and not ".."
+        && tenantId.Length <= MaximumTenantIdLength
+        && tenantId.AsSpan().IndexOfAnyExcept(_tenantCharacters) < 0;
 
     static bool IsSingleValueIdentityClaim(string type) =>
         string.Equals(type, SubjectClaimType, StringComparison.OrdinalIgnoreCase)
