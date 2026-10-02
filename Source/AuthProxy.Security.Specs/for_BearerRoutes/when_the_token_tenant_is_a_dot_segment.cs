@@ -34,13 +34,13 @@ public class when_the_token_tenant_is_a_dot_segment
         using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(harness.Origin.ReceivedAnythingFor($"/api/tenants/{tenantId}"));
+        Assert.True(harness.Origin.ReceivedAnythingFor($"/api/tenants/{tenantId}/exists"));
         Assert.True(harness.Origin.ReceivedAnythingFor(path));
     }
 
     sealed class VerifyingTenantHarness : BearerRouteHarness
     {
         protected override void AddSettings(IDictionary<string, string?> settings) =>
-            settings[$"{C.AuthProxy.SectionKey}:TenantVerification:UrlTemplate"] = $"{Origin.BaseUrl}/api/tenants/{{tenantId}}";
+            settings[$"{C.AuthProxy.SectionKey}:TenantVerification:UrlTemplate"] = $"{Origin.BaseUrl}/api/tenants/{{tenantId}}/exists";
     }
 }
