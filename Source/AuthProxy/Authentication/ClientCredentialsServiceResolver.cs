@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.Extensions.Options;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -87,6 +88,14 @@ public class ClientCredentialsServiceResolver(
         var routed = ServiceRoutes.Resolve(request, config.CurrentValue);
         if (routed is null)
         {
+            if (request.HttpContext.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is not null)
+            {
+                // A selected proxy endpoint is authoritative, even if its service is no longer configured.
+                // Never authenticate it as a caller-selected service or the sole client-credentials candidate.
+                service = default!;
+                return false;
+            }
+
             return TryResolveCandidate(request, out service);
         }
 
