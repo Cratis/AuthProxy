@@ -17,7 +17,8 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// to the backend of a service that declares <see cref="C.Service.AccessToken"/>. Machine callers authenticated by a
 /// bearer token keep their own <c language="text">Authorization</c> header, and anonymous paths are forwarded as they are.
 /// When no token can be obtained the request is refused with <c language="text">401</c>, never forwarded without the token
-/// the backend expects.
+/// the backend expects. A configuration reload snapshot whose destinations do not match the token policy is refused
+/// with <c language="text">503</c> before obtaining a token.
 /// </remarks>
 /// <param name="next">The next middleware in the proxy pipeline.</param>
 /// <param name="logger">The <see cref="ILogger"/> for diagnostics.</param>
@@ -40,6 +41,14 @@ public class AccessTokenForwardingMiddleware(
             || !IsSessionRequest(context))
         {
             await next(context);
+            return;
+        }
+
+        // YARP publishes the cluster model and destinations separately. Never acquire a token for a policy
+        // paired with destinations from another binding, even in the short interval during a reload.
+        if (!HasBoundDestinations(proxy))
+        {
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             return;
         }
 
@@ -77,6 +86,13 @@ public class AccessTokenForwardingMiddleware(
         accessToken = JsonSerializer.Deserialize<C.ServiceAccessToken>(policy)!;
         return true;
     }
+
+    static bool HasBoundDestinations(IReverseProxyFeature proxy) =>
+        proxy.Cluster.Config.Metadata!.TryGetValue(MicroserviceReverseProxyConfigProvider.DestinationMetadataKey, out var destinationId)
+        && proxy.AvailableDestinations.Count > 0
+        && proxy.AllDestinations.Count > 0
+        && proxy.AvailableDestinations.All(destination => string.Equals(destination.DestinationId, destinationId, StringComparison.Ordinal))
+        && proxy.AllDestinations.All(destination => string.Equals(destination.DestinationId, destinationId, StringComparison.Ordinal));
 
     static bool IsSessionRequest(HttpContext context) =>
         context.User.Identity?.IsAuthenticated == true

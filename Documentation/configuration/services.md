@@ -688,6 +688,9 @@ provider must be configured. AuthProxy refuses to start otherwise.
 - Requests to the `Frontend`, requests on [anonymous paths](#anonymous-paths), and machine callers that
   authenticate with their own bearer token ([client credentials](#client-credentials) or JWT bearer) are
   forwarded as before.
+- Tokens stay bound to the backend and audience selected for the request across configuration reloads.
+  If a request captures a token policy and destinations from different configuration versions, AuthProxy
+  refuses it with `503` before obtaining or forwarding a token. Retry after the reload completes.
 - When no token can be obtained, the request is refused with `401` instead of being forwarded without one.
   This happens when the session has no refresh token, the provider rejects the refresh token, the provider
   cannot be reached, or the user signed in with another provider than `Provider`. An `invalid_grant` error

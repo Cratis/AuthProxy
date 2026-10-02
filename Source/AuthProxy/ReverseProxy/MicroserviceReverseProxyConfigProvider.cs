@@ -58,6 +58,11 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     internal const string AccessTokenMetadataKey = "Cratis.AuthProxy.AccessToken";
 
     /// <summary>
+    /// The cluster metadata key binding the access token policy to its versioned destination.
+    /// </summary>
+    internal const string DestinationMetadataKey = "Cratis.AuthProxy.Destination";
+
+    /// <summary>
     /// The <see cref="EndpointMetadataKey"/> value of a service's backend cluster.
     /// </summary>
     internal const string BackendEndpoint = "Backend";
@@ -551,17 +556,20 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             if (ms.Backend is not null)
             {
+                var destinationId = BackendDestinationId(key, ms);
+                var metadata = ClusterMetadata(key, BackendEndpoint, ms.AccessToken);
+                metadata[DestinationMetadataKey] = destinationId;
                 clusters.Add(ClusterFor(config, ms, ms.Backend) with
                 {
                     ClusterId = BackendClusterId(key),
 
-                    // A request retains its selected cluster config and available destinations. Give a changed
-                    // binding a new destination state so YARP cannot mutate the address while it awaits a token.
+                    // Give a changed binding a new destination state so YARP cannot mutate the address while
+                    // a request awaits a token. Metadata lets forwarding reject mixed snapshots during reload.
                     Destinations = new Dictionary<string, DestinationConfig>
                     {
-                        [BackendDestinationId(key, ms)] = new() { Address = ms.Backend.BaseUrl }
+                        [destinationId] = new() { Address = ms.Backend.BaseUrl }
                     },
-                    Metadata = ClusterMetadata(key, BackendEndpoint, ms.AccessToken),
+                    Metadata = metadata,
                 });
             }
 

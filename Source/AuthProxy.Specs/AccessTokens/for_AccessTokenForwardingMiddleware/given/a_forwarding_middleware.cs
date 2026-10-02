@@ -24,6 +24,9 @@ public class a_forwarding_middleware : Specification
     protected AccessTokenForwardingMiddleware _middleware;
     protected string _authorizationPolicy = "default";
     protected string _endpoint = ReverseProxy.MicroserviceReverseProxyConfigProvider.BackendEndpoint;
+    protected string? _destinationBinding = "bound-destination";
+    protected IReadOnlyList<DestinationState> _availableDestinations = [new("bound-destination")];
+    protected IReadOnlyList<DestinationState> _allDestinations = [new("bound-destination")];
 
     void Establish()
     {
@@ -50,22 +53,30 @@ public class a_forwarding_middleware : Specification
 
     protected Task Invoke()
     {
+        var metadata = new Dictionary<string, string>
+        {
+            [ReverseProxy.MicroserviceReverseProxyConfigProvider.ServiceMetadataKey] = "reporting",
+            [ReverseProxy.MicroserviceReverseProxyConfigProvider.EndpointMetadataKey] = _endpoint,
+            [ReverseProxy.MicroserviceReverseProxyConfigProvider.AccessTokenMetadataKey] = JsonSerializer.Serialize(_accessToken),
+        };
+        if (_destinationBinding is not null)
+        {
+            metadata[ReverseProxy.MicroserviceReverseProxyConfigProvider.DestinationMetadataKey] = _destinationBinding;
+        }
+
         var cluster = new ClusterModel(
             new ClusterConfig
             {
                 ClusterId = "reporting-cluster",
-                Metadata = new Dictionary<string, string>
-                {
-                    [ReverseProxy.MicroserviceReverseProxyConfigProvider.ServiceMetadataKey] = "reporting",
-                    [ReverseProxy.MicroserviceReverseProxyConfigProvider.EndpointMetadataKey] = _endpoint,
-                    [ReverseProxy.MicroserviceReverseProxyConfigProvider.AccessTokenMetadataKey] = JsonSerializer.Serialize(_accessToken),
-                },
+                Metadata = metadata,
             },
             new HttpMessageInvoker(new SocketsHttpHandler()));
         var route = new RouteModel(new RouteConfig { RouteId = "route", AuthorizationPolicy = _authorizationPolicy }, null, HttpTransformer.Empty);
         var feature = Substitute.For<IReverseProxyFeature>();
         feature.Route.Returns(route);
         feature.Cluster.Returns(cluster);
+        feature.AvailableDestinations.Returns(_availableDestinations);
+        feature.AllDestinations.Returns(_allDestinations);
         _context.Features.Set(feature);
 
         return _middleware.InvokeAsync(_context, _tokens);

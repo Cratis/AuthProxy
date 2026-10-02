@@ -54,6 +54,9 @@ public class when_a_token_forwarding_binding_changes : Specification
     [Fact] void should_keep_the_cluster_id_when_only_the_address_changes() => _newAddress.Clusters.Single().ClusterId.ShouldEqual(_newPolicy.Clusters.Single().ClusterId);
     [Fact] void should_version_the_destination_when_only_the_policy_changes() => (_original.Clusters.Single().Destinations!.Single().Key != _newPolicy.Clusters.Single().Destinations!.Single().Key).ShouldBeTrue();
     [Fact] void should_version_the_destination_when_only_the_address_changes() => (_newPolicy.Clusters.Single().Destinations!.Single().Key != _newAddress.Clusters.Single().Destinations!.Single().Key).ShouldBeTrue();
+    [Fact] void should_bind_the_original_policy_to_its_destination() => _original.Clusters.Single().Metadata![MicroserviceReverseProxyConfigProvider.DestinationMetadataKey].ShouldEqual(_original.Clusters.Single().Destinations!.Single().Key);
+    [Fact] void should_bind_the_new_policy_to_its_destination() => _newPolicy.Clusters.Single().Metadata![MicroserviceReverseProxyConfigProvider.DestinationMetadataKey].ShouldEqual(_newPolicy.Clusters.Single().Destinations!.Single().Key);
+    [Fact] void should_bind_the_new_address_to_its_destination() => _newAddress.Clusters.Single().Metadata![MicroserviceReverseProxyConfigProvider.DestinationMetadataKey].ShouldEqual(_newAddress.Clusters.Single().Destinations!.Single().Key);
     [Fact] void should_keep_the_original_scopes_immutable() => OriginalPolicy().Scopes.ShouldContainOnly("old-audience");
     [Fact] void should_keep_the_original_resource() => OriginalPolicy().Resource.ShouldEqual("old-resource");
     [Fact] void should_keep_the_original_provider() => OriginalPolicy().Provider.ShouldEqual("old-provider");
