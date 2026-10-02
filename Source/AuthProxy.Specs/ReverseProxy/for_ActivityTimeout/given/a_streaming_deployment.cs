@@ -3,6 +3,7 @@
 
 using System.Net.WebSockets;
 using System.Text;
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -62,6 +63,7 @@ public class a_streaming_deployment : Specification
                 },
             };
         });
+        builder.AddIngressAuthentication();
         builder.SetupReverseProxy();
 
         _proxy = builder.Build();

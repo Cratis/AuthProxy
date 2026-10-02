@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using C = Cratis.AuthProxy.Configuration;
@@ -41,6 +43,36 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     internal const string AnonymousAuthorizationPolicy = "anonymous";
 
     /// <summary>
+    /// The cluster metadata key naming the service a cluster belongs to.
+    /// </summary>
+    internal const string ServiceMetadataKey = "Cratis.AuthProxy.Service";
+
+    /// <summary>
+    /// The cluster metadata key naming which endpoint of the service a cluster is.
+    /// </summary>
+    internal const string EndpointMetadataKey = "Cratis.AuthProxy.Endpoint";
+
+    /// <summary>
+    /// The cluster metadata key holding the access token policy selected with its destination.
+    /// </summary>
+    internal const string AccessTokenMetadataKey = "Cratis.AuthProxy.AccessToken";
+
+    /// <summary>
+    /// The cluster metadata key binding the access token policy to its versioned destination.
+    /// </summary>
+    internal const string DestinationMetadataKey = "Cratis.AuthProxy.Destination";
+
+    /// <summary>
+    /// The <see cref="EndpointMetadataKey"/> value of a service's backend cluster.
+    /// </summary>
+    internal const string BackendEndpoint = "Backend";
+
+    /// <summary>
+    /// The <see cref="EndpointMetadataKey"/> value of a service's frontend cluster.
+    /// </summary>
+    internal const string FrontendEndpoint = "Frontend";
+
+    /// <summary>
     /// The path prefix served by a service's backend rather than its frontend.
     /// </summary>
     const string ApiPathPrefix = ServiceRoutes.ApiPathPrefix;
@@ -75,9 +107,10 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         ILogger<MicroserviceReverseProxyConfigProvider> logger)
     {
         _logger = logger;
+        var snapshot = config.CurrentValue;
         _inner = new InMemoryConfigProvider(
-            BuildRoutes(config.CurrentValue, logger),
-            BuildClusters(config.CurrentValue));
+            BuildRoutes(snapshot, logger),
+            BuildClusters(snapshot));
         _configurationChanged = config.OnChange(Rebuild);
     }
 
@@ -523,13 +556,20 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             if (ms.Backend is not null)
             {
+                var destinationId = BackendDestinationId(key, ms);
+                var metadata = ClusterMetadata(key, BackendEndpoint, ms.AccessToken);
+                metadata[DestinationMetadataKey] = destinationId;
                 clusters.Add(ClusterFor(config, ms, ms.Backend) with
                 {
                     ClusterId = BackendClusterId(key),
+
+                    // Give a changed binding a new destination state so YARP cannot mutate the address while
+                    // a request awaits a token. Metadata lets forwarding reject mixed snapshots during reload.
                     Destinations = new Dictionary<string, DestinationConfig>
                     {
-                        ["destination1"] = new() { Address = ms.Backend.BaseUrl }
+                        [destinationId] = new() { Address = ms.Backend.BaseUrl }
                     },
+                    Metadata = metadata,
                 });
             }
 
@@ -542,11 +582,40 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     {
                         ["destination1"] = new() { Address = ms.Frontend.BaseUrl }
                     },
+                    Metadata = ClusterMetadata(key, FrontendEndpoint),
                 });
             }
         }
 
         return clusters;
+    }
+
+    static Dictionary<string, string> ClusterMetadata(string key, string endpoint, C.ServiceAccessToken? accessToken = null)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            [ServiceMetadataKey] = key,
+            [EndpointMetadataKey] = endpoint,
+        };
+        if (accessToken is not null)
+        {
+            metadata[AccessTokenMetadataKey] = JsonSerializer.Serialize(accessToken);
+        }
+
+        return metadata;
+    }
+
+    static string BackendDestinationId(string key, C.Service service)
+    {
+        if (service.AccessToken is null)
+        {
+            return "destination1";
+        }
+
+        var binding = JsonSerializer.Serialize(new { Address = service.Backend?.BaseUrl, Policy = service.AccessToken });
+        var version = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(binding)));
+
+        return $"{key}-backend-destination-{version}";
     }
 
     /// <summary>
