@@ -13,13 +13,14 @@ namespace Cratis.AuthProxy;
 /// Middleware that handles tenant selection for authenticated users when the selection strategy is configured.
 /// A tenant resolved from the selection cookie is periodically re-validated against the tenant endpoint
 /// (bounded by <see cref="C.Session.TenantRevalidationInterval"/>) so revoked tenant access takes effect
-/// without calling the backend on every request.
+/// without calling the backend on every request. If the tenant endpoint is unavailable, callers without
+/// a resolved tenant receive HTTP 503; re-validation of an already selected tenant continues to fail open.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="tenantResolver">The tenant resolver.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
-/// <param name="errorPageProvider">The error page provider used to serve the selection page.</param>
+/// <param name="errorPageProvider">The error page provider used to serve the selection and service-unavailable pages.</param>
 /// <param name="memoryCache">The memory cache used to bound how often the selected tenant is re-validated.</param>
 public class TenantSelectionMiddleware(
     RequestDelegate next,
@@ -86,7 +87,23 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        var tenantOptions = (await GetTenantOptions(context, selectionOptions)).Tenants;
+        var tenantOptionsResult = await GetTenantOptions(context, selectionOptions);
+        if (!tenantOptionsResult.Succeeded)
+        {
+            if (context.IsDocumentNavigation())
+            {
+                await errorPageProvider.WriteErrorPageAsync(
+                    context,
+                    WellKnownPageNames.ServiceUnavailable,
+                    StatusCodes.Status503ServiceUnavailable);
+                return;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return;
+        }
+
+        var tenantOptions = tenantOptionsResult.Tenants;
         if (tenantOptions.Count == 0)
         {
             await next(context);
@@ -148,7 +165,17 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        var tenantOptions = (await GetTenantOptions(context, selectionOptions)).Tenants;
+        var tenantOptionsResult = await GetTenantOptions(context, selectionOptions);
+        if (!tenantOptionsResult.Succeeded)
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.ServiceUnavailable,
+                StatusCodes.Status503ServiceUnavailable);
+            return;
+        }
+
+        var tenantOptions = tenantOptionsResult.Tenants;
         if (!tenantOptions.Any(_ => string.Equals(_.Id, tenantId, StringComparison.OrdinalIgnoreCase)))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -274,6 +301,13 @@ public class TenantSelectionMiddleware(
         return true;
     }
 
+    /// <summary>
+    /// Fetches an authoritative tenant list, distinguishing no tenant access from an unavailable endpoint.
+    /// Unavailability is surfaced as HTTP 503 during selection, but fails open during cookie re-validation.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="selectionOptions">The selection strategy options carrying the tenant endpoint.</param>
+    /// <returns>The tenant list and whether the endpoint gave an authoritative answer.</returns>
     async Task<TenantOptionsResult> GetTenantOptions(HttpContext context, Tenancy.SelectionOptions selectionOptions)
     {
         var principal = context.BuildClientPrincipal();
@@ -341,6 +375,8 @@ public class TenantSelectionMiddleware(
     /// The outcome of calling the tenant endpoint. <c language="text">Succeeded</c> is <see langword="false"/> only when
     /// the endpoint could not give an authoritative answer (unreachable, server error, unparseable body);
     /// an authoritative "no tenants" answer has <c language="text">Succeeded</c> <see langword="true"/> with an empty list.
+    /// An unavailable result produces HTTP 503 during selection, but permits an already selected tenant
+    /// to continue during re-validation.
     /// </summary>
     /// <param name="Succeeded">Whether the endpoint gave an authoritative answer.</param>
     /// <param name="Tenants">The tenants available to the user when the call succeeded.</param>

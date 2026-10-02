@@ -183,6 +183,16 @@ When this strategy is configured and no `.cratis-tenant` cookie exists yet, Auth
 The page links back to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`, and AuthProxy validates
 the selected tenant against the endpoint response before writing the `.cratis-tenant` cookie.
 
+If `TenantsEndpoint` is unreachable, times out, returns an error other than `401`/`403`, or returns
+unparseable JSON, AuthProxy responds with `503 Service Unavailable` instead of reporting that the
+user has no organization. Document navigations and tenant-selection callbacks receive
+`service-unavailable.html`; other callers receive a bare `503` without an HTML page.
+An authoritative empty list or `401`/`403` response still proceeds to the normal no-tenant handling
+(`no-organization.html` at `403` when no lobby is configured).
+
+Revalidation of an already-selected tenant fails open during an endpoint outage, so a transient
+failure does not revoke an existing tenant selection.
+
 ---
 
 ## Tenant registry

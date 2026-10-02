@@ -42,6 +42,12 @@ public static class WellKnownPageNames
     public const string NoOrganization = "no-organization.html";
 
     /// <summary>
+    /// The page returned when the tenant selection endpoint cannot be reached or does not give
+    /// a usable answer, so AuthProxy cannot determine the caller's tenants (HTTP 503).
+    /// </summary>
+    public const string ServiceUnavailable = "service-unavailable.html";
+
+    /// <summary>
     /// The page returned when an invitation token is presented that has passed its expiry time.
     /// </summary>
     public const string InvitationExpired = "invitation-expired.html";
