@@ -11,6 +11,7 @@ public class when_the_tenants_endpoint_returns_service_unavailable : given.a_ten
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
+    [Fact] void should_prevent_caching() => _context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");
     [Fact] void should_respond_with_service_unavailable() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
     [Fact] void should_serve_the_service_unavailable_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.ServiceUnavailable, StatusCodes.Status503ServiceUnavailable);
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();

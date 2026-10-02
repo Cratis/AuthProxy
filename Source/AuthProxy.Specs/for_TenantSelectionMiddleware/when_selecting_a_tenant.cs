@@ -47,7 +47,8 @@ public class when_selecting_a_tenant : Specification
             tenantResolver,
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = WellKnownPaths.SelectTenant;

@@ -11,6 +11,7 @@ public class a_tenant_selection_endpoint : Specification
     protected DefaultHttpContext _context;
     protected IErrorPageProvider _errorPageProvider;
     protected bool _nextCalled;
+    protected int _endpointCalls;
     protected HttpStatusCode? _endpointStatus;
     protected string _endpointBody = "[]";
     protected Exception _endpointFailure = new HttpRequestException("Tenant endpoint is unavailable");
@@ -54,7 +55,8 @@ public class a_tenant_selection_endpoint : Specification
             Substitute.For<ITenantResolver>(),
             httpClientFactory,
             _errorPageProvider,
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";
@@ -65,12 +67,15 @@ public class a_tenant_selection_endpoint : Specification
 
     sealed class TenantsHandler(a_tenant_selection_endpoint specification) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            specification._endpointStatus is { } status
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            specification._endpointCalls++;
+            return specification._endpointStatus is { } status
                 ? Task.FromResult(new HttpResponseMessage(status)
                 {
                     Content = new StringContent(specification._endpointBody)
                 })
                 : Task.FromException<HttpResponseMessage>(specification._endpointFailure);
+        }
     }
 }

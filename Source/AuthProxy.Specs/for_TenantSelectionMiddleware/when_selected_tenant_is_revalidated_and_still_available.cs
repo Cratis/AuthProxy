@@ -54,7 +54,8 @@ public class when_selected_tenant_is_revalidated_and_still_available : Specifica
             tenantResolver,
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
     }
 
     async Task Because()

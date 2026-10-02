@@ -53,7 +53,8 @@ public class when_selected_tenant_is_no_longer_available_for_the_user : Specific
             tenantResolver,
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";

@@ -190,6 +190,10 @@ user has no organization. Document navigations and tenant-selection callbacks re
 An authoritative empty list or `401`/`403` response still proceeds to the normal no-tenant handling
 (`no-organization.html` at `403` when no lobby is configured).
 
+If the signed-in session no longer has a forwardable identity, AuthProxy signs the user out instead
+of reporting a service outage. Navigations redirect to provider selection with `reason=invalid-session`;
+other callers receive `401`.
+
 Revalidation of an already-selected tenant fails open during an endpoint outage, so a transient
 failure does not revoke an existing tenant selection.
 

@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
 using Microsoft.Extensions.Caching.Memory;
@@ -15,6 +16,7 @@ namespace Cratis.AuthProxy;
 /// (bounded by <see cref="C.Session.TenantRevalidationInterval"/>) so revoked tenant access takes effect
 /// without calling the backend on every request. If the tenant endpoint is unavailable, callers without
 /// a resolved tenant receive HTTP 503; re-validation of an already selected tenant continues to fail open.
+/// A session without a forwardable identity is terminated rather than reported as an endpoint outage.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
@@ -22,13 +24,15 @@ namespace Cratis.AuthProxy;
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="errorPageProvider">The error page provider used to serve the selection and service-unavailable pages.</param>
 /// <param name="memoryCache">The memory cache used to bound how often the selected tenant is re-validated.</param>
+/// <param name="logger">The logger.</param>
 public class TenantSelectionMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
     ITenantResolver tenantResolver,
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
-    IMemoryCache memoryCache)
+    IMemoryCache memoryCache,
+    ILogger<TenantSelectionMiddleware> logger)
 {
     const string RevalidationCacheKeyPrefix = "TenantSelectionRevalidation";
 
@@ -88,8 +92,15 @@ public class TenantSelectionMiddleware(
         }
 
         var tenantOptionsResult = await GetTenantOptions(context, selectionOptions);
+        if (!tenantOptionsResult.HasIdentity)
+        {
+            await HandleInvalidSession(context);
+            return;
+        }
+
         if (!tenantOptionsResult.Succeeded)
         {
+            context.Response.Headers.CacheControl = "no-store";
             if (context.IsDocumentNavigation())
             {
                 await errorPageProvider.WriteErrorPageAsync(
@@ -166,8 +177,15 @@ public class TenantSelectionMiddleware(
         }
 
         var tenantOptionsResult = await GetTenantOptions(context, selectionOptions);
+        if (!tenantOptionsResult.HasIdentity)
+        {
+            await HandleInvalidSession(context);
+            return;
+        }
+
         if (!tenantOptionsResult.Succeeded)
         {
+            context.Response.Headers.CacheControl = "no-store";
             await errorPageProvider.WriteErrorPageAsync(
                 context,
                 WellKnownPageNames.ServiceUnavailable,
@@ -202,6 +220,22 @@ public class TenantSelectionMiddleware(
 
         context.Response.StatusCode = StatusCodes.Status302Found;
         context.Response.Headers.Location = requestedReturnUrl;
+    }
+
+    async Task HandleInvalidSession(HttpContext context)
+    {
+        logger.TerminatingUnforwardableSession(RequestPathRedaction.Redact(context.Request.Path));
+        await SessionTermination.SignOutAndClearCookies(context, config.CurrentValue.Logout);
+
+        if (context.IsDocumentNavigation())
+        {
+            var returnUrl = RelativeRedirect.Resolve(context.GetPathAndQuery());
+            context.Response.Redirect(
+                $"{WellKnownPaths.LoginPage}?{SignInFailureReason.QueryKey}={SignInFailureReason.InvalidSession}&returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
     }
 
     /// <summary>
@@ -304,6 +338,7 @@ public class TenantSelectionMiddleware(
     /// <summary>
     /// Fetches an authoritative tenant list, distinguishing no tenant access from an unavailable endpoint.
     /// Unavailability is surfaced as HTTP 503 during selection, but fails open during cookie re-validation.
+    /// A missing forwardable identity is a separate outcome that terminates the session during selection.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="selectionOptions">The selection strategy options carrying the tenant endpoint.</param>
@@ -313,7 +348,7 @@ public class TenantSelectionMiddleware(
         var principal = context.BuildClientPrincipal();
         if (principal is null)
         {
-            return TenantOptionsResult.Unavailable;
+            return TenantOptionsResult.NoIdentity;
         }
 
         using var client = httpClientFactory.CreateClient();
@@ -325,8 +360,9 @@ public class TenantSelectionMiddleware(
         {
             response = await client.SendAsync(request);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            logger.TenantEndpointUnavailable(exception.GetType().Name);
             return TenantOptionsResult.Unavailable;
         }
 
@@ -342,17 +378,18 @@ public class TenantSelectionMiddleware(
 
         if (!response.IsSuccessStatusCode)
         {
+            logger.TenantEndpointReturnedError((int)response.StatusCode);
             return TenantOptionsResult.Unavailable;
-        }
-
-        var json = await response.Content.ReadAsStringAsync();
-        if (string.IsNullOrWhiteSpace(json))
-        {
-            return new(Succeeded: true, []);
         }
 
         try
         {
+            var json = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new(Succeeded: true, []);
+            }
+
             var tenants = JsonSerializer.Deserialize<List<TenantOption>>(json, _serializerOptions) ?? [];
             return new(
                 Succeeded: true,
@@ -361,8 +398,9 @@ public class TenantSelectionMiddleware(
                     .DistinctBy(_ => _.Id, StringComparer.OrdinalIgnoreCase)
                     .ToList());
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            logger.TenantEndpointReturnedUnusableResponse(exception.GetType().Name);
             return TenantOptionsResult.Unavailable;
         }
     }
@@ -372,16 +410,19 @@ public class TenantSelectionMiddleware(
         [property: System.Text.Json.Serialization.JsonPropertyName("name")] string Name);
 
     /// <summary>
-    /// The outcome of calling the tenant endpoint. <c language="text">Succeeded</c> is <see langword="false"/> only when
-    /// the endpoint could not give an authoritative answer (unreachable, server error, unparseable body);
+    /// The outcome of calling the tenant endpoint. <c language="text">Succeeded</c> is <see langword="false"/> when
+    /// the endpoint could not give an authoritative answer (unreachable, server error, unparseable body)
+    /// or no forwardable identity exists; <c language="text">HasIdentity</c> distinguishes the session failure.
     /// an authoritative "no tenants" answer has <c language="text">Succeeded</c> <see langword="true"/> with an empty list.
     /// An unavailable result produces HTTP 503 during selection, but permits an already selected tenant
     /// to continue during re-validation.
     /// </summary>
     /// <param name="Succeeded">Whether the endpoint gave an authoritative answer.</param>
     /// <param name="Tenants">The tenants available to the user when the call succeeded.</param>
-    sealed record TenantOptionsResult(bool Succeeded, IReadOnlyList<TenantOption> Tenants)
+    /// <param name="HasIdentity">Whether the session has a forwardable identity.</param>
+    sealed record TenantOptionsResult(bool Succeeded, IReadOnlyList<TenantOption> Tenants, bool HasIdentity = true)
     {
         public static readonly TenantOptionsResult Unavailable = new(false, []);
+        public static readonly TenantOptionsResult NoIdentity = new(false, [], HasIdentity: false);
     }
 }

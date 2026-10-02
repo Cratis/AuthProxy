@@ -56,6 +56,7 @@ at all is treated as an API caller, because it almost always is.
 | Unauthenticated, one provider configured | `302` to the provider | `401` |
 | Unauthenticated, no providers configured | Forwarded | Forwarded |
 | Authenticated, tenant selection required | `200` + `select-tenant.html` | `403`, no page, no `.cratis-tenants` cookie |
+| Authenticated, `TenantsEndpoint` unavailable | `503` + `service-unavailable.html` | `503`, no page |
 | Lobby mode, no invitation | `401` + `invitation-required.html` | `401` + `invitation-required.html` |
 
 Two rows are worth reading twice.

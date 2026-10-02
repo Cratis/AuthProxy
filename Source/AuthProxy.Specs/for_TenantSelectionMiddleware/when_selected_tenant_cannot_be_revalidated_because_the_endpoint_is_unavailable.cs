@@ -50,7 +50,8 @@ public class when_selected_tenant_cannot_be_revalidated_because_the_endpoint_is_
             tenantResolver,
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";

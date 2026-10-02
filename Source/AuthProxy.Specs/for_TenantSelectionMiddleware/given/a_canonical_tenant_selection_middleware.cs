@@ -54,7 +54,8 @@ public class a_canonical_tenant_selection_middleware : Specification
             tenantResolver,
             clients,
             Substitute.For<IErrorPageProvider>(),
-            memoryCache);
+            memoryCache,
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
     }
 
     protected DefaultHttpContext ContextFor(string authenticationScheme)
