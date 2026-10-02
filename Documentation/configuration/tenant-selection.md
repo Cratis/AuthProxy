@@ -10,12 +10,12 @@ The page receives tenant data through a cookie, not by calling your tenant endpo
 ## Flow
 
 1. Authenticated request arrives without a `.cratis-tenant` cookie.
-2. AuthProxy calls the configured `Selection.Options.TenantsEndpoint`.
+2. AuthProxy calls the configured `Selection.Options.TenantsEndpoint`. If the endpoint is unavailable or returns an unusable answer, AuthProxy returns `503` with `service-unavailable.html` for a browser navigation (a bare `503` for other callers); no tenant cookie is written.
 3. If exactly one tenant is returned, AuthProxy sets `.cratis-tenant` immediately, removes any `.cratis-tenants` cookie, and redirects to the original URL (no selection page shown).
 4. If more than one tenant is returned, AuthProxy writes `.cratis-tenants` (URL-encoded JSON array) as a session cookie and serves `select-tenant.html` — but only to a browser navigating to a page. Every other caller is refused with `403` instead, because a chooser page delivered as `200` reads as the data they asked for. See [Unauthenticated responses](unauthenticated-responses.md).
 5. User clicks a tenant option.
 6. Browser navigates to `/.cratis/select-tenant?tenantId=<id>&returnUrl=<path>`.
-7. AuthProxy validates the selected `tenantId` against `TenantsEndpoint` and sets `.cratis-tenant`.
+7. AuthProxy validates the selected `tenantId` against `TenantsEndpoint` and sets `.cratis-tenant`. If the endpoint is unavailable or returns an unusable answer, AuthProxy returns `503` with `service-unavailable.html` instead; no tenant cookie is written.
 8. AuthProxy redirects back to `returnUrl`. The `.cratis-tenants` cookie is **retained** so the application can offer an in-app tenant switcher.
 
 ---

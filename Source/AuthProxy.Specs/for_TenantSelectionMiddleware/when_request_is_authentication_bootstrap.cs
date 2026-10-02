@@ -38,7 +38,8 @@ public class when_request_is_authentication_bootstrap : Specification
             Substitute.For<ITenantResolver>(),
             Substitute.For<IHttpClientFactory>(),
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/signin-scheme";

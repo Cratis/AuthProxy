@@ -56,7 +56,8 @@ public class when_tenant_revalidation_is_disabled : Specification
             tenantResolver,
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";

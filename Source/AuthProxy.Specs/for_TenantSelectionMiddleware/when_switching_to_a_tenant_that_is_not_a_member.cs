@@ -40,7 +40,8 @@ public class when_switching_to_a_tenant_that_is_not_a_member : Specification
             Substitute.For<ITenantResolver>(),
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = WellKnownPaths.SelectTenant;

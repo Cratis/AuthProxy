@@ -54,7 +54,8 @@ public class when_authenticated_user_has_no_resolved_tenant_and_only_one_tenant_
             tenantResolver,
             httpClientFactory,
             _errorPageProvider,
-            new MemoryCache(new MemoryCacheOptions()));
+            new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";
