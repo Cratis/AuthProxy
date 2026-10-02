@@ -189,16 +189,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             }
         }
 
-        // Version token-forwarding clusters with their destination and policy. YARP must not reuse a
-        // destination state whose address can change while a request awaits a token for the old audience.
-        var backendVersions = services.ToDictionary(
-            _ => BackendClusterId(_.Key.ToLowerInvariant()),
-            _ => VersionedBackendClusterId(_.Key.ToLowerInvariant(), _.Value),
-            StringComparer.Ordinal);
-
-        return routes.ConvertAll(route => backendVersions.TryGetValue(route.ClusterId!, out var version)
-            ? route with { ClusterId = version }
-            : route);
+        return routes;
     }
 
     /// <summary>
@@ -562,10 +553,13 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             {
                 clusters.Add(ClusterFor(config, ms, ms.Backend) with
                 {
-                    ClusterId = VersionedBackendClusterId(key, ms),
+                    ClusterId = BackendClusterId(key),
+
+                    // A request retains its selected cluster config and available destinations. Give a changed
+                    // binding a new destination state so YARP cannot mutate the address while it awaits a token.
                     Destinations = new Dictionary<string, DestinationConfig>
                     {
-                        [ms.AccessToken is null ? "destination1" : VersionedBackendClusterId(key, ms)] = new() { Address = ms.Backend.BaseUrl }
+                        [BackendDestinationId(key, ms)] = new() { Address = ms.Backend.BaseUrl }
                     },
                     Metadata = ClusterMetadata(key, BackendEndpoint, ms.AccessToken),
                 });
@@ -603,17 +597,17 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         return metadata;
     }
 
-    static string VersionedBackendClusterId(string key, C.Service service)
+    static string BackendDestinationId(string key, C.Service service)
     {
         if (service.AccessToken is null)
         {
-            return BackendClusterId(key);
+            return "destination1";
         }
 
         var binding = JsonSerializer.Serialize(new { Address = service.Backend?.BaseUrl, Policy = service.AccessToken });
         var version = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(binding)));
 
-        return $"{BackendClusterId(key)}-{version}";
+        return $"{key}-backend-destination-{version}";
     }
 
     /// <summary>

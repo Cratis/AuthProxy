@@ -120,6 +120,7 @@ public class AccessTokenForwardingHarness : WebApplicationFactory<Program>
                 [$"{C.AuthProxy.SectionKey}:Services:reporting:Backend:BaseUrl"] = Backend.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:reporting:Frontend:BaseUrl"] = Frontend.BaseUrl,
                 [$"{C.AuthProxy.SectionKey}:Services:reporting:ResolveIdentityDetails"] = "false",
+                [$"{C.AuthProxy.SectionKey}:Services:reporting:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
                 [$"{C.AuthProxy.SectionKey}:Services:reporting:AccessToken:Scopes:0"] = "api://reporting/access_as_user",
 
                 [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
