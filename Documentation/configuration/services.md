@@ -737,14 +737,18 @@ every token-authenticated request instead.
   requirements are the whole decision at the edge and the backend answers for the rest.
 - An accepted request is forwarded straight to the service **backend**, whichever of the service's endpoints
   would otherwise serve that path, with its path and query unchanged. AuthProxy adds no `Service-ID` header; one
-  the caller sent is passed through like any other request header that is not an identity header.
+  the caller sent is passed through like any other request header that is not an identity header. The backend's
+  [activity timeout](#timeouts-and-streaming) applies, with backend → service → root → default precedence,
+  including after configuration reloads.
 - The session cookie is never read, and the `Cookie` header is not forwarded.
-- A request whose path on the route still carries percent-encoding after the server has decoded it (such as an
-  encoded `/`), a backslash, a `;` anywhere in it, repeated `/` separators, or a `.` or `..` segment is refused with `400` before its token
-  is read: a backend that decoded or normalized it differently would receive a principal vouched for at a path
-  that is not a bearer route. The `;` starts a path parameter, which Tomcat, Jetty and Spring strip before
-  resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`. Repeated separators can hide a
-  stricter nested route from AuthProxy while a backend collapses them, so `/v1//admin` is refused too.
+- When any bearer route is configured, a request whose path still carries percent-encoding after the server
+  has decoded it (such as an encoded `/`), a backslash, a `;` anywhere in it, repeated `/` separators, or a `.` or
+  `..` segment is refused with `400` **before route selection**, including on browser-session paths. A backend
+  that decoded or normalized it differently could otherwise serve a bearer resource under browser-session
+  authentication or a weaker bearer policy. The `;` starts a path parameter, which Tomcat, Jetty and Spring
+  strip before resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`. Repeated separators can
+  hide a stricter nested route, such as `/v1//admin`, or the only bearer prefix, such as `/api//mcp/tools` when
+  `/api/mcp` is configured. Clients must send unambiguous paths; there is no browser-session fallback.
 - Every refusal is an API-style `400`, `401`, `403` or `503` — or `405` for a method other than `GET` or `HEAD`
   on the `ResourceMetadataUrl` path — never a redirect or a page. See
   [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).
@@ -754,4 +758,6 @@ every token-authenticated request instead.
 - A route that overlaps an anonymous path, repeats another route's prefix, names no issuer or audience, or
   belongs to a service without a backend is refused at startup, as is one that does not accept callers without
   identity verification in a deployment that requires it.
-- With no bearer route configured, nothing changes.
+- With no bearer route configured, the bearer gate leaves requests untouched. Browser sessions still strip
+  inbound `x-cratis-token-scope` and `x-cratis-token-client-id` headers and claims in the `urn:cratis:bearer:`
+  namespace, which only bearer routes set.

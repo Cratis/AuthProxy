@@ -1,9 +1,11 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;
 using Yarp.ReverseProxy.Transforms.Builder;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.BearerRoutes;
 
@@ -20,15 +22,15 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="forwarder">The YARP forwarder.</param>
 /// <param name="clientFactory">The YARP client factory, which applies the reverse proxy's own client configuration.</param>
 /// <param name="transformBuilder">The YARP transform builder.</param>
+/// <param name="config">The current configuration, including the backend's activity timeout.</param>
 /// <param name="logger">The logger.</param>
 public sealed class BearerRouteForwarder(
     IHttpForwarder forwarder,
     IForwarderHttpClientFactory clientFactory,
     ITransformBuilder transformBuilder,
+    IOptionsMonitor<C.AuthProxy> config,
     ILogger<BearerRouteForwarder> logger) : IBearerRouteForwarder, IDisposable
 {
-    static readonly ForwarderRequestConfig _requestConfig = new() { ActivityTimeout = TimeSpan.FromMinutes(5) };
-
     readonly HttpTransformer _transformer = transformBuilder.Create(context => context.RequestTransforms.Add(new BearerRouteHeadersTransform()));
 
     readonly HttpMessageInvoker _invoker = clientFactory.CreateClient(new ForwarderHttpClientContext
@@ -53,7 +55,16 @@ public sealed class BearerRouteForwarder(
             context.Items[BearerRouteDefaults.ForwardedIdentityItemKey] = identity;
         }
 
-        var error = await forwarder.SendAsync(context, route.BackendBaseUrl, _invoker, _requestConfig, _transformer);
+        var current = config.CurrentValue;
+        current.Services.TryGetValue(route.ServiceName, out var service);
+        var requestConfig = new ForwarderRequestConfig
+        {
+            ActivityTimeout = service?.Backend?.ActivityTimeout
+                ?? service?.ActivityTimeout
+                ?? current.ActivityTimeout
+                ?? C.AuthProxy.DefaultActivityTimeout,
+        };
+        var error = await forwarder.SendAsync(context, route.BackendBaseUrl, _invoker, requestConfig, _transformer);
         if (error != ForwarderError.None)
         {
             logger.BearerRouteForwardingFailed(

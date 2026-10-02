@@ -60,6 +60,15 @@ public class BearerRouteMiddleware(
             return;
         }
 
+        // Reject aliases before selecting a route: a backend may normalize a path that would otherwise
+        // miss every bearer prefix and fall through to browser-session authentication.
+        if (!BearerRouteTable.IsUnambiguous(context.Request.Path))
+        {
+            logger.BearerRoutePathAmbiguous();
+            BearerChallenge.BadRequest(context);
+            return;
+        }
+
         if (BearerRouteTable.TryMatchResourceMetadata(context.Request.Path, current, out var metadataRoute))
         {
             await ServeResourceMetadata(context, metadataRoute);
@@ -68,13 +77,6 @@ public class BearerRouteMiddleware(
 
         if (BearerRouteTable.TryMatch(context.Request.Path, current, out var route))
         {
-            if (!BearerRouteTable.IsUnambiguous(context.Request.Path))
-            {
-                logger.BearerRoutePathAmbiguous(route.Prefix, route.ServiceName);
-                BearerChallenge.BadRequest(context);
-                return;
-            }
-
             await Authenticate(context, route, current);
             return;
         }

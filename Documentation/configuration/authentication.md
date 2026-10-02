@@ -600,7 +600,7 @@ at startup.
 
 | Situation | Response |
 |-----------|----------|
-| Path on the route still percent-encoded after decoding, or containing a backslash, repeated `/` separators, a `;` (path parameter, as in `/mcp/..;/api`) or a `.`/`..` segment | `400`, no challenge |
+| Path still percent-encoded after decoding, or containing a backslash, repeated `/` separators, a `;` (path parameter, as in `/mcp/..;/api`) or a `.`/`..` segment, on any route when bearer routes are configured | `400` before route selection, no challenge |
 | No bearer token (a browser session does not count) | `401`, `WWW-Authenticate: Bearer resource_metadata="<ResourceMetadataUrl>"` |
 | Token invalid, expired, wrongly signed, from another issuer or for another audience; without a single `sub`; or without a claim a `ClaimMappings` entry reads | `401`, `WWW-Authenticate: Bearer error="invalid_token", resource_metadata="…"` |
 | Token lacks a required scope | `403`, `WWW-Authenticate: Bearer error="insufficient_scope", scope="<required scopes>", resource_metadata="…"` |
