@@ -11,7 +11,10 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.Identity.Abstractions;
+using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -78,6 +81,10 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<ICanonicalIdentityResolver, CanonicalIdentityResolver>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.TryAddSingleton<ICredentialsLoader>(services => new DefaultCredentialsLoader(services.GetRequiredService<ILogger<DefaultCredentialsLoader>>()));
+        builder.Services.TryAddSingleton<IOidcClientAssertions, OidcClientAssertions>();
         builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
 
         if (jwtSection.Exists())
@@ -208,7 +215,7 @@ public static class AuthenticationServiceCollectionExtensions
             {
                 options.Authority = capturedProvider.Authority;
                 options.ClientId = capturedProvider.ClientId;
-                options.ClientSecret = capturedProvider.ClientSecret;
+                options.ClientSecret = capturedProvider.UsesClientAssertion ? null : capturedProvider.ClientSecret;
                 options.ResponseType = "code";
 
                 if (AadMultiTenantIssuer.IsMultiTenantAuthority(capturedProvider.Authority))
@@ -279,6 +286,17 @@ public static class AuthenticationServiceCollectionExtensions
                     {
                         context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
                         return Task.CompletedTask;
+                    },
+                    OnAuthorizationCodeReceived = context => capturedProvider.UsesClientAssertion
+                        ? OidcClientAuthentication.Apply(context.HttpContext, scheme, capturedProvider, context.Options, context.TokenEndpointRequest!)
+                        : Task.CompletedTask,
+                    OnPushAuthorization = async context =>
+                    {
+                        if (capturedProvider.UsesClientAssertion)
+                        {
+                            await OidcClientAuthentication.Apply(context.HttpContext, scheme, capturedProvider, context.Options, context.ProtocolMessage);
+                            context.HandleClientAuthentication();
+                        }
                     },
                     OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
                     OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
