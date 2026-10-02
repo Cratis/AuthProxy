@@ -4,6 +4,7 @@
 using Cratis.AuthProxy.Admission;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Ingress;
@@ -105,6 +106,10 @@ public static class IngressExtensions
         // that never opts in.
         builder.AddAdmission();
 
+        // The same holds for the bearer-route gate: UseIngress always places it, and it hands every request on
+        // untouched for a deployment that declares no bearer route.
+        builder.AddBearerRoutes();
+
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, KeyRingConfigurationValidator>();
         builder.Services
             .AddDataProtection()
@@ -150,6 +155,11 @@ public static class IngressExtensions
         // design — a gate placed anywhere later would leave them public whatever it decided. It short-
         // circuits on its first line for every deployment that has not opted in.
         app.UseMiddleware<AdmissionMiddleware>();
+
+        // Ahead of the pages, the static files and authentication, because a bearer route must reach none of
+        // them: a request on one is answered here, by a forward or an API-style refusal. It hands every request on
+        // untouched when no bearer route is configured.
+        app.UseMiddleware<BearerRouteMiddleware>();
 
         // Routes match one service header, so a client still sending the legacy one is given the current one
         // before any endpoint is selected.

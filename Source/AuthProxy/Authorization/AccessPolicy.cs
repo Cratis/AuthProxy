@@ -39,9 +39,24 @@ public class AccessPolicy : IAccessPolicy
         }
 
         service ??= NamedService(context, config);
-        foreach (var requirement in RequirementsFor(service, config))
+        return Evaluate(context.User, RequirementsFor(config, service));
+    }
+
+    /// <inheritdoc/>
+    public AccessDecision Evaluate(ClaimsPrincipal user, C.AuthProxy config, string serviceName, C.BearerRoute route)
+    {
+        var requirements = route.IgnoreDeploymentRequiredClaims
+            ? route.RequiredClaims
+            : RequirementsFor(config, FindService(config, serviceName)).Concat(route.RequiredClaims);
+
+        return Evaluate(user, requirements);
+    }
+
+    static AccessDecision Evaluate(ClaimsPrincipal user, IEnumerable<C.ClaimRequirement> requirements)
+    {
+        foreach (var requirement in requirements)
         {
-            if (!IsSatisfied(requirement, context.User))
+            if (!IsSatisfied(requirement, user))
             {
                 return AccessDecision.Denied(requirement.Claim);
             }
@@ -53,10 +68,10 @@ public class AccessPolicy : IAccessPolicy
     /// <summary>
     /// Gets every requirement that applies to a request: the root's, then the target service's.
     /// </summary>
-    /// <param name="service">The targeted service, if any.</param>
     /// <param name="config">The auth proxy configuration to read.</param>
+    /// <param name="service">The targeted service, if any.</param>
     /// <returns>The applicable requirements, root-first.</returns>
-    static IEnumerable<C.ClaimRequirement> RequirementsFor(C.Service? service, C.AuthProxy config)
+    static IEnumerable<C.ClaimRequirement> RequirementsFor(C.AuthProxy config, C.Service? service)
     {
         foreach (var requirement in config.Authorization.RequiredClaims)
         {

@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.BearerRoutes;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.Identity;
@@ -76,8 +77,10 @@ public static class ClientPrincipalExtensions
             .Concat(["anonymous", "authenticated"])
             .Distinct();
 
+        // The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
+        // get to say that, so its claims in that namespace are never forwarded.
         var claims = user.Claims
-            .Where(c => !IsRoleClaim(c.Type, isCanonical))
+            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !BearerRouteClaims.IsReserved(c.Type))
             .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
 
         return new ClientPrincipal

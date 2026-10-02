@@ -28,6 +28,10 @@ public class InjectIdentityHeadersTransform : RequestTransform
         // the tenancy middleware having run, so nothing a caller sent survives whatever path led here.
         SpoofableHeaders.Strip(context.ProxyRequest.Headers);
 
+        // Only a bearer route vouches for these, and bearer routes are never forwarded through here.
+        context.ProxyRequest.Headers.Remove(Headers.TokenClientId);
+        context.ProxyRequest.Headers.Remove(Headers.TokenScope);
+
         var principal = httpContext.BuildClientPrincipal();
         if (principal is not null)
         {

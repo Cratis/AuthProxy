@@ -50,6 +50,8 @@ public class TenancyMiddleware(
         // Every x-ms-client-principal* header and the tenant under both of its names; only the tenant this
         // middleware resolves below is ever forwarded.
         SpoofableHeaders.Strip(context.Request.Headers);
+        context.Request.Headers.Remove(Headers.TokenClientId);
+        context.Request.Headers.Remove(Headers.TokenScope);
 
         // 2. Resolve tenant.
         if (!tenantResolver.TryResolve(context, out string tenantId))

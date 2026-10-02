@@ -46,6 +46,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `ActivityTimeout` | `TimeSpan` | The root `ActivityTimeout`, then `00:05:00` | How long a request proxied to this service may sit idle before AuthProxy cancels it. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
+| `BearerRoutes` | `BearerRouteConfig[]` | `[]` | Path prefixes authenticated by an access token from an external authorization server instead of a browser session. See [Bearer routes](#bearer-routes). |
 | `AccessToken` | `ServiceAccessTokenConfig` | `null` | Forwards the signed-in user's access token for this service's audience to its backend. See [Forwarding the user's access token](#forwarding-the-users-access-token). |
 
 ### ServiceEndpointConfig properties
@@ -607,6 +608,168 @@ The verification endpoint's response can optionally include a `tenant` property,
 carries on the issued tokens and can resolve into the `x-cratis-tenant-id` header on proxied requests.
 See [Back-channel client credentials](authentication.md#back-channel-client-credentials) for the full
 token, tenant-resolution, and refresh-token flow.
+
+---
+
+## Bearer routes
+
+A bearer route is a path prefix on a service that is called by programs — a CLI, an MCP client, another
+service — with an access token issued by an external authorization server such as Cratis Identity. AuthProxy
+stays a relying party: it validates the token and forwards the request, and it never issues these tokens.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authorization": {
+        "RequiredClaims": [
+          { "Claim": "urn:github:team", "AnyOf": [ "Cratis/direct" ] }
+        ]
+      },
+      "Services": {
+        "direct": {
+          "Backend": { "BaseUrl": "http://direct:8080/" },
+          "Frontend": { "BaseUrl": "http://direct:8080/" },
+          "BearerRoutes": [
+            {
+              "PathPrefix": "/mcp",
+              "Issuers": [ { "Issuer": "https://auth.example/" } ],
+              "Audiences": [ "direct-api" ],
+              "RequiredScopes": [ "direct:read" ],
+              "ResourceMetadataUrl": "https://cratis.direct/.well-known/oauth-protected-resource/mcp",
+              "IdentityProvider": "github",
+              "ClaimMappings": {
+                "sub": "github_id",
+                "preferred_username": "github_login"
+              },
+              "IgnoreDeploymentRequiredClaims": true,
+              "AcceptWithoutIdentityVerification": true
+            },
+            {
+              "PathPrefix": "/v1",
+              "Issuers": [ { "Issuer": "https://auth.example/" } ],
+              "Audiences": [ "direct-api" ],
+              "ResourceMetadataUrl": "https://cratis.direct/.well-known/oauth-protected-resource/v1",
+              "IdentityProvider": "github",
+              "ClaimMappings": {
+                "sub": "github_id",
+                "preferred_username": "github_login"
+              },
+              "IgnoreDeploymentRequiredClaims": true,
+              "AcceptWithoutIdentityVerification": true
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+This is Direct's shape: Cratis Identity issues tokens with `aud=direct-api` for both `https://cratis.direct/mcp`
+and `https://cratis.direct/v1`. The claim mappings make a token-authenticated request carry the same
+`x-ms-client-principal-id` (the numeric GitHub id) and `x-ms-client-principal-name` (the GitHub login) as a
+browser session signed in through Direct's GitHub provider, so Direct resolves the same user either way. The
+Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:bearer:subject` claim.
+
+Direct's deployment also requires the `urn:github:team` claim. A browser session gets it from Direct's GitHub
+sign-in, which reads team membership from the GitHub API; a Cratis Identity access token does not carry it. Claim
+requirements apply to bearer routes by default, so without `IgnoreDeploymentRequiredClaims` every token on these
+routes would be refused with `403`. With it, the proxy-wide and service requirements are left out on the route,
+AuthProxy logs a warning at startup naming them, and Direct's backend is what decides whether the caller is a member
+of the tenant. When Cratis Identity mints a team or membership claim, either remove
+`IgnoreDeploymentRequiredClaims` (if the claim is `urn:github:team` itself), or keep it and require the new claim
+on the route:
+
+```json
+"RequiredClaims": [
+  { "Claim": "urn:cratis:membership", "AnyOf": [ "direct" ] }
+]
+```
+
+`AcceptWithoutIdentityVerification` states the same thing for `/.cratis/me`: Direct answers it for browser
+sessions, a bearer route never calls it, and Direct's backend checks the caller's membership of the tenant on
+every token-authenticated request instead.
+
+### BearerRouteConfig properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `PathPrefix` | `string` | — | The prefix this route covers, for example `/mcp`. Matched case-insensitively on segment boundaries, with the same rules as [anonymous paths](#what-a-valid-entry-looks-like). The longest matching prefix wins. |
+| `Issuers` | `BearerIssuerConfig[]` | — | The authorization servers whose tokens are accepted. At least one. |
+| `Audiences` | `string[]` | — | The token's `aud` must exactly match at least one of these, including any trailing slash. At least one. |
+| `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
+| `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication and must be outside every bearer-route prefix. |
+| `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |
+| `ClaimMappings` | `map<string, string>` | `{}` | Forwarded claim type → token claim it is read from, replacing all case variants of the target. A missing source refuses the token; mapped `sub`, `preferred_username` and `name` require one usable source value. Targets may not differ only by case or overwrite the route's tenant claim. Claim types containing `:` cannot be keys, because `:` separates configuration sections. |
+| `IdentityProvider` | `string` | `bearer` | The identity provider named in the forwarded principal. |
+| `ForwardAuthorizationHeader` | `bool` | `false` | Whether the backend also receives the `Authorization` header. |
+| `ClockSkew` | `TimeSpan` | `00:00:30` | Allowed clock skew for `exp` and `nbf`. At most `00:05:00`. |
+| `RequiredClaims` | `{ Claim, AnyOf }[]` | `[]` | Claim requirements of the route's own, checked against the token's principal after `ClaimMappings`, in addition to the deployment's. Same shape and rules as [`Authorization:RequiredClaims`](authorization.md); a requirement on a role claim is refused at startup, because a token never carries a role. |
+| `IgnoreDeploymentRequiredClaims` | `bool` | `false` | Leave the deployment's claim requirements — proxy-wide and the service's — out on this route. For a deployment whose requirements name a claim the token issuer does not mint. Logged as a warning at startup. |
+| `AcceptWithoutIdentityVerification` | `bool` | `false` | State that this route's callers are accepted without any service's `/.cratis/me` being asked about them. Required when a service declares `IdentityVerification: Required`; under `BestEffort` it silences the startup warning. See [What a bearer route changes](#what-a-bearer-route-changes). |
+
+### BearerIssuerConfig properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `Issuer` | `string` | — | The issuer identifier. The token's `iss` and the issuer metadata's `issuer` must both be exactly this value. HTTPS, or plain HTTP on a loopback host for development. |
+| `MetadataAddress` | `string` | RFC 8414 address | The metadata document. Defaults to `/.well-known/oauth-authorization-server` inserted between the issuer's host and path. An OpenID Connect discovery document works too. |
+| `TokenTypes` | `string[]` | `at+jwt`, `application/at+jwt` | Accepted JWT `typ` header values, so an ID token cannot be presented as an access token. |
+
+### What a bearer route changes
+
+- A request on a bearer route is answered before static files, authentication, provider selection, tenant
+  selection and identity enrichment — none of them apply. [Admission](admission.md) and the trusted-proxy
+  boundary run first and apply as to any request.
+- The deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
+  the token's principal after `ClaimMappings`, unless the route sets `IgnoreDeploymentRequiredClaims`. The
+  route's own `RequiredClaims` apply on top either way. A token that does not satisfy them is refused with `403`.
+  A requirement on a role can never be met: roles are dropped from every token.
+- A bearer route **never calls `/.cratis/me`**, in either identity-verification mode: the endpoint answers for
+  browser sessions, not for principals authenticated by a token. The backend must enforce tenant membership.
+  - Under explicitly configured `BestEffort`, a `403` from a service's `/.cratis/me` refuses a browser session but not a
+    token. AuthProxy starts, and logs a warning for each bearer route in a deployment where some service answers
+    `/.cratis/me`, unless the route sets `AcceptWithoutIdentityVerification: true`.
+  - Under `Required` (the default), AuthProxy **refuses to start** with a bearer route unless the route sets
+    `AcceptWithoutIdentityVerification: true`.
+
+  Setting it is the operator's statement that, on this route, the validated token, its scopes and the claim
+  requirements are the whole decision at the edge and the backend answers for the rest.
+- Bearer prefixes are full external paths claimed on **every host**, not relative to the owning service's
+  `PathPrefix` or restricted by its `Hosts`. They may lie under their own service's `PathPrefix`, but cannot
+  overlap another service's `PathPrefix`, even on different hosts. AuthProxy refuses such overlaps at startup.
+- A service with bearer routes cannot set `StripPathPrefix: true`: a browser request such as
+  `/app/api/mcp/tools` could otherwise be stripped to `/api/mcp/tools` and bypass the bearer policy there.
+  AuthProxy refuses this configuration at startup. Set `StripPathPrefix: false` and have the backend serve
+  the full external paths, or remove the bearer routes from that service; do not expose the same bearer-only
+  backend resource through another service that strips a prefix.
+- An accepted request is forwarded straight to the service **backend**, whichever of the service's endpoints
+  would otherwise serve that path, with its path and query unchanged. AuthProxy adds no `Service-ID` header; one
+  the caller sent is passed through like any other request header that is not an identity header. The backend's
+  [activity timeout](#timeouts-and-streaming) applies, with backend → service → root → default precedence,
+  including after configuration reloads.
+- The session cookie is never read, and the `Cookie` header is not forwarded.
+- When any bearer route is configured, a request whose path still carries percent-encoding after the server
+  has decoded it (such as an encoded `/`), a backslash, a `;` anywhere in it, repeated `/` separators, or a `.` or
+  `..` segment is refused with `400` **before route selection**, including on browser-session paths. A backend
+  that decoded or normalized it differently could otherwise serve a bearer resource under browser-session
+  authentication or a weaker bearer policy. The `;` starts a path parameter, which Tomcat, Jetty and Spring
+  strip before resolving dot segments, so they read `/mcp/..;/api/items` as `/api/items`. Repeated separators can
+  hide a stricter nested route, such as `/v1//admin`, or the only bearer prefix, such as `/api//mcp/tools` when
+  `/api/mcp` is configured. Clients must send unambiguous paths; there is no browser-session fallback.
+- Every refusal is an API-style `400`, `401`, `403` or `503` — or `405` for a method other than `GET` or `HEAD`
+  on the `ResourceMetadataUrl` path — never a redirect or a page. See
+  [Bearer routes](authentication.md#bearer-routes-access-tokens-from-an-authorization-server).
+- A token from a bearer-route issuer is refused with `401` on every path that is **not** one of the issuer's
+  bearer routes, even where another bearer scheme (the [JWT Bearer](authentication.md#jwt-bearer-api) handler)
+  would accept it. A browser-only surface such as `/api` stays browser-only.
+- A route that overlaps an anonymous path, repeats another route's prefix, names no issuer or audience, or
+  belongs to a service without a backend is refused at startup, as is one that does not accept callers without
+  identity verification in a deployment that requires it.
+- With no bearer route configured, the bearer gate leaves requests untouched. Browser sessions still strip
+  inbound `x-cratis-token-scope` and `x-cratis-token-client-id` headers and claims in the `urn:cratis:bearer:`
+  namespace, which only bearer routes set.
 
 ---
 

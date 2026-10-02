@@ -254,3 +254,18 @@ If a strategy provides a strategy-specific verification URL template (for exampl
 
 When verification fails, AuthProxy serves `tenant-not-found.html`.
 See [Error pages](error-pages.md) to override this page.
+
+---
+
+## Bearer routes
+
+On a [bearer route](services.md#bearer-routes) the tenant comes from the access token alone: the claim named by
+`TenantClaimType` (`tid` by default). None of the resolution strategies above run, the tenant-selection cookie is
+never read and the tenant-selection page is never served.
+
+- A token that does not carry exactly one tenant, or carries one that is not made of letters, digits, `-`, `.`,
+  `_` or `~` (at most 256 characters), is refused with `403`. There is no fallback to a default tenant.
+- When [tenant verification](#tenant-verification) is configured, the tenant is verified the same way; a tenant
+  that fails verification is refused with `403` rather than the tenant-not-found page.
+- The tenant is forwarded as `Tenant-ID`. It records which tenant the user chose when the token was granted; the
+  backend still decides whether the user is a member of it.

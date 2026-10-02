@@ -1,0 +1,37 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+namespace Cratis.AuthProxy.BearerRoutes;
+
+internal static partial class BearerRoutesLogging
+{
+    [LoggerMessage(LogLevel.Warning, "The metadata at '{MetadataAddress}' does not name the configured issuer '{Issuer}'. Tokens from that issuer are refused until it does.")]
+    internal static partial void IssuerMetadataNamesAnotherIssuer(this ILogger logger, string issuer, string metadataAddress);
+
+    [LoggerMessage(LogLevel.Warning, "The metadata or signing keys of issuer '{Issuer}' could not be retrieved from '{MetadataAddress}'.")]
+    internal static partial void IssuerMetadataUnavailable(this ILogger logger, Exception exception, string issuer, string metadataAddress);
+
+    [LoggerMessage(LogLevel.Information, "Bearer token refused on route '{Route}' of service '{Service}' ({Status}): {Reason}")]
+    internal static partial void BearerTokenRefused(this ILogger logger, string route, string service, BearerTokenValidationStatus status, string reason);
+
+    [LoggerMessage(LogLevel.Information, "A token from bearer-route issuer '{Issuer}' was presented on {Path}, which is not one of its bearer routes. Refused.")]
+    internal static partial void BearerTokenOutsideItsRoutes(this ILogger logger, string issuer, string path);
+
+    [LoggerMessage(LogLevel.Information, "A request has an encoded character, a backslash, a semicolon, repeated separators or a dot segment in its path. Refused before route selection because bearer routes are configured.")]
+    internal static partial void BearerRoutePathAmbiguous(this ILogger logger);
+
+    [LoggerMessage(LogLevel.Information, "A valid bearer token on route '{Route}' of service '{Service}' does not satisfy the required claim '{Claim}'. Refused.")]
+    internal static partial void BearerAccessDenied(this ILogger logger, string route, string service, string claim);
+
+    [LoggerMessage(LogLevel.Warning, "Tenant '{TenantId}' named by a bearer token on {Path} could not be verified. Refused.")]
+    internal static partial void BearerTenantNotVerified(this ILogger logger, string tenantId, string path);
+
+    [LoggerMessage(LogLevel.Warning, "Bearer route '{Route}' of service '{Service}' sets IgnoreDeploymentRequiredClaims, so the deployment's claim requirements on {Claims} are not applied to its tokens. Only the route's own RequiredClaims are.")]
+    internal static partial void BearerRouteIgnoresDeploymentRequirements(this ILogger logger, string route, string service, string claims);
+
+    [LoggerMessage(LogLevel.Warning, "Bearer route '{Route}' of service '{Service}' does not call /.cratis/me, so a 403 from {Services} that would refuse a browser session does not refuse its tokens; the backend must decide membership. Set AcceptWithoutIdentityVerification on the route to state that this is intended.")]
+    internal static partial void BearerRouteDoesNotConsultIdentityVerification(this ILogger logger, string route, string service, string services);
+
+    [LoggerMessage(LogLevel.Warning, "Forwarding bearer route '{Route}' of service '{Service}' failed ({Error}).")]
+    internal static partial void BearerRouteForwardingFailed(this ILogger logger, Exception? exception, string route, string service, Yarp.ReverseProxy.Forwarder.ForwarderError error);
+}
