@@ -55,4 +55,4 @@ jobs:
         with:
           name: spec-results
           path: TestResults
-          retention-days: 14
+          retention-days: 7
