@@ -59,7 +59,7 @@ jobs:
         with:
           name: security-spec-results
           path: TestResults
-          retention-days: 14
+          retention-days: 7
 
   frontend-dependency-audit:
     name: Frontend dependency audit
@@ -142,4 +142,4 @@ jobs:
         with:
           name: vulnerable-dependency-report
           path: vulnerable.txt
-          retention-days: 14
+          retention-days: 7
