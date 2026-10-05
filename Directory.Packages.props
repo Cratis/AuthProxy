@@ -5,13 +5,13 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Cratis -->
-    <PackageVersion Include="Cratis.Arc.Core" Version="22.41.2" />
+    <PackageVersion Include="Cratis.Arc.Core" Version="22.50.5" />
     <!-- Microsoft -->
     <PackageVersion Include="Aspire.Hosting" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.NodeJs" Version="9.5.2" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Identity.Web.Certificate" Version="4.15.0" />
+    <PackageVersion Include="Microsoft.Identity.Web.Certificate" Version="4.16.0" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.12" />
     <!-- Azure -->
     <PackageVersion Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" Version="1.5.4" />
@@ -25,8 +25,8 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
     <!-- Analysis -->
     <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" NoWarn="NU5104" />
-    <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.290" />
+    <PackageVersion Include="Roslynator.Analyzers" Version="5.0.1" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.294" />
     <!-- Specifications -->
     <PackageVersion Include="Cratis.Specifications.XUnit" Version="4.1.1" />
     <PackageVersion Include="coverlet.collector" Version="10.1.0" />
