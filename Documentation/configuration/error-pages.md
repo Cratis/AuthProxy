@@ -126,6 +126,27 @@ closed: only a single `email_verified` claim parsing to exactly `true` counts as
 duplicated, malformed, or non-`true` claim is answered with this page too. See
 [Invitation to Organization](lobby/invitation-to-organization.md) for the complete binding behavior.
 
+### Invitation email substitutions
+
+Replacement invitation pages can use these literal tokens as HTML text:
+
+| Token | Available on | Value |
+|---|---|---|
+| `{{invitedEmail}}` | `invitation-select-provider.html`, `invitation-email-mismatch.html`, `invitation-email-unavailable.html` | The validated invitation's recipient address, or empty for an invitation without an email recipient. |
+| `{{assertedEmail}}` | `invitation-email-mismatch.html` | The provider's single usable email address. Empty when no unambiguous address was supplied; never inferred from a username. On the other invitation pages it is empty. |
+
+For example, a replacement mismatch page can contain:
+
+```html
+<p>Invited address: {{invitedEmail}}</p>
+<p>Selected account: {{assertedEmail}}</p>
+```
+
+Values are HTML-encoded and display-only: they do not change verified-email matching or authorize an
+invitation. They are supplied only for a validated invitation flow and its correlated callback, not for a
+bare static-page URL, invalid capability, or unrelated authentication failure. Put the tokens in HTML text,
+not JavaScript or URLs. Pages that omit the tokens keep their existing content.
+
 ---
 
 ## Provider info cookie (`.cratis-providers`)

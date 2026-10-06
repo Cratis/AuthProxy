@@ -28,5 +28,5 @@ public class when_completing_an_attested_invitation_without_verified_email : an_
     /// The identity provider supplied no usable email at all, so the invitee sees the dedicated
     /// unavailable-address outcome instead of a generic invalid-link denial that offers no real recovery.
     /// </summary>
-    [Fact] void should_serve_the_email_unavailable_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden);
+    [Fact] void should_serve_the_email_unavailable_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden, Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == Email && values["{{assertedEmail}}"] == string.Empty));
 }

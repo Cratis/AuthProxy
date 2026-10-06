@@ -24,5 +24,5 @@ public class and_the_session_predates_the_invitation : given.an_invite_exchange
     [Fact] void should_continue_the_pipeline() => _nextCalled.ShouldBeTrue();
     [Fact]
     void should_not_serve_an_error_page() =>
-        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
+        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>());
 }

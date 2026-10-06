@@ -66,5 +66,6 @@ public class when_valid_invite_token_is_presented_with_multiple_providers : Spec
         _errorPageProvider.Received(1).WriteErrorPageAsync(
             _context,
             WellKnownPageNames.InvitationSelectProvider,
-            StatusCodes.Status200OK);
+            StatusCodes.Status200OK,
+            Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == string.Empty && values["{{assertedEmail}}"] == string.Empty));
 }
