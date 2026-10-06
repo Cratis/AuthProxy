@@ -21,7 +21,8 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// AuthProxy authenticates the refresh the way it authenticates the sign-in: with the provider's client secret, or
 /// with the client assertion of its certificate or federated credential. A provider that rotates refresh tokens gets
 /// the new one stored. Refreshes for one session are serialized within this instance, so concurrent requests do
-/// not race to redeem the same refresh token.
+/// not race to redeem the same refresh token. Proxied requests cache tokens per backend destination binding as
+/// well as audience, so a backend-only configuration reload cannot reuse a token acquired for the old destination.
 /// </remarks>
 /// <param name="store">The <see cref="IUserTokenStore"/> holding refresh and access tokens.</param>
 /// <param name="oidcOptions">The OIDC handler options, for each provider's client and metadata.</param>
@@ -86,7 +87,7 @@ public sealed class UserAccessTokens(
     static string AudienceKey(string scheme, C.ServiceAccessToken accessToken)
     {
         var scopes = string.Join(' ', accessToken.Scopes.Select(_ => _.Trim()).Where(_ => _.Length > 0).Order(StringComparer.Ordinal));
-        var material = $"{scheme}\n{scopes}\n{accessToken.Resource.Trim()}";
+        var material = $"{scheme}\n{scopes}\n{accessToken.Resource.Trim()}\n{accessToken.DestinationBinding}";
         return WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     }
 
