@@ -168,7 +168,11 @@ static class InviteCallbackCompletion
         await context.HttpContext.SignInAsync(context.Options.SignInScheme, context.Principal!, context.Properties);
 
         var errorPageProvider = context.HttpContext.RequestServices.GetRequiredService<IErrorPageProvider>();
-        await errorPageProvider.WriteErrorPageAsync(context.HttpContext, pageName, statusCode);
+        var isEmailMismatch = string.Equals(pageName, WellKnownPageNames.InvitationEmailMismatch, StringComparison.Ordinal);
+        var substitutions = isEmailMismatch || string.Equals(pageName, WellKnownPageNames.InvitationEmailUnavailable, StringComparison.Ordinal)
+            ? InvitationPageEmails.ForRequest(context.HttpContext, includeAssertedEmail: isEmailMismatch)
+            : null;
+        await errorPageProvider.WriteErrorPageAsync(context.HttpContext, pageName, statusCode, substitutions);
         context.HandleResponse();
         return InviteCallbackCompletionResult.ResponseHandled;
     }

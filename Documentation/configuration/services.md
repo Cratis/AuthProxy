@@ -831,8 +831,8 @@ provider must be configured. AuthProxy refuses to start otherwise.
   inside its encrypted ticket. In this OIDC flow, the refresh token, access tokens and ID token never reach
   the browser. Failed sign-ins and identity-link callbacks create no stored token session.
 - For each request to the backend, AuthProxy uses that refresh token at the provider's token endpoint
-  (`grant_type=refresh_token`) to get a token for the service's scopes. The token is cached per session and
-  audience, and renewed shortly before it expires. AuthProxy authenticates to the token endpoint with the
+  (`grant_type=refresh_token`) to get a token for the service's scopes. The token is cached per session,
+  audience, and selected backend destination, and renewed shortly before it expires. AuthProxy authenticates to the token endpoint with the
   provider's `ClientSecret` or [client credential](authentication.md#client-credentials-certificates-and-federated-credentials),
   and stores a rotated refresh token when the provider issues one. Once a refresh starts, it finishes under
   a ten-second operation timeout independently of browser cancellation, so navigation does not discard
@@ -852,6 +852,10 @@ provider must be configured. AuthProxy refuses to start otherwise.
   authenticate with their own bearer token ([client credentials](#client-credentials) or JWT bearer) are
   forwarded as before.
 - Tokens stay bound to the backend and audience selected for the request across configuration reloads.
+  Changing only `Backend.BaseUrl` obtains a token again instead of reusing one cached for the previous backend,
+  even when the session, provider, scopes, and resource are unchanged.
+  Each service also has its own backend destination: services that declare the same provider, scopes, and
+  resource, even with the same `Backend.BaseUrl`, each obtain and cache their own token and their own rejection backoff.
   If a request captures a token policy and destinations from different configuration versions, AuthProxy
   refuses it with `503` before obtaining or forwarding a token. Retry after the reload completes.
 - When no token can be obtained, the request is refused with `401` instead of being forwarded without one.
@@ -859,7 +863,7 @@ provider must be configured. AuthProxy refuses to start otherwise.
   cannot be reached, or the user signed in with another provider than `Provider`. An `invalid_grant` error
   refuses that audience without discarding the session or other audiences: it can mean missing consent
   or a resource-specific policy rather than an expired refresh token. Rejections are cached for 30 seconds
-  per session and audience to avoid repeatedly redeeming the same refused refresh token. Signing in again
+  per session, audience, and backend destination to avoid repeatedly redeeming the same refused refresh token. Signing in again
   clears the previous session's rejections. The frontend should treat the `401`
   as a signal to sign in again through `/.cratis/login/{scheme}`; a missing consent or policy requirement
   may also need to be addressed at the provider.

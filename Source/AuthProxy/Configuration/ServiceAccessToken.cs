@@ -32,4 +32,10 @@ public class ServiceAccessToken
     /// request is refused.
     /// </summary>
     public string Provider { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the server-selected backend destination binding for access-token caching.
+    /// This is assigned from the matched proxy cluster, never from configuration or caller input.
+    /// </summary>
+    internal string DestinationBinding { get; set; } = string.Empty;
 }

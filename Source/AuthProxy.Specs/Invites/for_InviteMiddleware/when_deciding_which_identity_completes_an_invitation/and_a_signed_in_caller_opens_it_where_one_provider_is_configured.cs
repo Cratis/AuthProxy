@@ -28,7 +28,8 @@ public class and_a_signed_in_caller_opens_it_where_one_provider_is_configured : 
         _errorPageProvider.Received(1).WriteErrorPageAsync(
             _context,
             WellKnownPageNames.InvitationSelectProvider,
-            StatusCodes.Status200OK);
+            StatusCodes.Status200OK,
+            Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == string.Empty && values["{{assertedEmail}}"] == string.Empty));
 
     [Fact]
     void should_not_challenge_the_provider_silently() =>

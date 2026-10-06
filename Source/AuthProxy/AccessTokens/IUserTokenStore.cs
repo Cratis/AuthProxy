@@ -8,7 +8,8 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// </summary>
 /// <remarks>
 /// Entries are keyed by an unguessable session identifier that only the encrypted session cookie carries, so the
-/// tokens themselves never reach the browser.
+/// tokens themselves never reach the browser. The opaque audience key supplied by the token acquirer also
+/// identifies the backend destination binding for proxied requests, separating cached tokens across backend reloads.
 /// </remarks>
 public interface IUserTokenStore
 {

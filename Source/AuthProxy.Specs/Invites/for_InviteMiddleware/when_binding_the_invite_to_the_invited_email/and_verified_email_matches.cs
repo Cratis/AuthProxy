@@ -20,5 +20,5 @@ public class and_verified_email_matches : given.an_invite_exchange
     [Fact] void should_forward_to_the_exchange_endpoint() => _exchangeCalled.ShouldBeTrue();
     [Fact] void should_continue_the_pipeline() => _nextCalled.ShouldBeTrue();
     [Fact] void should_not_serve_an_error_page() =>
-        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
+        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>());
 }
