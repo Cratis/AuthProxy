@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
 using Microsoft.Extensions.Primitives;
 using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
@@ -84,8 +85,9 @@ public static class ServiceRoutes
         HostString parsed;
         try
         {
-            // ASP.NET decodes IDNs when reading the Host header; route declarations must use the same form.
-            parsed = HostString.FromUriComponent(trimmed.ToLowerInvariant());
+            // ASP.NET decodes IDNs when reading the Host header; route declarations must use the same
+            // composed Unicode form, even when configuration uses decomposed characters.
+            parsed = HostString.FromUriComponent(trimmed.Normalize(NormalizationForm.FormC).ToLowerInvariant());
         }
         catch (ArgumentException)
         {

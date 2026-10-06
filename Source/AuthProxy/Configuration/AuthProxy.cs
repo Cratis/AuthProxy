@@ -128,8 +128,9 @@ public class AuthProxy
     /// </summary>
     /// <remarks>
     /// The clock restarts every time data is read or written, so this is an idle limit rather than a limit on
-    /// the total duration. It is what ends a quiet WebSocket or Server-Sent Events stream. Must be greater
-    /// than zero. See <see cref="Service.ActivityTimeout"/> and <see cref="ServiceEndpoint.ActivityTimeout"/>
+    /// the total duration. It is what ends a quiet WebSocket or Server-Sent Events stream. Must be between
+    /// 1 and <see cref="int.MaxValue"/> milliseconds (about 24.8 days), inclusive. See
+    /// <see cref="Service.ActivityTimeout"/> and <see cref="ServiceEndpoint.ActivityTimeout"/>
     /// for the narrower settings.
     /// </remarks>
     public TimeSpan? ActivityTimeout { get; set; }
