@@ -326,7 +326,8 @@ public class InviteMiddleware(
                 await errorPageProvider.WriteErrorPageAsync(
                     context,
                     WellKnownPageNames.InvitationSelectProvider,
-                    StatusCodes.Status200OK);
+                    StatusCodes.Status200OK,
+                    InvitationPageEmails.ForSelection(tokenValidator, token, config.CurrentValue.Invite?.EmailClaim));
                 return;
             }
 
@@ -620,7 +621,8 @@ public class InviteMiddleware(
             await errorPageProvider.WriteErrorPageAsync(
                 context,
                 WellKnownPageNames.InvitationEmailMismatch,
-                StatusCodes.Status403Forbidden);
+                StatusCodes.Status403Forbidden,
+                InvitationPageEmails.ForRequest(context, includeAssertedEmail: true));
 
             return;
         }
@@ -630,7 +632,8 @@ public class InviteMiddleware(
             await errorPageProvider.WriteErrorPageAsync(
                 context,
                 WellKnownPageNames.InvitationEmailUnavailable,
-                StatusCodes.Status403Forbidden);
+                StatusCodes.Status403Forbidden,
+                InvitationPageEmails.ForRequest(context, includeAssertedEmail: false));
 
             return;
         }

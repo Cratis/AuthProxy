@@ -181,7 +181,7 @@ public class an_attested_invite_completion : Specification
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(new HttpClient(_handler));
         _errorPageProvider = Substitute.For<IErrorPageProvider>();
-        _errorPageProvider.WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>()).Returns(Task.CompletedTask);
+        _errorPageProvider.WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>()).Returns(Task.CompletedTask);
         _logger = new();
 
         _middleware = new(

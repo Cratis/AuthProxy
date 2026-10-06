@@ -142,6 +142,13 @@ address, rather than telling them their address mismatched.
 Email binding is off by default. See [Invitation to Organization](lobby/invitation-to-organization.md) for
 configuration and the limits of provider-supplied `email_verified` evidence.
 
+Replacement invitation selection, mismatch, and unavailable pages can display the HTML-encoded
+`{{invitedEmail}}` token. Mismatch pages can also display `{{assertedEmail}}` when the provider supplied a
+single usable address; otherwise it is empty, never inferred from a username. These display-only values
+are restricted to a validated invitation and its correlated callback. Static page URLs and unrelated
+failures receive no email evidence. See [Invitation email substitutions](error-pages.md#invitation-email-substitutions)
+for the complete contract and an example.
+
 ---
 
 ## Tenant not found

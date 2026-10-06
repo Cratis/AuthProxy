@@ -19,7 +19,8 @@ public class and_a_signed_in_caller_opens_the_invitation_link : given.an_invitat
         _errorPageProvider.Received(1).WriteErrorPageAsync(
             _context,
             WellKnownPageNames.InvitationSelectProvider,
-            StatusCodes.Status200OK);
+            StatusCodes.Status200OK,
+            Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == string.Empty && values["{{assertedEmail}}"] == string.Empty));
 
     [Fact] void should_carry_the_invitation_across_the_choice() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
     [Fact] void should_offer_every_configured_provider() => _context.Response.Headers.SetCookie.ToString().ShouldContain("Google");

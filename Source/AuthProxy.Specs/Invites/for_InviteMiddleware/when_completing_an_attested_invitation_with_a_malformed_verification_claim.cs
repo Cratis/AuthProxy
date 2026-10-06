@@ -26,5 +26,5 @@ public class when_completing_an_attested_invitation_with_a_malformed_verificatio
     [Fact] void should_not_call_the_completion_endpoint() => _handler.Request.ShouldBeNull();
     [Fact] void should_not_issue_a_complete_attestation() => _attestationIssuer.Identity.ShouldBeNull();
     [Fact] void should_not_continue_the_pipeline() => _nextCalled.ShouldBeFalse();
-    [Fact] void should_serve_the_email_mismatch_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden);
+    [Fact] void should_serve_the_email_mismatch_page() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden, Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == Email && values["{{assertedEmail}}"] == Email));
 }
