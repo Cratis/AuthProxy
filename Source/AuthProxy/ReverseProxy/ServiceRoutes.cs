@@ -1,7 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Text;
+using System.Globalization;
 using Microsoft.Extensions.Primitives;
 using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
@@ -85,13 +85,16 @@ public static class ServiceRoutes
         HostString parsed;
         try
         {
-            // ASP.NET decodes IDNs when reading the Host header; route declarations must use the same
-            // composed Unicode form, even when configuration uses decomposed characters.
-            parsed = HostString.FromUriComponent(trimmed.Normalize(NormalizationForm.FormC).ToLowerInvariant());
+            // Round-trip declarations through IDN mapping so compatibility characters, casing and
+            // normalization match the Unicode host ASP.NET decodes from the request's punycode.
+            parsed = HostString.FromUriComponent(trimmed);
+            var idn = new IdnMapping();
+            var canonicalHost = idn.GetUnicode(idn.GetAscii(parsed.Host));
+            parsed = parsed.Port is { } port ? new HostString(canonicalHost, port) : new HostString(canonicalHost);
         }
         catch (ArgumentException)
         {
-            // Invalid punycode is an unusable declaration, not a startup exception outside validation.
+            // Invalid IDNs are unusable declarations, not startup exceptions outside validation.
             return false;
         }
         if (Uri.CheckHostName(parsed.Host.Trim('[', ']')) == UriHostNameType.Unknown
