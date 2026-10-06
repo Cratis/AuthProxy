@@ -90,6 +90,14 @@ public static class ServiceRoutes
             parsed = HostString.FromUriComponent(trimmed);
             var idn = new IdnMapping();
             var canonicalHost = idn.GetUnicode(idn.GetAscii(parsed.Host));
+
+            // Mapping can fold compatibility characters (fullwidth ':' '[' ']' and similar) into authority
+            // delimiters. A mapped host must stay a bare host name; the port only comes from the declaration.
+            if (canonicalHost.IndexOfAny([':', '/', '*', '?', '#', '@', ' ', '[', ']', '\\']) >= 0)
+            {
+                return false;
+            }
+
             parsed = parsed.Port is { } port ? new HostString(canonicalHost, port) : new HostString(canonicalHost);
         }
         catch (ArgumentException)
