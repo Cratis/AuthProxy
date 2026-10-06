@@ -87,7 +87,8 @@ public static class ServiceRoutes
         {
             // Round-trip declarations through IDN mapping so compatibility characters, casing and
             // normalization match the Unicode host ASP.NET decodes from the request's punycode.
-            parsed = HostString.FromUriComponent(trimmed);
+            // ASCII input is lower-cased first, as before, so punycode detection does not depend on letter case.
+            parsed = HostString.FromUriComponent(trimmed.All(char.IsAscii) ? trimmed.ToLowerInvariant() : trimmed);
             var idn = new IdnMapping();
 
             // Only Unicode declarations and punycode labels (in any letter case) go through the mapping. Other plain
