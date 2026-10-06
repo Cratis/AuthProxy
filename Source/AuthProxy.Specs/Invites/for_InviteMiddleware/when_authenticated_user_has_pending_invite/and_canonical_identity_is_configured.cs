@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Invites.for_InviteMiddleware.given;
 
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware.when_authenticated_user_has_pending_invite;
@@ -31,8 +32,12 @@ public class and_canonical_identity_is_configured : a_canonical_invite_exchange
         GivenAuthenticatedUserWith(
             new Claim("oid", "configured-subject"),
             new Claim("sub", "old-sub"),
-            new Claim("name", "Cosmetic Name"));
+            new Claim("name", "Cosmetic Name"),
+            new Claim(CanonicalIdentityClaims.ProviderKey, "workforce"),
+            new Claim(CanonicalIdentityClaims.Issuer, "https://identity.example.com"),
+            new Claim(CanonicalIdentityClaims.Subject, "configured-subject"));
         _context.User = new ClaimsPrincipal(new ClaimsIdentity(_context.User.Claims, "github"));
+        CanonicalOidcFixture.AuthenticateCookie(_context, _context.User);
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

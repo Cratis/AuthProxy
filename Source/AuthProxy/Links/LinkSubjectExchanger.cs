@@ -58,7 +58,7 @@ public class LinkSubjectExchanger(
             return LinkExchangeResult.Failed;
         }
 
-        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, principal?.Identity?.AuthenticationType)
+        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, scheme ?? principal?.Identity?.AuthenticationType)
             ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
         if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
         {

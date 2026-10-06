@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -74,7 +75,10 @@ public class SignInNotifier(
             return SignInNotificationResult.Skipped;
         }
 
-        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, principal?.Identity?.AuthenticationType)
+        var authenticationScheme = scheme
+            ?? context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Ticket?.AuthenticationScheme
+            ?? principal?.Identity?.AuthenticationType;
+        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, authenticationScheme)
             ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
         if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
         {
