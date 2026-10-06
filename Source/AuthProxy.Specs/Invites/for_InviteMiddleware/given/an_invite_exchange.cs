@@ -82,7 +82,7 @@ public class an_invite_exchange : Specification
 
         _errorPageProvider = Substitute.For<IErrorPageProvider>();
         _errorPageProvider
-            .WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>())
+            .WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>())
             .Returns(Task.CompletedTask);
 
         _middleware = CreateMiddleware(config, optionsMonitor, httpClientFactory);

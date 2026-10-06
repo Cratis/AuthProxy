@@ -25,8 +25,8 @@ public class and_the_provider_supplies_no_email_address : given.an_invite_exchan
     [Fact] void should_not_forward_to_the_exchange_endpoint() => _exchangeCalled.ShouldBeFalse();
     [Fact] void should_not_continue_the_pipeline() => _nextCalled.ShouldBeFalse();
     [Fact] void should_serve_the_invitation_email_unavailable_page() =>
-        _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden);
+        _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden, Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == "someuser@example.com" && values["{{assertedEmail}}"] == string.Empty));
     [Fact] void should_not_accuse_the_account_of_being_the_wrong_one() =>
-        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, Arg.Any<int>());
+        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>());
     [Fact] void should_delete_the_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 }

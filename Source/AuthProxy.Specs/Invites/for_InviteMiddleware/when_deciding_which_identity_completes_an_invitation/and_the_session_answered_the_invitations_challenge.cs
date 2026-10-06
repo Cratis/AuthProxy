@@ -23,5 +23,5 @@ public class and_the_session_answered_the_invitations_challenge : given.an_invit
     [Fact] void should_clear_the_pending_invitation() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
     [Fact]
     void should_not_serve_an_error_page() =>
-        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
+        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>());
 }

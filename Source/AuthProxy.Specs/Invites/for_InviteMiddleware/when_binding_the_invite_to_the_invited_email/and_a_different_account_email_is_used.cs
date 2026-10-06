@@ -19,6 +19,6 @@ public class and_a_different_account_email_is_used : given.an_invite_exchange
     [Fact] void should_not_forward_to_the_exchange_endpoint() => _exchangeCalled.ShouldBeFalse();
     [Fact] void should_not_continue_the_pipeline() => _nextCalled.ShouldBeFalse();
     [Fact] void should_serve_the_invitation_email_mismatch_page() =>
-        _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden);
+        _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden, Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == "invited@example.com" && values["{{assertedEmail}}"] == "attacker@example.com"));
     [Fact] void should_delete_the_invite_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain(Cookies.InviteToken);
 }

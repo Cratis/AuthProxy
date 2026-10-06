@@ -61,7 +61,7 @@ class InviteCompletion(
                         authentication.Properties,
                         authentication.Properties?.IssuedUtc);
                 })
-            : await ExchangeInvite(inviteToken, context.User);
+            : await ExchangeInvite(context, inviteToken, context.User);
 
     /// <inheritdoc/>
     public async Task<InviteExchangeResult> ExchangeForTicket(HttpContext context, string inviteToken, ClaimsPrincipal principal, AuthenticationProperties properties) =>
@@ -76,7 +76,7 @@ class InviteCompletion(
 
                     // The ticket was received this instant; no handler has stamped an issue instant yet.
                     properties.IssuedUtc ?? DateTimeOffset.UtcNow)))
-            : await ExchangeInvite(inviteToken, principal);
+            : await ExchangeInvite(context, inviteToken, principal);
 
     /// <inheritdoc/>
     public bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl)
@@ -291,7 +291,7 @@ class InviteCompletion(
         if (!TryGetSingleExactClaim(principal, provider.EmailClaimType, out var email)
             || !InviteMiddleware.IsAnEmailAddress(email))
         {
-            return VerifiedIdentityResolution.EmailUnavailable;
+            return VerifiedIdentityResolution.EmailUnavailable(invitedEmail);
         }
 
         if (!TryGetSingleExactClaim(principal, provider.EmailVerifiedClaimType, out var rawEmailVerified)
@@ -299,7 +299,7 @@ class InviteCompletion(
             || !emailVerified
             || !string.Equals(invitedEmail, email, StringComparison.OrdinalIgnoreCase))
         {
-            return VerifiedIdentityResolution.EmailMismatch;
+            return VerifiedIdentityResolution.EmailMismatch(invitedEmail, email);
         }
 
         return VerifiedIdentityResolution.Success(new InvitationVerifiedIdentity(
@@ -308,6 +308,7 @@ class InviteCompletion(
 
     async Task<InviteExchangeResult> CompleteAttestedInvitation(HttpContext context, string inviteToken, Func<Task<InvitationCompletionSession>> sessionFactory)
     {
+        InvitationPageEmails.Clear(context);
         var entryResolution = ResolveEntryState(context, inviteToken);
         if (!entryResolution.Succeeded)
         {
@@ -331,6 +332,10 @@ class InviteCompletion(
         var identityResolution = ResolveVerifiedIdentity(session, entryResolution);
         if (!identityResolution.Succeeded)
         {
+            if (identityResolution.Emails is { } emails)
+            {
+                InvitationPageEmails.Remember(context, emails);
+            }
             return LogAndMapIdentityFailure(logger, identityResolution);
         }
 
@@ -532,8 +537,9 @@ class InviteCompletion(
             canonical.ProviderKey, canonical.NormalizedIssuer, canonical.Subject, null, assurance, authenticatedAt));
     }
 
-    async Task<InviteExchangeResult> ExchangeInvite(string inviteToken, ClaimsPrincipal principal)
+    async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken, ClaimsPrincipal principal)
     {
+        InvitationPageEmails.Clear(context);
         var exchangeUrl = config.CurrentValue.Invite?.ExchangeUrl;
         if (string.IsNullOrWhiteSpace(exchangeUrl))
         {
@@ -567,7 +573,7 @@ class InviteCompletion(
         // An invitation is otherwise a pure bearer link - anyone with the URL could sign in with their
         // own account and be provisioned as the invited user. Bind the invite to its intended recipient by
         // requiring provider-supplied authenticated-session email evidence to match the invited email.
-        var binding = EvaluateInvitedEmailBinding(inviteToken, email, emailVerified);
+        var binding = EvaluateInvitedEmailBinding(context, principal, inviteToken, email, emailVerified);
         if (binding == InviteExchangeResult.EmailUnavailable)
         {
             logger.InviteEmailUnavailable();
@@ -630,6 +636,8 @@ class InviteCompletion(
     /// Evaluates the invite against the authenticated account, enforcing that the invited email (when the
     /// token carries one) matches provider-supplied authenticated-session email evidence.
     /// </summary>
+    /// <param name="context">The request that may display the binding failure.</param>
+    /// <param name="principal">The provider principal, used only to capture display evidence.</param>
     /// <param name="inviteToken">The validated invite token.</param>
     /// <param name="authenticatedEmail">The authenticating account's email.</param>
     /// <param name="emailVerified">
@@ -646,7 +654,7 @@ class InviteCompletion(
     /// that told us it is somebody else are different facts, and collapsing them reports a specific, wrong cause
     /// to an invitee whose account and address are both correct — leaving them no action that could work.
     /// </remarks>
-    InviteExchangeResult EvaluateInvitedEmailBinding(string inviteToken, string authenticatedEmail, bool? emailVerified)
+    InviteExchangeResult EvaluateInvitedEmailBinding(HttpContext context, ClaimsPrincipal principal, string inviteToken, string authenticatedEmail, bool? emailVerified)
     {
         var emailClaim = config.CurrentValue.Invite?.EmailClaim;
         if (string.IsNullOrWhiteSpace(emailClaim)
@@ -659,19 +667,19 @@ class InviteCompletion(
 
         if (string.IsNullOrWhiteSpace(authenticatedEmail))
         {
+            InvitationPageEmails.Remember(context, new(invitedEmail, string.Empty));
             return InviteExchangeResult.EmailUnavailable;
         }
 
         // The invite is bound to a specific email, so the account must own that email and the provider
         // must not have flagged it as unverified.
-        if (emailVerified == false)
+        if (emailVerified == false || !string.Equals(invitedEmail, authenticatedEmail, StringComparison.OrdinalIgnoreCase))
         {
+            InvitationPageEmails.Remember(context, new(invitedEmail, InvitationPageEmails.AssertedAddress(principal)));
             return InviteExchangeResult.EmailMismatch;
         }
 
-        return string.Equals(invitedEmail, authenticatedEmail, StringComparison.OrdinalIgnoreCase)
-            ? InviteExchangeResult.Success
-            : InviteExchangeResult.EmailMismatch;
+        return InviteExchangeResult.Success;
     }
 
     /// <summary>
@@ -789,15 +797,14 @@ class InviteCompletion(
     /// <param name="Identity">The resolved verified identity.</param>
     /// <param name="EmailOutcome">The specific email-binding outcome for the email-targeted recipient mode.</param>
     /// <param name="Reason">The bounded failure reason, or <see cref="InvitationCompletionFailureReason.None"/> on success.</param>
-    readonly record struct VerifiedIdentityResolution(bool Succeeded, InvitationVerifiedIdentity Identity, InviteExchangeResult EmailOutcome, InvitationCompletionFailureReason Reason)
+    /// <param name="Emails">Display-only email evidence for an email-binding failure.</param>
+    readonly record struct VerifiedIdentityResolution(bool Succeeded, InvitationVerifiedIdentity Identity, InviteExchangeResult EmailOutcome, InvitationCompletionFailureReason Reason, InvitationPageEmails? Emails = null)
     {
-        /// <summary>Gets the failure for a provider that supplied no address to bind the invitation against.</summary>
-        public static VerifiedIdentityResolution EmailUnavailable =>
-            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.EmailUnavailable, Reason: InvitationCompletionFailureReason.None);
+        public static VerifiedIdentityResolution EmailUnavailable(string invitedEmail) =>
+            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.EmailUnavailable, Reason: InvitationCompletionFailureReason.None, Emails: new(invitedEmail, string.Empty));
 
-        /// <summary>Gets the failure for a provider that supplied an unverified address, or somebody else's.</summary>
-        public static VerifiedIdentityResolution EmailMismatch =>
-            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.EmailMismatch, Reason: InvitationCompletionFailureReason.None);
+        public static VerifiedIdentityResolution EmailMismatch(string invitedEmail, string assertedEmail) =>
+            new(Succeeded: false, Identity: default!, EmailOutcome: InviteExchangeResult.EmailMismatch, Reason: InvitationCompletionFailureReason.None, Emails: new(invitedEmail, assertedEmail));
 
         public static VerifiedIdentityResolution Success(InvitationVerifiedIdentity identity) =>
             new(Succeeded: true, Identity: identity, EmailOutcome: InviteExchangeResult.Success, Reason: InvitationCompletionFailureReason.None);

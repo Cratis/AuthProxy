@@ -25,5 +25,5 @@ public class and_the_only_address_is_the_preferred_username : given.an_invite_ex
     [Fact] void should_forward_the_address_as_the_authenticated_email() =>
         _exchangeRequestBody.ShouldContain("invited@example.com");
     [Fact] void should_not_serve_an_error_page() =>
-        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
+        _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>(), Arg.Any<IReadOnlyDictionary<string, string>>());
 }
