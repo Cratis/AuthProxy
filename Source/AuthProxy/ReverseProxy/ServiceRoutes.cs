@@ -89,7 +89,12 @@ public static class ServiceRoutes
             // normalization match the Unicode host ASP.NET decodes from the request's punycode.
             parsed = HostString.FromUriComponent(trimmed);
             var idn = new IdnMapping();
-            var canonicalHost = idn.GetUnicode(idn.GetAscii(parsed.Host));
+
+            // Only Unicode declarations and punycode labels (in any letter case) go through the mapping. Other plain
+            // ASCII names, such as 'my--svc' or 'a-.example', are not IDN names and keep parsing as before.
+            var isPlainAscii = parsed.Host.All(char.IsAscii)
+                && !parsed.Host.Split('.').Any(label => label.StartsWith("xn--", StringComparison.OrdinalIgnoreCase));
+            var canonicalHost = isPlainAscii ? parsed.Host : idn.GetUnicode(idn.GetAscii(parsed.Host));
 
             // Mapping can fold compatibility characters (fullwidth ':' '[' ']' and similar) into authority
             // delimiters. A mapped host must stay a bare host name; the port only comes from the declaration.
