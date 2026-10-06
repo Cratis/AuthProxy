@@ -52,6 +52,8 @@ public class AccessTokenForwardingMiddleware(
             return;
         }
 
+        accessToken.DestinationBinding = proxy.Cluster.Config.Metadata![MicroserviceReverseProxyConfigProvider.DestinationMetadataKey];
+
         var result = UserTokenSessions.Of(context) is { } sessionId
             ? await tokens.GetFor(sessionId, accessToken, context.RequestAborted)
             : UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken);
