@@ -854,6 +854,8 @@ provider must be configured. AuthProxy refuses to start otherwise.
 - Tokens stay bound to the backend and audience selected for the request across configuration reloads.
   Changing only `Backend.BaseUrl` obtains a token again instead of reusing one cached for the previous backend,
   even when the session, provider, scopes, and resource are unchanged.
+  Each service also has its own backend destination: services that declare the same provider, scopes, and
+  resource, even with the same `Backend.BaseUrl`, each obtain and cache their own token and their own rejection backoff.
   If a request captures a token policy and destinations from different configuration versions, AuthProxy
   refuses it with `503` before obtaining or forwarding a token. Retry after the reload completes.
 - When no token can be obtained, the request is refused with `401` instead of being forwarded without one.
