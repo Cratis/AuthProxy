@@ -83,7 +83,8 @@ public class Service
     /// A long-lived stream (WebSocket, Server-Sent Events) is cut once it has been quiet for longer than this,
     /// so set it above the longest silence the backend can leave between messages — or have the backend send a
     /// heartbeat more often than that. <see cref="ServiceEndpoint.ActivityTimeout"/> narrows it to the backend
-    /// or the frontend alone. Must be greater than zero.
+    /// or the frontend alone. Must be between 1 and <see cref="int.MaxValue"/> milliseconds
+    /// (about 24.8 days), inclusive.
     /// </remarks>
     public TimeSpan? ActivityTimeout { get; set; }
 

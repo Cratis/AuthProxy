@@ -19,7 +19,8 @@ public class ServiceEndpoint
     /// <summary>
     /// Gets or sets how long a request proxied to this endpoint may sit idle — with no bytes moving in either
     /// direction — before the proxy cancels it. Leave unset to use <see cref="Service.ActivityTimeout"/>, then
-    /// the root <see cref="AuthProxy.ActivityTimeout"/>. Must be greater than zero.
+    /// the root <see cref="AuthProxy.ActivityTimeout"/>. Must be between 1 and <see cref="int.MaxValue"/>
+    /// milliseconds (about 24.8 days), inclusive.
     /// Only supported on Backend and Frontend endpoints; setting this on Registration fails configuration validation.
     /// </summary>
     public TimeSpan? ActivityTimeout { get; set; }

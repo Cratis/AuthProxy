@@ -132,7 +132,7 @@ public static class AuthProxyExtensions
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
-    /// <param name="timeout">The longest a request may go with no bytes moving in either direction. Must be greater than zero.</param>
+    /// <param name="timeout">The longest a request may go with no bytes moving in either direction. Must be between 1 and <see cref="int.MaxValue"/> milliseconds (about 24.8 days), inclusive.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <remarks>
     /// The limit applies to WebSocket and Server-Sent Events streams as much as to plain requests, so a stream
@@ -153,7 +153,7 @@ public static class AuthProxyExtensions
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
     /// <param name="builder">The resource builder.</param>
     /// <param name="serviceName">The service the limit applies to.</param>
-    /// <param name="timeout">The longest a request may go with no bytes moving in either direction. Must be greater than zero.</param>
+    /// <param name="timeout">The longest a request may go with no bytes moving in either direction. Must be between 1 and <see cref="int.MaxValue"/> milliseconds (about 24.8 days), inclusive.</param>
     /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
     /// <remarks>
     /// Takes precedence over <see cref="WithActivityTimeout{T}"/> for that service's backend and frontend.

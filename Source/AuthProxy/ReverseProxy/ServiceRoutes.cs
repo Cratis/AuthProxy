@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Globalization;
 using Microsoft.Extensions.Primitives;
 using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
@@ -84,12 +85,30 @@ public static class ServiceRoutes
         HostString parsed;
         try
         {
-            // ASP.NET decodes IDNs when reading the Host header; route declarations must use the same form.
-            parsed = HostString.FromUriComponent(trimmed.ToLowerInvariant());
+            // Round-trip declarations through IDN mapping so compatibility characters, casing and
+            // normalization match the Unicode host ASP.NET decodes from the request's punycode.
+            // ASCII input is lower-cased first, as before, so punycode detection does not depend on letter case.
+            parsed = HostString.FromUriComponent(trimmed.All(char.IsAscii) ? trimmed.ToLowerInvariant() : trimmed);
+            var idn = new IdnMapping();
+
+            // Only Unicode declarations and punycode labels (in any letter case) go through the mapping. Other plain
+            // ASCII names, such as 'my--svc' or 'a-.example', are not IDN names and keep parsing as before.
+            var isPlainAscii = parsed.Host.All(char.IsAscii)
+                && !parsed.Host.Split('.').Any(label => label.StartsWith("xn--", StringComparison.OrdinalIgnoreCase));
+            var canonicalHost = isPlainAscii ? parsed.Host : idn.GetUnicode(idn.GetAscii(parsed.Host));
+
+            // Mapping can fold compatibility characters (fullwidth ':' '[' ']' and similar) into authority
+            // delimiters. A mapped host must stay a bare host name; the port only comes from the declaration.
+            if (canonicalHost.IndexOfAny([':', '/', '*', '?', '#', '@', ' ', '[', ']', '\\']) >= 0)
+            {
+                return false;
+            }
+
+            parsed = parsed.Port is { } port ? new HostString(canonicalHost, port) : new HostString(canonicalHost);
         }
         catch (ArgumentException)
         {
-            // Invalid punycode is an unusable declaration, not a startup exception outside validation.
+            // Invalid IDNs are unusable declarations, not startup exceptions outside validation.
             return false;
         }
         if (Uri.CheckHostName(parsed.Host.Trim('[', ']')) == UriHostNameType.Unknown
