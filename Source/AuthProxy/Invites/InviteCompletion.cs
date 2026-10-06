@@ -61,7 +61,7 @@ class InviteCompletion(
                         authentication.Properties,
                         authentication.Properties?.IssuedUtc);
                 })
-            : await ExchangeInvite(context, inviteToken, context.User);
+            : await ExchangeInvite(context, inviteToken, context.User, AuthenticationSchemeOf(context, context.User));
 
     /// <inheritdoc/>
     public async Task<InviteExchangeResult> ExchangeForTicket(HttpContext context, string inviteToken, ClaimsPrincipal principal, AuthenticationProperties properties) =>
@@ -76,7 +76,7 @@ class InviteCompletion(
 
                     // The ticket was received this instant; no handler has stamped an issue instant yet.
                     properties.IssuedUtc ?? DateTimeOffset.UtcNow)))
-            : await ExchangeInvite(context, inviteToken, principal);
+            : await ExchangeInvite(context, inviteToken, principal, AuthenticationSchemeOf(context, principal, properties));
 
     /// <inheritdoc/>
     public bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl)
@@ -175,6 +175,12 @@ class InviteCompletion(
             ?? (InviteMiddleware.IsAnEmailAddress(preferredUsername) ? preferredUsername : null)
             ?? string.Empty;
     }
+
+    static string? AuthenticationSchemeOf(HttpContext context, ClaimsPrincipal principal, AuthenticationProperties? properties = null) =>
+        properties is not null && properties.Items.TryGetValue(Authentication.AuthenticationServiceCollectionExtensions.AuthenticationSchemeStateKey, out var scheme)
+            ? scheme
+            : context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Ticket?.AuthenticationScheme
+                ?? principal.Identity?.AuthenticationType;
 
     static bool TryGetSingleExactClaim(ClaimsPrincipal principal, string claimType, out string value)
     {
@@ -537,7 +543,7 @@ class InviteCompletion(
             canonical.ProviderKey, canonical.NormalizedIssuer, canonical.Subject, null, assurance, authenticatedAt));
     }
 
-    async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken, ClaimsPrincipal principal)
+    async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken, ClaimsPrincipal principal, string? authenticationScheme)
     {
         InvitationPageEmails.Clear(context);
         var exchangeUrl = config.CurrentValue.Invite?.ExchangeUrl;
@@ -547,7 +553,7 @@ class InviteCompletion(
             return InviteExchangeResult.Failed;
         }
 
-        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, principal.Identity?.AuthenticationType)
+        var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, authenticationScheme)
             ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
         if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
         {
