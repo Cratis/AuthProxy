@@ -191,49 +191,51 @@ public static class AuthenticationServiceCollectionExtensions
         // IsDocumentNavigation() classification TenantSelectionMiddleware and SelectProviderMiddleware
         // already use for their own refusals belongs here too: a caller that is not navigating gets the
         // refusal as a 401 it can act on, and only an actual browser navigation gets redirected.
-        options.Events.OnRedirectToLogin = async ctx =>
+        options.Events.OnRedirectToLogin = RedirectToLogin;
+    }
+
+    static async Task RedirectToLogin(RedirectContext<CookieAuthenticationOptions> ctx)
+    {
+        if (!ctx.HttpContext.IsDocumentNavigation())
         {
-            if (!ctx.HttpContext.IsDocumentNavigation())
-            {
-                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return;
-            }
+            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
 
-            var authConfig = ctx.HttpContext.RequestServices
-                .GetRequiredService<IOptionsMonitor<C.Authentication>>()
-                .CurrentValue;
+        var authConfig = ctx.HttpContext.RequestServices
+            .GetRequiredService<IOptionsMonitor<C.Authentication>>()
+            .CurrentValue;
 
-            var returnUrl = ctx.HttpContext.IsAuthenticationBootstrap()
-                ? "/"
-                : ctx.HttpContext.GetPathAndQuery();
+        var returnUrl = ctx.HttpContext.IsAuthenticationBootstrap()
+            ? "/"
+            : ctx.HttpContext.GetPathAndQuery();
 
-            if (authConfig.TotalProviderCount > 1)
-            {
-                ctx.Response.Redirect($"{WellKnownPaths.LoginPage}?returnUrl={Uri.EscapeDataString(returnUrl)}");
-                return;
-            }
+        if (authConfig.TotalProviderCount > 1)
+        {
+            ctx.Response.Redirect($"{WellKnownPaths.LoginPage}?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
 
-            if (authConfig.OidcProviders.Count == 1)
-            {
-                var scheme = OidcProviderScheme.FromName(authConfig.OidcProviders[0].Name);
-                ctx.Response.Redirect($"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString(returnUrl)}");
-                return;
-            }
+        if (authConfig.OidcProviders.Count == 1)
+        {
+            var scheme = OidcProviderScheme.FromName(authConfig.OidcProviders[0].Name);
+            ctx.Response.Redirect($"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
 
-            if (authConfig.OAuthProviders.Count == 1)
-            {
-                var scheme = OidcProviderScheme.FromName(authConfig.OAuthProviders[0].Name);
-                ctx.Response.Redirect($"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString(returnUrl)}");
-                return;
-            }
+        if (authConfig.OAuthProviders.Count == 1)
+        {
+            var scheme = OidcProviderScheme.FromName(authConfig.OAuthProviders[0].Name);
+            ctx.Response.Redirect($"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
 
-            // No providers configured — return 500 with diagnostic message
-            ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await ctx.Response.WriteAsync(
-                "Authentication is not configured. " +
-                "Please configure at least one OIDC or OAuth provider (GitHub, Microsoft, Google, Apple) " +
-                "via environment variables or application configuration.");
-        };
+        // No providers configured — return 500 with diagnostic message
+        ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        await ctx.Response.WriteAsync(
+            "Authentication is not configured. " +
+            "Please configure at least one OIDC or OAuth provider (GitHub, Microsoft, Google, Apple) " +
+            "via environment variables or application configuration.");
     }
 
     static void RegisterOidcProviders(AuthenticationBuilder authBuilder, IList<C.OidcProvider> providers)
@@ -244,105 +246,114 @@ public static class AuthenticationServiceCollectionExtensions
             var capturedProvider = provider;
             authBuilder.AddOpenIdConnect(scheme, options =>
             {
-                options.Authority = capturedProvider.Authority;
-                options.ClientId = capturedProvider.ClientId;
-                options.ClientSecret = capturedProvider.UsesClientAssertion ? null : capturedProvider.ClientSecret;
-                options.ResponseType = "code";
-
-                if (AadMultiTenantIssuer.IsMultiTenantAuthority(capturedProvider.Authority))
-                {
-                    // A multi-tenant Microsoft authority publishes the literal issuer template
-                    // "{tenantid}/v2.0" in its metadata, so the default issuer comparison rejects every
-                    // token. Validate against the tenant the token itself names instead.
-                    options.TokenValidationParameters.IssuerValidator = AadMultiTenantIssuer.Validate;
-                }
-
-                // The handler's default response mode is form_post, which has the provider hand the
-                // authorization code back in a cross-site POST — and browsers do not attach SameSite=Lax
-                // cookies to a cross-site POST, so the callback arrived without its correlation cookie and
-                // every OIDC handshake died with "Correlation failed" (the #104 sign-in loop). The code
-                // flow's standard query response mode returns the code in a top-level GET redirect, which
-                // Lax cookies do accompany — the handshake completes without weakening the cookies to
-                // SameSite=None. Providers that mandate form_post (e.g. Apple with name/email scopes) opt
-                // back in per provider, which also switches their handshake cookies to None+Secure below.
-                options.ResponseMode = OpenIdConnectResponseMode.Query;
-                options.GetClaimsFromUserInfoEndpoint = true;
-                if (capturedProvider.CanonicalIdentity is not null)
-                {
-                    // Canonical providers select one exact protocol claim name. Preserve those names instead
-                    // of applying the legacy WS-* inbound mapping; noncanonical providers remain unchanged.
-                    options.MapInboundClaims = false;
-                }
-
-                options.Scope.Add("openid");
-                options.Scope.Add("profile");
-                options.Scope.Add("email");
-
-                foreach (var scope in capturedProvider.Scopes)
-                {
-                    options.Scope.Add(scope);
-                }
-
-                options.CallbackPath = $"/signin-{scheme}";
-
-                // Lax + SameAsRequest keeps the handshake cookies flowing across the provider redirect,
-                // marks them Secure whenever the site runs on HTTPS, and still supports local HTTP
-                // development callback flows.
-                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.NonceCookie.SameSite = SameSiteMode.Lax;
-                options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-
-                // Keep the transient handshake cookies at the root path (they otherwise default to the
-                // callback path) so the browser sends them on the logout request and they can be cleared
-                // there instead of accumulating from abandoned sign-in attempts.
-                options.CorrelationCookie.Path = "/";
-                options.NonceCookie.Path = "/";
-
-                if (capturedProvider.ResponseMode == C.OidcResponseMode.FormPost)
-                {
-                    // A form_post callback is a cross-site POST, and only SameSite=None cookies travel with
-                    // one — which in turn requires Secure. A provider configured for form_post therefore
-                    // trades the Lax hardening for a working handshake; the default query mode keeps Lax.
-                    options.ResponseMode = OpenIdConnectResponseMode.FormPost;
-                    options.CorrelationCookie.SameSite = SameSiteMode.None;
-                    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-                    options.NonceCookie.SameSite = SameSiteMode.None;
-                    options.NonceCookie.SecurePolicy = CookieSecurePolicy.Always;
-                }
-
-                options.Events = new OpenIdConnectEvents
-                {
-                    OnTokenValidated = context =>
-                    {
-                        context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
-                        return Task.CompletedTask;
-                    },
-                    OnTokenResponseReceived = UserTokenSessions.Capture,
-                    OnAuthorizationCodeReceived = context => capturedProvider.UsesClientAssertion
-                        ? OidcClientAuthentication.Apply(context.HttpContext, scheme, capturedProvider, context.Options, context.TokenEndpointRequest!)
-                        : Task.CompletedTask,
-                    OnPushAuthorization = async context =>
-                    {
-                        if (capturedProvider.UsesClientAssertion)
-                        {
-                            await OidcClientAuthentication.Apply(context.HttpContext, scheme, capturedProvider, context.Options, context.ProtocolMessage);
-                            context.HandleClientAuthentication();
-                        }
-                    },
-                    OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
-                    OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
-                    OnTicketReceived = context => HandleTicketReceived(
-                        context,
-                        () => CanonicalSessionRegistrationFingerprint.Create(
-                            scheme,
-                            capturedProvider,
-                            (OpenIdConnectOptions)context.Options),
-                        capturedProvider.CanonicalIdentity,
-                        "oidc")
-                };
+                ConfigureOidcOptions(options, capturedProvider, scheme);
+                options.Events = CreateOidcEvents(capturedProvider, scheme);
             });
         }
+    }
+
+    static void ConfigureOidcOptions(OpenIdConnectOptions options, C.OidcProvider provider, string scheme)
+    {
+        options.Authority = provider.Authority;
+        options.ClientId = provider.ClientId;
+        options.ClientSecret = provider.UsesClientAssertion ? null : provider.ClientSecret;
+        options.ResponseType = "code";
+
+        if (AadMultiTenantIssuer.IsMultiTenantAuthority(provider.Authority))
+        {
+            // A multi-tenant Microsoft authority publishes the literal issuer template
+            // "{tenantid}/v2.0" in its metadata, so the default issuer comparison rejects every
+            // token. Validate against the tenant the token itself names instead.
+            options.TokenValidationParameters.IssuerValidator = AadMultiTenantIssuer.Validate;
+        }
+
+        // The handler's default response mode is form_post, which has the provider hand the
+        // authorization code back in a cross-site POST — and browsers do not attach SameSite=Lax
+        // cookies to a cross-site POST, so the callback arrived without its correlation cookie and
+        // every OIDC handshake died with "Correlation failed" (the #104 sign-in loop). The code
+        // flow's standard query response mode returns the code in a top-level GET redirect, which
+        // Lax cookies do accompany — the handshake completes without weakening the cookies to
+        // SameSite=None. Providers that mandate form_post (e.g. Apple with name/email scopes) opt
+        // back in per provider, which also switches their handshake cookies to None+Secure below.
+        options.ResponseMode = OpenIdConnectResponseMode.Query;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        if (provider.CanonicalIdentity is not null)
+        {
+            // Canonical providers select one exact protocol claim name. Preserve those names instead
+            // of applying the legacy WS-* inbound mapping; noncanonical providers remain unchanged.
+            options.MapInboundClaims = false;
+        }
+
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+
+        foreach (var scope in provider.Scopes)
+        {
+            options.Scope.Add(scope);
+        }
+
+        options.CallbackPath = $"/signin-{scheme}";
+
+        // Lax + SameAsRequest keeps the handshake cookies flowing across the provider redirect,
+        // marks them Secure whenever the site runs on HTTPS, and still supports local HTTP
+        // development callback flows.
+        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.NonceCookie.SameSite = SameSiteMode.Lax;
+        options.NonceCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // Keep the transient handshake cookies at the root path (they otherwise default to the
+        // callback path) so the browser sends them on the logout request and they can be cleared
+        // there instead of accumulating from abandoned sign-in attempts.
+        options.CorrelationCookie.Path = "/";
+        options.NonceCookie.Path = "/";
+
+        if (provider.ResponseMode == C.OidcResponseMode.FormPost)
+        {
+            // A form_post callback is a cross-site POST, and only SameSite=None cookies travel with
+            // one — which in turn requires Secure. A provider configured for form_post therefore
+            // trades the Lax hardening for a working handshake; the default query mode keeps Lax.
+            options.ResponseMode = OpenIdConnectResponseMode.FormPost;
+            options.CorrelationCookie.SameSite = SameSiteMode.None;
+            options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.NonceCookie.SameSite = SameSiteMode.None;
+            options.NonceCookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
+    }
+
+    static OpenIdConnectEvents CreateOidcEvents(C.OidcProvider provider, string scheme)
+    {
+        return new OpenIdConnectEvents
+        {
+            OnTokenValidated = context =>
+            {
+                context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
+                return Task.CompletedTask;
+            },
+            OnTokenResponseReceived = UserTokenSessions.Capture,
+            OnAuthorizationCodeReceived = context => provider.UsesClientAssertion
+                ? OidcClientAuthentication.Apply(context.HttpContext, scheme, provider, context.Options, context.TokenEndpointRequest!)
+                : Task.CompletedTask,
+            OnPushAuthorization = async context =>
+            {
+                if (provider.UsesClientAssertion)
+                {
+                    await OidcClientAuthentication.Apply(context.HttpContext, scheme, provider, context.Options, context.ProtocolMessage);
+                    context.HandleClientAuthentication();
+                }
+            },
+            OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
+            OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
+            OnTicketReceived = context => HandleTicketReceived(
+                context,
+                () => CanonicalSessionRegistrationFingerprint.Create(
+                    scheme,
+                    provider,
+                    (OpenIdConnectOptions)context.Options),
+                provider.CanonicalIdentity,
+                "oidc")
+        };
     }
 
     static void RegisterOAuthProviders(AuthenticationBuilder authBuilder, IList<C.OAuthProvider> providers)
@@ -354,77 +365,88 @@ public static class AuthenticationServiceCollectionExtensions
 
             authBuilder.AddOAuth(scheme, options =>
             {
-                options.AuthorizationEndpoint = capturedProvider.AuthorizationEndpoint;
-                options.TokenEndpoint = capturedProvider.TokenEndpoint;
-                options.UserInformationEndpoint = capturedProvider.UserInformationEndpoint;
-                options.ClientId = capturedProvider.ClientId;
-                options.ClientSecret = capturedProvider.ClientSecret;
-                options.CallbackPath = $"/signin-{scheme}";
-                options.SaveTokens = true;
-
-                // Lax + SameAsRequest keeps the handshake cookie flowing across the provider redirect,
-                // marks it Secure whenever the site runs on HTTPS, and still supports local HTTP
-                // development callback flows.
-                options.CorrelationCookie.SameSite = SameSiteMode.Lax;
-                options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-
-                // Keep the transient correlation cookie at the root path (it otherwise defaults to the
-                // callback path) so the browser sends it on the logout request and it can be cleared there
-                // instead of accumulating from abandoned sign-in attempts.
-                options.CorrelationCookie.Path = "/";
-
-                foreach (var scope in capturedProvider.Scopes)
-                {
-                    options.Scope.Add(scope);
-                }
-
-                foreach (var mapping in capturedProvider.ClaimMappings)
-                {
-                    options.ClaimActions.MapJsonKey(mapping.Key, mapping.Value);
-                }
-
-                foreach (var parameter in capturedProvider.AuthorizationParameters)
-                {
-                    options.AdditionalAuthorizationParameters.Add(parameter.Key, parameter.Value);
-                }
-
-                options.Events = new OAuthEvents
-                {
-                    OnCreatingTicket = async ctx =>
-                    {
-                        var request = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
-                        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
-                        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
-
-                        var response = await ctx.Backchannel.SendAsync(request, ctx.HttpContext.RequestAborted);
-                        response.EnsureSuccessStatusCode();
-
-                        using var user = JsonDocument.Parse(
-                            await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
-                        ctx.RunClaimActions(user.RootElement);
-
-                        await EnrichProviderClaims(ctx, capturedProvider);
-
-                        if (capturedProvider.CanonicalIdentity is not null
-                            && !string.IsNullOrWhiteSpace(capturedProvider.VerifiedEmailEndpoint)
-                            && InvitationAuthenticationState.IsBound(ctx.Properties))
-                        {
-                            await AddVerifiedOAuthEmail(ctx, capturedProvider);
-                        }
-                    },
-                    OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
-                    OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
-                    OnTicketReceived = context => HandleTicketReceived(
-                        context,
-                        () => CanonicalSessionRegistrationFingerprint.Create(
-                            scheme,
-                            capturedProvider,
-                            (OAuthOptions)context.Options),
-                        capturedProvider.CanonicalIdentity,
-                        "oauth")
-                };
+                ConfigureOAuthOptions(options, capturedProvider, scheme);
+                options.Events = CreateOAuthEvents(capturedProvider, scheme);
             });
+        }
+    }
+
+    static void ConfigureOAuthOptions(OAuthOptions options, C.OAuthProvider provider, string scheme)
+    {
+        options.AuthorizationEndpoint = provider.AuthorizationEndpoint;
+        options.TokenEndpoint = provider.TokenEndpoint;
+        options.UserInformationEndpoint = provider.UserInformationEndpoint;
+        options.ClientId = provider.ClientId;
+        options.ClientSecret = provider.ClientSecret;
+        options.CallbackPath = $"/signin-{scheme}";
+        options.SaveTokens = true;
+
+        // Lax + SameAsRequest keeps the handshake cookie flowing across the provider redirect,
+        // marks it Secure whenever the site runs on HTTPS, and still supports local HTTP
+        // development callback flows.
+        options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+
+        // Keep the transient correlation cookie at the root path (it otherwise defaults to the
+        // callback path) so the browser sends it on the logout request and it can be cleared there
+        // instead of accumulating from abandoned sign-in attempts.
+        options.CorrelationCookie.Path = "/";
+
+        foreach (var scope in provider.Scopes)
+        {
+            options.Scope.Add(scope);
+        }
+
+        foreach (var mapping in provider.ClaimMappings)
+        {
+            options.ClaimActions.MapJsonKey(mapping.Key, mapping.Value);
+        }
+
+        foreach (var parameter in provider.AuthorizationParameters)
+        {
+            options.AdditionalAuthorizationParameters.Add(parameter.Key, parameter.Value);
+        }
+    }
+
+    static OAuthEvents CreateOAuthEvents(C.OAuthProvider provider, string scheme)
+    {
+        return new OAuthEvents
+        {
+            OnCreatingTicket = ctx => CreateOAuthTicket(ctx, provider),
+            OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
+            OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
+            OnTicketReceived = context => HandleTicketReceived(
+                context,
+                () => CanonicalSessionRegistrationFingerprint.Create(
+                    scheme,
+                    provider,
+                    (OAuthOptions)context.Options),
+                provider.CanonicalIdentity,
+                "oauth")
+        };
+    }
+
+    static async Task CreateOAuthTicket(OAuthCreatingTicketContext ctx, C.OAuthProvider provider)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
+
+        var response = await ctx.Backchannel.SendAsync(request, ctx.HttpContext.RequestAborted);
+        response.EnsureSuccessStatusCode();
+
+        using var user = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
+        ctx.RunClaimActions(user.RootElement);
+
+        await EnrichProviderClaims(ctx, provider);
+
+        if (provider.CanonicalIdentity is not null
+            && !string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)
+            && InvitationAuthenticationState.IsBound(ctx.Properties))
+        {
+            await AddVerifiedOAuthEmail(ctx, provider);
         }
     }
 
@@ -485,16 +507,7 @@ public static class AuthenticationServiceCollectionExtensions
         C.CanonicalIdentity? canonicalIdentity,
         string protocolAssurance)
     {
-        // A completed handshake is the one moment every leftover transient sign-in cookie is both visible
-        // (this is the callback path, where legacy path-scoped stragglers still flow) and safe to remove —
-        // the handshake they belonged to is either this one, already consumed, or abandoned. Clearing them
-        // here means one successful sign-in heals a browser poisoned by earlier half-cleared sessions.
-        // The deployment-configured additional cookies ride the same sweep: a stale foreign session cookie
-        // (say, one another proxy scoped to the parent domain) is just as poisonous as a leftover handshake
-        // cookie, so a successful sign-in heals the browser of those too.
-        TransientAuthenticationCookies.Clear(context.HttpContext);
-        var logout = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Logout;
-        AdditionalLogoutCookies.Clear(context.HttpContext, logout.AdditionalCookies);
+        ClearLeftoverCookies(context);
 
         var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
         string? validatedIssuer = null;
@@ -536,6 +549,25 @@ public static class AuthenticationServiceCollectionExtensions
             context.Properties!.Items[CanonicalSessionRegistrationFingerprint.StateKey] = createRegistrationFingerprint();
         }
 
+        await CompleteSignIn(context);
+    }
+
+    static void ClearLeftoverCookies(TicketReceivedContext context)
+    {
+        // A completed handshake is the one moment every leftover transient sign-in cookie is both visible
+        // (this is the callback path, where legacy path-scoped stragglers still flow) and safe to remove —
+        // the handshake they belonged to is either this one, already consumed, or abandoned. Clearing them
+        // here means one successful sign-in heals a browser poisoned by earlier half-cleared sessions.
+        // The deployment-configured additional cookies ride the same sweep: a stale foreign session cookie
+        // (say, one another proxy scoped to the parent domain) is just as poisonous as a leftover handshake
+        // cookie, so a successful sign-in heals the browser of those too.
+        TransientAuthenticationCookies.Clear(context.HttpContext);
+        var logout = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Logout;
+        AdditionalLogoutCookies.Clear(context.HttpContext, logout.AdditionalCookies);
+    }
+
+    static async Task CompleteSignIn(TicketReceivedContext context)
+    {
         // A non-link ticket means a real sign-in is completing. Record which provider established this session so
         // a later RP-initiated logout can target the correct identity provider's end-session endpoint (persisted
         // into the auth cookie by the RemoteAuthenticationHandler that signs the ticket in), and notify the
@@ -646,25 +678,7 @@ public static class AuthenticationServiceCollectionExtensions
 
         if (reservedClaims.Length == 0 && fingerprintKeys.Length == 0)
         {
-            try
-            {
-                var authentication = context.HttpContext.RequestServices
-                    .GetRequiredService<IOptionsMonitor<C.Authentication>>()
-                    .CurrentValue;
-                if (!context.Properties.Items.TryGetValue(AuthenticationSchemeStateKey, out var legacyProviderScheme)
-                    || string.IsNullOrWhiteSpace(legacyProviderScheme)
-                    || !IsConfiguredCanonicalProvider(authentication, legacyProviderScheme))
-                {
-                    return;
-                }
-            }
-            catch (OptionsValidationException)
-            {
-                await RejectCanonicalSession(context);
-                return;
-            }
-
-            await RejectCanonicalSession(context);
+            await ValidateLegacyCanonicalSession(context);
             return;
         }
 
@@ -698,6 +712,29 @@ public static class AuthenticationServiceCollectionExtensions
         {
             await RejectCanonicalSession(context);
         }
+    }
+
+    static async Task ValidateLegacyCanonicalSession(CookieValidatePrincipalContext context)
+    {
+        try
+        {
+            var authentication = context.HttpContext.RequestServices
+                .GetRequiredService<IOptionsMonitor<C.Authentication>>()
+                .CurrentValue;
+            if (!context.Properties.Items.TryGetValue(AuthenticationSchemeStateKey, out var legacyProviderScheme)
+                || string.IsNullOrWhiteSpace(legacyProviderScheme)
+                || !IsConfiguredCanonicalProvider(authentication, legacyProviderScheme))
+            {
+                return;
+            }
+        }
+        catch (OptionsValidationException)
+        {
+            await RejectCanonicalSession(context);
+            return;
+        }
+
+        await RejectCanonicalSession(context);
     }
 
     static bool IsConfiguredCanonicalProvider(C.Authentication authentication, string scheme) =>
