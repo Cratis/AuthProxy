@@ -412,7 +412,29 @@ public static class AuthenticationServiceCollectionExtensions
     {
         return new OAuthEvents
         {
-            OnCreatingTicket = ctx => CreateOAuthTicket(ctx, provider),
+            OnCreatingTicket = async ctx =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
+
+                var response = await ctx.Backchannel.SendAsync(request, ctx.HttpContext.RequestAborted);
+                response.EnsureSuccessStatusCode();
+
+                using var user = JsonDocument.Parse(
+                    await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
+                ctx.RunClaimActions(user.RootElement);
+
+                await EnrichProviderClaims(ctx, provider);
+
+                if (provider.CanonicalIdentity is not null
+                    && !string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)
+                    && InvitationAuthenticationState.IsBound(ctx.Properties))
+                {
+                    await AddVerifiedOAuthEmail(ctx, provider);
+                }
+            },
             OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
             OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
             OnTicketReceived = context => HandleTicketReceived(
@@ -424,30 +446,6 @@ public static class AuthenticationServiceCollectionExtensions
                 provider.CanonicalIdentity,
                 "oauth")
         };
-    }
-
-    static async Task CreateOAuthTicket(OAuthCreatingTicketContext ctx, C.OAuthProvider provider)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, ctx.Options.UserInformationEndpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ctx.AccessToken);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
-
-        var response = await ctx.Backchannel.SendAsync(request, ctx.HttpContext.RequestAborted);
-        response.EnsureSuccessStatusCode();
-
-        using var user = JsonDocument.Parse(
-            await response.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted));
-        ctx.RunClaimActions(user.RootElement);
-
-        await EnrichProviderClaims(ctx, provider);
-
-        if (provider.CanonicalIdentity is not null
-            && !string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)
-            && InvitationAuthenticationState.IsBound(ctx.Properties))
-        {
-            await AddVerifiedOAuthEmail(ctx, provider);
-        }
     }
 
     /// <summary>
