@@ -151,6 +151,14 @@ public class InviteMiddleware(
     {
     }
 
+    enum PendingInvitationOutcome
+    {
+        Rejected = 0,
+        AlreadyCompleted = 1,
+        Authenticated = 2,
+        NotEstablished = 3
+    }
+
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
@@ -825,12 +833,4 @@ public class InviteMiddleware(
     }
 
     sealed record InvitationEntryPlan(List<OidcProviderInfo> Providers, bool Attested, int? FailureStatusCode);
-
-    enum PendingInvitationOutcome
-    {
-        Rejected,
-        AlreadyCompleted,
-        Authenticated,
-        NotEstablished
-    }
 }
