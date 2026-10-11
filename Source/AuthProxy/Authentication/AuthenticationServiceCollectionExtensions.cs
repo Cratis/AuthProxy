@@ -620,8 +620,21 @@ public static class AuthenticationServiceCollectionExtensions
 
         try
         {
-            var verifiedPrimaryEmails = await FetchVerifiedPrimaryEmails(context, provider);
-            if (verifiedPrimaryEmails is null || verifiedPrimaryEmails.Length != 1)
+            using var request = new HttpRequestMessage(HttpMethod.Get, provider.VerifiedEmailEndpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
+
+            using var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            var verifiedPrimaryEmails = GetVerifiedPrimaryEmails(document.RootElement);
+            if (verifiedPrimaryEmails.Length != 1)
             {
                 return;
             }
@@ -648,27 +661,12 @@ public static class AuthenticationServiceCollectionExtensions
         }
     }
 
-    static async Task<string[]?> FetchVerifiedPrimaryEmails(OAuthCreatingTicketContext context, C.OAuthProvider provider)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, provider.VerifiedEmailEndpoint);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
-
-        using var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
-        response.EnsureSuccessStatusCode();
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
-        if (document.RootElement.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        return document.RootElement.EnumerateArray()
+    static string[] GetVerifiedPrimaryEmails(JsonElement root) =>
+        root.EnumerateArray()
             .Where(IsVerifiedPrimaryEmail)
             .Select(_ => _.GetProperty("email").GetString()!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-    }
 
     static bool IsVerifiedPrimaryEmail(JsonElement element) =>
         element.ValueKind == JsonValueKind.Object
