@@ -507,18 +507,8 @@ public static class AuthenticationServiceCollectionExtensions
     {
         ClearLeftoverCookies(context);
 
-        var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
-        string? validatedIssuer = null;
-        context.Properties?.Items.TryGetValue(ValidatedIssuerStateKey, out validatedIssuer);
-        var canonicalResolution = canonicalIdentityResolver.Resolve(
-            context.Principal,
-            context.Scheme.Name,
-            validatedIssuer,
-            isFreshAuthentication: true);
-        context.Properties?.Items.Remove(ValidatedIssuerStateKey);
-        context.Properties?.Items.Remove(CanonicalSessionRegistrationFingerprint.StateKey);
-        if (canonicalResolution.IsConfigured
-            && (!canonicalResolution.Succeeded || canonicalResolution.Principal is null))
+        var canonicalResolution = ResolveFreshCanonicalIdentity(context);
+        if (IsUnresolvedCanonicalIdentity(canonicalResolution))
         {
             context.Fail("Canonical federated identity could not be resolved.");
             return;
@@ -534,9 +524,7 @@ public static class AuthenticationServiceCollectionExtensions
             AddProtocolAssurance(context.Principal!, canonicalIdentity.AssuranceClaimType, protocolAssurance);
         }
 
-        if (context.Properties is not null
-            && context.Properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode)
-            && linkMode == "true")
+        if (IsLinkMode(context.Properties))
         {
             await LinkCallbackCompletion.Complete(context, context.Properties);
             return;
@@ -549,6 +537,29 @@ public static class AuthenticationServiceCollectionExtensions
 
         await CompleteSignIn(context);
     }
+
+    static CanonicalIdentityResolution ResolveFreshCanonicalIdentity(TicketReceivedContext context)
+    {
+        var canonicalIdentityResolver = context.HttpContext.RequestServices.GetRequiredService<ICanonicalIdentityResolver>();
+        string? validatedIssuer = null;
+        context.Properties?.Items.TryGetValue(ValidatedIssuerStateKey, out validatedIssuer);
+        var canonicalResolution = canonicalIdentityResolver.Resolve(
+            context.Principal,
+            context.Scheme.Name,
+            validatedIssuer,
+            isFreshAuthentication: true);
+        context.Properties?.Items.Remove(ValidatedIssuerStateKey);
+        context.Properties?.Items.Remove(CanonicalSessionRegistrationFingerprint.StateKey);
+        return canonicalResolution;
+    }
+
+    static bool IsUnresolvedCanonicalIdentity(CanonicalIdentityResolution resolution) =>
+        resolution.IsConfigured && (!resolution.Succeeded || resolution.Principal is null);
+
+    static bool IsLinkMode(AuthenticationProperties? properties) =>
+        properties is not null
+        && properties.Items.TryGetValue(LinkMiddleware.LinkModePropertyKey, out var linkMode)
+        && linkMode == "true";
 
     static void ClearLeftoverCookies(TicketReceivedContext context)
     {
@@ -605,42 +616,12 @@ public static class AuthenticationServiceCollectionExtensions
         }
 
         var identity = provider.CanonicalIdentity!;
-        foreach (var claim in claimsIdentity.Claims
-                     .Where(_ => string.Equals(_.Type, identity.EmailClaimType, StringComparison.Ordinal)
-                         || string.Equals(_.Type, identity.EmailVerifiedClaimType, StringComparison.Ordinal))
-                     .ToArray())
-        {
-            claimsIdentity.RemoveClaim(claim);
-        }
+        RemoveEmailClaims(claimsIdentity, identity);
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, provider.VerifiedEmailEndpoint);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-            request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
-
-            using var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
-            response.EnsureSuccessStatusCode();
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
-            if (document.RootElement.ValueKind != JsonValueKind.Array)
-            {
-                return;
-            }
-
-            var verifiedPrimaryEmails = document.RootElement.EnumerateArray()
-                .Where(_ => _.ValueKind == JsonValueKind.Object
-                    && _.TryGetProperty("primary", out var primary)
-                    && primary.ValueKind == JsonValueKind.True
-                    && _.TryGetProperty("verified", out var verified)
-                    && verified.ValueKind == JsonValueKind.True
-                    && _.TryGetProperty("email", out var email)
-                    && email.ValueKind == JsonValueKind.String
-                    && !string.IsNullOrWhiteSpace(email.GetString()))
-                .Select(_ => _.GetProperty("email").GetString()!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            if (verifiedPrimaryEmails.Length != 1)
+            var verifiedPrimaryEmails = await FetchVerifiedPrimaryEmails(context, provider);
+            if (verifiedPrimaryEmails is null || verifiedPrimaryEmails.Length != 1)
             {
                 return;
             }
@@ -655,6 +636,50 @@ public static class AuthenticationServiceCollectionExtensions
             return;
         }
     }
+
+    static void RemoveEmailClaims(ClaimsIdentity claimsIdentity, C.CanonicalIdentity identity)
+    {
+        foreach (var claim in claimsIdentity.Claims
+                     .Where(_ => string.Equals(_.Type, identity.EmailClaimType, StringComparison.Ordinal)
+                         || string.Equals(_.Type, identity.EmailVerifiedClaimType, StringComparison.Ordinal))
+                     .ToArray())
+        {
+            claimsIdentity.RemoveClaim(claim);
+        }
+    }
+
+    static async Task<string[]?> FetchVerifiedPrimaryEmails(OAuthCreatingTicketContext context, C.OAuthProvider provider)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, provider.VerifiedEmailEndpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Cratis-AuthProxy", "1.0"));
+
+        using var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(context.HttpContext.RequestAborted));
+        if (document.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        return document.RootElement.EnumerateArray()
+            .Where(IsVerifiedPrimaryEmail)
+            .Select(_ => _.GetProperty("email").GetString()!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    static bool IsVerifiedPrimaryEmail(JsonElement element) =>
+        element.ValueKind == JsonValueKind.Object
+        && IsTrueProperty(element, "primary")
+        && IsTrueProperty(element, "verified")
+        && element.TryGetProperty("email", out var email)
+        && email.ValueKind == JsonValueKind.String
+        && !string.IsNullOrWhiteSpace(email.GetString());
+
+    static bool IsTrueProperty(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
 
     static void AddProtocolAssurance(ClaimsPrincipal principal, string assuranceClaimType, string protocolAssurance)
     {
@@ -681,12 +706,7 @@ public static class AuthenticationServiceCollectionExtensions
         }
 
         if (reservedClaims.Length == 0
-            || fingerprintKeys.Length != 1
-            || !string.Equals(fingerprintKeys[0], CanonicalSessionRegistrationFingerprint.StateKey, StringComparison.Ordinal)
-            || !context.Properties.Items.TryGetValue(CanonicalSessionRegistrationFingerprint.StateKey, out var storedFingerprint)
-            || !CanonicalSessionRegistrationFingerprint.IsWellFormed(storedFingerprint)
-            || !context.Properties.Items.TryGetValue(AuthenticationSchemeStateKey, out var providerScheme)
-            || string.IsNullOrWhiteSpace(providerScheme))
+            || !TryReadStoredSession(context, fingerprintKeys, out var storedFingerprint, out var providerScheme))
         {
             await RejectCanonicalSession(context);
             return;
@@ -694,14 +714,7 @@ public static class AuthenticationServiceCollectionExtensions
 
         try
         {
-            var services = context.HttpContext.RequestServices;
-            var resolver = services.GetRequiredService<ICanonicalIdentityResolver>();
-            var resolution = resolver.Resolve(context.Principal, context.Scheme.Name);
-            if (!resolution.IsConfigured
-                || !resolution.Succeeded
-                || resolution.Identity is null
-                || !TryCreateCurrentRegistrationFingerprint(services, providerScheme, out var expectedFingerprint)
-                || !string.Equals(storedFingerprint, expectedFingerprint, StringComparison.Ordinal))
+            if (!MatchesCurrentRegistration(context, storedFingerprint, providerScheme))
             {
                 await RejectCanonicalSession(context);
             }
@@ -710,6 +723,41 @@ public static class AuthenticationServiceCollectionExtensions
         {
             await RejectCanonicalSession(context);
         }
+    }
+
+    static bool TryReadStoredSession(
+        CookieValidatePrincipalContext context,
+        string[] fingerprintKeys,
+        out string storedFingerprint,
+        out string providerScheme)
+    {
+        storedFingerprint = string.Empty;
+        providerScheme = string.Empty;
+        if (fingerprintKeys.Length != 1
+            || !string.Equals(fingerprintKeys[0], CanonicalSessionRegistrationFingerprint.StateKey, StringComparison.Ordinal)
+            || !context.Properties.Items.TryGetValue(CanonicalSessionRegistrationFingerprint.StateKey, out var fingerprint)
+            || !CanonicalSessionRegistrationFingerprint.IsWellFormed(fingerprint)
+            || !context.Properties.Items.TryGetValue(AuthenticationSchemeStateKey, out var scheme)
+            || string.IsNullOrWhiteSpace(scheme))
+        {
+            return false;
+        }
+
+        storedFingerprint = fingerprint!;
+        providerScheme = scheme;
+        return true;
+    }
+
+    static bool MatchesCurrentRegistration(CookieValidatePrincipalContext context, string storedFingerprint, string providerScheme)
+    {
+        var services = context.HttpContext.RequestServices;
+        var resolver = services.GetRequiredService<ICanonicalIdentityResolver>();
+        var resolution = resolver.Resolve(context.Principal, context.Scheme.Name);
+        return resolution.IsConfigured
+            && resolution.Succeeded
+            && resolution.Identity is not null
+            && TryCreateCurrentRegistrationFingerprint(services, providerScheme, out var expectedFingerprint)
+            && string.Equals(storedFingerprint, expectedFingerprint, StringComparison.Ordinal);
     }
 
     static async Task ValidateLegacyCanonicalSession(CookieValidatePrincipalContext context)

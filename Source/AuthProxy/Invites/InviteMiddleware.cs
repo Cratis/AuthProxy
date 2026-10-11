@@ -450,19 +450,8 @@ public class InviteMiddleware(
             return;
         }
 
-        var validationResult = tokenValidator.ValidateDetailed(token);
-        if (validationResult != InviteTokenValidationResult.Valid)
+        if (await TryRejectInvalidInvitationToken(context, token))
         {
-            logger.InviteTokenValidationFailed(validationResult);
-
-            var pageName = validationResult == InviteTokenValidationResult.Expired
-                ? WellKnownPageNames.InvitationExpired
-                : WellKnownPageNames.InvitationInvalid;
-
-            await errorPageProvider.WriteErrorPageAsync(
-                context,
-                pageName,
-                StatusCodes.Status401Unauthorized);
             return;
         }
 
@@ -476,6 +465,46 @@ public class InviteMiddleware(
             return;
         }
 
+        var entry = await TryBeginInvitationEntry(context, token);
+        if (entry is null)
+        {
+            return;
+        }
+
+        AppendInvitationCookies(context, token, entry.State);
+        await ProceedWithProviders(context, token, entry);
+    }
+
+    async Task<bool> TryRejectInvalidInvitationToken(HttpContext context, string token)
+    {
+        var validationResult = tokenValidator.ValidateDetailed(token);
+        if (validationResult == InviteTokenValidationResult.Valid)
+        {
+            return false;
+        }
+
+        logger.InviteTokenValidationFailed(validationResult);
+
+        var pageName = validationResult == InviteTokenValidationResult.Expired
+            ? WellKnownPageNames.InvitationExpired
+            : WellKnownPageNames.InvitationInvalid;
+
+        await errorPageProvider.WriteErrorPageAsync(
+            context,
+            pageName,
+            StatusCodes.Status401Unauthorized);
+        return true;
+    }
+
+    /// <summary>
+    /// Resolves the providers and, for the attested protocol, the staged entry state; answers the request and
+    /// returns <see langword="null"/> when the invitation cannot be entered.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="token">The validated invitation token.</param>
+    /// <returns>The entry to proceed with, or <see langword="null"/> when the response has been written.</returns>
+    async Task<InvitationEntry?> TryBeginInvitationEntry(HttpContext context, string token)
+    {
         var attestedProtocolEnabled = IsAttestedProtocolEnabled();
         var recipientProviderKey = string.Empty;
         if (attestedProtocolEnabled
@@ -485,7 +514,7 @@ public class InviteMiddleware(
                 out recipientProviderKey))
         {
             await WriteInvitationInvalid(context, StatusCodes.Status401Unauthorized);
-            return;
+            return null;
         }
 
         var currentAuthConfig = authConfig.CurrentValue;
@@ -493,23 +522,27 @@ public class InviteMiddleware(
         if (attestedProtocolEnabled && providers.Count == 0)
         {
             await WriteInvitationInvalid(context, StatusCodes.Status403Forbidden);
-            return;
+            return null;
         }
 
-        InvitationEntryState? entryState = null;
-        if (attestedProtocolEnabled)
+        if (!attestedProtocolEnabled)
         {
-            var staging = await StageInvitation(context, token);
-            if (!staging.Succeeded)
-            {
-                await WriteInvitationInvalid(context, StatusCodes.Status401Unauthorized);
-                return;
-            }
-
-            entryState = staging.State;
+            return new InvitationEntry(providers, null);
         }
 
-        AppendInvitationCookies(context, token, entryState);
+        var staging = await StageInvitation(context, token);
+        if (!staging.Succeeded)
+        {
+            await WriteInvitationInvalid(context, StatusCodes.Status401Unauthorized);
+            return null;
+        }
+
+        return new InvitationEntry(providers, staging.State);
+    }
+
+    async Task ProceedWithProviders(HttpContext context, string token, InvitationEntry entry)
+    {
+        var providers = entry.Providers;
 
         // A caller that already carries a session is never challenged straight through, however few
         // providers are configured. The session it arrived with is not the identity this invitation may
@@ -529,7 +562,7 @@ public class InviteMiddleware(
         // No providers: would require error handling (skipped for now).
         if (providers.Count == 1)
         {
-            await ChallengeSingleProvider(context, token, providers[0], entryState);
+            await ChallengeSingleProvider(context, token, providers[0], entry.State);
             return;
         }
 
@@ -722,54 +755,76 @@ public class InviteMiddleware(
     async Task<(bool Succeeded, InvitationEntryState? State)> StageInvitation(HttpContext context, string inviteToken)
     {
         var invite = config.CurrentValue.Invite;
-        if (invite is null
-            || attestationIssuer is null
-            || entryStateProtector is null
-            || inviteToken.Length > InviteCompletion.MaximumAttestedInvitationTokenLength
-            || string.IsNullOrWhiteSpace(invite.StageUrl)
-            || string.IsNullOrWhiteSpace(invite.TenantClaim)
-            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
-            || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
+        var entryState = TryCreateEntryState(context, inviteToken, invite);
+        if (entryState is null
+            || !attestationIssuer!.TryIssueStage(entryState, out var attestation))
         {
             return (false, null);
         }
 
-        var entryState = new InvitationEntryState(
+        var body = new InvitationStageRequest(
+            entryState.InvitationTransaction,
+            inviteToken,
+            entryState.InvitationChallenge);
+        var staged = await PostStageRequest(context, invite!.StageUrl!, attestation, body);
+        return staged ? (true, entryState) : (false, null);
+    }
+
+    InvitationEntryState? TryCreateEntryState(HttpContext context, string inviteToken, C.Invite? invite)
+    {
+        if (!IsStagingConfigured(invite, inviteToken)
+            || attestationIssuer is null
+            || entryStateProtector is null
+            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
+            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim!, out var tenantId)
+            || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
+        {
+            return null;
+        }
+
+        return new InvitationEntryState(
             tenantId,
             invitationId,
             InvitationAttestationIssuer.CreateOpaqueValue(),
             InvitationAttestationIssuer.CreateOpaqueValue(),
             InvitationAuthenticationState.ComputeCapabilityHash(inviteToken),
             DateTimeOffset.UtcNow.AddMinutes(15));
-        if (!attestationIssuer.TryIssueStage(entryState, out var attestation))
-        {
-            return (false, null);
-        }
+    }
 
+    static bool IsStagingConfigured([NotNullWhen(true)] C.Invite? invite, string inviteToken) =>
+        invite is not null
+        && inviteToken.Length <= InviteCompletion.MaximumAttestedInvitationTokenLength
+        && !string.IsNullOrWhiteSpace(invite.StageUrl)
+        && !string.IsNullOrWhiteSpace(invite.TenantClaim);
+
+    async Task<bool> PostStageRequest(
+        HttpContext context,
+        string stageUrl,
+        string attestation,
+        InvitationStageRequest body)
+    {
         using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, invite.StageUrl);
+        using var request = new HttpRequestMessage(HttpMethod.Post, stageUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
-        request.Content = JsonContent.Create(new InvitationStageRequest(
-            entryState.InvitationTransaction,
-            inviteToken,
-            entryState.InvitationChallenge));
+        request.Content = JsonContent.Create(body);
 
         try
         {
             using var response = await client.SendAsync(request, context.RequestAborted);
             if (response.IsSuccessStatusCode)
             {
-                return (true, entryState);
+                return true;
             }
 
             logger.InviteExchangeEndpointFailed((int)response.StatusCode);
         }
         catch (Exception exception)
         {
-            logger.FailedToCallInviteExchangeEndpoint(exception, invite.StageUrl);
+            logger.FailedToCallInviteExchangeEndpoint(exception, stageUrl);
         }
 
-        return (false, null);
+        return false;
     }
+
+    sealed record InvitationEntry(List<OidcProviderInfo> Providers, InvitationEntryState? State);
 }
