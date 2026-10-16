@@ -192,6 +192,24 @@ its prefix.
 
 WebSocket upgrades and server-sent events follow the same routes as any other request.
 
+#### Several hosts, one sign-in
+
+A host routes a request; it does not isolate one service from another. A service-selection header or
+`?service=` still beats the host, so a frontend served from one host can call another service's backend by
+naming it, and that service's [authorization requirements](authorization.md) apply to the call. Its response is
+readable by scripts on the first host, and `SameSite=Lax` does not separate sibling subdomains. Do not put
+applications that must not read each other's data behind one AuthProxy.
+
+To make the hosts share one session, set `Session:CookieDomain`, and to run every sign-in handshake on one
+host, `SignIn:CallbackHost`. See [One proxy, several hosts](one-proxy-several-hosts.md). From Aspire, declare the routes
+with `WithHosts` and `WithPathPrefix`:
+
+```csharp
+authProxy
+    .WithHosts("portal", "portal.example.com")
+    .WithPathPrefix("reporting", "/reporting", stripPathPrefix: true);
+```
+
 
 ---
 

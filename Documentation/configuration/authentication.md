@@ -490,6 +490,8 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
       "Session": {
         "Lifetime": "12:00:00",
         "SlidingExpiration": false,
+        "CookieName": ".Cratis.AuthProxy.Auth.v2",
+        "CookieDomain": "",
         "TerminateOnIdentityDenial": false,
         "IdentityRevalidationInterval": "00:10:00",
         "TenantRevalidationInterval": "00:10:00"
@@ -503,12 +505,26 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 | ---------- | --------- | ------------- |
 | `Lifetime` | `12:00:00` | Absolute lifetime of the authentication ticket. When it elapses the user must re-authenticate with the identity provider, even in a browser session that never closed. |
 | `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
+| `CookieName` | `.Cratis.AuthProxy.Auth.v2` | Name of the session cookie. Set it to keep two AuthProxy deployments under one parent domain from reading each other's sessions, or to retire an old cookie. Changing it signs users out once. It has to be a valid cookie name, and the `__Host-` prefix is refused when `CookieDomain` is set. |
+| `CookieDomain` | `""` (host-only) | Domain the session cookie is scoped to, for example `.example.com`, so one sign-in is honored on every host under it. Empty keeps today's host-only cookie. See [One proxy, several hosts](one-proxy-several-hosts.md). |
 | `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. |
 | `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative means no bound: with any Required service (the default) no authorization record is written; when every participating service is BestEffort it falls back to ten minutes. The independent in-memory result cache still applies. |
 | `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative disables re-validation. |
 
 The authentication cookie itself carries no persistent `Expires` — the browser drops it when the session
-ends — and is `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever the site is served over HTTPS.
+ends — and is `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever the site is served over HTTPS. It
+belongs to the one host that issued it unless you set `CookieDomain`.
+
+### Sharing the session across hosts
+
+`CookieDomain` scopes the cookie to a parent domain so that one sign-in is honored on every host under it.
+Use the narrowest domain that covers the hosts in `Services:<name>:Hosts`: the cookie also goes to hosts
+that are not behind AuthProxy. AuthProxy refuses to start when a declared host is outside the domain, when
+the domain is an IP address, a top-level domain, a wildcard or carries a port, and when a tenant resolution
+uses the [`SubHost` strategy](tenancy.md#subhost-strategy-options). It warns when `AllowedHosts` accepts every
+host. Browsers that still hold an earlier host-only cookie have it deleted on sign-in and sign-out. The full
+walk-through, including the single callback host `SignIn:CallbackHost`, is in
+[One proxy, several hosts](one-proxy-several-hosts.md).
 Re-validation is cached in memory per instance, so within an interval no extra backend calls are made;
 when the interval lapses, a single backend round-trip refreshes the cached identity or tenant context.
 

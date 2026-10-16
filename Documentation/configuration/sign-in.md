@@ -127,6 +127,33 @@ Cratis__AuthProxy__SignIn__NotifyUrl=https://studio.example.com/api/internal/sig
 When `NotifyUrl` is empty or the `SignIn` section is absent, sign-in notifications are disabled (nothing is
 posted).
 
+### Running the handshake on one host
+
+The same `SignIn` section holds `CallbackHost`, which has nothing to do with notifications. It names the one
+host the identity-provider handshake runs on, so a deployment that serves several hosts registers a single
+callback and a single post-logout address with the provider:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Session": { "CookieDomain": ".example.com" },
+      "SignIn": { "CallbackHost": "auth.example.com" }
+    }
+  }
+}
+```
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `CallbackHost` | `""` | Host, with an optional port, that runs every OAuth or OIDC handshake. Empty keeps today's behavior: each host completes its own. It requires `Session:CookieDomain`, and the host has to lie inside it; AuthProxy refuses to start otherwise. |
+
+A sign-in or sign-out that starts on another host is sent to the callback host and returns to the original
+address, which is only honored for hosts a service declares, frontends, the lobby and
+[`Logout:AllowedRedirectOrigins`](logout.md#allowing-additional-post-logout-origins), inside the cookie domain.
+Invitations, credential links and registration keep running on the host they start on. See
+[One proxy, several hosts](one-proxy-several-hosts.md#4-run-every-handshake-on-one-host).
+
 ---
 
 ## The signed envelope

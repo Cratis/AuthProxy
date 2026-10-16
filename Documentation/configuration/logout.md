@@ -53,7 +53,10 @@ of AuthProxy.
 
 Both the local logout and the post-logout callback:
 
-1. Sign the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2`), including any chunked variants.
+1. Sign the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2` unless you set
+   [`Session:CookieName`](authentication.md#session-lifetime-and-re-validation)), including any chunked variants.
+   With `Session:CookieDomain` the deletion carries the domain, so it ends the session on every host under it,
+   and the stale host-only copy an earlier deployment left behind is deleted too.
 2. Delete every AuthProxy session cookie:
    - `.cratis-identity`
    - `.cratis-identity-authorization`
@@ -98,9 +101,19 @@ when its origin (scheme + host + port) matches any of:
 - The configured **lobby frontend** (`Cratis:AuthProxy:Invite:Lobby:Frontend:BaseUrl`).
 - Any origin listed in **`Cratis:AuthProxy:Logout:AllowedRedirectOrigins`** (see below).
 
-Same-site **relative** URLs (a single leading `/`, but not `//`) are always allowed.
+- When [`SignIn:CallbackHost`](sign-in.md#running-the-handshake-on-one-host) is configured, the origin of every
+  host a service declares in `Hosts`, on the scheme the request arrived on. Without a callback host, hosts are
+  not added: a deployment that serves several hosts without one lists them under `AllowedRedirectOrigins`.
+
+Same-site **relative** URLs (a single leading `/`, but not `//`) are always allowed. Addresses carrying user
+information (`https://user@host/`) are never allowed.
 
 If `redirect` is missing, empty, or fails validation, AuthProxy falls back to the application root (`/`).
+
+With a [callback host](sign-in.md#running-the-handshake-on-one-host), a logout that ends at the identity
+provider and starts on another host is sent to the callback host first, because the identity provider returns the browser to one registered
+address and the carrier of the final destination is a host-only cookie. The session cookie is deleted there
+and is shared, so the person is signed out on every host under the cookie domain.
 
 ---
 

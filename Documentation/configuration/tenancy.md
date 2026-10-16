@@ -139,6 +139,13 @@ The resolved subhost string becomes the tenant ID directly.
 **No `Tenants` dictionary lookup is performed** — unlike `Host`, `Claim`, and `Route` strategies, SubHost does not match a source identifier against a pre-configured list.
 This is intentional: SubHost is designed for environments where tenants are provisioned dynamically (for example SaaS platforms where each customer gets their own subdomain).
 
+### SubHost and a shared session cookie
+
+`Session:CookieDomain` cannot be combined with a `SubHost` resolution: AuthProxy refuses to start. The host-only
+session cookie is what keeps a session for one tenant off the next tenant's host, and a cookie shared across the
+domain would send it to every tenant. See
+[Why the cookie domain is refused with SubHost tenancy](one-proxy-several-hosts.md#why-the-cookie-domain-is-refused-with-subhost-tenancy).
+
 ### SubHost and authentication callbacks
 
 For interactive authentication flows, AuthProxy stores SubHost strategy metadata in protected authentication `state` when it issues the provider challenge. On callback, AuthProxy restores this metadata and redirects to the tenant subhost.
