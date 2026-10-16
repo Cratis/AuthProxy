@@ -31,6 +31,24 @@ public class SignIn
     public string NotifyUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the one host the identity-provider handshake runs on, as <c language="text">host</c> or <c language="text">host:port</c>,
+    /// for example <c language="text">auth.cratis.io</c>. Leave empty — the default — and every host completes its own handshake.
+    /// </summary>
+    /// <remarks>
+    /// With a callback host, a sign-in that starts on another host is sent to this one, runs the whole OAuth or OIDC
+    /// handshake there and returns to the original host afterwards, so the provider needs a single registered callback
+    /// and a single post-logout address however many hosts one proxy serves. It requires
+    /// <see cref="Session.CookieDomain"/>, because the session has to be valid on the host the person returns to, and
+    /// the host has to lie inside that domain.
+    /// <para>
+    /// Setting it also lets a sign-in or sign-out return to an absolute address, but only to a host a service declares
+    /// in <see cref="Service.Hosts"/> or to an origin in <see cref="Logout.AllowedRedirectOrigins"/>, and only inside the
+    /// cookie domain. Invitations, credential links and registration keep running on the host they start on.
+    /// </para>
+    /// </remarks>
+    public string CallbackHost { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the signed-envelope configuration for sign-in notifications.
     /// Set this section to have AuthProxy authenticate every notification with a short-lived RS256 JWS bound
     /// to the exact request it accompanies.

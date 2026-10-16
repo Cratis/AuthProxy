@@ -74,18 +74,30 @@ public class LogoutMiddleware(
         var scheme = ResolveAuthenticationScheme(authenticated?.Properties);
         var endSessionEndpoint = await endSessionEndpointResolver.Resolve(scheme, context.RequestAborted);
 
+        var endsAtIdentityProvider = !string.IsNullOrWhiteSpace(endSessionEndpoint) && !string.IsNullOrWhiteSpace(idToken);
+
+        // The identity provider sends the browser back to the one registered address, and the carrier of the final
+        // destination is a host-only cookie, so it has to be written on that host. The shared session is read from
+        // there just as well; nothing is cleared yet.
+        if (endsAtIdentityProvider && SignInCallbackHost.TryBuildLogoutBounce(context, authProxyConfig, target, out var bounce))
+        {
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            context.Response.Headers.Location = bounce;
+            return;
+        }
+
         // Always clear the local session immediately. Even when the identity provider cannot be reached the
         // user must end up logged out locally.
         await SessionTermination.SignOutAndClearCookies(context, authProxyConfig.Session, authProxyConfig.Logout);
 
         context.Response.StatusCode = StatusCodes.Status302Found;
 
-        if (!string.IsNullOrWhiteSpace(endSessionEndpoint) && !string.IsNullOrWhiteSpace(idToken))
+        if (endsAtIdentityProvider)
         {
             // Carry the validated final destination across the round-trip in a short-lived cookie instead of
             // exposing it to the identity provider in the URL. It is re-validated on the callback.
             SetLogoutRedirectCookie(context, target);
-            context.Response.Headers.Location = BuildEndSessionRedirect(context, endSessionEndpoint!, idToken!);
+            context.Response.Headers.Location = BuildEndSessionRedirect(context, authProxyConfig, endSessionEndpoint!, idToken!);
             logger.RedirectingToEndSession(scheme!);
             return;
         }
@@ -113,9 +125,12 @@ public class LogoutMiddleware(
         context.Response.Headers.Location = target;
     }
 
-    static string BuildEndSessionRedirect(HttpContext context, string endSessionEndpoint, string idToken)
+    static string BuildEndSessionRedirect(HttpContext context, C.AuthProxy authProxyConfig, string endSessionEndpoint, string idToken)
     {
-        var callbackUri = $"{context.Request.Scheme}://{context.Request.Host}{WellKnownPaths.LogoutCallback}";
+        // One registered post-logout address when a callback host is configured, the host the request is on otherwise.
+        var callbackUri = SignInCallbackHost.TryBuildAddress(context, authProxyConfig, WellKnownPaths.LogoutCallback, out var fixedAddress)
+            ? fixedAddress
+            : $"{context.Request.Scheme}://{context.Request.Host}{WellKnownPaths.LogoutCallback}";
         var parameters = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             [OpenIdConnectParameterNames.IdTokenHint] = idToken,

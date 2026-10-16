@@ -27,30 +27,27 @@ public static class TenantAuthenticationState
     /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata.</param>
     /// <param name="returnUrl">The return URL to use after successful authentication.</param>
     /// <returns>An <see cref="AuthenticationProperties"/> initialized for the challenge.</returns>
-    public static AuthenticationProperties CreateChallengeProperties(HttpContext context, ITenantResolver tenantResolver, string returnUrl)
-    {
-        var properties = new AuthenticationProperties
-        {
-            RedirectUri = NormalizeReturnUrl(returnUrl)
-        };
+    /// <remarks>
+    /// The return URL is reduced to a same-site relative path. Use the overload taking the configuration where a
+    /// sign-in may legitimately return to another host of the same proxy.
+    /// </remarks>
+    public static AuthenticationProperties CreateChallengeProperties(HttpContext context, ITenantResolver tenantResolver, string returnUrl) =>
+        BuildChallengeProperties(context, tenantResolver, NormalizeReturnUrl(returnUrl));
 
-        if (!tenantResolver.TryResolve(context, out TenantResolutionResult result)
-            || string.IsNullOrWhiteSpace(result.TenantId))
-        {
-            return properties;
-        }
-
-        properties.Items[TenantIdStateKey] = result.TenantId;
-        properties.Items[StrategyStateKey] = result.Strategy.ToString();
-
-        if (result.Strategy == C.TenantSourceIdentifierResolverType.SubHost
-            && !string.IsNullOrWhiteSpace(result.SubHostParentHost))
-        {
-            properties.Items[SubHostParentHostStateKey] = result.SubHostParentHost.Trim().TrimStart('.');
-        }
-
-        return properties;
-    }
+    /// <summary>
+    /// Creates challenge properties for a sign-in that may return to another host of the same proxy.
+    /// </summary>
+    /// <param name="context">The current HTTP context.</param>
+    /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata.</param>
+    /// <param name="returnUrl">The return URL to use after successful authentication.</param>
+    /// <param name="config">The auth proxy configuration deciding which absolute return URLs are honored.</param>
+    /// <returns>An <see cref="AuthenticationProperties"/> initialized for the challenge.</returns>
+    /// <remarks>
+    /// See <see cref="SignInReturnUrl"/>: without <see cref="C.SignIn.CallbackHost"/> this is the same as the overload
+    /// without the configuration.
+    /// </remarks>
+    public static AuthenticationProperties CreateChallengeProperties(HttpContext context, ITenantResolver tenantResolver, string returnUrl, C.AuthProxy config) =>
+        BuildChallengeProperties(context, tenantResolver, SignInReturnUrl.Resolve(context, config, returnUrl));
 
     /// <summary>
     /// Tries to resolve a post-authentication redirect URI from tenant metadata in state.
@@ -122,7 +119,7 @@ public static class TenantAuthenticationState
     /// method had just rejected into one that looks clean, and doing it on Linux but not on Windows.
     /// </para>
     /// </remarks>
-    static string NormalizeReturnUrl(string? returnUrl)
+    internal static string NormalizeReturnUrl(string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
@@ -142,6 +139,31 @@ public static class TenantAuthenticationState
         }
 
         return RelativeRedirect.Resolve($"/{returnUrl}");
+    }
+
+    static AuthenticationProperties BuildChallengeProperties(HttpContext context, ITenantResolver tenantResolver, string redirectUri)
+    {
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = redirectUri
+        };
+
+        if (!tenantResolver.TryResolve(context, out TenantResolutionResult result)
+            || string.IsNullOrWhiteSpace(result.TenantId))
+        {
+            return properties;
+        }
+
+        properties.Items[TenantIdStateKey] = result.TenantId;
+        properties.Items[StrategyStateKey] = result.Strategy.ToString();
+
+        if (result.Strategy == C.TenantSourceIdentifierResolverType.SubHost
+            && !string.IsNullOrWhiteSpace(result.SubHostParentHost))
+        {
+            properties.Items[SubHostParentHostStateKey] = result.SubHostParentHost.Trim().TrimStart('.');
+        }
+
+        return properties;
     }
 
     static string BuildAbsoluteRedirectUri(string scheme, string host, string returnUrl)
