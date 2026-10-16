@@ -4,6 +4,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -50,6 +51,18 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
     /// <summary>The query key that gives the signed-in caller the operations claim.</summary>
     public const string OperationsQueryKey = "operations";
 
+    /// <summary>The name of the OAuth provider the harness signs in through.</summary>
+    public const string ProviderName = "TestIdp";
+
+    /// <summary>The scheme of <see cref="ProviderName"/>.</summary>
+    public const string ProviderScheme = "testidp";
+
+    /// <summary>The address the provider's authorization endpoint answers on.</summary>
+    public const string ProviderAuthorizationEndpoint = "http://idp.test/authorize";
+
+    /// <summary>An origin a sign-out may return to that is not under <see cref="Domain"/>.</summary>
+    public const string OutsideTheDomainOrigin = "http://marketing.other.test";
+
     /// <summary>The tenant every request resolves to.</summary>
     public const string TenantId = "33333333-3333-3333-3333-333333333333";
 
@@ -82,6 +95,9 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
 
     /// <summary>Gets the configured session cookie domain, or <see langword="null"/> for a host-only cookie.</summary>
     protected virtual string? CookieDomain => Domain;
+
+    /// <summary>Gets the configured sign-in callback host, or <see langword="null"/> when every host runs its own handshake.</summary>
+    protected virtual string? CallbackHost => null;
 
     /// <summary>
     /// Gets the value of every <c language="text">Set-Cookie</c> header of a response, in the order they were sent.
@@ -218,12 +234,12 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
 
             [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
 
+            // A trusted destination for a sign-out that lies outside the cookie domain, so a spec can show that a
+            // sign-in is still refused there.
+            [$"{C.AuthProxy.SectionKey}:Logout:AllowedRedirectOrigins:0"] = OutsideTheDomainOrigin,
+
             [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Strategy"] = nameof(C.TenantSourceIdentifierResolverType.Specified),
             [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Options:TenantId"] = TenantId,
-
-            [$"{C.Authentication.SectionKey}:OidcProviders:0:Name"] = "Provider One",
-            [$"{C.Authentication.SectionKey}:OidcProviders:0:Authority"] = "https://login.example.test/one",
-            [$"{C.Authentication.SectionKey}:OidcProviders:0:ClientId"] = "client-one",
         };
 
         if (CookieDomain is not null)
@@ -231,10 +247,33 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
             settings[$"{C.Session.SectionKey}:{nameof(C.Session.CookieDomain)}"] = CookieDomain;
         }
 
+        if (CallbackHost is not null)
+        {
+            settings[$"{C.AuthProxy.SectionKey}:SignIn:{nameof(C.SignIn.CallbackHost)}"] = CallbackHost;
+        }
+
+        // Providers are registered while the application is built, ahead of the deferred configuration callbacks,
+        // so the provider is supplied as a setting. It is an OAuth provider because its challenge needs no discovery
+        // document; the token and user endpoints are answered by FakeIdentityProvider below.
+        builder
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:Name", ProviderName)
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:AuthorizationEndpoint", ProviderAuthorizationEndpoint)
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:TokenEndpoint", "http://idp.test/token")
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:UserInformationEndpoint", "http://idp.test/user")
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:ClientId", "test-client")
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:ClientSecret", "test-secret")
+            .UseSetting($"{C.Authentication.SectionKey}:OAuthProviders:0:ClaimMappings:sub", "id");
+
         builder
             .UseEnvironment("Production")
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(settings))
-            .ConfigureTestServices(services => services.AddTransient<IStartupFilter, SignInStartupFilter>());
+            .ConfigureTestServices(services =>
+            {
+                services.AddTransient<IStartupFilter, SignInStartupFilter>();
+                services.PostConfigure<OAuthOptions>(
+                    ProviderScheme,
+                    options => options.Backchannel = new HttpClient(new FakeIdentityProvider()) { Timeout = TimeSpan.FromSeconds(10) });
+            });
     }
 
     /// <summary>
@@ -269,5 +308,27 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
 
                 next(app);
             };
+    }
+
+    /// <summary>
+    /// Answers the identity provider's token and user-information endpoints.
+    /// </summary>
+    sealed class FakeIdentityProvider : HttpMessageHandler
+    {
+        /// <inheritdoc/>
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var url = request.RequestUri?.ToString() ?? string.Empty;
+            var body = url switch
+            {
+                _ when url.StartsWith("http://idp.test/token", StringComparison.OrdinalIgnoreCase) => /*lang=json,strict*/ "{\"access_token\":\"test-access-token\",\"token_type\":\"Bearer\"}",
+                _ when url.StartsWith("http://idp.test/user", StringComparison.OrdinalIgnoreCase) => /*lang=json,strict*/ "{\"id\":\"provider-user-1\"}",
+                _ => null
+            };
+
+            return Task.FromResult(body is null
+                ? new HttpResponseMessage(HttpStatusCode.NotFound)
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") });
+        }
     }
 }

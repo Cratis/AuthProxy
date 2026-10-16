@@ -1,0 +1,73 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Microsoft.AspNetCore.Authentication;
+
+namespace Cratis.AuthProxy.Authentication.for_SelectProviderMiddleware;
+
+public class when_single_provider_is_configured_with_a_callback_host_on_another_host : Specification
+{
+    SelectProviderMiddleware _middleware;
+    DefaultHttpContext _context;
+    bool _nextCalled;
+    string _challengedScheme = string.Empty;
+
+    void Establish()
+    {
+        var proxyConfig = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        proxyConfig.CurrentValue.Returns(new C.AuthProxy
+        {
+            Session = new() { CookieDomain = ".example.test" },
+            SignIn = new() { CallbackHost = "auth.example.test" },
+            Services = new Dictionary<string, C.Service>
+            {
+                ["console"] = new() { Hosts = ["console.example.test"], Backend = new() { BaseUrl = "http://backend/" } }
+            }
+        });
+
+        var authConfig = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        authConfig.CurrentValue.Returns(new C.Authentication
+        {
+            OidcProviders = [new C.OidcProvider { Name = "my-provider", Authority = "https://auth.example.com", ClientId = "id" }]
+        });
+
+        _middleware = new SelectProviderMiddleware(
+            _ =>
+            {
+                _nextCalled = true;
+                return Task.CompletedTask;
+            },
+            proxyConfig,
+            authConfig,
+            Substitute.For<IErrorPageProvider>(),
+            Substitute.For<ITenantResolver>(),
+            Substitute.For<IAuthenticationSchemeProvider>());
+
+        _context = new DefaultHttpContext();
+        _context.Request.Scheme = "https";
+        _context.Request.Host = new HostString("console.example.test");
+        _context.Request.Path = "/protected";
+        _context.Request.QueryString = new QueryString("?id=7");
+
+        // A browser navigating to a page — the only caller redirected to a login provider.
+        _context.Request.Headers["Sec-Fetch-Dest"] = "document";
+        _context.Response.Body = new System.IO.MemoryStream();
+
+        var authService = Substitute.For<IAuthenticationService>();
+        authService
+            .ChallengeAsync(Arg.Any<HttpContext>(), Arg.Do<string>(s => _challengedScheme = s), Arg.Any<AuthenticationProperties>())
+            .Returns(Task.CompletedTask);
+
+        var serviceProvider = Substitute.For<IServiceProvider>();
+        serviceProvider.GetService(typeof(IAuthenticationService)).Returns(authService);
+        _context.RequestServices = serviceProvider;
+    }
+
+    async Task Because() => await _middleware.InvokeAsync(_context);
+
+    [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
+    [Fact] void should_not_challenge_on_this_host() => _challengedScheme.ShouldBeEmpty();
+    [Fact] void should_redirect() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status302Found);
+    [Fact] void should_redirect_to_the_login_endpoint_of_the_callback_host() => _context.Response.Headers.Location.ToString().StartsWith($"https://auth.example.test/.cratis/login/{OidcProviderScheme.FromName("my-provider")}?", StringComparison.Ordinal).ShouldBeTrue();
+    [Fact] void should_carry_the_original_address() => _context.Response.Headers.Location.ToString().ShouldContain(Uri.EscapeDataString("https://console.example.test/protected?id=7"));
+}
