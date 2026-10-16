@@ -105,7 +105,7 @@ public class IdentityMiddleware(
     {
         if (config.Session.TerminateOnIdentityDenial)
         {
-            await SessionTermination.SignOutAndClearCookies(context, config.Logout);
+            await SessionTermination.SignOutAndClearCookies(context, config.Session, config.Logout);
         }
 
         await errorPageProvider.WriteErrorPageAsync(

@@ -125,7 +125,13 @@ public class SelectProviderMiddleware(
 
         var scheme = OidcProviderScheme.FromName(providers[0].Name);
         var returnUrl = ResolveReturnUrl(context);
-        var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
+        if (SignInCallbackHost.TryBuildLoginBounce(context, proxyConfig.CurrentValue, scheme, returnUrl, out var bounce))
+        {
+            context.Response.Redirect(bounce);
+            return;
+        }
+
+        var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl, proxyConfig.CurrentValue);
         await context.ChallengeAsync(scheme, properties);
     }
 

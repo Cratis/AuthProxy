@@ -14,8 +14,8 @@ using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Registrations;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HostFiltering;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -68,6 +68,8 @@ public static class IngressExtensions
 
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SignInCallbackHostConfigurationValidator>();
         builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
 
         // The forwarded-headers middleware and everything downstream that asks whether a request came through
@@ -137,6 +139,14 @@ public static class IngressExtensions
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}");
         }
 
+        var allowedHosts = app.Services.GetRequiredService<IOptions<HostFilteringOptions>>().Value.AllowedHosts;
+        foreach (var warning in SessionConfigurationWarnings.Describe(
+            app.Services.GetRequiredService<IOptions<C.AuthProxy>>().Value.Session,
+            allowedHosts ?? []))
+        {
+            app.Logger.SessionConfigurationWarning(warning);
+        }
+
         if (bool.TryParse(Environment.GetEnvironmentVariable(ForwardedHeadersEnvironmentVariable), out var hostHandlesForwardedHeaders)
             && hostHandlesForwardedHeaders)
         {
@@ -179,6 +189,10 @@ public static class IngressExtensions
         // the request.
         app.UseRouting();
         app.UseAuthentication();
+
+        // Right after authentication so it can tell a session cookie that failed to become a ticket from an
+        // absent one. It does nothing for a deployment that configures neither a cookie domain nor a name.
+        app.UseMiddleware<SessionCookieHealingMiddleware>();
         app.UseMiddleware<LogoutMiddleware>();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseMiddleware<LinkMiddleware>();
@@ -232,51 +246,12 @@ public static class IngressExtensions
         }
 
         // Initiates the challenge for the requested provider scheme.
-        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
-        {
-            var config = authConfig.CurrentValue;
-            var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
-                || config.OAuthProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme);
-
-            if (!providerExists)
-            {
-                context.Response.StatusCode = StatusCodes.Status404NotFound;
-                await context.Response.WriteAsync($"Provider '{scheme}' is not configured.");
-                return;
-            }
-
-            var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
-            var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
-            if (!InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return;
-            }
-            await context.ChallengeAsync(scheme, properties);
-        })
+        app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", (string scheme, HttpContext context, IOptionsMonitor<C.AuthProxy> proxyConfig, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
+            LoginChallenge.Begin(scheme, context, proxyConfig.CurrentValue, authConfig.CurrentValue, tenantResolver, writeBody: true))
         .AllowAnonymous();
 
-        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], async (string scheme, HttpContext context, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
-        {
-            var config = authConfig.CurrentValue;
-            var providerExists = config.OidcProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme)
-                || config.OAuthProviders.Any(p => OidcProviderScheme.FromName(p.Name) == scheme);
-
-            if (!providerExists)
-            {
-                context.Response.StatusCode = StatusCodes.Status404NotFound;
-                return;
-            }
-
-            var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
-            var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
-            if (!InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
-            {
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return;
-            }
-            await context.ChallengeAsync(scheme, properties);
-        })
+        app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], (string scheme, HttpContext context, IOptionsMonitor<C.AuthProxy> proxyConfig, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
+            LoginChallenge.Begin(scheme, context, proxyConfig.CurrentValue, authConfig.CurrentValue, tenantResolver, writeBody: false))
         .AllowAnonymous();
 
         // Serves the bundled React login-selection SPA. Like every sign-in selection surface it refuses

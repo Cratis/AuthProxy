@@ -23,6 +23,11 @@ public class Session
     public const string SectionKey = $"{AuthProxy.SectionKey}:Session";
 
     /// <summary>
+    /// The default name of the session cookie.
+    /// </summary>
+    public const string DefaultCookieName = ".Cratis.AuthProxy.Auth.v2";
+
+    /// <summary>
     /// The default absolute lifetime of an authenticated session.
     /// </summary>
     public static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(12);
@@ -36,6 +41,31 @@ public class Session
     /// The default duration a resolved identity result is held in the proxy's own memory.
     /// </summary>
     public static readonly TimeSpan DefaultIdentityResultCacheDuration = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Gets or sets the name of the session cookie. Defaults to <see cref="DefaultCookieName"/>.
+    /// </summary>
+    /// <remarks>
+    /// Set this when a second AuthProxy runs under the same parent domain, or when you share a session cookie
+    /// domain across hosts and want the sessions of different proxies kept apart. The name must be an RFC 6265
+    /// token, and the <c language="text">__Host-</c> prefix is refused when <see cref="CookieDomain"/> is set because the prefix
+    /// forbids a domain. Changing the name signs existing users out once; the old host-only cookie is deleted on
+    /// the next sign-in and sign-out.
+    /// </remarks>
+    public string CookieName { get; set; } = DefaultCookieName;
+
+    /// <summary>
+    /// Gets or sets the domain the session cookie is scoped to, for example <c language="text">.cratis.io</c>, so one sign-in
+    /// is honored on every host under it. Leave empty — the default — for a host-only cookie, which is today's behavior.
+    /// </summary>
+    /// <remarks>
+    /// Use the narrowest domain that covers every host in <see cref="Service.Hosts"/>. A domain cookie is sent to every
+    /// host under the domain, including hosts that are not behind AuthProxy, so a broad domain widens who can replay it.
+    /// Startup fails when a declared service host lies outside the domain, when the domain is an IP address or a
+    /// bare top-level domain, and when it is combined with <c language="text">SubHost</c> tenant resolution, where the host-only
+    /// cookie is what keeps one tenant's session off another tenant's host.
+    /// </remarks>
+    public string CookieDomain { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the lifetime of the authentication ticket. When it elapses the user must

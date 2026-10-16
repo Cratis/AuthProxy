@@ -476,3 +476,21 @@ This sets `Cratis:AuthProxy:Invite:Lobby:Registration:BaseUrl`. Users who visit 
 authenticate through AuthProxy and are then redirected to that registration URL.
 
 See [Lobby](../configuration/lobby/index.md) for the onboarding flow walkthroughs.
+
+## One proxy, several hosts
+
+Give each service its own hosts or path prefix, and share one sign-in across them:
+
+```csharp
+authproxy
+    .WithHosts("console", "console.example.com")
+    .WithHosts("operations", "operations.example.com")
+    .WithPathPrefix("reporting", "/reporting", stripPathPrefix: true)
+    .WithSessionCookieDomain(".example.com")
+    .WithSignInCallbackHost("auth.example.com");
+```
+
+`WithHosts` appends when called more than once for a service. `WithSessionCookieDomain` shares the session
+cookie with every host under the domain, `WithSessionCookieName` renames it, and `WithSignInCallbackHost` runs
+every sign-in handshake on one host, which requires the cookie domain. None of them changes anything until you call it.
+See [One proxy, several hosts](../configuration/one-proxy-several-hosts.md) for the whole setup and what AuthProxy refuses to start with.

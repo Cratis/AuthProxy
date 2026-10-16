@@ -72,6 +72,12 @@ public static class AuthenticationServiceCollectionExtensions
                 ClientCredentialsDefaults.AuthenticationScheme,
                 _ => { });
 
+        // The name and the domain of the session cookie come from the bound options rather than from the
+        // configuration read above, so the cookie, its sign-out and its cleanup all follow the one setting.
+        builder.Services
+            .AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
+            .Configure<IOptionsMonitor<C.AuthProxy>>((options, config) => SessionCookie.Apply(options.Cookie, config.CurrentValue.Session));
+
         var authConfig = builder.Configuration
             .GetSection(C.Authentication.SectionKey)
             .Get<C.Authentication>() ?? new();
@@ -139,7 +145,6 @@ public static class AuthenticationServiceCollectionExtensions
     static void ConfigureCookieOptions(CookieAuthenticationOptions options, C.Session session)
     {
         options.Cookie.HttpOnly = true;
-        options.Cookie.Name = ".Cratis.AuthProxy.Auth.v2";
         options.Cookie.SameSite = SameSiteMode.Lax;
 
         // Mark the cookie Secure whenever the request itself is HTTPS — the forwarded-headers middleware
@@ -172,6 +177,17 @@ public static class AuthenticationServiceCollectionExtensions
         {
             await existingSigningIn(context);
             await UserTokenSessions.Complete(context);
+        };
+
+        // After the new cookie is written, never before: a browser that signed in before the shared domain or the
+        // new cookie name was configured still holds the old host-only copy. See SessionCookieHealing.
+        var existingSignedIn = options.Events.OnSignedIn;
+        options.Events.OnSignedIn = async context =>
+        {
+            await existingSignedIn(context);
+            SessionCookieHealing.DeleteHostOnlyCopies(
+                context.HttpContext,
+                context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Session);
         };
 
         var existingSigningOut = options.Events.OnSigningOut;

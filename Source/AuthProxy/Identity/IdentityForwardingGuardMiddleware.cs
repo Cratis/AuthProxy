@@ -46,7 +46,7 @@ public class IdentityForwardingGuardMiddleware(
         }
 
         logger.TerminatingUnforwardableSession(RequestPathRedaction.Redact(context.Request.Path));
-        await SessionTermination.SignOutAndClearCookies(context, config.CurrentValue.Logout);
+        await SessionTermination.SignOutAndClearCookies(context, config.CurrentValue.Session, config.CurrentValue.Logout);
 
         // A person navigating gets the provider-selection page with a reason and their destination
         // preserved; every other caller gets a status it can act on — never a silently forwarded,

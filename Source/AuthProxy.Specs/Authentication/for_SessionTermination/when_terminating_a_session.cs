@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Authentication.for_SessionTermination;
 
 public class when_terminating_a_session : Specification
 {
-    const string AuthenticationCookie = ".Cratis.AuthProxy.Auth.v2";
+    const string AuthenticationCookie = C.Session.DefaultCookieName;
     const string AuthenticationChunkOne = $"{AuthenticationCookie}C1";
     const string AuthenticationChunkTwo = $"{AuthenticationCookie}C2";
     const string CorrelationCookie = $"{Cookies.CorrelationPrefix}provider.state";
@@ -56,6 +56,7 @@ public class when_terminating_a_session : Specification
 
     async Task Because() => await SessionTermination.SignOutAndClearCookies(
         _context,
+        new C.Session(),
         new C.Logout
         {
             AdditionalCookies = [new C.LogoutCookie { Name = AdditionalCookie }]

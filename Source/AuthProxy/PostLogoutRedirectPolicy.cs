@@ -12,9 +12,9 @@ namespace Cratis.AuthProxy;
 /// <remarks>
 /// The post-logout redirect target is an absolute URL and can therefore not be validated with the
 /// relative-URL check used for tenant selection. Instead it is validated against an allow-list of origins
-/// that combines the proxy's own public origin with the configured service frontends, the lobby frontend,
-/// and any explicitly configured origins. A missing or disallowed target falls back to the application root
-/// (<c language="text">/</c>).
+/// — <see cref="AllowedOrigins"/>, shared with the sign-in return URL — that combines the proxy's own public
+/// origin with the configured service frontends, the lobby frontend, and any explicitly configured origins.
+/// A missing or disallowed target falls back to the application root (<c language="text">/</c>).
 /// <para>
 /// Only the <em>scheme</em> half of that self-origin is bounded by the trusted-proxy boundary, because that
 /// is the half the forwarded-headers middleware settles. The host half is <c language="text">Request.Host</c> as it
@@ -70,60 +70,6 @@ public static class PostLogoutRedirectPolicy
             return false;
         }
 
-        var targetOrigin = target.GetLeftPart(UriPartial.Authority);
-        return GetAllowedOrigins(context, authProxyConfig)
-            .Contains(targetOrigin, StringComparer.OrdinalIgnoreCase);
-    }
-
-    static IEnumerable<string> GetAllowedOrigins(HttpContext context, C.AuthProxy authProxyConfig)
-    {
-        // The proxy's own public origin as seen by the browser. The scheme is whatever the forwarded-headers
-        // middleware settled on, so it reflects X-Forwarded-Proto only as far as the configured trusted-proxy
-        // boundary allows — an untrusted caller cannot add a second origin to this list by naming a scheme.
-        // The host is not bounded by that boundary at all; it is Request.Host as it arrived, which the
-        // AllowedHosts setting is what constrains. See the remarks on this type.
-        if (context.Request.Host.HasValue
-            && Uri.TryCreate($"{context.Request.Scheme}://{context.Request.Host.Value}", UriKind.Absolute, out var self))
-        {
-            yield return self.GetLeftPart(UriPartial.Authority);
-        }
-
-        // Reuse the configured service frontends as permitted post-logout destinations.
-        foreach (var service in authProxyConfig.Services.Values)
-        {
-            if (TryGetOrigin(service.Frontend?.BaseUrl, out var origin))
-            {
-                yield return origin;
-            }
-        }
-
-        // The lobby frontend is also a permitted destination when configured.
-        if (TryGetOrigin(authProxyConfig.Invite?.Lobby?.Frontend?.BaseUrl, out var lobbyOrigin))
-        {
-            yield return lobbyOrigin;
-        }
-
-        // Any explicitly configured post-logout redirect origins (e.g. a separate marketing site).
-        foreach (var configured in authProxyConfig.Logout.AllowedRedirectOrigins)
-        {
-            if (TryGetOrigin(configured, out var configuredOrigin))
-            {
-                yield return configuredOrigin;
-            }
-        }
-    }
-
-    static bool TryGetOrigin(string? url, out string origin)
-    {
-        origin = string.Empty;
-        if (string.IsNullOrWhiteSpace(url)
-            || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-        {
-            return false;
-        }
-
-        origin = uri.GetLeftPart(UriPartial.Authority);
-        return true;
+        return AllowedOrigins.Contains(context, authProxyConfig, target);
     }
 }

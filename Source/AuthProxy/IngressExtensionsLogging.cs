@@ -10,4 +10,7 @@ internal static partial class IngressExtensionsLogging
 
     [LoggerMessage(LogLevel.Warning, "{Variable} is set, so the host inserts its own forwarded-headers middleware ahead of every AuthProxy middleware. The peer AuthProxy records as the caller is then the one the header already replaced, and the declared trusted-proxy boundary is applied a second time to a request that has already been rewritten. Unset it and let {ModeKey} and {TrustedProxiesKey} declare the boundary.")]
     internal static partial void ForwardedHeadersEnvironmentSwitchIsOn(this ILogger logger, string variable, string modeKey, string trustedProxiesKey);
+
+    [LoggerMessage(LogLevel.Warning, "{Warning}")]
+    internal static partial void SessionConfigurationWarning(this ILogger logger, string warning);
 }

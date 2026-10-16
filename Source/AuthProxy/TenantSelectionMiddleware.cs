@@ -225,7 +225,7 @@ public class TenantSelectionMiddleware(
     async Task HandleInvalidSession(HttpContext context)
     {
         logger.TerminatingUnforwardableSession(RequestPathRedaction.Redact(context.Request.Path));
-        await SessionTermination.SignOutAndClearCookies(context, config.CurrentValue.Logout);
+        await SessionTermination.SignOutAndClearCookies(context, config.CurrentValue.Session, config.CurrentValue.Logout);
 
         if (context.IsDocumentNavigation())
         {

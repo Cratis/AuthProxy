@@ -34,7 +34,7 @@ public class CallbackAuthProxyFactory : WebApplicationFactory<Program>
     public const string SubjectAlreadyExistsUrl = "http://lobby.test/already-a-member";
     public const string TenantId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     public const string TenantClaim = "tenant_id";
-    public const string SessionCookieName = ".Cratis.AuthProxy.Auth.v2";
+    public const string SessionCookieName = C.Session.DefaultCookieName;
 
     readonly string _pagesPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 

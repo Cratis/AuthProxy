@@ -14,7 +14,7 @@ namespace Cratis.AuthProxy.Links.for_LinkCallbackCompletion.when_the_exchange_fa
 /// </summary>
 public class and_the_primary_session_exists : a_link_callback_context
 {
-    const string PrimaryAuthenticationCookie = ".Cratis.AuthProxy.Auth.v2";
+    const string PrimaryAuthenticationCookie = C.Session.DefaultCookieName;
 
     protected override LinkExchangeResult ExchangeResult => LinkExchangeResult.Failed;
 
