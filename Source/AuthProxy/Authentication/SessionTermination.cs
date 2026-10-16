@@ -24,12 +24,19 @@ public static class SessionTermination
     /// Signs the current caller out of the cookie scheme and deletes every AuthProxy-issued cookie, plus
     /// any additional cookies the deployment configured (<see cref="C.Logout.AdditionalCookies"/>).
     /// </summary>
+    /// <remarks>
+    /// The session cookie itself is deleted by the cookie scheme, with the configured domain, so a shared cookie is
+    /// removed for every host under it. The stale host-only copies a move to a shared domain or a new cookie name
+    /// leaves behind are deleted here too — see <see cref="SessionCookieHealing"/>.
+    /// </remarks>
     /// <param name="context">The <see cref="HttpContext"/> whose session to terminate.</param>
+    /// <param name="session">The session configuration naming the session cookie.</param>
     /// <param name="logout">The logout configuration naming the additional cookies to delete.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    public static async Task SignOutAndClearCookies(HttpContext context, C.Logout logout)
+    public static async Task SignOutAndClearCookies(HttpContext context, C.Session session, C.Logout logout)
     {
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        SessionCookieHealing.DeleteHostOnlyCopies(context, session);
         context.Response.Cookies.Delete(Cookies.Identity);
         context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
         context.Response.Cookies.Delete(Cookies.Tenant);

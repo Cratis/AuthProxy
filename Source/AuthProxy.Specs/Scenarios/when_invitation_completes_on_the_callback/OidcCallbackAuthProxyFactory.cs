@@ -43,7 +43,7 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
     public const string TenantId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
     public const string TenantClaim = "tenant_id";
     public const string CanonicalProviderKey = "testoidc";
-    public const string SessionCookieName = ".Cratis.AuthProxy.Auth.v2";
+    public const string SessionCookieName = C.Session.DefaultCookieName;
     public const string DefaultSubject = "oidc-subject-1";
     public const string DefaultEmail = "invitee@example.com";
     public const string DefaultAssurance = "urn:mace:incommon:iap:silver";

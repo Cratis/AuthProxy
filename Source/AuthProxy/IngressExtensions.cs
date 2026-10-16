@@ -16,6 +16,7 @@ using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HostFiltering;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -68,6 +69,7 @@ public static class IngressExtensions
 
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
         builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
 
         // The forwarded-headers middleware and everything downstream that asks whether a request came through
@@ -137,6 +139,14 @@ public static class IngressExtensions
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}");
         }
 
+        var allowedHosts = app.Services.GetRequiredService<IOptions<HostFilteringOptions>>().Value.AllowedHosts;
+        foreach (var warning in SessionConfigurationWarnings.Describe(
+            app.Services.GetRequiredService<IOptions<C.AuthProxy>>().Value.Session,
+            allowedHosts ?? []))
+        {
+            app.Logger.SessionConfigurationWarning(warning);
+        }
+
         if (bool.TryParse(Environment.GetEnvironmentVariable(ForwardedHeadersEnvironmentVariable), out var hostHandlesForwardedHeaders)
             && hostHandlesForwardedHeaders)
         {
@@ -179,6 +189,10 @@ public static class IngressExtensions
         // the request.
         app.UseRouting();
         app.UseAuthentication();
+
+        // Right after authentication so it can tell a session cookie that failed to become a ticket from an
+        // absent one. It does nothing for a deployment that configures neither a cookie domain nor a name.
+        app.UseMiddleware<SessionCookieHealingMiddleware>();
         app.UseMiddleware<LogoutMiddleware>();
         app.UseMiddleware<Authentication.SelectProviderMiddleware>();
         app.UseMiddleware<LinkMiddleware>();
