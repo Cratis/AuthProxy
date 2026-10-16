@@ -213,6 +213,145 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Declares the hosts a named service answers for, so one AuthProxy can serve several hosts without a
+    /// service-selection header.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"console"</c>).
+    /// </param>
+    /// <param name="hosts">
+    /// The host names the service claims, each optionally with a port (e.g. <c language="text">console.example.com</c> or
+    /// <c language="text">console.example.com:8443</c>). Matching is exact and case-insensitive, and wildcards are not supported.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// A request for a declared host reaches that service's frontend and backend, and the service's own
+    /// authorization requirements apply to it. A service-selection header or query value still wins over the
+    /// host, and a host no service claims routes nothing. AuthProxy refuses to start when two services claim the
+    /// same host. The ingress in front of AuthProxy has to preserve the <c language="text">Host</c> header.
+    /// <para>
+    /// Calling this more than once for a service appends to its hosts.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithHosts<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        params string[] hosts)
+        where T : IResourceWithEnvironment
+    {
+        var annotation = GetOrCreateAnnotation(builder.Resource);
+        annotation.ServiceHostCounts.TryGetValue(serviceName, out var index);
+
+        foreach (var host in hosts)
+        {
+            builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__Hosts__{index}", host);
+            index++;
+        }
+
+        annotation.ServiceHostCounts[serviceName] = index;
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Declares the path prefix a named service answers for, so one AuthProxy host can serve several services.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="serviceName">
+    /// The service key used in the AuthProxy <c language="text">Services</c> configuration (e.g. <c language="text">"reports"</c>).
+    /// </param>
+    /// <param name="pathPrefix">
+    /// The rooted path of literal segments the service claims (e.g. <c language="text">/reports</c>). It cannot be one of the
+    /// paths AuthProxy reserves for itself.
+    /// </param>
+    /// <param name="stripPathPrefix">
+    /// Whether to remove the prefix from the path before forwarding, for a service that does not know it is mounted
+    /// under one. The removed prefix is announced in <c language="text">X-Forwarded-Prefix</c>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Combine it with <see cref="WithHosts{T}"/> to claim a prefix on specific hosts only.
+    /// </remarks>
+    public static IResourceBuilder<T> WithPathPrefix<T>(
+        this IResourceBuilder<T> builder,
+        string serviceName,
+        string pathPrefix,
+        bool stripPathPrefix = false)
+        where T : IResourceWithEnvironment
+    {
+        builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__PathPrefix", pathPrefix);
+
+        return stripPathPrefix
+            ? builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__StripPathPrefix", bool.TrueString)
+            : builder;
+    }
+
+    /// <summary>
+    /// Shares the session cookie across every host under a parent domain, so one sign-in is honored on all of them.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="domain">
+    /// The parent domain, for example <c language="text">.example.com</c>. Use the narrowest domain that covers every host declared
+    /// through <see cref="WithHosts{T}"/>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// AuthProxy refuses to start when a declared host is outside the domain, when the domain is an address or a
+    /// top-level domain, and when tenants are resolved by sub-host. Set <c language="text">AllowedHosts</c> on AuthProxy as well: the
+    /// shared cookie makes the <c language="text">Host</c> header a more valuable thing to spoof. Without this call the session
+    /// cookie belongs to the one host that issued it.
+    /// </remarks>
+    public static IResourceBuilder<T> WithSessionCookieDomain<T>(
+        this IResourceBuilder<T> builder,
+        string domain)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Session__CookieDomain", domain);
+
+    /// <summary>
+    /// Names the session cookie, for two AuthProxy deployments under one parent domain or for a rename.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="name">The cookie name. The default is <c language="text">.Cratis.AuthProxy.Auth.v2</c>.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Changing the name signs existing users out once. AuthProxy deletes the old default-named host-only cookie on the
+    /// next sign-in and sign-out. The <c language="text">__Host-</c> prefix is refused when a cookie domain is set.
+    /// </remarks>
+    public static IResourceBuilder<T> WithSessionCookieName<T>(
+        this IResourceBuilder<T> builder,
+        string name)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Session__CookieName", name);
+
+    /// <summary>
+    /// Runs every sign-in handshake on one host, so the identity provider needs a single callback and a single
+    /// post-logout address however many hosts AuthProxy serves.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="host">
+    /// The host, with an optional port (e.g. <c language="text">auth.example.com</c>). It has to lie inside the domain given to
+    /// <see cref="WithSessionCookieDomain{T}"/>.
+    /// </param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// Requires <see cref="WithSessionCookieDomain{T}"/>; AuthProxy refuses to start without it. A sign-in that starts
+    /// on another host is sent to this one and returns to the original address afterwards, which is only honored for
+    /// hosts declared through <see cref="WithHosts{T}"/>. Invitations, credential links and registration keep running on
+    /// the host they start on and need a callback registered for it.
+    /// </remarks>
+    public static IResourceBuilder<T> WithSignInCallbackHost<T>(
+        this IResourceBuilder<T> builder,
+        string host)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__SignIn__CallbackHost", host);
+
+    /// <summary>
     /// Declares the request paths on a named service that are served to unauthenticated callers.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
