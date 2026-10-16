@@ -49,6 +49,16 @@ public class RegistrationMiddleware(
             return;
         }
 
+        // A signed-in user arriving on /register has already been through the start of the flow - the
+        // registration redirect points at the lobby's own /register page, which is served behind this proxy.
+        // Starting a new flow here would send the user to sign in again, over and over, so let the request
+        // through to the lobby.
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            await next(context);
+            return;
+        }
+
         var registrationUrlConfigured = !string.IsNullOrWhiteSpace(proxyConfig.CurrentValue.Invite?.Lobby?.Registration?.BaseUrl);
         if (!registrationUrlConfigured)
         {
