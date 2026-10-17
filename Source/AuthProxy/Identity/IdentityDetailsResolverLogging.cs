@@ -37,4 +37,7 @@ internal static partial class IdentityDetailsResolverLogging
 
     [LoggerMessage(LogLevel.Warning, "Identity resolution for user {UserId} did not get its turn within the configured verification budget")]
     internal static partial void IdentityResolutionQueueExhausted(this ILogger logger, string userId);
+
+    [LoggerMessage(LogLevel.Warning, "The identity details are {Length} characters once encoded, over the {Maximum} a cookie may carry. The identity cookie is not written; the service should publish a smaller identity.")]
+    internal static partial void IdentityCookieTooLarge(this ILogger logger, int length, int maximum);
 }
