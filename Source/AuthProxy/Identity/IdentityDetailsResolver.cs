@@ -45,6 +45,14 @@ public class IdentityDetailsResolver(
     /// </summary>
     const string ResolutionQueueLabel = "identity-resolution";
 
+    /// <summary>
+    /// The longest encoded value the readable identity cookie is allowed to carry. Browsers refuse a cookie
+    /// larger than 4096 bytes (name and attributes included) and reverse proxies reject a response whose headers
+    /// exceed their buffer (nginx answers 502 "upstream sent too big header"), so an identity that does not fit
+    /// is not published through the cookie at all: a cookie is a cache of the identity, never the only copy of it.
+    /// </summary>
+    internal const int MaxIdentityCookieValueLength = 3072;
+
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -334,6 +342,16 @@ public class IdentityDetailsResolver(
         // the authorization decision they represent — to be re-resolved against the services without
         // paying a backend round-trip on every request. A non-positive interval keeps it a session cookie.
         var revalidationInterval = config.CurrentValue.Session.IdentityRevalidationInterval;
+
+        if (encoded.Length > MaxIdentityCookieValueLength)
+        {
+            // Dropping the cookie (and any stale smaller one) beats an unbounded Set-Cookie header: a response
+            // that is too big for the browser or the ingress takes the whole request down with it. The
+            // frontend then reads the identity from the endpoint instead of the cookie.
+            logger.IdentityCookieTooLarge(encoded.Length, MaxIdentityCookieValueLength);
+            ExpireIdentityCookie(context);
+            return;
+        }
 
         context.Response.Cookies.Append(Cookies.Identity, encoded, new CookieOptions
         {
