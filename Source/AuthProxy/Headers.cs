@@ -80,6 +80,16 @@ public static class Headers
     public const string TokenScope = "x-cratis-token-scope";
 
     /// <summary>
+    /// The signed assertion AuthProxy attaches to every request it forwards when signed forwarding is configured.
+    /// </summary>
+    /// <remarks>
+    /// A compact ES256 JWS binding the destination, the request method and path, and a digest of every identity and
+    /// tenant header the request carries. A backend that verifies it believes those headers only when they arrive
+    /// exactly as AuthProxy sent them. An inbound copy is always removed, whether signing is configured or not.
+    /// </remarks>
+    public const string ForwardedIdentity = "x-cratis-forwarded-identity";
+
+    /// <summary>
     /// Service identifier used to route requests to the appropriate service.
     /// </summary>
     /// <remarks>

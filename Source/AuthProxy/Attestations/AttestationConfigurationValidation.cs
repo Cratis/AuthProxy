@@ -65,13 +65,7 @@ static class AttestationConfigurationValidation
     /// <param name="failures">The accumulated failures.</param>
     internal static void ValidateSigningKey(string keyId, string privateKeyPem, string path, List<string> failures)
     {
-        ValidateBoundedValue(keyId, $"{path}.KeyId", failures);
-        if (string.IsNullOrEmpty(keyId)
-            || keyId.Length > 128
-            || keyId.Any(_ => !(char.IsAsciiLetterOrDigit(_) || _ is '.' or '_' or '-')))
-        {
-            failures.Add($"{path}.KeyId must be a bounded ASCII identifier using letters, digits, periods, underscores, or hyphens.");
-        }
+        ValidateKeyId(keyId, path, failures);
         if (string.IsNullOrWhiteSpace(privateKeyPem))
         {
             failures.Add($"{path}.PrivateKeyPem is required.");
@@ -91,6 +85,23 @@ static class AttestationConfigurationValidation
         catch (Exception exception) when (exception is CryptographicException or ArgumentException)
         {
             failures.Add($"{path}.PrivateKeyPem must contain a valid RSA private key.");
+        }
+    }
+
+    /// <summary>
+    /// Validates one configured signing key identifier, which travels in a JWS <c language="text">kid</c> header.
+    /// </summary>
+    /// <param name="keyId">The configured key identifier.</param>
+    /// <param name="path">The configuration path of the signing key collection, reported on failure.</param>
+    /// <param name="failures">The accumulated failures.</param>
+    internal static void ValidateKeyId(string keyId, string path, List<string> failures)
+    {
+        ValidateBoundedValue(keyId, $"{path}.KeyId", failures);
+        if (string.IsNullOrEmpty(keyId)
+            || keyId.Length > 128
+            || keyId.Any(_ => !(char.IsAsciiLetterOrDigit(_) || _ is '.' or '_' or '-')))
+        {
+            failures.Add($"{path}.KeyId must be a bounded ASCII identifier using letters, digits, periods, underscores, or hyphens.");
         }
     }
 }

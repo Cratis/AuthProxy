@@ -246,4 +246,13 @@ public class Service
     /// browser-session model.
     /// </remarks>
     public IList<BearerRoute> BearerRoutes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the audience written to the signed forwarding assertion of every request sent to this service.
+    /// </summary>
+    /// <remarks>
+    /// Used only when <see cref="AuthProxy.ForwardingAttestation"/> is configured. When unset, the audience is the
+    /// service's configuration key. The service's verifier must expect exactly this value.
+    /// </remarks>
+    public string? ForwardingAudience { get; set; }
 }
