@@ -1,0 +1,45 @@
+{
+  "description": "Golden vectors for the x-cratis-forwarded-identity assertion (Cratis/AuthProxy#139, Cratis/Arc#2837). The private key exists only to reproduce the token; never use it outside tests. ECDSA signatures are randomized, so a verifier asserts that the token verifies with publicKeyPem and that its first two segments equal signingInput byte for byte.",
+  "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgz5UJqvNZJwx19Aam\nalWHqJmkuQne3mY7d3AQjqv6g5uhRANCAATcKffKGe6SxQusOa863+azEzvfgjy1\nHAj/TdAy/t7guVp1hHvi9T34CxY5jwRY1BFSNS1FsBg8qRt6x/sCijlW\n-----END PRIVATE KEY-----\n",
+  "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE3Cn3yhnuksULrDmvOt/msxM734I8\ntRwI/03QMv7e4LladYR74vU9+AsWOY8EWNQRUjUtRbAYPKkbesf7Aoo5Vg==\n-----END PUBLIC KEY-----\n",
+  "keyId": "golden-1",
+  "issuer": "https://auth.example.com",
+  "audience": "reports",
+  "issuedAt": 1767225600,
+  "lifetimeSeconds": 30,
+  "jti": "AAECAwQFBgcICQoLDA0ODw",
+  "method": "POST",
+  "path": "/api/reports/42/approve",
+  "headers": [
+    {
+      "name": "x-cratis-tenant-id",
+      "value": "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    },
+    {
+      "name": "accept",
+      "value": "application/json"
+    },
+    {
+      "name": "x-ms-client-principal-name",
+      "value": "ada@example.com"
+    },
+    {
+      "name": "x-ms-client-principal-name*",
+      "value": "UTF-8''%C3%85da"
+    },
+    {
+      "name": "x-ms-client-principal-id",
+      "value": "9f8a7c1e-4b2d-4f6a-8e3b-1c2d3e4f5a6b"
+    },
+    {
+      "name": "x-ms-client-principal",
+      "value": "eyJhdXRoX3R5cCI6Im9pZGMiLCJuYW1lX3R5cCI6Im5hbWUiLCJyb2xlX3R5cCI6InJvbGVzIiwiY2xhaW1zIjpbeyJ0eXAiOiJzdWIiLCJ2YWwiOiI5ZjhhN2MxZS00YjJkLTRmNmEtOGUzYi0xYzJkM2U0ZjVhNmIifSx7InR5cCI6Im5hbWUiLCJ2YWwiOiJhZGFAZXhhbXBsZS5jb20ifV19"
+    }
+  ],
+  "canonical": "x-ms-client-principal:eyJhdXRoX3R5cCI6Im9pZGMiLCJuYW1lX3R5cCI6Im5hbWUiLCJyb2xlX3R5cCI6InJvbGVzIiwiY2xhaW1zIjpbeyJ0eXAiOiJzdWIiLCJ2YWwiOiI5ZjhhN2MxZS00YjJkLTRmNmEtOGUzYi0xYzJkM2U0ZjVhNmIifSx7InR5cCI6Im5hbWUiLCJ2YWwiOiJhZGFAZXhhbXBsZS5jb20ifV19\nx-ms-client-principal-id:9f8a7c1e-4b2d-4f6a-8e3b-1c2d3e4f5a6b\nx-ms-client-principal-name:ada@example.com\nx-ms-client-principal-name*:UTF-8''%C3%85da\nx-cratis-tenant-id:7c9e6679-7425-40de-944b-e07fc1f90ae7\n",
+  "fwh": "2xrySe2LRVxeF9Hk76e0qoirYhuR5xFvhujGdypAcmU",
+  "protectedHeader": "{\"alg\":\"ES256\",\"typ\":\"cratis-fwd+jwt\",\"kid\":\"golden-1\"}",
+  "payload": "{\"iss\":\"https://auth.example.com\",\"aud\":\"reports\",\"iat\":1767225600,\"nbf\":1767225600,\"exp\":1767225630,\"jti\":\"AAECAwQFBgcICQoLDA0ODw\",\"htm\":\"POST\",\"htp\":\"/api/reports/42/approve\",\"sub\":\"9f8a7c1e-4b2d-4f6a-8e3b-1c2d3e4f5a6b\",\"tid\":\"7c9e6679-7425-40de-944b-e07fc1f90ae7\",\"fwh\":\"2xrySe2LRVxeF9Hk76e0qoirYhuR5xFvhujGdypAcmU\"}",
+  "signingInput": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImNyYXRpcy1md2Qrand0Iiwia2lkIjoiZ29sZGVuLTEifQ.eyJpc3MiOiJodHRwczovL2F1dGguZXhhbXBsZS5jb20iLCJhdWQiOiJyZXBvcnRzIiwiaWF0IjoxNzY3MjI1NjAwLCJuYmYiOjE3NjcyMjU2MDAsImV4cCI6MTc2NzIyNTYzMCwianRpIjoiQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImh0bSI6IlBPU1QiLCJodHAiOiIvYXBpL3JlcG9ydHMvNDIvYXBwcm92ZSIsInN1YiI6IjlmOGE3YzFlLTRiMmQtNGY2YS04ZTNiLTFjMmQzZTRmNWE2YiIsInRpZCI6IjdjOWU2Njc5LTc0MjUtNDBkZS05NDRiLWUwN2ZjMWY5MGFlNyIsImZ3aCI6IjJ4cnlTZTJMUlZ4ZUY5SGs3NmUwcW9pcllodVI1eEZ2aHVqR2R5cEFjbVUifQ",
+  "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6ImNyYXRpcy1md2Qrand0Iiwia2lkIjoiZ29sZGVuLTEifQ.eyJpc3MiOiJodHRwczovL2F1dGguZXhhbXBsZS5jb20iLCJhdWQiOiJyZXBvcnRzIiwiaWF0IjoxNzY3MjI1NjAwLCJuYmYiOjE3NjcyMjU2MDAsImV4cCI6MTc2NzIyNTYzMCwianRpIjoiQUFFQ0F3UUZCZ2NJQ1FvTERBME9EdyIsImh0bSI6IlBPU1QiLCJodHAiOiIvYXBpL3JlcG9ydHMvNDIvYXBwcm92ZSIsInN1YiI6IjlmOGE3YzFlLTRiMmQtNGY2YS04ZTNiLTFjMmQzZTRmNWE2YiIsInRpZCI6IjdjOWU2Njc5LTc0MjUtNDBkZS05NDRiLWUwN2ZjMWY5MGFlNyIsImZ3aCI6IjJ4cnlTZTJMUlZ4ZUY5SGs3NmUwcW9pcllodVI1eEZ2aHVqR2R5cEFjbVUifQ.22KO6fnjL5hmzVIvUkDmN96KdCFAqqratPYZPrXlou1NqKfYpJVagIQwOT2rsh0x9T3zhu4VoANU1xxZbnCIEA"
+}
