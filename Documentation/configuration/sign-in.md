@@ -166,6 +166,10 @@ JWS over each notification and sends it as `Authorization: Bearer`.
 **The body is unchanged.** The envelope travels in a header, so an application already consuming
 notifications keeps parsing exactly the same JSON.
 
+[Signed forwarding](signed-forwarding.md) uses the same key model (an issuer, an active key identifier and
+pinned public keys) with a different envelope: an ES256 assertion on every request AuthProxy forwards. Use
+separate keys for the two.
+
 ### What the envelope binds
 
 The envelope is a profile of [RFC 9449 (DPoP)](https://www.rfc-editor.org/rfc/rfc9449) rather than a scheme of

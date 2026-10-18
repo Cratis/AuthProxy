@@ -14,6 +14,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
       "TenantVerification": { ... },
       "Tenants": { ... },
       "Services": { ... },
+      "ForwardingAttestation": { ... },
       "Session": { ... },
       "SignIn": { ... },
       "Logout": { ... },
@@ -39,6 +40,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Data Protection Keys](data-protection.md) | Sharing the key ring that encrypts sessions and tokens between replicas: a file system, Azure Blob Storage or Redis, with optional Azure Key Vault key protection. |
 | [Trusted Proxies](trusted-proxies.md) | Which callers may speak for the client through `X-Forwarded-For` and `X-Forwarded-Proto`, and how many hops to follow. |
 | [Services](services.md) | Routing requests to backend and frontend services, and the idle timeout that applies to proxied requests, WebSockets and SSE streams. |
+| [Signed Forwarding](signed-forwarding.md) | Signing the identity and tenant headers AuthProxy forwards, so a service can verify they came from AuthProxy instead of trusting the network. |
 | [One Proxy, Several Hosts](one-proxy-several-hosts.md) | Giving each application its own host behind one AuthProxy and one sign-in, with a shared session cookie and a single identity-provider callback. |
 | [Management Listener](management-listener.md) | An opt-in private listener carrying liveness and readiness endpoints, so a probe tests more than "a process accepted a socket". |
 | [Lobby](lobby/index.md) | Invite and registration flows that hand users off to the lobby experience. |

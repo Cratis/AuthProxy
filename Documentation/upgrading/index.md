@@ -9,3 +9,4 @@ Notes on releases that change what an unchanged configuration does.
 |--------|---------|
 | [Identity verification is required by default](identity-verification-required-by-default.md) | A service that has a backend is now verified by its `/.cratis/me` answer, and anything but an explicit positive denies. |
 | [Tenant and service headers follow Arc](tenant-and-service-headers.md) | Both current and legacy tenant and service headers are forwarded during the transition; legacy forwarding is deprecated, and client-supplied tenant headers are stripped. |
+| [Signed forwarding](../configuration/signed-forwarding.md#enabling-it) | A caller-supplied `x-cratis-forwarded-identity` header is now always removed before a request is forwarded. Nothing else changes until you configure signing; follow the enablement order when you do. |

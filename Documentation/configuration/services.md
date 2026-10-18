@@ -48,6 +48,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
 | `BearerRoutes` | `BearerRouteConfig[]` | `[]` | Path prefixes authenticated by an access token from an external authorization server instead of a browser session. See [Bearer routes](#bearer-routes). |
 | `AccessToken` | `ServiceAccessTokenConfig` | `null` | Forwards the signed-in user's access token for this service's audience to its backend. See [Forwarding the user's access token](#forwarding-the-users-access-token). |
+| `ForwardingAudience` | `string` | The service's key | The audience of the signed forwarding assertion sent to this service. Used only when signed forwarding is configured. See [Signed forwarding](signed-forwarding.md#audiences). |
 
 ### ServiceEndpointConfig properties
 

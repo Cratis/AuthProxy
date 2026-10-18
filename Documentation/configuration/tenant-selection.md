@@ -58,6 +58,17 @@ tenant is auto-selected), so no switcher is shown for single-tenant users.
 
 ---
 
+## Signing the endpoint call
+
+With [signed forwarding](signed-forwarding.md) configured, every call to `TenantsEndpoint` carries a signed
+`x-cratis-forwarded-identity` assertion. Its audience is that of the configured service whose backend has the
+endpoint's scheme, host and port (the longest matching backend path wins). When no service serves the
+endpoint, or the matching services disagree, set `Selection.Options.ForwardingAudience`; AuthProxy refuses to
+start without an audience. A call that cannot be signed is not sent and is treated as an unavailable
+endpoint. See [Audiences](signed-forwarding.md#audiences).
+
+---
+
 ## Endpoint response shape
 
 `TenantsEndpoint` must return JSON with one object per selectable tenant:

@@ -368,6 +368,35 @@ custom selection page and the full flow.
 
 ---
 
+## Signed forwarding
+
+Sign the identity and tenant headers AuthProxy forwards with an EC P-256 key, so each service can verify
+they came from AuthProxy:
+
+```csharp
+authproxy.WithSignedForwarding(
+    issuer: "https://auth.example.com",
+    keyId: "forwarding-2026-10",
+    privateKeyPem: forwardingSigningKey);
+```
+
+Load `forwardingSigningKey` from a secret provider.
+
+| Parameter | Required | Description |
+| ----------- | ---------- | ------------- |
+| `issuer` | ✓ | Written to every assertion. Verifying services must expect the same value. |
+| `keyId` | ✓ | The identifier of the signing key, written to the `kid` header. |
+| `privateKeyPem` | ✓ | The PEM-encoded EC P-256 private key. Supply it from a secret. |
+| `lifetime` | – | How long an assertion is valid. Defaults to 30 seconds; must be between 10 and 60 seconds. |
+
+The method writes `Cratis__AuthProxy__ForwardingAttestation__*` with one signing key. Each service is the
+audience of the assertions it receives, named by its key unless its configuration sets `ForwardingAudience`.
+Give every verifying service the matching public key, and follow the
+[enablement order](../configuration/signed-forwarding.md#enabling-it). See
+[Signed Forwarding](../configuration/signed-forwarding.md) for the assertion format and key rotation.
+
+---
+
 ## Invites, registration and lobby
 
 ### Core invite configuration

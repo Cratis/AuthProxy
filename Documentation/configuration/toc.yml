@@ -28,6 +28,8 @@
   href: management-listener.md
 - name: Services
   href: services.md
+- name: Signed Forwarding
+  href: signed-forwarding.md
 - name: One Proxy, Several Hosts
   href: one-proxy-several-hosts.md
 - name: Public Application Surfaces
