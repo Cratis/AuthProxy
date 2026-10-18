@@ -1237,6 +1237,49 @@ public static class AuthProxyExtensions
     }
 
     /// <summary>
+    /// Enables signed forwarding: AuthProxy attaches an ES256 assertion to every request it forwards to a service, so
+    /// the service can verify that the identity and tenant headers it receives were written by AuthProxy.
+    /// </summary>
+    /// <typeparam name="T">The resource type, which must support environment variables.</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <param name="issuer">The issuer AuthProxy writes to every assertion. Verifying services must expect the same value.</param>
+    /// <param name="keyId">The identifier of the active EC P-256 signing key.</param>
+    /// <param name="privateKeyPem">The PEM-encoded EC P-256 private key supplied from a secret provider.</param>
+    /// <param name="lifetime">The assertion lifetime. The default is 30 seconds; it must be between 10 and 60 seconds.</param>
+    /// <returns>The same resource builder for chaining.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="lifetime"/> is shorter than 10 seconds or longer than 60 seconds.</exception>
+    /// <remarks>
+    /// Give every verifying service the matching public key before enabling signing. Each service is the audience of
+    /// the assertions it receives, named by its configuration key unless it states a forwarding audience. AuthProxy
+    /// writes the private value to an environment variable and never logs it.
+    /// </remarks>
+    public static IResourceBuilder<T> WithSignedForwarding<T>(
+        this IResourceBuilder<T> builder,
+        string issuer,
+        string keyId,
+        string privateKeyPem,
+        TimeSpan? lifetime = null)
+        where T : IResourceWithEnvironment
+    {
+        const string prefix = $"{ConfigPrefix}__ForwardingAttestation";
+        var assertionLifetime = lifetime ?? TimeSpan.FromSeconds(30);
+        if (assertionLifetime < TimeSpan.FromSeconds(10) || assertionLifetime > TimeSpan.FromSeconds(60))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(lifetime),
+                lifetime,
+                "Signed forwarding lifetime must be between 10 and 60 seconds.");
+        }
+
+        return builder
+            .WithEnvironment($"{prefix}__Issuer", issuer)
+            .WithEnvironment($"{prefix}__ActiveKeyId", keyId)
+            .WithEnvironment($"{prefix}__SigningKeys__0__KeyId", keyId)
+            .WithEnvironment($"{prefix}__SigningKeys__0__PrivateKeyPem", privateKeyPem)
+            .WithEnvironment($"{prefix}__Lifetime", assertionLifetime.ToString("c"));
+    }
+
+    /// <summary>
     /// Configures the AuthProxy invite system, deriving the exchange endpoint URL from the specified Aspire service resource.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
