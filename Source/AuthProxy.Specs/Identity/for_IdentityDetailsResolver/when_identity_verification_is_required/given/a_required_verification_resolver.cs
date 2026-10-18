@@ -71,6 +71,7 @@ public class a_required_verification_resolver : Specification
             [],
             _memoryCache,
             _authorizationCache,
+            Substitute.For<IForwardedIdentitySigner>(),
             _logger);
         _context = new DefaultHttpContext();
     }

@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -30,6 +31,7 @@ public static class BearerRouteServiceCollectionExtensions
     {
         builder.Services.AddHttpClient(BearerRouteDefaults.MetadataHttpClientName, client => client.Timeout = MetadataTimeout);
         builder.Services.AddSingleton<IBearerIssuerMetadata, BearerIssuerMetadata>();
+        builder.Services.AddForwardedIdentitySigning();
         builder.Services.AddSingleton<IBearerTokenValidator, BearerTokenValidator>();
         builder.Services.AddSingleton<IBearerRouteForwarder, BearerRouteForwarder>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, BearerRouteConfigurationValidator>();

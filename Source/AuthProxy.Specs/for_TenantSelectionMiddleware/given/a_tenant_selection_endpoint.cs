@@ -56,6 +56,7 @@ public class a_tenant_selection_endpoint : Specification
             httpClientFactory,
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

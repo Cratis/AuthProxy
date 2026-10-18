@@ -13,4 +13,7 @@ internal static partial class TenantSelectionMiddlewareLogging
 
     [LoggerMessage(LogLevel.Warning, "Tenant endpoint did not return a usable response ({ExceptionType})")]
     internal static partial void TenantEndpointReturnedUnusableResponse(this ILogger logger, string exceptionType);
+
+    [LoggerMessage(LogLevel.Warning, "Tenant endpoint call could not be signed and was not sent")]
+    internal static partial void TenantEndpointCallNotSigned(this ILogger logger);
 }

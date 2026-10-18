@@ -48,6 +48,7 @@ public class when_selecting_a_tenant : Specification
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

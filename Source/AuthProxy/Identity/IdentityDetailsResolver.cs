@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -22,6 +23,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="principalEnrichers">Enrichers that augment the principal before it is sent to the identity endpoint.</param>
 /// <param name="memoryCache">The memory cache used to deduplicate concurrent identity resolutions.</param>
 /// <param name="authorizationCache">The tamper-proof record of a previously resolved authorization.</param>
+/// <param name="signer">The signer of the identity forwarded to each service's identity endpoint.</param>
 /// <param name="logger">The logger.</param>
 /// <remarks>
 /// What each service's answer is worth is a per-service setting — see
@@ -36,6 +38,7 @@ public class IdentityDetailsResolver(
     IEnumerable<IIdentityDetailsPrincipalEnricher> principalEnrichers,
     IMemoryCache memoryCache,
     IIdentityAuthorizationCache authorizationCache,
+    IForwardedIdentitySigner signer,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
     const string CacheKeyPurpose = "IdentityDetails";
@@ -61,7 +64,7 @@ public class IdentityDetailsResolver(
     };
 
     readonly ConcurrentDictionary<IdentityAccountTenantKey, SemaphoreSlim> _resolverLocks = new();
-    readonly IdentityEndpointCaller _endpointCaller = new(httpClientFactory, logger);
+    readonly IdentityEndpointCaller _endpointCaller = new(httpClientFactory, signer, logger);
 
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)

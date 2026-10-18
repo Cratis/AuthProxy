@@ -3,6 +3,7 @@
 
 using System.Net;
 using System.Text.Json.Nodes;
+using Cratis.AuthProxy.ForwardedIdentity;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -10,6 +11,7 @@ namespace Cratis.AuthProxy.Identity;
 /// Calls one service's <c language="text">/.cratis/me</c> endpoint and reports what it established.
 /// </summary>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
+/// <param name="signer">The signer of the forwarded identity.</param>
 /// <param name="logger">
 /// The logger to write to. This is the resolver's own logger rather than one of this type's category, so
 /// everything an operator needs to explain a single identity resolution stays on one category.
@@ -20,7 +22,7 @@ namespace Cratis.AuthProxy.Identity;
 /// opinion about what should happen next. The resolver decides what the fact is worth, which is where the
 /// per-service mode belongs.
 /// </remarks>
-public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogger logger)
+public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, IForwardedIdentitySigner signer, ILogger logger)
 {
     /// <summary>
     /// Calls a service's identity endpoint and reports the outcome.
@@ -58,6 +60,13 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         var tenant = HeaderValue.ToTransportValue(tenantId);
         request.Headers.Add(Headers.TenantId, tenant);
         request.Headers.Add(Headers.LegacyTenantId, tenant);
+
+        // A request that has to be signed and cannot be is not sent: the service never hears from it, which is
+        // a fact like any other unreachable service and is reported the same way.
+        if (signer.Sign(request, signer.AudienceFor(serviceName)) == ForwardedIdentitySigningStatus.Failed)
+        {
+            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
+        }
 
         using var timeoutSource = timeout > TimeSpan.Zero
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)

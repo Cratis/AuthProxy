@@ -51,6 +51,7 @@ public class when_selected_tenant_cannot_be_revalidated_because_the_endpoint_is_
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

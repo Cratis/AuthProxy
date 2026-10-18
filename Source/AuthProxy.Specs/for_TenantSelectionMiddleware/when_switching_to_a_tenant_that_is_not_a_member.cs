@@ -41,6 +41,7 @@ public class when_switching_to_a_tenant_that_is_not_a_member : Specification
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

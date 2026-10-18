@@ -41,6 +41,7 @@ public class when_switching_tenant_retains_the_tenant_list : Specification
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

@@ -68,5 +68,10 @@ public enum IdentityVerificationReason
     /// <summary>
     /// The service's answer could not be read or parsed as JSON.
     /// </summary>
-    UnreadableResponse = 10
+    UnreadableResponse = 10,
+
+    /// <summary>
+    /// Signed forwarding is configured and the call could not be signed, so it was not sent.
+    /// </summary>
+    ForwardedIdentityNotSigned = 11
 }

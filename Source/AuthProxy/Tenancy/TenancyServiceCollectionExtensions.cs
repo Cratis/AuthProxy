@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
 using Microsoft.Extensions.Options;
 
 namespace Cratis.AuthProxy.Tenancy;
@@ -20,6 +21,7 @@ public static class TenancyServiceCollectionExtensions
         // The tenant selection middleware uses the memory cache to bound how often a selected tenant
         // is re-validated against the tenant endpoint.
         builder.Services.AddMemoryCache();
+        builder.Services.AddForwardedIdentitySigning();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, HostSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, ClaimSourceIdentifierStrategy>();
         builder.Services.AddSingleton<ISourceIdentifierStrategy, RouteSourceIdentifierStrategy>();

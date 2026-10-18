@@ -24,4 +24,10 @@ public static class BearerRouteDefaults
     /// authenticated on a bearer route. Absent for everything else, including a protected-resource metadata request.
     /// </summary>
     internal const string ForwardedIdentityItemKey = "Cratis.AuthProxy.BearerRoutes.ForwardedIdentity";
+
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key holding the configuration key of the service a bearer-route request is
+    /// forwarded to, which names the audience of its signed forwarding assertion.
+    /// </summary>
+    internal const string ServiceItemKey = "Cratis.AuthProxy.BearerRoutes.Service";
 }

@@ -70,6 +70,7 @@ public class when_invite_claim_forwarding_is_configured : Specification
             enrichers,
             Substitute.For<IMemoryCache>(),
             Substitute.For<IIdentityAuthorizationCache>(),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<IdentityDetailsResolver>>());
 
         _context = new DefaultHttpContext();

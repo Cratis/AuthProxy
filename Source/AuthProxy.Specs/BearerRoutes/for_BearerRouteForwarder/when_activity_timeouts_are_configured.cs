@@ -58,6 +58,7 @@ public class when_activity_timeouts_are_configured
             provider.GetRequiredService<IForwarderHttpClientFactory>(),
             provider.GetRequiredService<ITransformBuilder>(),
             monitor,
+            Substitute.For<IForwardedIdentitySigner>(),
             NullLogger<BearerRouteForwarder>.Instance);
         var route = BearerRouteTable.All(initial).Single();
         await forwarder.Forward(new DefaultHttpContext(), route, identity: null);

@@ -55,6 +55,7 @@ public class a_canonical_tenant_selection_middleware : Specification
             clients,
             Substitute.For<IErrorPageProvider>(),
             memoryCache,
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
     }
 

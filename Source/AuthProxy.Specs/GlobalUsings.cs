@@ -3,6 +3,7 @@
 
 global using System.Security.Claims;
 global using Cratis.AuthProxy.ErrorPages;
+global using Cratis.AuthProxy.ForwardedIdentity;
 global using Cratis.AuthProxy.Identity;
 global using Cratis.AuthProxy.Tenancy;
 global using Cratis.Specifications;

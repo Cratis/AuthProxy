@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.AccessTokens;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -24,6 +25,7 @@ public static class ReverseProxyExtensions
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ActivityTimeoutConfigurationValidator>();
+        builder.Services.AddForwardedIdentitySigning();
         builder.Services.AddSingleton<MicroserviceReverseProxyConfigProvider>();
         builder.Services.AddDistributedMemoryCache();
         builder.Services.TryAddSingleton(TimeProvider.System);
@@ -47,6 +49,9 @@ public static class ReverseProxyExtensions
             {
                 ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
                 PathPrefixTransform.Apply(ctx);
+
+                // Last, so the assertion covers the identity and tenant headers and the path exactly as they are sent.
+                ctx.RequestTransforms.Add(new ForwardedIdentitySignatureTransform(ctx.Services.GetRequiredService<IForwardedIdentitySigner>()));
             });
 
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();

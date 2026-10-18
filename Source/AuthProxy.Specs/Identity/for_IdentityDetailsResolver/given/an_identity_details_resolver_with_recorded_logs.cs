@@ -46,6 +46,7 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
+            Substitute.For<IForwardedIdentitySigner>(),
             _logger);
     }
 

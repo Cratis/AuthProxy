@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -24,6 +25,7 @@ namespace Cratis.AuthProxy;
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="errorPageProvider">The error page provider used to serve the selection and service-unavailable pages.</param>
 /// <param name="memoryCache">The memory cache used to bound how often the selected tenant is re-validated.</param>
+/// <param name="signer">The signer of the identity forwarded to the tenant endpoint.</param>
 /// <param name="logger">The logger.</param>
 public class TenantSelectionMiddleware(
     RequestDelegate next,
@@ -32,6 +34,7 @@ public class TenantSelectionMiddleware(
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
     IMemoryCache memoryCache,
+    IForwardedIdentitySigner signer,
     ILogger<TenantSelectionMiddleware> logger)
 {
     const string RevalidationCacheKeyPrefix = "TenantSelectionRevalidation";
@@ -162,6 +165,32 @@ public class TenantSelectionMiddleware(
             context,
             WellKnownPageNames.SelectTenant,
             StatusCodes.Status200OK);
+    }
+
+    /// <summary>
+    /// Gets the selection strategy options when tenant selection is enabled with a usable tenant endpoint.
+    /// </summary>
+    /// <param name="authProxyConfig">The auth proxy configuration.</param>
+    /// <param name="selectionOptions">The selection strategy options, when enabled.</param>
+    /// <returns><see langword="true"/> when tenant selection is enabled; otherwise <see langword="false"/>.</returns>
+    internal static bool TryGetSelectionOptions(C.AuthProxy authProxyConfig, out Tenancy.SelectionOptions selectionOptions)
+    {
+        selectionOptions = new();
+        var selectionResolution = authProxyConfig.TenantResolutions
+            .FirstOrDefault(_ => _.Strategy == C.TenantSourceIdentifierResolverType.Selection);
+        if (selectionResolution?.Options is not Tenancy.SelectionOptions typedSelectionOptions)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(typedSelectionOptions.TenantsEndpoint)
+            || !Uri.IsWellFormedUriString(typedSelectionOptions.TenantsEndpoint, UriKind.Absolute))
+        {
+            return false;
+        }
+
+        selectionOptions = typedSelectionOptions;
+        return true;
     }
 
     static IdentityAccountTenantKey RevalidationCacheKey(IdentityAccountBinding account, string tenantId) =>
@@ -315,26 +344,6 @@ public class TenantSelectionMiddleware(
 
     bool IsSafeRelativeUrl(string? url) => RelativeRedirect.IsSameSiteRelative(url);
 
-    bool TryGetSelectionOptions(C.AuthProxy authProxyConfig, out Tenancy.SelectionOptions selectionOptions)
-    {
-        selectionOptions = new();
-        var selectionResolution = authProxyConfig.TenantResolutions
-            .FirstOrDefault(_ => _.Strategy == C.TenantSourceIdentifierResolverType.Selection);
-        if (selectionResolution?.Options is not Tenancy.SelectionOptions typedSelectionOptions)
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(typedSelectionOptions.TenantsEndpoint)
-            || !Uri.IsWellFormedUriString(typedSelectionOptions.TenantsEndpoint, UriKind.Absolute))
-        {
-            return false;
-        }
-
-        selectionOptions = typedSelectionOptions;
-        return true;
-    }
-
     /// <summary>
     /// Fetches an authoritative tenant list, distinguishing no tenant access from an unavailable endpoint.
     /// Unavailability is surfaced as HTTP 503 during selection, but fails open during cookie re-validation.
@@ -354,6 +363,10 @@ public class TenantSelectionMiddleware(
         using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, selectionOptions.TenantsEndpoint);
         request.SetMicrosoftIdentityHeaders(principal);
+        if (!TrySign(request, selectionOptions))
+        {
+            return TenantOptionsResult.Unavailable;
+        }
 
         HttpResponseMessage response;
         try
@@ -403,6 +416,33 @@ public class TenantSelectionMiddleware(
             logger.TenantEndpointReturnedUnusableResponse(exception.GetType().Name);
             return TenantOptionsResult.Unavailable;
         }
+    }
+
+    /// <summary>
+    /// Signs the call to the tenant endpoint when signed forwarding is configured.
+    /// </summary>
+    /// <param name="request">The call to the tenant endpoint.</param>
+    /// <param name="selectionOptions">The selection strategy options carrying the tenant endpoint.</param>
+    /// <returns><see langword="false"/> when the call must not be sent because it could not be signed.</returns>
+    /// <remarks>
+    /// The call is signed like a proxied request, for the audience of the service that serves the endpoint. A call
+    /// that cannot be signed is never sent unsigned; the endpoint is reported unavailable instead.
+    /// </remarks>
+    bool TrySign(HttpRequestMessage request, Tenancy.SelectionOptions selectionOptions)
+    {
+        if (!signer.IsEnabled)
+        {
+            return true;
+        }
+
+        var audience = ForwardingAudiences.ForTenantSelection(config.CurrentValue, selectionOptions, out _);
+        if (audience is null || signer.Sign(request, audience) != ForwardedIdentitySigningStatus.Attested)
+        {
+            logger.TenantEndpointCallNotSigned();
+            return false;
+        }
+
+        return true;
     }
 
     sealed record TenantOption(

@@ -55,6 +55,7 @@ public class when_selected_tenant_is_revalidated_and_still_available : Specifica
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
     }
 

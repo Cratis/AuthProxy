@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
+
 namespace Cratis.AuthProxy.Identity;
 
 /// <summary>
@@ -17,6 +19,7 @@ public static class IdentityServiceCollectionExtensions
     {
         builder.Services.AddHttpClient();
         builder.Services.AddMemoryCache();
+        builder.Services.AddForwardedIdentitySigning();
         builder.Services.AddSingleton<IIdentityDetailsPrincipalEnricher, InviteTokenClaimsPrincipalEnricher>();
         builder.Services.AddSingleton<IIdentityAuthorizationCache, IdentityAuthorizationCache>();
         builder.Services.AddSingleton<IIdentityDetailsResolver, IdentityDetailsResolver>();

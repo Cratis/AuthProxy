@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;
@@ -23,15 +24,21 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="clientFactory">The YARP client factory, which applies the reverse proxy's own client configuration.</param>
 /// <param name="transformBuilder">The YARP transform builder.</param>
 /// <param name="config">The current configuration, including the backend's activity timeout.</param>
+/// <param name="signer">The signer of the forwarded identity, applied after every identity header is set.</param>
 /// <param name="logger">The logger.</param>
 public sealed class BearerRouteForwarder(
     IHttpForwarder forwarder,
     IForwarderHttpClientFactory clientFactory,
     ITransformBuilder transformBuilder,
     IOptionsMonitor<C.AuthProxy> config,
+    IForwardedIdentitySigner signer,
     ILogger<BearerRouteForwarder> logger) : IBearerRouteForwarder, IDisposable
 {
-    readonly HttpTransformer _transformer = transformBuilder.Create(context => context.RequestTransforms.Add(new BearerRouteHeadersTransform()));
+    readonly HttpTransformer _transformer = transformBuilder.Create(context =>
+    {
+        context.RequestTransforms.Add(new BearerRouteHeadersTransform());
+        context.RequestTransforms.Add(new ForwardedIdentitySignatureTransform(signer));
+    });
 
     readonly HttpMessageInvoker _invoker = clientFactory.CreateClient(new ForwarderHttpClientContext
     {
@@ -54,6 +61,8 @@ public sealed class BearerRouteForwarder(
         {
             context.Items[BearerRouteDefaults.ForwardedIdentityItemKey] = identity;
         }
+
+        context.Items[BearerRouteDefaults.ServiceItemKey] = route.ServiceName;
 
         var current = config.CurrentValue;
         current.Services.TryGetValue(route.ServiceName, out var service);

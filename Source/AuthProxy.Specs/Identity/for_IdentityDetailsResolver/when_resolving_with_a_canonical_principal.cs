@@ -73,6 +73,7 @@ public class when_resolving_with_a_canonical_principal : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<IdentityDetailsResolver>>());
     }
 

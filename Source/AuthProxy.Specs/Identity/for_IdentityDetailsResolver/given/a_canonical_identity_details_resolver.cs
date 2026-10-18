@@ -42,6 +42,7 @@ public class a_canonical_identity_details_resolver : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
+            Substitute.For<IForwardedIdentitySigner>(),
             Substitute.For<ILogger<IdentityDetailsResolver>>());
     }
 
