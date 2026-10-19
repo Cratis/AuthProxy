@@ -1,3 +1,8 @@
+---
+title: "Aspire Hosting Integration"
+description: "Host AuthProxy in a .NET Aspire app model as a container or project resource, and configure services, admission, authentication and tenancy from code."
+---
+
 # Aspire Hosting Integration
 
 ## Canonical provider identity

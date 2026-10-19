@@ -1,3 +1,8 @@
+---
+title: "Lobby"
+description: "The AuthProxy lobby finishes onboarding for users who cannot enter the application directly, through invitations or self-serve registration."
+---
+
 # Lobby
 
 AuthProxy uses the lobby to finish onboarding when a user cannot enter the application directly

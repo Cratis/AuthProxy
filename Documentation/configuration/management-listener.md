@@ -1,3 +1,8 @@
+---
+title: "Management Listener"
+description: "Turn on the AuthProxy management listener, a second private socket for health and readiness probes that keeps the public port free of them."
+---
+
 # Management Listener
 
 AuthProxy answers nothing about itself. There is no health endpoint, no readiness endpoint, no metrics

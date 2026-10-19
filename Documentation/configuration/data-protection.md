@@ -1,3 +1,8 @@
+---
+title: "Data Protection Keys"
+description: "Configure the ASP.NET Core Data Protection key ring that AuthProxy uses to encrypt cookies and tokens, shared and persistent across replicas and restarts."
+---
+
 # Data Protection Keys
 
 AuthProxy encrypts its authentication cookie, the cookies it uses during sign-in, and every token it issues

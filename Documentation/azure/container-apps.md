@@ -1,3 +1,8 @@
+---
+title: "AuthProxy on Azure Container Apps"
+description: "Run AuthProxy on Azure Container Apps with external ingress in front of internal-ingress backends, and isolate those backends from other apps."
+---
+
 # AuthProxy on Azure Container Apps
 
 AuthProxy runs on Container Apps as one container app with **external** ingress, in front of backends and

@@ -1,3 +1,8 @@
+---
+title: "Unauthenticated Responses"
+description: "How AuthProxy answers a caller that cannot proceed, by serving a page or returning a status code depending on the caller rather than the path."
+---
+
 # Unauthenticated Responses
 
 AuthProxy answers a caller that cannot proceed in one of two ways: it serves a page, or it returns a

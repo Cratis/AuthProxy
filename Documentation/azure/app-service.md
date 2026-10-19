@@ -1,3 +1,8 @@
+---
+title: "AuthProxy on Azure App Service"
+description: "Run AuthProxy on Azure App Service as a Linux custom container and restrict each backend and frontend app so that only AuthProxy can reach it."
+---
+
 # AuthProxy on Azure App Service
 
 AuthProxy runs on App Service as a Linux custom container, with your backends and frontends as separate App

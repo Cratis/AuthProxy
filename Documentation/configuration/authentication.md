@@ -1,3 +1,8 @@
+---
+title: "Authentication"
+description: "Configure AuthProxy authentication: OpenID Connect cookie sessions, JWT Bearer tokens, back-channel client credentials, and OAuth providers such as GitHub."
+---
+
 # Authentication
 
 AuthProxy supports three authentication modes that can be active simultaneously:

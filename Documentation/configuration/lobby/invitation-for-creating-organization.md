@@ -1,3 +1,8 @@
+---
+title: "Invitation for Creating Organization"
+description: "Invite a user through AuthProxy so that, after signing in, they land in the Lobby frontend to create a new organization."
+---
+
 # Invitation for Creating Organization
 
 Use this flow when you invite a user who should create a new organization after they authenticate.

@@ -1,3 +1,8 @@
+---
+title: "Tenancy"
+description: "AuthProxy resolves a tenant ID from each request and forwards it to downstream services, and prevents clients from choosing their own tenant."
+---
+
 # Tenancy
 
 AuthProxy resolves a **tenant ID** string from each incoming request and stores it in the request context.

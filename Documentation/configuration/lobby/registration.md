@@ -1,3 +1,8 @@
+---
+title: "Registration"
+description: "Let a user start self-serve registration at the AuthProxy register endpoint and create a new organization without receiving an invite first."
+---
+
 # Registration
 
 Use registration when a user should create a new organization without receiving an invite first.

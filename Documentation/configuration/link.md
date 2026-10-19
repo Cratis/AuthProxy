@@ -1,3 +1,8 @@
+---
+title: "Credential Linking"
+description: "Let a signed-in user prove control of another identity-provider login and link it to their account through AuthProxy without replacing their session."
+---
+
 # Credential Linking
 
 AuthProxy can let an **already signed-in** user prove control of an additional identity-provider login and

@@ -1,3 +1,8 @@
+---
+title: "Custom Error Pages"
+description: "Replace AuthProxy's built-in HTML error pages with your own by mounting a directory of custom pages and setting the PagesPath option."
+---
+
 # Custom Error Pages
 
 AuthProxy serves user-friendly HTML pages for error conditions instead of bare HTTP status codes.

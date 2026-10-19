@@ -1,3 +1,8 @@
+---
+title: "Trusted Proxies"
+description: "Configure which callers AuthProxy trusts to set X-Forwarded-For and X-Forwarded-Proto, so forwarded headers from untrusted callers are ignored."
+---
+
 # Trusted Proxies
 
 AuthProxy almost never sees a browser. It sees an ingress controller, a load balancer, a service-mesh

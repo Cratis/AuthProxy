@@ -1,3 +1,8 @@
+---
+title: "Public Application Surfaces"
+description: "Declare anonymous paths in AuthProxy so visitors with no account, such as magic-link or signed-URL pages, can reach parts of an application."
+---
+
 # Public Application Surfaces
 
 Some parts of an application are served to someone who has no account and never will: a magic-link

@@ -1,3 +1,8 @@
+---
+title: "Logout"
+description: "Use the AuthProxy well-known logout endpoint to end the current session and send the user to a validated redirect destination."
+---
+
 # Logout
 
 AuthProxy exposes a well-known logout endpoint that ends the current session and returns the user to a

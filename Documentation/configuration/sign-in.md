@@ -1,3 +1,8 @@
+---
+title: "Sign-in Notifications"
+description: "Have AuthProxy notify your application over a service-to-service back channel each time a user actually signs in through an identity provider."
+---
+
 # Sign-in Notifications
 
 AuthProxy can notify the application every time a user **actually signs in** — that is, when a signed-out

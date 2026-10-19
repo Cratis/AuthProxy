@@ -1,3 +1,8 @@
+---
+title: "Tenant Selection Page"
+description: "Configure the AuthProxy tenant-selection page that users see after login until they choose a tenant, and how it receives tenant data."
+---
+
 # Tenant Selection Page
 
 When tenant selection is configured, AuthProxy serves a tenant-selection page after login until the
