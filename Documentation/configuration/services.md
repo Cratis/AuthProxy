@@ -1,3 +1,8 @@
+---
+title: "Services"
+description: "Configure the services AuthProxy routes to with YARP, each with a backend, a frontend or both, plus routing, hosts and path prefixes."
+---
+
 # Services
 
 AuthProxy routes requests to one or more **services** using [YARP](https://microsoft.github.io/reverse-proxy/).

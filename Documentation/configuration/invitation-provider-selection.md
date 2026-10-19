@@ -1,3 +1,8 @@
+---
+title: "Provider Selection Pages"
+description: "Customize the AuthProxy provider-selection pages shown for sign-in and invitations, using the provider data AuthProxy injects through a cookie."
+---
+
 # Provider Selection Pages
 
 When multiple identity providers are configured, AuthProxy serves a provider-selection page

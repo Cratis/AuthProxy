@@ -1,3 +1,8 @@
+---
+title: "Receiving Webhooks"
+description: "Let inbound webhooks reach your service through AuthProxy without a user session, depending on whether you control the sender."
+---
+
 # Receiving Webhooks
 
 An inbound webhook is a request from a system that has no user session and never will. AuthProxy has two

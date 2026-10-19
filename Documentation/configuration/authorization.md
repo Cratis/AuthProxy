@@ -1,3 +1,8 @@
+---
+title: "Authorization"
+description: "Make AuthProxy the first gate by requiring claims, or GitHub organization and team membership, before an authenticated caller can reach any service."
+---
+
 # Authorization
 
 Authentication tells you *who* is knocking. On a public host that is not the same as deciding whether they

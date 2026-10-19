@@ -1,3 +1,8 @@
+---
+title: "Admission"
+description: "Admission makes an AuthProxy deployment closed, so every caller without a valid capability gets an identical 404 and the sign-in surface stays undiscoverable."
+---
+
 # Admission
 
 AuthProxy's sign-in surface is public by design. The provider list at `/.cratis/providers`, the

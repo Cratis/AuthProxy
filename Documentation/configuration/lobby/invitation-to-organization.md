@@ -1,3 +1,8 @@
+---
+title: "Invitation to Organization"
+description: "Invite a user into an existing organization through AuthProxy so they continue straight into the application after signing in."
+---
+
 # Invitation to Organization
 
 Use this flow when you invite a user into an organization that already exists. AuthProxy still uses

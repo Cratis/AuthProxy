@@ -1,3 +1,8 @@
+---
+title: "Failed Sign-ins"
+description: "How AuthProxy handles a failed or cancelled identity-provider sign-in by redirecting to provider selection with a reason and clearing handshake cookies."
+---
+
 # Failed Sign-ins
 
 A sign-in that leaves AuthProxy for an identity provider can come back broken: the provider round-trip

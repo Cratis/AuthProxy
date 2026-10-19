@@ -1,3 +1,8 @@
+---
+title: "Configuration"
+description: "Configure AuthProxy through the Cratis:AuthProxy section of appsettings.json or Cratis__AuthProxy__ environment variables, with an overview of the settings."
+---
+
 # Configuration
 
 Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section of `appsettings.json`

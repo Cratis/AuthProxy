@@ -1,3 +1,8 @@
+---
+title: "Well-Known Pages"
+description: "Override the built-in AuthProxy HTML pages for provider selection, invitation and tenant errors, and HTTP errors by mounting your own pages."
+---
+
 # Well-Known Pages
 
 AuthProxy serves built-in HTML pages for a range of conditions — provider selection,
