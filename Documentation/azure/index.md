@@ -1,3 +1,8 @@
+---
+title: "Deploying on Azure"
+description: "Deploy AuthProxy on Azure with Microsoft Entra ID sign-in and keep your backends reachable only through the proxy, with the setup shared by both platforms."
+---
+
 # Deploying on Azure
 
 This guide takes AuthProxy from nothing to a working deployment on Azure, signing users in with Microsoft
