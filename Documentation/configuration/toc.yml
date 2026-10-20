@@ -42,3 +42,5 @@
   href: error-pages.md
 - name: Well-Known Pages
   href: well-known-pages.md
+- name: Search-Index Exclusion
+  href: search-indexing.md

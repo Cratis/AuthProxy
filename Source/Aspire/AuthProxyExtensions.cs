@@ -11,6 +11,16 @@ public static class AuthProxyExtensions
     const string ConfigPrefix = "Cratis__AuthProxy";
 
     /// <summary>
+    /// Requests search-index exclusion for every host served by this AuthProxy deployment.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <returns>The same resource builder for chaining.</returns>
+    public static IResourceBuilder<T> WithSearchIndexExclusion<T>(this IResourceBuilder<T> builder)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__SearchIndexing__Exclude", bool.TrueString);
+
+    /// <summary>
     /// Adds an AuthProxy container resource to the application model.
     /// </summary>
     /// <param name="builder">The <see cref="IDistributedApplicationBuilder"/>.</param>

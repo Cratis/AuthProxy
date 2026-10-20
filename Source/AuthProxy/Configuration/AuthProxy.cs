@@ -40,6 +40,11 @@ public class AuthProxy
     public Admission Admission { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the deployment-wide search-index exclusion configuration.
+    /// </summary>
+    public SearchIndexing SearchIndexing { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the browser-session hardening configuration: the bounded authentication session
     /// lifetime and the identity/tenant re-validation intervals.
     /// </summary>
