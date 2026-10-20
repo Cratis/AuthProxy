@@ -156,6 +156,12 @@ public static class IngressExtensions
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}");
         }
 
+        app.UseSearchIndexingHeaders();
+
+        // The explicit opt-in opens only this exact GET/HEAD path, before admission and authentication.
+        // Management-listener isolation, when configured, has already run.
+        app.UseMiddleware<SearchIndexingMiddleware>();
+
         // Who actually connected has to be recorded before the forwarded headers are applied, because
         // applying them replaces the answer with whatever the header claimed.
         app.UseMiddleware<TrustedProxyMiddleware>();

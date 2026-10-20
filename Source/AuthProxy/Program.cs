@@ -29,6 +29,9 @@ builder.AddManagement();
 
 var app = builder.Build();
 
+// Wrap even the management listener's early answers; this adds no routes or authentication decisions.
+app.UseSearchIndexingHeaders();
+
 // First, so a request on the private management listener is answered before authentication, tenancy or the
 // reverse proxy can see it — and so a request for a management path on the public listener is refused
 // before anything else can serve it.
