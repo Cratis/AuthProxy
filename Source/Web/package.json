@@ -31,7 +31,7 @@
     "typescript": "~7.0.2",
     "typescript-eslint": "8.65.0",
     "typescript-for-eslint": "npm:typescript@6.0.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.7"
   },
   "packageManager": "yarn@4.17.1",
   "//": "Resolve source-map-js to fix GHSA-68fv-2mgg-jv7q (indexed source-map event-loop denial of service).",
