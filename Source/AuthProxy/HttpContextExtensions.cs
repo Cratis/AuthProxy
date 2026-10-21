@@ -74,8 +74,15 @@ public static class HttpContextExtensions
     /// ever saw it: an invitation link would redirect to provider selection instead of staging the
     /// invitation, and the flow could only complete on a second pass once a cookie it never planted
     /// happened to exist.
+    /// <para>
+    /// A signed-in caller on the registration URL with no registration pending is the exception: the flow has
+    /// already run and sent them to the lobby's own registration page, which is served behind this proxy at the
+    /// same path. That request is the lobby's, so it keeps the route that forwards it there.
+    /// </para>
     /// </remarks>
-    public static bool IsProxyOwnedFlow(this HttpContext context) => context.IsInvitation() || context.IsRegistration();
+    public static bool IsProxyOwnedFlow(this HttpContext context) =>
+        context.IsInvitation()
+        || (context.IsRegistration() && !(context.User.Identity?.IsAuthenticated == true && !context.HasPendingRegistration()));
 
     /// <summary>
     /// Determines whether the request targets one of the login endpoints.
