@@ -62,7 +62,8 @@ sealed record InvitationPageEmails(string InvitedEmail, string AssertedEmail)
     }
 
     static bool IsUsableAddress(string email) =>
-        email.Length <= 2048 && string.Equals(email, email.Trim(), StringComparison.Ordinal) && InviteMiddleware.IsAnEmailAddress(email);
+        email.Length <= 2048 && string.Equals(email, email.Trim(), StringComparison.Ordinal) && InviteMiddleware.IsAnEmailAddress(email)
+        && email.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '+' or '-' or '@');
 
     /// <summary>
     /// Encodes display text and braces so an address cannot introduce another replacement token.

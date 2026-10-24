@@ -23,6 +23,6 @@ public class when_a_valid_invitation_offers_provider_selection : given.an_email_
     Task Because() => _middleware.InvokeAsync(_context);
 
     [Fact] void should_offer_provider_selection() => _page.ShouldEqual(WellKnownPageNames.InvitationSelectProvider);
-    [Fact] void should_encode_the_invited_address() => _substitutions!["{{invitedEmail}}"].ShouldEqual("&lt;b&gt;invite&lt;/b&gt;@example.com");
+    [Fact] void should_blank_the_invited_address_containing_markup() => _substitutions!["{{invitedEmail}}"].ShouldBeEmpty();
     [Fact] void should_supply_no_asserted_address_before_authentication() => _substitutions!["{{assertedEmail}}"].ShouldBeEmpty();
 }

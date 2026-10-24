@@ -9,6 +9,6 @@ public class when_attested_recipient_evidence_contains_markup : for_InviteMiddle
 
     Task Because() => _middleware.InvokeAsync(_context);
 
-    [Fact] void should_encode_the_captured_recipient_and_supply_the_asserted_address() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden, Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"] == "&lt;script&gt;invite&lt;/script&gt;@example.com" && values["{{assertedEmail}}"] == Email));
+    [Fact] void should_blank_the_captured_recipient_and_supply_the_asserted_address() => _errorPageProvider.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden, Arg.Is<IReadOnlyDictionary<string, string>>(values => values["{{invitedEmail}}"].Length == 0 && values["{{assertedEmail}}"] == Email));
     [Fact] void should_issue_no_completion_attestation() => _attestationIssuer.Identity.ShouldBeNull();
 }

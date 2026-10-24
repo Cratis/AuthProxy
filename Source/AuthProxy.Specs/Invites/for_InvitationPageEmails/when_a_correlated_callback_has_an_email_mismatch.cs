@@ -16,6 +16,6 @@ public class when_a_correlated_callback_has_an_email_mismatch : given.a_callback
 
     [Fact] void should_handle_the_callback_response() => _result.ShouldEqual(InviteCallbackCompletionResult.ResponseHandled);
     [Fact] void should_answer_with_the_mismatch_page() => _page.ShouldEqual(WellKnownPageNames.InvitationEmailMismatch);
-    [Fact] void should_encode_the_validated_recipient() => _substitutions!["{{invitedEmail}}"].ShouldEqual("&lt;script&gt;invite&lt;/script&gt;@example.com");
-    [Fact] void should_encode_the_provider_address() => _substitutions!["{{assertedEmail}}"].ShouldEqual("&lt;b&gt;selected&lt;/b&gt;@example.com");
+    [Fact] void should_blank_the_validated_recipient() => _substitutions!["{{invitedEmail}}"].ShouldBeEmpty();
+    [Fact] void should_blank_the_provider_address() => _substitutions!["{{assertedEmail}}"].ShouldBeEmpty();
 }
