@@ -16,7 +16,7 @@ public class when_the_issuer_is_slow_to_refresh
         await using var harness = new BearerRouteHarness();
         using var client = harness.CreateBearerClient();
         var knownToken = harness.Issuer.Token();
-        using var initial = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/initial", knownToken));
+        using var initial = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/initial", knownToken), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
 
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -28,12 +28,12 @@ public class when_the_issuer_is_slow_to_refresh
             started.TrySetResult();
             return release.Task;
         };
-        var refresh = client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/refresh", harness.Issuer.Token()));
+        var refresh = client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/refresh", harness.Issuer.Token()), TestContext.Current.CancellationToken);
         try
         {
-            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            using var known = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/known-during-refresh", knownToken))
-                .WaitAsync(TimeSpan.FromSeconds(5));
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            using var known = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/known-during-refresh", knownToken), TestContext.Current.CancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(HttpStatusCode.OK, known.StatusCode);
             Assert.True(harness.Origin.ReceivedAnythingFor("/mcp/known-during-refresh"));
             Assert.False(refresh.IsCompleted);
@@ -41,7 +41,7 @@ public class when_the_issuer_is_slow_to_refresh
         finally
         {
             release.TrySetResult();
-            using var refreshed = await refresh.WaitAsync(TimeSpan.FromSeconds(5));
+            using var refreshed = await refresh.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
             Assert.Equal(unavailable ? HttpStatusCode.Unauthorized : HttpStatusCode.OK, refreshed.StatusCode);
         }
 

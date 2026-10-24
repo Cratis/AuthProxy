@@ -20,10 +20,12 @@ public class when_identity_claims_are_mapped(BearerRouteHarness harness)
         using var client = harness.CreateBearerClient();
         var path = $"/mcp/multiple-{source}";
         harness.Origin.Clear();
-        using var response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new Dictionary<string, object>
-        {
-            [source] = new[] { "one", "two" },
-        })));
+        using var response = await client.SendAsync(
+            BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new Dictionary<string, object>
+            {
+                [source] = new[] { "one", "two" },
+            })),
+            TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains("invalid_token", response.Headers.WwwAuthenticate.ToString(), StringComparison.Ordinal);
         Assert.False(harness.Origin.ReceivedAnythingFor(path));
@@ -34,11 +36,13 @@ public class when_identity_claims_are_mapped(BearerRouteHarness harness)
     {
         using var client = harness.CreateBearerClient();
         const string path = "/mcp/case-variant-subject";
-        using var response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new Dictionary<string, object>
-        {
-            ["SUB"] = "another-user",
-            ["PREFERRED_USERNAME"] = "another-name",
-        })));
+        using var response = await client.SendAsync(
+            BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new Dictionary<string, object>
+            {
+                ["SUB"] = "another-user",
+                ["PREFERRED_USERNAME"] = "another-name",
+            })),
+            TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var forwarded = harness.Origin.LastRequestTo(path)!;
         Assert.Equal(BearerRouteHarness.GitHubId, forwarded.Value(Headers.PrincipalId));
@@ -58,7 +62,7 @@ public class when_identity_claims_are_mapped(BearerRouteHarness harness)
             ["SUB"] = "another-user",
             ["PREFERRED_USERNAME"] = "another-name",
         }.Concat(StubIssuer.DefaultClaims()).ToDictionary(_ => _.Key, _ => _.Value));
-        using var response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, token));
+        using var response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, token), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var forwarded = harness.Origin.LastRequestTo(path)!;
         Assert.Equal(BearerRouteHarness.AccountId, forwarded.Value(Headers.PrincipalId));

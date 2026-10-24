@@ -16,18 +16,18 @@ public class when_repeated_separators_hide_a_stricter_route
 
         // Demonstrate that this backend resolves the ambiguous path to the stricter route.
         using var origin = new HttpClient();
-        using var direct = await origin.GetAsync($"{harness.Origin.BaseUrl.TrimEnd('/')}{path}");
+        using var direct = await origin.GetAsync($"{harness.Origin.BaseUrl.TrimEnd('/')}{path}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, direct.StatusCode);
         Assert.True(harness.Origin.ReceivedAnythingFor(path.Replace("///", "/", StringComparison.Ordinal).Replace("//", "/", StringComparison.Ordinal)));
         harness.Origin.Clear();
 
-        using var broad = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/v1/items", token));
+        using var broad = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/v1/items", token), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, broad.StatusCode);
-        using var narrow = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/v1/admin", token));
+        using var narrow = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/v1/admin", token), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, narrow.StatusCode);
         harness.Origin.Clear();
 
-        using var ambiguous = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, token));
+        using var ambiguous = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, path, token), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, ambiguous.StatusCode);
         Assert.Equal("no-store", ambiguous.Headers.CacheControl?.ToString());
         Assert.Empty(harness.Origin.Received);

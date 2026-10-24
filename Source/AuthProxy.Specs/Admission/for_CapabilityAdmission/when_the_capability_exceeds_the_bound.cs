@@ -19,6 +19,6 @@ public class when_the_capability_exceeds_the_bound : given.a_capability_admissio
     async Task Because() => _admitted = await _admission.TryAdmit(_context, _config);
 
     [Fact] void should_not_admit_the_caller() => _admitted.ShouldBeFalse();
-    [Fact] void should_not_ask_the_verifier() => _verifier.DidNotReceiveWithAnyArgs().Verify(default!, default);
+    [Fact] void should_not_ask_the_verifier() => _verifier.DidNotReceiveWithAnyArgs().Verify(default!, TestContext.Current.CancellationToken);
     [Fact] void should_issue_no_cookie() => _context.Response.Headers.SetCookie.Count.ShouldEqual(0);
 }

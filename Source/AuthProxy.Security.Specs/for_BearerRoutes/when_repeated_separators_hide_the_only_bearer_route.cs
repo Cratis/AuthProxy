@@ -15,23 +15,23 @@ public class when_repeated_separators_hide_the_only_bearer_route
 
         // This origin serves the bearer resource when it collapses the repeated separators.
         using var origin = new HttpClient();
-        using var direct = await origin.GetAsync($"{harness.Origin.BaseUrl.TrimEnd('/')}{path}");
+        using var direct = await origin.GetAsync($"{harness.Origin.BaseUrl.TrimEnd('/')}{path}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, direct.StatusCode);
         Assert.True(harness.Origin.ReceivedAnythingFor("/api/mcp/tools"));
         harness.Origin.Clear();
 
         using var browserRequest = SecurityHarness.Authenticated(HttpMethod.Get, "/api/items", "browser-user");
-        using var browser = await client.SendAsync(browserRequest);
+        using var browser = await client.SendAsync(browserRequest, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, browser.StatusCode);
         Assert.NotNull(harness.Origin.LastRequestTo("/api/items"));
 
         using var canonicalRequest = SecurityHarness.Authenticated(HttpMethod.Get, "/api/mcp/tools", "browser-user");
-        using var canonical = await client.SendAsync(canonicalRequest);
+        using var canonical = await client.SendAsync(canonicalRequest, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, canonical.StatusCode);
         harness.Origin.Clear();
 
         using var request = SecurityHarness.Authenticated(HttpMethod.Get, path, "browser-user");
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("no-store", response.Headers.CacheControl?.ToString());
         Assert.Empty(harness.Origin.Received);

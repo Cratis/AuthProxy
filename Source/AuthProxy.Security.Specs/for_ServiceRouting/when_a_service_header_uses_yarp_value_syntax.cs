@@ -21,7 +21,7 @@ public class when_a_service_header_uses_yarp_value_syntax(ServiceRoutingHarness 
         harness.ClearOrigins();
         using var request = ServiceRoutingHarness.Request("/api/users", "portal.example.test");
         request.Headers.TryAddWithoutValidation(Headers.ServiceId, header);
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.False(harness.Admin.ReceivedAnythingFor("/api/users"));
@@ -38,7 +38,7 @@ public class when_a_service_header_uses_yarp_value_syntax(ServiceRoutingHarness 
         harness.ClearOrigins();
         using var request = ServiceRoutingHarness.Request("/api/users", "portal.example.test", withAdminClaim: true);
         request.Headers.TryAddWithoutValidation(Headers.ServiceId, header);
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(harness.Admin.ReceivedAnythingFor("/api/users"));

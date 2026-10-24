@@ -13,17 +13,17 @@ public class when_the_issuer_rotates_its_key
     {
         await using var harness = new BearerRouteHarness();
         using var client = harness.CreateBearerClient();
-        using var initial = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/before-rotation", harness.Issuer.Token()));
+        using var initial = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/before-rotation", harness.Issuer.Token()), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
 
         harness.Issuer.RotateKey();
-        using var rotated = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/after-rotation", harness.Issuer.Token()));
+        using var rotated = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/after-rotation", harness.Issuer.Token()), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, rotated.StatusCode);
         Assert.True(harness.Origin.ReceivedAnythingFor("/mcp/after-rotation"));
         Assert.Equal(2, harness.Issuer.MetadataRequests);
 
         harness.Issuer.RotateKey();
-        using var throttled = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/second-rotation", harness.Issuer.Token()));
+        using var throttled = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/second-rotation", harness.Issuer.Token()), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, throttled.StatusCode);
         Assert.Equal(2, harness.Issuer.MetadataRequests);
     }
@@ -34,16 +34,16 @@ public class when_the_issuer_rotates_its_key
         await using var harness = new BearerRouteHarness();
         using var client = harness.CreateBearerClient();
         var knownToken = harness.Issuer.Token();
-        using var initial = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/known-key", knownToken));
+        using var initial = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/known-key", knownToken), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, initial.StatusCode);
 
         harness.Issuer.RotateKey();
         harness.Issuer.MetadataUnavailable = true;
-        using var unknown = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/unknown-key", harness.Issuer.Token()));
+        using var unknown = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/unknown-key", harness.Issuer.Token()), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, unknown.StatusCode);
-        using var known = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/known-key-during-outage", knownToken));
+        using var known = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/known-key-during-outage", knownToken), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, known.StatusCode);
-        using var retry = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/retry-unknown-key", harness.Issuer.Token()));
+        using var retry = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, "/mcp/retry-unknown-key", harness.Issuer.Token()), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, retry.StatusCode);
         Assert.Equal(2, harness.Issuer.MetadataRequests);
     }
