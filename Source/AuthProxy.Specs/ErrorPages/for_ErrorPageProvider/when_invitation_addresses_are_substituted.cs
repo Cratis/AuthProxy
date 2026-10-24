@@ -15,7 +15,7 @@ public class when_invitation_addresses_are_substituted : given.an_invitation_pag
 
     Task Because() => _provider.WriteErrorPageAsync(_context, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden, InvitationPageEmails.ForRequest(_context, includeAssertedEmail: true));
 
-    [Fact] void should_render_the_recipient_without_recursive_replacement() => Body().ShouldContain("&#123;&#123;assertedEmail&#125;&#125;@example.com");
-    [Fact] void should_render_the_asserted_address_as_text() => Body().ShouldContain("&lt;script&gt;selected&lt;/script&gt;@example.com");
+    [Fact] void should_leave_both_unsafe_addresses_blank() => Body().ShouldContain("<body>|</body>");
+    [Fact] void should_not_render_the_replacement_token_from_the_recipient() => Body().ShouldNotContain("assertedEmail");
     [Fact] void should_not_render_a_script_element() => Body().ShouldNotContain("<script>");
 }

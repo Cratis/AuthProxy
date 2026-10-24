@@ -133,7 +133,7 @@ duplicated, malformed, or non-`true` claim is answered with this page too. See
 
 ### Invitation email substitutions
 
-Replacement invitation pages can use these literal tokens as HTML text:
+Replacement invitation pages can use these literal tokens in HTML text or quoted attributes:
 
 | Token | Available on | Value |
 |---|---|---|
@@ -147,10 +147,13 @@ For example, a replacement mismatch page can contain:
 <p>Selected account: {{assertedEmail}}</p>
 ```
 
-Values are HTML-encoded and display-only: they do not change verified-email matching or authorize an
-invitation. They are supplied only for a validated invitation flow and its correlated callback, not for a
-bare static-page URL, invalid capability, or unrelated authentication failure. Put the tokens in HTML text,
-not JavaScript or URLs. Pages that omit the tokens keep their existing content.
+Only addresses made of ASCII letters, digits, `.`, `_`, `+`, `-` and `@` are displayed; addresses containing
+any other character are replaced with an empty string. Values are still HTML-encoded and display-only: they
+do not change verified-email matching or authorize an invitation. They are supplied only for a validated
+invitation flow and its correlated callback, not for a bare static-page URL, invalid capability, or unrelated
+authentication failure. Use the tokens only in HTML text or quoted attributes, never in unquoted attributes,
+event-handler attributes, `<script>` blocks, or `href`/`src` URLs. Pages that omit the tokens keep their existing
+content.
 
 ---
 
