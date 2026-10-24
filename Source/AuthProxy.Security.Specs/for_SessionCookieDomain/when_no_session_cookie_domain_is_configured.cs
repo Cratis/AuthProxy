@@ -17,7 +17,7 @@ public class when_no_session_cookie_domain_is_configured(HostOnlySessionCookieHa
     IReadOnlyList<string> _requestWithTheCookieTwice = [];
     HttpResponseMessage? _usedOnAnotherHost;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         var signedIn = await harness.SignIn(client, SessionCookieHarness.ConsoleHost);
@@ -30,7 +30,7 @@ public class when_no_session_cookie_domain_is_configured(HostOnlySessionCookieHa
         _logout = SessionCookieHarness.SetCookies(await client.SendAsync(SessionCookieHarness.Request(SessionCookieHarness.ChronicleHost, WellKnownPaths.Logout, session)));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_keep_the_default_cookie_name() =>

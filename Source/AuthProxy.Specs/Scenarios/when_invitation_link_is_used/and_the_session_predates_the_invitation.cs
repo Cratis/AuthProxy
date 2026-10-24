@@ -17,7 +17,7 @@ public class and_the_session_predates_the_invitation(AuthProxyFactory factory) :
     HttpResponseMessage? _response;
     int _exchangeCallsBefore;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
@@ -32,7 +32,7 @@ public class and_the_session_predates_the_invitation(AuthProxyFactory factory) :
         _response = await client.GetAsync("/");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_not_call_the_exchange_endpoint() =>

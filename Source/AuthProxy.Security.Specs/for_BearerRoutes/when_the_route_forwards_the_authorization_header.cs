@@ -16,7 +16,7 @@ public class when_the_route_forwards_the_authorization_header(BearerRouteHarness
     string _token = string.Empty;
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -29,7 +29,7 @@ public class when_the_route_forwards_the_authorization_header(BearerRouteHarness
         _forwarded = harness.Origin.LastRequestTo(Path);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_request() => Assert.NotNull(_forwarded);
     [Fact] public void should_forward_the_token() => Assert.Equal($"Bearer {_token}", _forwarded!.Value("Authorization"));

@@ -34,7 +34,7 @@ public class and_a_valid_capability_is_presented(AuthProxyFactory factory) : ICl
     HttpResponseMessage? _unknownProvider;
     string _unknownProviderBody = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateProbingClient();
 
@@ -56,7 +56,7 @@ public class and_a_valid_capability_is_presented(AuthProxyFactory factory) : ICl
         _unknownProviderBody = await _unknownProvider.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_admit_the_caller() => Assert.Equal(HttpStatusCode.NoContent, _admissionStatus);
     [Fact] public void should_issue_exactly_one_cookie() => Assert.Single(_issuedCookies);

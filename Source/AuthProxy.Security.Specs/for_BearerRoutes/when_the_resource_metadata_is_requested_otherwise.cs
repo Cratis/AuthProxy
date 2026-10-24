@@ -27,7 +27,7 @@ public class when_the_resource_metadata_is_requested_otherwise(BearerRouteHarnes
     bool _writesForwarded;
     bool _beneathForwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -48,7 +48,7 @@ public class when_the_resource_metadata_is_requested_otherwise(BearerRouteHarnes
         _beneathForwarded = harness.Origin.ReceivedAnythingFor(BeneathPath);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _head?.Dispose();
         _put?.Dispose();
@@ -57,7 +57,7 @@ public class when_the_resource_metadata_is_requested_otherwise(BearerRouteHarnes
         _upperCase?.Dispose();
         _trailingSeparator?.Dispose();
         _beneath?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_serve_head() => Assert.Equal(HttpStatusCode.OK, _head!.StatusCode);

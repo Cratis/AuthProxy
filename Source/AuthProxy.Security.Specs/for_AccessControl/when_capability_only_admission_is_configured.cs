@@ -58,7 +58,7 @@ public class when_capability_only_admission_is_configured(CapabilityOnlyHarness 
     HttpStatusCode _admittedStatus;
     bool _originSawTheAdmittedCaller;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -91,7 +91,7 @@ public class when_capability_only_admission_is_configured(CapabilityOnlyHarness 
         _admittedStatus = response.StatusCode;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>
     /// Records what one probe answered, treating a request the pipeline threw on as a shape of its own.

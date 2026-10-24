@@ -17,7 +17,7 @@ public class when_the_issuer_cannot_be_reached(BearerRouteHarness harness) : IAs
     HttpResponseMessage? _response;
     bool _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -29,10 +29,10 @@ public class when_the_issuer_cannot_be_reached(BearerRouteHarness harness) : IAs
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_answer_service_unavailable() => Assert.Equal(HttpStatusCode.ServiceUnavailable, _response!.StatusCode);

@@ -30,6 +30,6 @@ public class when_a_configured_oidc_callback_cannot_resolve_its_subject : config
         await _oidcOptions.Events.OnTicketReceived(_ticketContext);
     }
 
-    [Fact] void should_fail_the_callback() => _ticketContext.Result!.Failure.ShouldNotBeNull();
+    [Fact] void should_fail_the_callback() => _ticketContext.Result.Failure.ShouldNotBeNull();
     [Fact] void should_not_apply_an_enriched_principal() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.ProviderKey).ShouldBeNull();
 }

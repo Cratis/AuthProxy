@@ -14,7 +14,7 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 public class and_invite_claims_are_forwarded_to_identity_provider(ClaimsForwardingAuthProxyFactory factory)
     : IClassFixture<ClaimsForwardingAuthProxyFactory>, IAsyncLifetime
 {
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
@@ -28,7 +28,7 @@ public class and_invite_claims_are_forwarded_to_identity_provider(ClaimsForwardi
         await client.GetAsync("/");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_call_the_identity_details_provider() =>

@@ -18,7 +18,7 @@ public class and_the_subject_already_exists(CallbackAuthProxyFactory factory) : 
     CallbackAuthProxyFactory.ProviderSignIn _signIn;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.ExchangeStatusCode = HttpStatusCode.Conflict;
         var token = TokenFixture.CreateToken(
@@ -31,7 +31,7 @@ public class and_the_subject_already_exists(CallbackAuthProxyFactory factory) : 
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_call_the_exchange_endpoint_on_the_callback() =>

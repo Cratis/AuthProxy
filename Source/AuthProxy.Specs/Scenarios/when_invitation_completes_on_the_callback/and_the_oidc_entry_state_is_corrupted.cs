@@ -26,7 +26,7 @@ public class and_the_oidc_entry_state_is_corrupted(OidcCallbackAuthProxyFactory 
     string _callbackBody;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.Reset();
 
@@ -54,7 +54,7 @@ public class and_the_oidc_entry_state_is_corrupted(OidcCallbackAuthProxyFactory 
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_stage_the_signed_invitation() =>

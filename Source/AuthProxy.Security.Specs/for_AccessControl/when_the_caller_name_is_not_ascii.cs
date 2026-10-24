@@ -33,7 +33,7 @@ public class when_the_caller_name_is_not_ascii(SecurityHarness harness) : IAsync
     ClientPrincipal? _principal;
     string _decodedName = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -58,10 +58,10 @@ public class when_the_caller_name_is_not_ascii(SecurityHarness harness) : IAsync
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_answer_the_caller() => Assert.Equal(HttpStatusCode.OK, _response!.StatusCode);

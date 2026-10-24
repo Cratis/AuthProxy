@@ -17,7 +17,7 @@ public class and_the_entry_transaction_is_not_authentic(AuthProxyFactory factory
 
     string _presentingNothing = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateProbingClient();
 
@@ -31,7 +31,7 @@ public class and_the_entry_transaction_is_not_authentic(AuthProxyFactory factory
         _shapes["empty"] = await Present(client, string.Empty);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_answer_every_unauthentic_transaction_the_way_an_absent_one_is_answered() =>

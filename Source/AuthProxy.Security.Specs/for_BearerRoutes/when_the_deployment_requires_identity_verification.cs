@@ -17,7 +17,7 @@ public class when_the_deployment_requires_identity_verification(GatedBearerRoute
     HttpResponseMessage? _response;
     bool _verified;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -29,10 +29,10 @@ public class when_the_deployment_requires_identity_verification(GatedBearerRoute
         _verified = harness.Origin.ReceivedAnythingFor(WellKnownPaths.IdentityDetails);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_forward_the_request() => Assert.Equal(HttpStatusCode.OK, _response!.StatusCode);

@@ -21,7 +21,7 @@ public class when_a_valid_token_is_presented(BearerRouteHarness harness) : IAsyn
     ForwardedRequest? _forwarded;
     ClientPrincipal? _principal;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -34,10 +34,10 @@ public class when_a_valid_token_is_presented(BearerRouteHarness harness) : IAsyn
         ClientPrincipal.TryFromBase64(_forwarded?.Value(Headers.Principal), out _principal);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_answer_with_the_origin_response() => Assert.Equal(HttpStatusCode.OK, _response!.StatusCode);

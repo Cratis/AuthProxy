@@ -16,13 +16,13 @@ public class when_a_callback_host_is_not_configured(SessionCookieHarness harness
 {
     ProviderBrowser.Handshake? _handshake;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         _handshake = await ProviderBrowser.SignIn(client, SessionCookieHarness.ChronicleHost, "http://operations.example.test/users?page=2");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_not_bounce() => Assert.Null(_handshake!.Bounce);

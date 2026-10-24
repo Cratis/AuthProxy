@@ -11,13 +11,13 @@ public class and_request_is_made(AuthProxyFactory factory) : IClassFixture<AuthP
 {
     HttpResponseMessage? _response;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient(authenticated: true);
         _response = await client.GetAsync("/this/path/does/not/exist");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_404() => Assert.Equal(System.Net.HttpStatusCode.NotFound, _response.StatusCode);
 }

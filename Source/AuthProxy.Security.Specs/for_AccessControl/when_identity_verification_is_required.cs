@@ -34,7 +34,7 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
     bool _originSawTheVerifiedCaller;
     bool _positiveSessionWasPreserved;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -61,10 +61,10 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
             _ => !RequiredVerificationHarness.Deletes(_admittedPage, _));
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         harness.VerifyEveryCaller();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

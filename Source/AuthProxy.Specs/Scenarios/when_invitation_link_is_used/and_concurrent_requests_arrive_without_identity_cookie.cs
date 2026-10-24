@@ -15,7 +15,7 @@ public class and_concurrent_requests_arrive_without_identity_cookie(AuthProxyFac
 {
     const int ConcurrentRequestCount = 5;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient(authenticated: true);
 
@@ -27,7 +27,7 @@ public class and_concurrent_requests_arrive_without_identity_cookie(AuthProxyFac
         await Task.WhenAll(tasks);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_call_the_identity_endpoint_only_once() =>

@@ -15,7 +15,7 @@ public class when_a_store_lacks_its_settings : Specification
     }
 
     [Fact] void should_refuse_a_blob_store_without_a_blob() => _blob.Failed.ShouldBeTrue();
-    [Fact] void should_name_the_blob_setting() => _blob.FailureMessage!.ShouldContain("DataProtection:AzureBlob:BlobUri");
+    [Fact] void should_name_the_blob_setting() => _blob.FailureMessage.ShouldContain("DataProtection:AzureBlob:BlobUri");
     [Fact] void should_refuse_a_redis_store_without_a_connection_string() => _redis.Failed.ShouldBeTrue();
-    [Fact] void should_name_the_connection_string_setting() => _redis.FailureMessage!.ShouldContain("DataProtection:Redis:ConnectionString");
+    [Fact] void should_name_the_connection_string_setting() => _redis.FailureMessage.ShouldContain("DataProtection:Redis:ConnectionString");
 }

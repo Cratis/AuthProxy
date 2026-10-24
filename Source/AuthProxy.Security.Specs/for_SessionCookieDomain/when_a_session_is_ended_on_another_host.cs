@@ -14,7 +14,7 @@ public class when_a_session_is_ended_on_another_host(SessionCookieHarness harnes
 {
     HttpResponseMessage? _logout;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost));
@@ -22,7 +22,7 @@ public class when_a_session_is_ended_on_another_host(SessionCookieHarness harnes
         _logout = await client.SendAsync(SessionCookieHarness.Request(SessionCookieHarness.OperationsHost, WellKnownPaths.Logout, session));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_redirect_after_logging_out() =>

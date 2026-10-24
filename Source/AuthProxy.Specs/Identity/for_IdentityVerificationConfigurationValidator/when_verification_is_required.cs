@@ -32,7 +32,7 @@ public class when_verification_is_required : Specification
 
     [Fact] void should_refuse_a_deployment_that_cannot_resolve_a_tenant() => _withoutTenantResolution.Failed.ShouldBeTrue();
     [Fact] void should_name_the_setting_that_clears_it() =>
-        _withoutTenantResolution.FailureMessage!.ShouldContain(nameof(C.AuthProxy.TenantResolutions));
+        _withoutTenantResolution.FailureMessage.ShouldContain(nameof(C.AuthProxy.TenantResolutions));
 
     [Fact] void should_accept_it_once_a_tenant_resolution_is_declared() => _withTenantResolution.Succeeded.ShouldBeTrue();
     [Fact] void should_leave_an_enrichment_deployment_alone() => _withoutVerification.Succeeded.ShouldBeTrue();

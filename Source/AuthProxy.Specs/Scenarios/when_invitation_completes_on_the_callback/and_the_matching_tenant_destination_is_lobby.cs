@@ -17,7 +17,7 @@ public class and_the_matching_tenant_destination_is_lobby(MatchingTenantLobbyRed
     CallbackAuthProxyFactory.ProviderSignIn _signIn;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _invitationId = Guid.NewGuid().ToString();
         var token = TokenFixture.CreateToken(
@@ -35,7 +35,7 @@ public class and_the_matching_tenant_destination_is_lobby(MatchingTenantLobbyRed
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_stage_the_signed_invitation() =>

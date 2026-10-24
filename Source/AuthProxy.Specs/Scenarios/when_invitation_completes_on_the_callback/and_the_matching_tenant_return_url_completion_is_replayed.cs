@@ -16,7 +16,7 @@ public class and_the_matching_tenant_return_url_completion_is_replayed(CallbackA
     HttpResponseMessage _replay;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
@@ -38,7 +38,7 @@ public class and_the_matching_tenant_return_url_completion_is_replayed(CallbackA
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_exchange_only_once() =>

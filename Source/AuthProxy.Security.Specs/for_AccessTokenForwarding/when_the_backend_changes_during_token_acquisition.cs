@@ -22,7 +22,7 @@ public class when_the_backend_changes_during_token_acquisition : IAsyncLifetime
     ForwardedRequest? _oldBackendRequest;
     ForwardedRequest? _newBackendRequest;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _client = _harness.CreateSecurityClient();
         _client.Timeout = TimeSpan.FromSeconds(20);
@@ -51,7 +51,7 @@ public class when_the_backend_changes_during_token_acquisition : IAsyncLifetime
         _newBackendRequest = _harness.Frontend.LastRequestTo("/api/new");
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _harness.Tokens.Resume.TrySetResult();
         try

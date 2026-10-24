@@ -8,14 +8,14 @@ public class and_request_is_made(AuthProxyFactory factory) : IClassFixture<AuthP
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient(authenticated: true);
         _response = await client.GetAsync("/");
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_403() => Assert.Equal(System.Net.HttpStatusCode.Forbidden, _response.StatusCode);
     [Fact] public void should_return_html() => Assert.Equal("text/html; charset=utf-8", _response.Content.Headers.ContentType?.ToString());

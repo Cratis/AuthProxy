@@ -40,10 +40,10 @@ public class when_no_mode_is_stated : Specification
 
     [Fact] void should_refuse_the_deployment() => _withoutTenantResolution.Failed.ShouldBeTrue();
     [Fact] void should_name_the_setting_that_clears_it() =>
-        _withoutTenantResolution.FailureMessage!.ShouldContain(nameof(C.AuthProxy.TenantResolutions));
+        _withoutTenantResolution.FailureMessage.ShouldContain(nameof(C.AuthProxy.TenantResolutions));
     [Fact] void should_name_the_opt_out() =>
-        _withoutTenantResolution.FailureMessage!.ShouldContain(nameof(C.IdentityVerificationMode.BestEffort));
+        _withoutTenantResolution.FailureMessage.ShouldContain(nameof(C.IdentityVerificationMode.BestEffort));
     [Fact] void should_name_the_way_to_skip_the_endpoint() =>
-        _withoutTenantResolution.FailureMessage!.ShouldContain(nameof(C.Service.ResolveIdentityDetails));
+        _withoutTenantResolution.FailureMessage.ShouldContain(nameof(C.Service.ResolveIdentityDetails));
     [Fact] void should_leave_a_service_that_is_never_asked_alone() => _withoutIdentityResolution.Succeeded.ShouldBeTrue();
 }

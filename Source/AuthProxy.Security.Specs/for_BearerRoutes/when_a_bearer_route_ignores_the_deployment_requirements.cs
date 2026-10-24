@@ -18,7 +18,7 @@ public class when_a_bearer_route_ignores_the_deployment_requirements(GatedBearer
     HttpResponseMessage? _member;
     HttpResponseMessage? _notAMember;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -38,11 +38,11 @@ public class when_a_bearer_route_ignores_the_deployment_requirements(GatedBearer
         }));
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _member?.Dispose();
         _notAMember?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_forward_a_token_satisfying_the_route_requirements() => Assert.Equal(HttpStatusCode.OK, _member!.StatusCode);

@@ -13,7 +13,7 @@ public class when_reentering_after_identity_denial(
     HttpResponseMessage? _anonymous;
     bool _anonymousWasForwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         harness.DenyEveryCaller();
@@ -26,10 +26,10 @@ public class when_reentering_after_identity_denial(
         _anonymousWasForwarded = harness.Origin.ReceivedAnythingFor(RequiredVerificationHarness.AnonymousPath);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         harness.VerifyEveryCaller();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

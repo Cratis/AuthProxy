@@ -23,7 +23,7 @@ public class when_a_service_would_refuse_the_caller_through_its_identity_endpoin
     HttpResponseMessage? _browser;
     bool _identityEndpointCalledForTheToken;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -44,11 +44,11 @@ public class when_a_service_would_refuse_the_caller_through_its_identity_endpoin
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _bearer?.Dispose();
         _browser?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_forward_the_token() => Assert.Equal(HttpStatusCode.OK, _bearer!.StatusCode);

@@ -26,7 +26,7 @@ public class when_no_trusted_proxies_are_declared(SecurityHarness harness) : IAs
     bool _namedTheConfigurationKey;
     bool _namedTheMode;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         await client.SendAsync(SecurityHarness.Anonymous(HttpMethod.Get, SecurityHarness.AnonymousPath));
@@ -37,7 +37,7 @@ public class when_no_trusted_proxies_are_declared(SecurityHarness harness) : IAs
             nameof(C.TrustedProxyMode.Configured));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_name_the_configuration_key_that_leaves_the_fallback() => Assert.True(_namedTheConfigurationKey);
     [Fact] public void should_name_the_mode_it_is_running_in() => Assert.True(_namedTheMode);

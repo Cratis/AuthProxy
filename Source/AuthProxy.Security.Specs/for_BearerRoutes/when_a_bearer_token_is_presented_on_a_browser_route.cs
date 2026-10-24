@@ -19,7 +19,7 @@ public class when_a_bearer_token_is_presented_on_a_browser_route(BearerRouteHarn
     HttpResponseMessage? _sessionOnly;
     bool _forwardedWithToken;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -34,12 +34,12 @@ public class when_a_bearer_token_is_presented_on_a_browser_route(BearerRouteHarn
         _sessionOnly = await client.SendAsync(SecurityHarness.Authenticated(HttpMethod.Get, Path, "bearer-spec-user"));
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
         _withSession?.Dispose();
         _sessionOnly?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_refuse_it() => Assert.Equal(HttpStatusCode.Unauthorized, _response!.StatusCode);

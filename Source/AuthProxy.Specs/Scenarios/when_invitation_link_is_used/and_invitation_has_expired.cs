@@ -10,7 +10,7 @@ public class and_invitation_has_expired(AuthProxyFactory factory) : IClassFixtur
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Token signed with the correct key but with an expiry time in the past.
         var token = TokenFixture.CreateToken(
@@ -24,7 +24,7 @@ public class and_invitation_has_expired(AuthProxyFactory factory) : IClassFixtur
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_401() => Assert.Equal(System.Net.HttpStatusCode.Unauthorized, _response.StatusCode);
     [Fact] public void should_return_html() => Assert.Equal("text/html; charset=utf-8", _response.Content.Headers.ContentType?.ToString());

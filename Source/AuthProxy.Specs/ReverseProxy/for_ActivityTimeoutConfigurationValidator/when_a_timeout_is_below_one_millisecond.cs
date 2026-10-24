@@ -12,6 +12,6 @@ public class when_a_timeout_is_below_one_millisecond : Specification
         new C.AuthProxy { ActivityTimeout = TimeSpan.FromTicks(TimeSpan.TicksPerMillisecond / 2) });
 
     [Fact] void should_fail() => _result.Failed.ShouldBeTrue();
-    [Fact] void should_name_the_setting() => _result.FailureMessage!.ShouldContain($"{C.AuthProxy.SectionKey}:ActivityTimeout ");
-    [Fact] void should_explain_the_minimum() => _result.FailureMessage!.ShouldContain("less than one millisecond");
+    [Fact] void should_name_the_setting() => _result.FailureMessage.ShouldContain($"{C.AuthProxy.SectionKey}:ActivityTimeout ");
+    [Fact] void should_explain_the_minimum() => _result.FailureMessage.ShouldContain("less than one millisecond");
 }

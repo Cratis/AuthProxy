@@ -18,7 +18,7 @@ public class when_no_token_is_presented(BearerRouteHarness harness) : IAsyncLife
     HttpResponseMessage? _withSession;
     bool _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -28,11 +28,11 @@ public class when_no_token_is_presented(BearerRouteHarness harness) : IAsyncLife
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _anonymous?.Dispose();
         _withSession?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_refuse_as_unauthorized() => Assert.Equal(HttpStatusCode.Unauthorized, _anonymous!.StatusCode);

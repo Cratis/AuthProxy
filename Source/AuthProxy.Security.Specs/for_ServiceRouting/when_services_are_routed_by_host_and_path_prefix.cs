@@ -28,7 +28,7 @@ public class when_services_are_routed_by_host_and_path_prefix(ServiceRoutingHarn
     HttpResponseMessage? _proxyOwnedPathOnAHost;
     bool _adminSawTheProxyOwnedPath;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -66,7 +66,7 @@ public class when_services_are_routed_by_host_and_path_prefix(ServiceRoutingHarn
         _adminSawTheProxyOwnedPath = harness.Admin.ReceivedAnythingFor(WellKnownPaths.Providers);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_forward_a_prefixed_api_request_to_the_service_claiming_the_prefix() =>

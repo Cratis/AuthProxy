@@ -46,12 +46,9 @@ jobs:
         run: dotnet build Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj --configuration Release
 
       - name: Run security specs
-        run: >
-          dotnet test Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj
-          --configuration Release
-          --no-build
-          --logger "trx;LogFileName=security-specs.trx"
-          --results-directory TestResults
+        run: |
+          mkdir -p TestResults
+          ./Source/AuthProxy.Security.Specs/bin/Release/net10.0/AuthProxy.Security.Specs -result-trx "${PWD}/TestResults/security-specs.trx"
 
       - name: Upload security spec results
         if: always()

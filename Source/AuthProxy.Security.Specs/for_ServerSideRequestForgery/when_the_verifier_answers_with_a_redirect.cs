@@ -48,7 +48,7 @@ public class when_the_verifier_answers_with_a_redirect : IAsyncLifetime
     CapabilityVerification _verification;
     string _baseUrl = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _verifier = await StartRedirectingVerifier();
 
@@ -70,7 +70,7 @@ public class when_the_verifier_answers_with_a_redirect : IAsyncLifetime
             .Verify(new CapabilityPresentation(Capability, Transaction, Challenge), CancellationToken.None);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         await _services.DisposeAsync();
         await _verifier.StopAsync();

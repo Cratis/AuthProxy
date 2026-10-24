@@ -37,7 +37,7 @@ public class when_a_claim_gate_is_configured(ClaimGatedHarness harness) : IAsync
     HttpResponseMessage? _unqualifiedOnAnonymousPath;
     bool _originSawTheUnqualifiedCallerOnTheAnonymousPath;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -59,7 +59,7 @@ public class when_a_claim_gate_is_configured(ClaimGatedHarness harness) : IAsync
         _originSawTheUnqualifiedCallerOnTheAnonymousPath = harness.Origin.ReceivedAnythingFor(ClaimGatedHarness.AnonymousPath);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_refuse_an_authenticated_caller_without_the_required_claim() =>

@@ -13,13 +13,13 @@ public class when_a_sign_in_starts_on_the_callback_host(FixedCallbackHostHarness
 {
     ProviderBrowser.Handshake? _handshake;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         _handshake = await ProviderBrowser.SignIn(client, FixedCallbackHostHarness.CallbackHostName, "/welcome");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_not_bounce() => Assert.Null(_handshake!.Bounce);

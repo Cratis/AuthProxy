@@ -11,7 +11,7 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_link_is_used;
 public class and_identity_cookie_prevents_repeated_endpoint_calls(AuthProxyFactory factory)
     : IClassFixture<AuthProxyFactory>, IAsyncLifetime
 {
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // First request: no identity cookie → resolver should call the endpoint and set the cookie.
         using var firstClient = factory.CreateTestClient(authenticated: true);
@@ -33,7 +33,7 @@ public class and_identity_cookie_prevents_repeated_endpoint_calls(AuthProxyFacto
         await secondClient.GetAsync("/");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_call_the_identity_endpoint_exactly_once() =>

@@ -17,7 +17,7 @@ public class when_a_backend_receives_the_users_access_token(AccessTokenForwardin
     HttpResponseMessage? _rejected;
     bool _backendSawTheRejectedSession;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -35,7 +35,7 @@ public class when_a_backend_receives_the_users_access_token(AccessTokenForwardin
         _backendSawTheRejectedSession = harness.Backend.ReceivedAnythingFor("/api/orders");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_forward_the_users_access_token_to_the_backend() =>

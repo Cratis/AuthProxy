@@ -12,6 +12,6 @@ public class when_a_timeout_is_thirty_days : Specification
         new C.AuthProxy { ActivityTimeout = TimeSpan.FromDays(30) });
 
     [Fact] void should_fail() => _result.Failed.ShouldBeTrue();
-    [Fact] void should_name_the_setting() => _result.FailureMessage!.ShouldContain($"{C.AuthProxy.SectionKey}:ActivityTimeout ");
-    [Fact] void should_explain_the_maximum() => _result.FailureMessage!.ShouldContain("the proxy can schedule");
+    [Fact] void should_name_the_setting() => _result.FailureMessage.ShouldContain($"{C.AuthProxy.SectionKey}:ActivityTimeout ");
+    [Fact] void should_explain_the_maximum() => _result.FailureMessage.ShouldContain("the proxy can schedule");
 }

@@ -20,7 +20,7 @@ public class and_the_capability_survives_the_round_trip(CallbackAuthProxyFactory
     CallbackAuthProxyFactory.ProviderSignIn _signIn;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _invitationId = Guid.NewGuid().ToString();
         var token = TokenFixture.CreateToken(
@@ -33,7 +33,7 @@ public class and_the_capability_survives_the_round_trip(CallbackAuthProxyFactory
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_challenge_the_provider_for_the_invitation() =>

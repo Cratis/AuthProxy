@@ -18,7 +18,7 @@ public class and_the_peer_is_trusted(TrustedProxyHarness harness) : IAsyncLifeti
 {
     string? _notification;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -34,7 +34,7 @@ public class and_the_peer_is_trusted(TrustedProxyHarness harness) : IAsyncLifeti
         _notification = harness.Origin.LastSignInNotification();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_notified_the_application() => Assert.NotNull(_notification);
 

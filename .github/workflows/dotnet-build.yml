@@ -41,13 +41,15 @@ jobs:
       - name: Build (Release)
         run: dotnet build --configuration Release
 
+      # xUnit v3 spec projects are executables; the process exit code fails the step.
       - name: Test
-        run: >
-          dotnet test
-          --configuration Debug
-          --no-build
-          --logger "trx;LogFileName=specs.trx"
-          --results-directory TestResults
+        run: |
+          mkdir -p TestResults
+          failed=0
+          for spec in Aspire.Specs AuthProxy.Security.Specs AuthProxy.Specs; do
+            "./Source/${spec}/bin/Debug/net10.0/${spec}" -result-trx "${PWD}/TestResults/${spec}.trx" || failed=1
+          done
+          exit "${failed}"
 
       - name: Upload spec results
         if: always()

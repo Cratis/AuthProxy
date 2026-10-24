@@ -17,6 +17,6 @@ public class when_redis_is_configured_without_selecting_a_store : Specification
 
     [Fact] void should_refuse_the_configuration() => _result.Failed.ShouldBeTrue();
     [Fact] void should_fail_once_for_the_ignored_section() => _result.Failures.Count().ShouldEqual(1);
-    [Fact] void should_name_the_ignored_redis_section() => _result.FailureMessage!.ShouldContain("DataProtection:Redis");
-    [Fact] void should_name_the_default_store() => _result.FailureMessage!.ShouldContain("DataProtection:Store is 'FileSystem'");
+    [Fact] void should_name_the_ignored_redis_section() => _result.FailureMessage.ShouldContain("DataProtection:Redis");
+    [Fact] void should_name_the_default_store() => _result.FailureMessage.ShouldContain("DataProtection:Store is 'FileSystem'");
 }

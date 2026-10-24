@@ -18,7 +18,7 @@ public class and_the_oidc_id_token_nonce_is_wrong(OidcCallbackAuthProxyFactory f
     OidcCallbackAuthProxyFactory.ProviderSignIn _signIn;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.Reset();
         factory.SignWithWrongNonce = true;
@@ -38,7 +38,7 @@ public class and_the_oidc_id_token_nonce_is_wrong(OidcCallbackAuthProxyFactory f
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] void should_not_call_the_completion_endpoint() => Assert.Equal(0, _exchangeCallsDuringFlow);
     [Fact] void should_fail_the_remote_round_trip_itself() => Assert.Contains("reason=remote-failure", _signIn.Callback.Headers.Location?.ToString());

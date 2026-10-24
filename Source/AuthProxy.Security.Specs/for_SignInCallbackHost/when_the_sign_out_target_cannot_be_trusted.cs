@@ -14,7 +14,7 @@ public class when_the_sign_out_target_cannot_be_trusted(FixedCallbackHostHarness
 {
     readonly Dictionary<string, string> _destinations = [];
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost));
@@ -37,7 +37,7 @@ public class when_the_sign_out_target_cannot_be_trusted(FixedCallbackHostHarness
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_return_to_a_declared_host() =>

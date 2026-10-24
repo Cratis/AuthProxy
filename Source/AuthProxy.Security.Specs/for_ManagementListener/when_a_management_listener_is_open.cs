@@ -24,7 +24,7 @@ public class when_a_management_listener_is_open(ManagementListenerHarness harnes
     int _outboundAfterProbes;
     bool _originSawManagementPortTraffic;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = ManagementListenerHarness.CreateClient();
 
@@ -63,7 +63,7 @@ public class when_a_management_listener_is_open(ManagementListenerHarness harnes
         await Capture(client, "public-application-health-child", $"{harness.PublicBaseUrl}{ManagementListenerHarness.ApplicationHealthPath}/status");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_bind_both_listeners() =>

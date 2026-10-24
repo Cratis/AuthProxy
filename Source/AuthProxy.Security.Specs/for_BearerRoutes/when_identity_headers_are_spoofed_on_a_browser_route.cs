@@ -17,7 +17,7 @@ public class when_identity_headers_are_spoofed_on_a_browser_route(BearerRouteHar
     HttpResponseMessage? _response;
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -32,10 +32,10 @@ public class when_identity_headers_are_spoofed_on_a_browser_route(BearerRouteHar
         _forwarded = harness.Origin.LastRequestTo(Path);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_forward_the_request() => Assert.NotNull(_forwarded);

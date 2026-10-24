@@ -27,10 +27,10 @@ public class when_lobby_timeouts_are_stated : Specification
 
     [Fact] void should_fail() => _result.Failed.ShouldBeTrue();
     [Fact] void should_report_one_failure_per_setting() => _result.Failures.Count().ShouldEqual(4);
-    [Fact] void should_name_the_lobby_setting() => _result.FailureMessage!.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:ActivityTimeout is not supported.");
-    [Fact] void should_name_the_backend_setting() => _result.FailureMessage!.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:Backend:ActivityTimeout is not supported.");
-    [Fact] void should_name_the_frontend_setting() => _result.FailureMessage!.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:Frontend:ActivityTimeout is not supported.");
-    [Fact] void should_name_the_registration_setting() => _result.FailureMessage!.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:Registration:ActivityTimeout is not supported.");
+    [Fact] void should_name_the_lobby_setting() => _result.FailureMessage.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:ActivityTimeout is not supported.");
+    [Fact] void should_name_the_backend_setting() => _result.FailureMessage.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:Backend:ActivityTimeout is not supported.");
+    [Fact] void should_name_the_frontend_setting() => _result.FailureMessage.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:Frontend:ActivityTimeout is not supported.");
+    [Fact] void should_name_the_registration_setting() => _result.FailureMessage.ShouldContain($"{C.AuthProxy.SectionKey}:Invite:Lobby:Registration:ActivityTimeout is not supported.");
     [Fact] void should_explain_why_the_settings_are_unsupported() => _result.Failures.All(failure => failure.Contains("Invite:Lobby does not create proxy clusters, so ActivityTimeout cannot apply.", StringComparison.Ordinal)).ShouldBeTrue();
     [Fact] void should_explain_how_to_correct_the_settings() => _result.Failures.All(failure => failure.Contains("Remove this setting and configure the proxied service under Services instead.", StringComparison.Ordinal)).ShouldBeTrue();
 }
