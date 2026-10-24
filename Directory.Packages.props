@@ -7,6 +7,8 @@
   <ItemGroup>
     <!-- Cratis -->
     <PackageVersion Include="Cratis.Arc.Core" Version="22.77.0" />
+    <!-- Specifications 5 needs the generator fix in Fundamentals 7.26.1; Arc.Core resolves 7.23.0 transitively. -->
+    <PackageVersion Include="Cratis.Fundamentals" Version="7.26.1" />
     <!-- Microsoft -->
     <PackageVersion Include="Aspire.Hosting" Version="13.6.1" />
     <PackageVersion Include="Aspire.Hosting.NodeJs" Version="9.5.2" />
