@@ -22,7 +22,7 @@ public class and_the_capability_is_presented_anywhere_else(AuthProxyFactory fact
 
     string _presentingNothing = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateProbingClient();
 
@@ -35,7 +35,7 @@ public class and_the_capability_is_presented_anywhere_else(AuthProxyFactory fact
         _answers["in a cookie"] = await CaptureWithHeader(client, "Cookie", $"{Cookies.EntryTransaction}={_capability}");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_admit_nobody() =>

@@ -30,7 +30,7 @@ public class when_a_bearer_token_is_presented_off_its_routes_with_unusual_format
     HttpContext? _secondHeader;
     bool _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -51,10 +51,10 @@ public class when_a_bearer_token_is_presented_off_its_routes_with_unusual_format
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _control?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_let_the_jwt_bearer_handler_accept_a_token_from_another_issuer() => Assert.Equal(HttpStatusCode.OK, _control!.StatusCode);

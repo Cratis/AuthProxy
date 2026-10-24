@@ -28,7 +28,7 @@ public class when_the_token_is_not_an_acceptable_access_token(BearerRouteHarness
     HttpResponseMessage? _unusableTenant;
     bool _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -46,7 +46,7 @@ public class when_the_token_is_not_an_acceptable_access_token(BearerRouteHarness
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _idToken?.Dispose();
         _publicKeyAsSecret?.Dispose();
@@ -55,7 +55,7 @@ public class when_the_token_is_not_an_acceptable_access_token(BearerRouteHarness
         _withoutMappedSource?.Dispose();
         _twoTenants?.Dispose();
         _unusableTenant?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_refuse_an_id_token() => Assert.Equal(HttpStatusCode.Unauthorized, _idToken!.StatusCode);

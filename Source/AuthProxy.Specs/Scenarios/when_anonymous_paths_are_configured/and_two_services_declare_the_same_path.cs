@@ -22,7 +22,7 @@ public class and_two_services_declare_the_same_path(SharedPrefixAuthProxyFactory
     HttpResponseMessage? _shared;
     HttpResponseMessage? _sharedChild;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
 
@@ -30,7 +30,7 @@ public class and_two_services_declare_the_same_path(SharedPrefixAuthProxyFactory
         _sharedChild = await client.GetAsync($"{AuthProxyFactory.AnonymousFrontendPath}/some-token");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_shared_prefix() => Assert.Equal(HttpStatusCode.BadGateway, _shared!.StatusCode);
     [Fact] public void should_forward_below_the_shared_prefix() => Assert.Equal(HttpStatusCode.BadGateway, _sharedChild!.StatusCode);

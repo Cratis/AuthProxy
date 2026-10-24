@@ -17,7 +17,7 @@ public class when_the_token_tenant_is_a_dot_segment
         await using var harness = new VerifyingTenantHarness();
         using var client = harness.CreateBearerClient();
         using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new Dictionary<string, object> { ["tid"] = tenantId }));
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Empty(harness.Origin.Received);
@@ -31,7 +31,7 @@ public class when_the_token_tenant_is_a_dot_segment
         await using var harness = new VerifyingTenantHarness();
         using var client = harness.CreateBearerClient();
         using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new Dictionary<string, object> { ["tid"] = tenantId }));
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(harness.Origin.ReceivedAnythingFor($"/api/tenants/{tenantId}/exists"));

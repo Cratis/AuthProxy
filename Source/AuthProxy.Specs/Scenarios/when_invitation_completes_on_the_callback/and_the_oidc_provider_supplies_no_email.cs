@@ -24,7 +24,7 @@ public class and_the_oidc_provider_supplies_no_email(OidcCallbackAuthProxyFactor
     string _callbackBody;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.Reset();
         factory.IdentityClaims = new Dictionary<string, string>
@@ -48,7 +48,7 @@ public class and_the_oidc_provider_supplies_no_email(OidcCallbackAuthProxyFactor
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_not_call_the_completion_endpoint() =>

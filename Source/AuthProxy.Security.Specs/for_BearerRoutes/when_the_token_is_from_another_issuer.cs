@@ -15,7 +15,7 @@ public class when_the_token_is_from_another_issuer(BearerRouteHarness harness) :
     HttpResponseMessage? _response;
     bool _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -24,10 +24,10 @@ public class when_the_token_is_from_another_issuer(BearerRouteHarness harness) :
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_refuse_it() => Assert.Equal(HttpStatusCode.Unauthorized, _response!.StatusCode);

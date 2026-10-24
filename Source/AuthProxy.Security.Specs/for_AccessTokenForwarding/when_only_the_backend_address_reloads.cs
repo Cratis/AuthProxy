@@ -22,7 +22,7 @@ public class when_only_the_backend_address_reloads : IAsyncLifetime
     ForwardedRequest? _after;
     int _redemptionsBeforeReload;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = _harness.CreateSecurityClient();
         var store = _harness.Services.GetRequiredService<IUserTokenStore>();
@@ -48,7 +48,7 @@ public class when_only_the_backend_address_reloads : IAsyncLifetime
         _after = _harness.Frontend.LastRequestTo("/api/after");
     }
 
-    public Task DisposeAsync() => _harness.DisposeAsync().AsTask();
+    public ValueTask DisposeAsync() => _harness.DisposeAsync();
 
     [Fact] public void should_reuse_the_cached_token_before_reload() => Assert.Equal(1, _redemptionsBeforeReload);
     [Fact] public void should_forward_the_original_token_only_to_the_original_backend() => Assert.Equal("Bearer redemption-1", _before!.Value("Authorization"));

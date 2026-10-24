@@ -24,7 +24,7 @@ public class when_a_session_is_shared_across_hosts(SessionCookieHarness harness)
     HttpResponseMessage? _operationsWithoutSession;
     bool _operationsSawTheAnonymousCaller;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -52,7 +52,7 @@ public class when_a_session_is_shared_across_hosts(SessionCookieHarness harness)
         _operationsSawTheAnonymousCaller = harness.OperationsOrigin.ReceivedAnythingFor("/api/users");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_scope_the_session_cookie_to_the_parent_domain() =>

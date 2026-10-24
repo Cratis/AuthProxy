@@ -20,7 +20,7 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
     ForwardedRequest? _forwarded;
     ClientPrincipal? _principal;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -46,7 +46,7 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
         ClientPrincipal.TryFromBase64(_forwarded?.Value(Headers.Principal), out _principal);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_request() => Assert.NotNull(_principal);
     [Fact] public void should_grant_no_role() => Assert.Equal(["anonymous", "authenticated"], _principal!.UserRoles);

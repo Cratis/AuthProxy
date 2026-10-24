@@ -17,7 +17,7 @@ public class when_the_boundary_is_declared(TrustedProxyHarness harness) : IAsync
 {
     bool _warned;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         await client.SendAsync(TrustedProxyHarness.From(TrustedProxyHarness.TrustedPeer, TrustedProxyHarness.AnonymousPath));
@@ -25,7 +25,7 @@ public class when_the_boundary_is_declared(TrustedProxyHarness harness) : IAsync
         _warned = harness.Logs.Mentioning($"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_not_warn_about_the_boundary() => Assert.False(_warned);
 }

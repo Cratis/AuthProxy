@@ -17,7 +17,7 @@ public class and_the_matching_tenant_destination_is_return_url(CallbackAuthProxy
     CallbackAuthProxyFactory.ProviderSignIn _signIn;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
@@ -33,7 +33,7 @@ public class and_the_matching_tenant_destination_is_return_url(CallbackAuthProxy
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_use_return_url_as_the_enum_default() =>

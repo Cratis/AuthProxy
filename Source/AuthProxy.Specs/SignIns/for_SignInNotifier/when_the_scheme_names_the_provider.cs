@@ -29,6 +29,6 @@ public class when_the_scheme_names_the_provider : a_sign_in_notifier
     async Task Because() => _result = await _notifier.Notify(_httpContext, _principal, "google");
 
     [Fact] void should_succeed() => _result.ShouldEqual(SignInNotificationResult.Notified);
-    [Fact] void should_attribute_the_configured_provider_behind_the_scheme() => _handler.LastRequestBody!.ShouldContain("Google");
-    [Fact] void should_not_leak_the_authentication_type() => _handler.LastRequestBody!.ShouldNotContain("AuthenticationTypes.Federation");
+    [Fact] void should_attribute_the_configured_provider_behind_the_scheme() => _handler.LastRequestBody.ShouldContain("Google");
+    [Fact] void should_not_leak_the_authentication_type() => _handler.LastRequestBody.ShouldNotContain("AuthenticationTypes.Federation");
 }

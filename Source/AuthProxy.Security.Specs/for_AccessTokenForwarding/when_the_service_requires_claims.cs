@@ -16,7 +16,7 @@ public class when_the_service_requires_claims : IAsyncLifetime
     HttpResponseMessage? _denied;
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = _harness.CreateSecurityClient();
         using var authorized = AccessTokenForwardingHarness.FromSession("/api/authorized", "claim-session");
@@ -29,7 +29,7 @@ public class when_the_service_requires_claims : IAsyncLifetime
         _denied = await client.SendAsync(denied);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _authorized?.Dispose();
         _denied?.Dispose();

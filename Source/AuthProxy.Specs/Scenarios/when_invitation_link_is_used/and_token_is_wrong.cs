@@ -8,14 +8,14 @@ public class and_token_is_wrong(AuthProxyFactory factory) : IClassFixture<AuthPr
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
         _response = await client.GetAsync("/invite/this-is-not-a-jwt");
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_401() => Assert.Equal(System.Net.HttpStatusCode.Unauthorized, _response.StatusCode);
     [Fact] public void should_not_call_exchange_endpoint() => Assert.Equal(0, factory.ExchangeCallCount);

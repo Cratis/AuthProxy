@@ -21,7 +21,7 @@ public class when_forwarded_headers_come_from_an_untrusted_peer(TrustedProxyHarn
 {
     ObservedRequest? _observed;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -34,7 +34,7 @@ public class when_forwarded_headers_come_from_an_untrusted_peer(TrustedProxyHarn
         _observed = harness.Observations.Last;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_observed_the_request() => Assert.NotNull(_observed);
 

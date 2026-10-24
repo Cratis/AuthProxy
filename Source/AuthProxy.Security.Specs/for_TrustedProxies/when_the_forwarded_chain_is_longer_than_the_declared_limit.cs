@@ -20,7 +20,7 @@ public class when_the_forwarded_chain_is_longer_than_the_declared_limit(TrustedP
 
     ObservedRequest? _observed;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -34,7 +34,7 @@ public class when_the_forwarded_chain_is_longer_than_the_declared_limit(TrustedP
         _observed = harness.Observations.Last;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_observed_the_request() => Assert.NotNull(_observed);
 

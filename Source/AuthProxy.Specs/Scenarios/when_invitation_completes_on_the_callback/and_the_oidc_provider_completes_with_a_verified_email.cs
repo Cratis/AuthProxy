@@ -30,7 +30,7 @@ public class and_the_oidc_provider_completes_with_a_verified_email(OidcCallbackA
     IReadOnlyDictionary<string, string> _attestedFacts;
     string _exchangeBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.Reset();
 
@@ -54,7 +54,7 @@ public class and_the_oidc_provider_completes_with_a_verified_email(OidcCallbackA
         _exchangeBody = exchange.Body;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] void should_challenge_the_oidc_provider() => Assert.StartsWith($"{OidcCallbackAuthProxyFactory.Authority}/authorize", _signIn.Challenge.Headers.Location?.ToString());
     [Fact] void should_call_the_attested_completion_endpoint_exactly_once() => Assert.Equal(1, factory.ExchangeCallCount);

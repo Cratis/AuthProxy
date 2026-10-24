@@ -67,7 +67,7 @@ public class when_the_logout_endpoint_is_given_a_hostile_target(SecurityHarness 
     /// </summary>
     public static TheoryData<string> SafeTargets => new(_safeTargets);
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -81,7 +81,7 @@ public class when_the_logout_endpoint_is_given_a_hostile_target(SecurityHarness 
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Theory]
     [MemberData(nameof(HostileTargets))]

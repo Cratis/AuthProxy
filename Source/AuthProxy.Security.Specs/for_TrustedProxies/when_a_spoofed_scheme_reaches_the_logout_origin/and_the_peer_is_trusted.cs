@@ -18,7 +18,7 @@ public class and_the_peer_is_trusted(TrustedProxyHarness harness) : IAsyncLifeti
 {
     string? _location;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -32,7 +32,7 @@ public class and_the_peer_is_trusted(TrustedProxyHarness harness) : IAsyncLifeti
         _location = response.Headers.Location?.ToString();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_redirect_to_the_declared_origin() =>

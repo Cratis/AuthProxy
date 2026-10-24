@@ -17,7 +17,7 @@ public class and_the_matching_tenant_lobby_completion_is_replayed(MatchingTenant
     HttpResponseMessage _replay;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _invitationId = Guid.NewGuid().ToString();
         var token = TokenFixture.CreateToken(
@@ -41,7 +41,7 @@ public class and_the_matching_tenant_lobby_completion_is_replayed(MatchingTenant
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_exchange_only_once() =>

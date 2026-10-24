@@ -29,7 +29,7 @@ public class and_the_caller_is_signed_in_without_a_tenant(TenantSelectionAuthPro
     HttpResponseMessage? _undeclared;
     string? _undeclaredBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
 
@@ -40,7 +40,7 @@ public class and_the_caller_is_signed_in_without_a_tenant(TenantSelectionAuthPro
         _undeclaredBody = await _undeclared.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontend!.StatusCode);
     [Fact] public void should_forward_the_declared_backend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredBackend!.StatusCode);

@@ -13,7 +13,7 @@ public class when_required_verification_has_no_tenant(
     bool _forwarded;
     IReadOnlyList<string> _authenticationCookies = [];
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         harness.VerifyEveryCaller();
@@ -27,10 +27,10 @@ public class when_required_verification_has_no_tenant(
         _forwarded = harness.Origin.ReceivedAnythingFor(RequiredVerificationHarness.ProtectedPath);
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         harness.VerifyEveryCaller();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

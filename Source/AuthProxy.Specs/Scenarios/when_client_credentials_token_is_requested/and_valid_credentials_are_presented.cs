@@ -40,7 +40,7 @@ public class and_valid_credentials_are_presented : Specification
     [Fact] void should_forward_the_well_known_verification_payload()
     {
         _factory.CapturedVerificationRequest.ShouldNotBeNull();
-        _factory.CapturedVerificationRequest!.Service.ShouldEqual("portal");
+        _factory.CapturedVerificationRequest.Service.ShouldEqual("portal");
         _factory.CapturedVerificationRequest.RoutePrefix.ShouldEqual("/api");
         _factory.CapturedVerificationRequest.ClientId.ShouldEqual("orders-api");
         _factory.CapturedVerificationRequest.ClientSecret.ShouldEqual("super-secret");

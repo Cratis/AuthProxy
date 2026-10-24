@@ -31,7 +31,7 @@ public class and_a_non_browser_caller_requests_a_page(AuthProxyFactory factory) 
     HttpResponseMessage? _identityBootstrap;
     string? _identityBootstrapBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
 
@@ -43,7 +43,7 @@ public class and_a_non_browser_caller_requests_a_page(AuthProxyFactory factory) 
         _identityBootstrapBody = await _identityBootstrap.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     static HttpRequestMessage Request(string path, string? accept = null, string? fetchDestination = null)
     {

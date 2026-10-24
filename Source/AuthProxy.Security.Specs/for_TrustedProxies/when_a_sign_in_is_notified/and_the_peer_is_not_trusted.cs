@@ -20,7 +20,7 @@ public class and_the_peer_is_not_trusted(TrustedProxyHarness harness) : IAsyncLi
     ObservedRequest? _observed;
     string? _notification;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -39,7 +39,7 @@ public class and_the_peer_is_not_trusted(TrustedProxyHarness harness) : IAsyncLi
         _notification = harness.Origin.LastSignInNotification();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_notified_the_application() => Assert.NotNull(_notification);
 

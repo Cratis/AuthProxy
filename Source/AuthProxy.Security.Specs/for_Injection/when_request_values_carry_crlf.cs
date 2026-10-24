@@ -67,7 +67,7 @@ public class when_request_values_carry_crlf(SecurityHarness harness) : IAsyncLif
     readonly List<ForwardedRequest?> _forwarded = [];
     Exchange? _legitimateLogout;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -90,7 +90,7 @@ public class when_request_values_carry_crlf(SecurityHarness harness) : IAsyncLif
         _legitimateLogout = await Send(client, SecurityHarness.Authenticated(HttpMethod.Get, $"{WellKnownPaths.Logout}?redirect={LegitimateRedirect}"));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_still_honor_a_redirect_target_that_carries_no_line_break() =>

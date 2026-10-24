@@ -21,7 +21,7 @@ public class and_the_capability_does_not_survive_the_round_trip(CallbackAuthProx
     int _exchangeCallsDuringCallback;
     int _exchangeCallsDuringFollowUp;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _invitationId = Guid.NewGuid().ToString();
         _token = TokenFixture.CreateToken(
@@ -47,7 +47,7 @@ public class and_the_capability_does_not_survive_the_round_trip(CallbackAuthProx
         _exchangeCallsDuringFollowUp = factory.ExchangeCallCount - exchangeCallsBefore - _exchangeCallsDuringCallback;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_redirect_the_callback_to_its_own_return_url() =>

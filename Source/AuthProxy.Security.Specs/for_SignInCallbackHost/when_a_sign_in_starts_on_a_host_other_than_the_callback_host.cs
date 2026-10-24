@@ -17,7 +17,7 @@ public class when_a_sign_in_starts_on_a_host_other_than_the_callback_host(FixedC
     ProviderBrowser.Handshake? _handshake;
     HttpResponseMessage? _servedOnTheOriginalHost;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         _handshake = await ProviderBrowser.SignIn(client, SessionCookieHarness.ChronicleHost, "/events?stream=7");
@@ -26,7 +26,7 @@ public class when_a_sign_in_starts_on_a_host_other_than_the_callback_host(FixedC
             SessionCookieHarness.Request(SessionCookieHarness.ChronicleHost, "/api/events", [.. _handshake.Session]));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_send_the_browser_to_the_callback_host_before_anything_else() =>

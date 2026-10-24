@@ -43,7 +43,7 @@ public class when_service_selectors_disagree_with_the_route(SecurityHarness harn
         }
 
         harness.Origin.Clear();
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         var path = pathAndQuery.Split('?')[0];
         var selectedOrigin = expectedService == "app" ? harness.Origin : second;
         var otherOrigin = expectedService == "app" ? second : harness.Origin;
@@ -64,7 +64,7 @@ public class when_service_selectors_disagree_with_the_route(SecurityHarness harn
         request.Headers.Add(Headers.ServiceId, "unknown");
         harness.Origin.Clear();
 
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         var forwarded = harness.Origin.LastRequestTo("/private");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -91,7 +91,7 @@ public class when_service_selectors_disagree_with_the_route(SecurityHarness harn
         request.Headers.Add(header, "unknown");
         harness.Origin.Clear();
 
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Empty(second.Received);

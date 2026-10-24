@@ -35,7 +35,7 @@ public class when_a_machine_token_targets_another_service
         control.Headers.TryAddWithoutValidation("Authorization", $"Bearer {token}");
         control.Headers.Host = "machine.example.test";
         control.Headers.TryAddWithoutValidation(Headers.ServiceId, "machine");
-        using var controlResponse = await client.SendAsync(control);
+        using var controlResponse = await client.SendAsync(control, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, controlResponse.StatusCode);
         Assert.NotNull(harness.Frontend.LastRequestTo(controlPath));
 
@@ -47,7 +47,7 @@ public class when_a_machine_token_targets_another_service
             request.Headers.TryAddWithoutValidation(Headers.ServiceId, service);
         }
 
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.False(harness.Backend.ReceivedAnythingFor(path.Split('?')[0]));
     }

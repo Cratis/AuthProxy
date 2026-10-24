@@ -14,12 +14,12 @@ public class when_notifying_a_completed_sign_in : a_sign_in_notifier
     [Fact] void should_notify() => _result.ShouldEqual(SignInNotificationResult.Notified);
     [Fact] void should_post_to_the_configured_notify_url() => _handler.LastRequest!.RequestUri!.ToString().ShouldEqual(NotifyUrl);
     [Fact] void should_post() => _handler.LastRequest!.Method.ShouldEqual(HttpMethod.Post);
-    [Fact] void should_send_the_subject() => _handler.LastRequestBody!.ShouldContain("subject-123");
-    [Fact] void should_send_the_identity_provider() => _handler.LastRequestBody!.ShouldContain("https://github.com");
-    [Fact] void should_not_add_a_canonical_provider_key() => _handler.LastRequestBody!.ShouldNotContain("providerKey");
-    [Fact] void should_send_the_client_ip_from_the_connection() => _handler.LastRequestBody!.ShouldContain(ConnectionAddress);
-    [Fact] void should_not_send_an_address_read_from_a_raw_forwarded_header() => _handler.LastRequestBody!.ShouldNotContain(ForgedForwardedAddress);
-    [Fact] void should_send_the_approximate_location() => _handler.LastRequestBody!.ShouldContain("Oslo");
-    [Fact] void should_send_the_parsed_browser() => _handler.LastRequestBody!.ShouldContain("Chrome");
-    [Fact] void should_send_the_parsed_operating_system() => _handler.LastRequestBody!.ShouldContain("Windows");
+    [Fact] void should_send_the_subject() => _handler.LastRequestBody.ShouldContain("subject-123");
+    [Fact] void should_send_the_identity_provider() => _handler.LastRequestBody.ShouldContain("https://github.com");
+    [Fact] void should_not_add_a_canonical_provider_key() => _handler.LastRequestBody.ShouldNotContain("providerKey");
+    [Fact] void should_send_the_client_ip_from_the_connection() => _handler.LastRequestBody.ShouldContain(ConnectionAddress);
+    [Fact] void should_not_send_an_address_read_from_a_raw_forwarded_header() => _handler.LastRequestBody.ShouldNotContain(ForgedForwardedAddress);
+    [Fact] void should_send_the_approximate_location() => _handler.LastRequestBody.ShouldContain("Oslo");
+    [Fact] void should_send_the_parsed_browser() => _handler.LastRequestBody.ShouldContain("Chrome");
+    [Fact] void should_send_the_parsed_operating_system() => _handler.LastRequestBody.ShouldContain("Windows");
 }

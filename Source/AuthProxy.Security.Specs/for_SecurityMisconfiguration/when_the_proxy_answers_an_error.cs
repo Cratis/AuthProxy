@@ -34,7 +34,7 @@ public class when_the_proxy_answers_an_error(SecurityHarness harness) : IAsyncLi
     readonly List<Answer> _answers = [];
     string _everyBody = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -48,7 +48,7 @@ public class when_the_proxy_answers_an_error(SecurityHarness harness) : IAsyncLi
         _everyBody = string.Join('\n', _answers.Select(answer => answer.Body));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_not_disclose_a_stack_frame_in_any_response() =>

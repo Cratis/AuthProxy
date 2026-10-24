@@ -14,7 +14,7 @@ public class when_a_session_is_used_on_a_host_no_service_claims(SessionCookieHar
     HttpResponseMessage? _response;
     bool _anyOriginSawIt;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost, withOperationsClaim: true));
@@ -26,7 +26,7 @@ public class when_a_session_is_used_on_a_host_no_service_claims(SessionCookieHar
             || harness.ChronicleOrigin.ReceivedAnythingFor("/api/users");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_route_nothing_that_no_service_claims() =>

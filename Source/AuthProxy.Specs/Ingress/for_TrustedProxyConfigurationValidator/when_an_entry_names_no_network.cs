@@ -13,6 +13,6 @@ public class when_an_entry_names_no_network : Specification
 
     [Fact] void should_fail() => _result.Failed.ShouldBeTrue();
     [Fact] void should_fail_once_per_offending_entry() => _result.Failures.Count().ShouldEqual(1);
-    [Fact] void should_name_the_offending_value() => _result.FailureMessage!.ShouldContain("not-an-address");
-    [Fact] void should_name_the_offending_position() => _result.FailureMessage!.ShouldContain($"{C.Ingress.SectionKey}:TrustedProxies:1");
+    [Fact] void should_name_the_offending_value() => _result.FailureMessage.ShouldContain("not-an-address");
+    [Fact] void should_name_the_offending_position() => _result.FailureMessage.ShouldContain($"{C.Ingress.SectionKey}:TrustedProxies:1");
 }

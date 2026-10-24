@@ -35,7 +35,7 @@ public class when_bearer_route_paths_are_matched(BearerRouteHarness harness) : I
     HttpContext? _currentSegmentWithPathParameter;
     HttpContext? _pathParameterOnAnOrdinarySegment;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         harness.Origin.Clear();
 
@@ -54,7 +54,7 @@ public class when_bearer_route_paths_are_matched(BearerRouteHarness harness) : I
         _pathParameterOnAnOrdinarySegment = await Send("/mcp/tools;jsessionid=abc");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_match_the_prefix_case_insensitively() => Assert.Equal(StatusCodes.Status200OK, _upperCase!.Response.StatusCode);
     [Fact] public void should_forward_the_case_insensitive_match() => Assert.True(harness.Origin.ReceivedAnythingFor("/MCP/upper-case"));

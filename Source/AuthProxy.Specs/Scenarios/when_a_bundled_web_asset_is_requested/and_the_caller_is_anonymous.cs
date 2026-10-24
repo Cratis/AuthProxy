@@ -19,14 +19,14 @@ public class and_the_caller_is_anonymous(AuthProxyFactory factory) : IClassFixtu
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateAnonymousClient();
         _response = await client.GetAsync(AuthProxyFactory.AssetPath);
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_200() => Assert.Equal(System.Net.HttpStatusCode.OK, _response!.StatusCode);
     [Fact] public void should_return_the_asset_content() => Assert.Equal(AuthProxyFactory.AssetContent, _responseBody);

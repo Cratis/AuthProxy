@@ -40,8 +40,8 @@ public class when_exchanging_a_canonical_subject : a_canonical_link_subject_exch
     async Task Because() => _result = await _exchanger.Exchange(_principal, _properties);
 
     [Fact] void should_succeed() => _result.ShouldEqual(LinkExchangeResult.Success);
-    [Fact] void should_post_the_configured_subject() => _handler.LastRequestBody!.ShouldContain("\"subject\":\"configured-subject\"");
-    [Fact] void should_post_the_provider_key() => _handler.LastRequestBody!.ShouldContain("\"providerKey\":\"workforce\"");
-    [Fact] void should_post_the_normalized_issuer() => _handler.LastRequestBody!.ShouldContain("\"issuer\":\"https://identity.example.com\"");
-    [Fact] void should_not_post_an_old_fallback_subject() => _handler.LastRequestBody!.ShouldNotContain("old-sub");
+    [Fact] void should_post_the_configured_subject() => _handler.LastRequestBody.ShouldContain("\"subject\":\"configured-subject\"");
+    [Fact] void should_post_the_provider_key() => _handler.LastRequestBody.ShouldContain("\"providerKey\":\"workforce\"");
+    [Fact] void should_post_the_normalized_issuer() => _handler.LastRequestBody.ShouldContain("\"issuer\":\"https://identity.example.com\"");
+    [Fact] void should_not_post_an_old_fallback_subject() => _handler.LastRequestBody.ShouldNotContain("old-sub");
 }

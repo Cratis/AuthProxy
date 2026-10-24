@@ -17,7 +17,7 @@ public class and_forged_token_is_presented_at_exchange(AuthProxyFactory factory)
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var (attackerKey, _) = TokenFixture.GenerateKeyPair();
         var forgedToken = TokenFixture.CreateToken(attackerKey);
@@ -27,7 +27,7 @@ public class and_forged_token_is_presented_at_exchange(AuthProxyFactory factory)
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_401() => Assert.Equal(System.Net.HttpStatusCode.Unauthorized, _response.StatusCode);
     [Fact] public void should_not_call_exchange_endpoint() => Assert.Equal(0, factory.ExchangeCallCount);

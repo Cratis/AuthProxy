@@ -30,7 +30,7 @@ public class when_hop_by_hop_headers_are_sent(SecurityHarness harness) : IAsyncL
 {
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -39,7 +39,7 @@ public class when_hop_by_hop_headers_are_sent(SecurityHarness harness) : IAsyncL
         _forwarded = harness.Origin.LastRequestTo(SecurityHarness.AnonymousPath);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_request() => Assert.NotNull(_forwarded);
 

@@ -29,7 +29,7 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
     ForwardedRequest? _authenticatedOnProtectedPath;
     string _injectedPrincipal = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -45,7 +45,7 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
         _authenticatedOnProtectedPath = harness.Origin.LastRequestTo(SecurityHarness.ProtectedPath);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_anonymous_request() => Assert.NotNull(_anonymousOnAnonymousPath);
     [Fact] public void should_forward_the_authenticated_request() => Assert.NotNull(_authenticatedOnProtectedPath);

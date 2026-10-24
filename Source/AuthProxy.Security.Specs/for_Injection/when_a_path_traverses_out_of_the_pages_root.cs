@@ -76,7 +76,7 @@ public class when_a_path_traverses_out_of_the_pages_root(SecurityHarness harness
     Attempt? _contentRootPage;
     Attempt? _encodedSeparator;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -92,7 +92,7 @@ public class when_a_path_traverses_out_of_the_pages_root(SecurityHarness harness
         _encodedSeparator = await Request(client, EncodedSeparatorPage);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_still_serve_a_page_from_the_configured_directory() =>

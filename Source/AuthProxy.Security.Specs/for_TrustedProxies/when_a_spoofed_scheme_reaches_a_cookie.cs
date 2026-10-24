@@ -24,7 +24,7 @@ public class when_a_spoofed_scheme_reaches_a_cookie(TrustedProxyHarness harness)
 {
     string _setCookie = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -39,7 +39,7 @@ public class when_a_spoofed_scheme_reaches_a_cookie(TrustedProxyHarness harness)
             : string.Empty;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_issued_the_cookie() => Assert.NotEqual(string.Empty, _setCookie);
 

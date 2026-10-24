@@ -16,7 +16,7 @@ public class when_the_resource_metadata_is_requested(BearerRouteHarness harness)
     HttpResponseMessage? _post;
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -30,11 +30,11 @@ public class when_the_resource_metadata_is_requested(BearerRouteHarness harness)
         _post = await client.SendAsync(new HttpRequestMessage(HttpMethod.Post, BearerRouteHarness.ResourceMetadataPath));
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
         _post?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_answer_with_the_origin_response() => Assert.Equal(HttpStatusCode.OK, _response!.StatusCode);

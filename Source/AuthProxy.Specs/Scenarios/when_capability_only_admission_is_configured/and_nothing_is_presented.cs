@@ -58,7 +58,7 @@ public class and_nothing_is_presented(AuthProxyFactory factory) : IClassFixture<
 
     readonly List<ObservedAnswer> _answers = [];
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateProbingClient();
 
@@ -71,7 +71,7 @@ public class and_nothing_is_presented(AuthProxyFactory factory) : IClassFixture<
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_answer_every_route_and_method_the_same_way_a_missing_path_is_answered() =>

@@ -22,5 +22,5 @@ public class when_notifying_a_canonical_oidc_cookie_session : given.a_canonical_
     async Task Because() => _result = await _notifier.Notify(_httpContext, _principal);
 
     [Fact] void should_notify() => _result.ShouldEqual(SignInNotificationResult.Notified);
-    [Fact] void should_post_the_canonical_subject() => _handler.LastRequestBody!.ShouldContain("\"subject\":\"configured-subject\"");
+    [Fact] void should_post_the_canonical_subject() => _handler.LastRequestBody.ShouldContain("\"subject\":\"configured-subject\"");
 }

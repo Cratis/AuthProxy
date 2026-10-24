@@ -21,7 +21,7 @@ public class when_an_rfc_7239_forwarded_header_is_sent(TrustedProxyHarness harne
     ObservedRequest? _observed;
     string? _notification;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -36,7 +36,7 @@ public class when_an_rfc_7239_forwarded_header_is_sent(TrustedProxyHarness harne
         _notification = harness.Origin.LastSignInNotification();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_observed_the_request() => Assert.NotNull(_observed);
     [Fact] public void should_have_notified_the_application() => Assert.NotNull(_notification);

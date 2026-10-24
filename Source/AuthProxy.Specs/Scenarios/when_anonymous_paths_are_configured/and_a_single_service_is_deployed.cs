@@ -26,7 +26,7 @@ public class and_a_single_service_is_deployed(SingleServiceAuthProxyFactory fact
     HttpResponseMessage? _undeclared;
     string? _undeclaredBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
 
@@ -38,7 +38,7 @@ public class and_a_single_service_is_deployed(SingleServiceAuthProxyFactory fact
         _undeclaredBody = await _undeclared.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontend!.StatusCode);
     [Fact] public void should_forward_below_the_declared_frontend_path() => Assert.Equal(HttpStatusCode.BadGateway, _declaredFrontendChild!.StatusCode);

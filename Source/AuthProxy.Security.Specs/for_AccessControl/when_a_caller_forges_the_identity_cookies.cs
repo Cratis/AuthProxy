@@ -31,7 +31,7 @@ public class when_a_caller_forges_the_identity_cookies(SecurityHarness harness) 
     bool _resolvedWithBothForged;
     bool _resolvedWithNoCookies;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _resolvedWithNoCookies = await IdentityWasResolved("clean", cookies: null);
 
@@ -48,7 +48,7 @@ public class when_a_caller_forges_the_identity_cookies(SecurityHarness harness) 
             $"{Cookies.Identity}=eyJ1c2VySWQiOiJhdHRhY2tlciJ9; {Cookies.IdentityAuthorization}=AAAAAAAAAAAAAAAAAAAAAA");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_resolve_identity_for_a_caller_presenting_no_cookies() =>

@@ -18,7 +18,7 @@ public class when_the_return_url_cannot_be_trusted(FixedCallbackHostHarness harn
 
     readonly Dictionary<string, string> _destinations = [];
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -46,7 +46,7 @@ public class when_the_return_url_cannot_be_trusted(FixedCallbackHostHarness harn
         }
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_keep_an_absolute_address_on_a_declared_host() =>

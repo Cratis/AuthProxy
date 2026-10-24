@@ -13,10 +13,12 @@ public class when_bearer_configuration_has_surrounding_whitespace
     {
         await using var harness = new PaddedBearerRouteHarness();
         using var client = harness.CreateBearerClient();
-        using var response = await client.SendAsync(BearerRouteHarness.WithToken(
-            HttpMethod.Get,
-            "/mcp/trimmed-configuration",
-            harness.Issuer.Token(new Dictionary<string, object> { ["tenant"] = BearerRouteHarness.TenantId }, without: ["tid"])));
+        using var response = await client.SendAsync(
+            BearerRouteHarness.WithToken(
+                HttpMethod.Get,
+                "/mcp/trimmed-configuration",
+                harness.Issuer.Token(new Dictionary<string, object> { ["tenant"] = BearerRouteHarness.TenantId }, without: ["tid"])),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(BearerRouteHarness.TenantId, harness.Origin.LastRequestTo("/mcp/trimmed-configuration")?.Value(Headers.TenantId));
@@ -27,10 +29,12 @@ public class when_bearer_configuration_has_surrounding_whitespace
     {
         await using var harness = new PaddedBearerRouteHarness();
         using var client = harness.CreateBearerClient();
-        using var response = await client.SendAsync(BearerRouteHarness.WithToken(
-            HttpMethod.Get,
-            "/mcp/padded-token-issuer",
-            harness.Issuer.Token(issuer: $" {harness.Issuer.Issuer} ")));
+        using var response = await client.SendAsync(
+            BearerRouteHarness.WithToken(
+                HttpMethod.Get,
+                "/mcp/padded-token-issuer",
+                harness.Issuer.Token(issuer: $" {harness.Issuer.Issuer} ")),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.False(harness.Origin.ReceivedAnythingFor("/mcp/padded-token-issuer"));

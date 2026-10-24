@@ -20,7 +20,7 @@ public class and_the_oidc_capability_does_not_survive_the_round_trip(OidcCallbac
     OidcCallbackAuthProxyFactory.ProviderSignIn _signIn;
     int _exchangeCallsDuringCallback;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.Reset();
 
@@ -40,7 +40,7 @@ public class and_the_oidc_capability_does_not_survive_the_round_trip(OidcCallbac
         _exchangeCallsDuringCallback = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_challenge_the_oidc_provider() =>

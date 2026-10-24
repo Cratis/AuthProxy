@@ -14,7 +14,7 @@ public class and_login_endpoint_is_requested(AuthProxyFactory factory) : IClassF
 {
     HttpResponseMessage? _response;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, $"/.cratis/login/{AuthProxyFactory.ProviderScheme}?returnUrl=%2Fdashboard");
@@ -23,7 +23,7 @@ public class and_login_endpoint_is_requested(AuthProxyFactory factory) : IClassF
         _response = await client.SendAsync(request);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_redirect_to_authorization_endpoint() => Assert.Equal(System.Net.HttpStatusCode.Redirect, _response!.StatusCode);
 

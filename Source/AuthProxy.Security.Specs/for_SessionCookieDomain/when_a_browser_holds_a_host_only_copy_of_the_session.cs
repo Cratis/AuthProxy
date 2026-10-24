@@ -16,7 +16,7 @@ public class when_a_browser_holds_a_host_only_copy_of_the_session(SessionCookieH
     IReadOnlyList<string> _requestSetCookies = [];
     IReadOnlyList<string> _signInSetCookies = [];
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         var shared = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost)).Single();
@@ -30,7 +30,7 @@ public class when_a_browser_holds_a_host_only_copy_of_the_session(SessionCookieH
         _signInSetCookies = SessionCookieHarness.SetCookies(await harness.SignIn(client, SessionCookieHarness.ConsoleHost, withOperationsClaim: false, stale));
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_delete_the_host_only_copy_when_the_cookie_arrives_twice() =>

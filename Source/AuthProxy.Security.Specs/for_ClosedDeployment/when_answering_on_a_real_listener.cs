@@ -39,7 +39,7 @@ public class when_answering_on_a_real_listener(ClosedDeploymentHarness harness) 
 
     bool _originSawAnything;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         harness.Origin.Clear();
 
@@ -56,7 +56,7 @@ public class when_answering_on_a_real_listener(ClosedDeploymentHarness harness) 
         _originSawAnything = !harness.Origin.Received.IsEmpty;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_refuse_an_unknown_path() =>

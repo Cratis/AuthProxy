@@ -16,7 +16,7 @@ public class when_identity_headers_are_spoofed_on_a_bearer_route(BearerRouteHarn
     ForwardedRequest? _forwarded;
     string _forgedPrincipal = string.Empty;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -39,7 +39,7 @@ public class when_identity_headers_are_spoofed_on_a_bearer_route(BearerRouteHarn
         _forwarded = harness.Origin.LastRequestTo(Path);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_forward_the_request() => Assert.NotNull(_forwarded);
     [Fact] public void should_replace_the_principal() => Assert.NotEqual(_forgedPrincipal, _forwarded!.Value(Headers.Principal));

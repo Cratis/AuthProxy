@@ -25,7 +25,7 @@ public class and_no_service_declares_client_credentials(AuthProxyFactory factory
 {
     string[] _routes = [];
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         using var client = factory.CreateProbingClient();
 
@@ -37,10 +37,10 @@ public class and_no_service_declares_client_credentials(AuthProxyFactory factory
                 .Select(endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
         ];
 
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_leave_the_token_endpoint_out_of_the_routing_table() =>

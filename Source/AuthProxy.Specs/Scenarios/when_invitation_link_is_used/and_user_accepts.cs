@@ -15,7 +15,7 @@ public class and_user_accepts(AuthProxyFactory factory) : IClassFixture<AuthProx
 {
     HttpResponseMessage? _response;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Valid invite token signed with the factory's known RSA key.
         var token = TokenFixture.CreateToken(
@@ -27,7 +27,7 @@ public class and_user_accepts(AuthProxyFactory factory) : IClassFixture<AuthProx
         _response = await client.GetAsync("/");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_redirect_to_lobby() =>

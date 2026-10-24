@@ -28,7 +28,7 @@ public class when_identity_denial_terminates_the_local_session(
     readonly List<bool> _redirected = [];
     readonly List<string> _missingCookieExpiries = [];
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         foreach (var deny in _denials)
@@ -63,10 +63,10 @@ public class when_identity_denial_terminates_the_local_session(
         }
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         harness.VerifyEveryCaller();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact]

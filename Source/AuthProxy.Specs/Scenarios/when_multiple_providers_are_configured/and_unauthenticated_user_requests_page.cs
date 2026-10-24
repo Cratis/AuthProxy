@@ -19,14 +19,14 @@ public class and_unauthenticated_user_requests_page(AuthProxyFactory factory) : 
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = factory.CreateTestClient();
         _response = await client.SendAsync(AuthProxyFactory.BrowserNavigation("/"));
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_200() => Assert.Equal(System.Net.HttpStatusCode.OK, _response!.StatusCode);
     [Fact] public void should_return_html() => Assert.Equal("text/html; charset=utf-8", _response!.Content.Headers.ContentType?.ToString());

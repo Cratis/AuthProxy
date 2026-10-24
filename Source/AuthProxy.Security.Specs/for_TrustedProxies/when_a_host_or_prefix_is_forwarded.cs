@@ -21,7 +21,7 @@ public class when_a_host_or_prefix_is_forwarded(TrustedProxyHarness harness) : I
 {
     ObservedRequest? _observed;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -34,7 +34,7 @@ public class when_a_host_or_prefix_is_forwarded(TrustedProxyHarness harness) : I
         _observed = harness.Observations.Last;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_observed_the_request() => Assert.NotNull(_observed);
 

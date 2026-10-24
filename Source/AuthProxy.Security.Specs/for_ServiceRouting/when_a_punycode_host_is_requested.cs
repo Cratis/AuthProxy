@@ -13,7 +13,7 @@ public class when_a_punycode_host_is_requested(ServiceRoutingHarness harness) : 
     HttpResponseMessage? _response;
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
         harness.ClearOrigins();
@@ -22,10 +22,10 @@ public class when_a_punycode_host_is_requested(ServiceRoutingHarness harness) : 
         _forwarded = harness.Portal.LastRequestTo("/api/books");
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _response?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_match_the_host_route() => Assert.Equal(HttpStatusCode.OK, _response!.StatusCode);

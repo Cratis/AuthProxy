@@ -15,7 +15,7 @@ public class when_an_anonymous_api_is_under_a_stripped_prefix(ServiceRoutingHarn
     {
         using var client = harness.CreateSecurityClient();
         harness.ClearOrigins();
-        using var response = await client.GetAsync($"{ServiceRoutingHarness.ReportsPrefix}/api/health");
+        using var response = await client.GetAsync($"{ServiceRoutingHarness.ReportsPrefix}/api/health", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var forwarded = harness.Reports.LastRequestTo("/api/health");

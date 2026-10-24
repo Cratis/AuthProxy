@@ -20,6 +20,6 @@ public class when_notifying_a_canonical_oidc_callback : given.a_canonical_sign_i
     async Task Because() => _result = await _notifier.Notify(_httpContext, _principal, "workforce");
 
     [Fact] void should_notify() => _result.ShouldEqual(SignInNotificationResult.Notified);
-    [Fact] void should_post_the_canonical_subject() => _handler.LastRequestBody!.ShouldContain("\"subject\":\"configured-subject\"");
-    [Fact] void should_post_the_provider_key() => _handler.LastRequestBody!.ShouldContain("\"providerKey\":\"workforce\"");
+    [Fact] void should_post_the_canonical_subject() => _handler.LastRequestBody.ShouldContain("\"subject\":\"configured-subject\"");
+    [Fact] void should_post_the_provider_key() => _handler.LastRequestBody.ShouldContain("\"providerKey\":\"workforce\"");
 }

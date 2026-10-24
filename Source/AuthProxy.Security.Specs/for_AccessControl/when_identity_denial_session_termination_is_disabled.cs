@@ -13,7 +13,7 @@ public class when_identity_denial_session_termination_is_disabled : IAsyncLifeti
     bool _forwardedAfterRecovery;
     bool _authenticationCookieWasDeleted;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _harness = new RequiredVerificationHarness(terminateOnIdentityDenial: false);
         using var client = _harness.CreateSecurityClient();
@@ -35,7 +35,7 @@ public class when_identity_denial_session_termination_is_disabled : IAsyncLifeti
         _forwardedAfterRecovery = _harness.Origin.ReceivedAnythingFor(RequiredVerificationHarness.ProtectedPath);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_harness is not null)
         {

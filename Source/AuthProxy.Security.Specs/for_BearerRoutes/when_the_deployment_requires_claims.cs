@@ -26,7 +26,7 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
     HttpResponseMessage? _unmapped;
     HttpResponseMessage? _caseVariant;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -49,7 +49,7 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
         }));
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _qualified?.Dispose();
         _withoutOrganization?.Dispose();
@@ -57,7 +57,7 @@ public class when_the_deployment_requires_claims(GatedBearerRouteHarness harness
         _mapped?.Dispose();
         _unmapped?.Dispose();
         _caseVariant?.Dispose();
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 
     [Fact] public void should_forward_a_token_satisfying_every_requirement() => Assert.Equal(HttpStatusCode.OK, _qualified!.StatusCode);

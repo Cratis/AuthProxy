@@ -23,6 +23,6 @@ public class when_settings_contradict_the_store : Specification
     });
 
     [Fact] void should_fail_once_per_contradiction() => _result.Failures.Count().ShouldEqual(2);
-    [Fact] void should_name_the_ignored_key_path() => _result.FailureMessage!.ShouldContain("DataProtectionKeysPath");
-    [Fact] void should_name_the_ignored_blob_section() => _result.FailureMessage!.ShouldContain("DataProtection:AzureBlob");
+    [Fact] void should_name_the_ignored_key_path() => _result.FailureMessage.ShouldContain("DataProtectionKeysPath");
+    [Fact] void should_name_the_ignored_blob_section() => _result.FailureMessage.ShouldContain("DataProtection:AzureBlob");
 }

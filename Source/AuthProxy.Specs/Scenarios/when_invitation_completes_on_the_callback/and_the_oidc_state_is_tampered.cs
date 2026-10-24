@@ -17,7 +17,7 @@ public class and_the_oidc_state_is_tampered(OidcCallbackAuthProxyFactory factory
     HttpResponseMessage _callback;
     int _exchangeCallsDuringFlow;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         factory.Reset();
 
@@ -46,7 +46,7 @@ public class and_the_oidc_state_is_tampered(OidcCallbackAuthProxyFactory factory
         _exchangeCallsDuringFlow = factory.ExchangeCallCount - exchangeCallsBefore;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] void should_not_call_the_completion_endpoint() => Assert.Equal(0, _exchangeCallsDuringFlow);
     [Fact] void should_fail_the_remote_round_trip_itself() => Assert.Contains("reason=remote-failure", _callback.Headers.Location?.ToString());

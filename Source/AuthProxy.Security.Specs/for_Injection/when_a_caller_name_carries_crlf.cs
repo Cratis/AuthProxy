@@ -25,7 +25,7 @@ public class when_a_caller_name_carries_crlf(SecurityHarness harness) : IAsyncLi
 
     ForwardedRequest? _forwarded;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -40,7 +40,7 @@ public class when_a_caller_name_carries_crlf(SecurityHarness harness) : IAsyncLi
         _forwarded = harness.Origin.LastRequestTo(SecurityHarness.ProtectedPath);
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_still_reach_the_origin() => Assert.NotNull(_forwarded);
 

@@ -10,7 +10,7 @@ public class and_invitation_is_invalid(AuthProxyFactory factory) : IClassFixture
     HttpResponseMessage? _response;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         // Token signed by a different (unknown) RSA key — signature validation fails.
         var (wrongKey, _) = TokenFixture.GenerateKeyPair();
@@ -21,7 +21,7 @@ public class and_invitation_is_invalid(AuthProxyFactory factory) : IClassFixture
         _responseBody = await _response.Content.ReadAsStringAsync();
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_return_401() => Assert.Equal(System.Net.HttpStatusCode.Unauthorized, _response.StatusCode);
     [Fact] public void should_return_html() => Assert.Equal("text/html; charset=utf-8", _response.Content.Headers.ContentType?.ToString());

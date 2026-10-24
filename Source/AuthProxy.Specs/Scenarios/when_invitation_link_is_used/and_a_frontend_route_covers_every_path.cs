@@ -27,7 +27,7 @@ public class and_a_frontend_route_covers_every_path(FrontendRoutedAuthProxyFacto
     HttpResponseMessage? _registration;
     string? _responseBody;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         var token = TokenFixture.CreateToken(
             factory.InviteKeyPair.PrivateKey,
@@ -39,7 +39,7 @@ public class and_a_frontend_route_covers_every_path(FrontendRoutedAuthProxyFacto
         _registration = await client.GetAsync("/register");
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_not_redirect_the_invitation_to_the_login_page() =>

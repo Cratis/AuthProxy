@@ -21,7 +21,7 @@ public class when_hostile_forwarded_values_are_shaped_to_confuse(TrustedProxyHar
     ObservedRequest? _withHostileValues;
     ObservedRequest? _withNothing;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
 
@@ -41,7 +41,7 @@ public class when_hostile_forwarded_values_are_shaped_to_confuse(TrustedProxyHar
         _withNothing = harness.Observations.Last;
     }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact] public void should_have_observed_both_requests() => Assert.NotNull(_withHostileValues);
 

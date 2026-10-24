@@ -22,6 +22,6 @@ public class when_a_uri_is_not_https : Specification
     });
 
     [Fact] void should_fail_once_per_setting() => _result.Failures.Count().ShouldEqual(2);
-    [Fact] void should_name_the_blob_address() => _result.FailureMessage!.ShouldContain("http://example.blob.core.windows.net/c/keys.xml");
-    [Fact] void should_name_the_vault_key() => _result.FailureMessage!.ShouldContain("not a uri");
+    [Fact] void should_name_the_blob_address() => _result.FailureMessage.ShouldContain("http://example.blob.core.windows.net/c/keys.xml");
+    [Fact] void should_name_the_vault_key() => _result.FailureMessage.ShouldContain("not a uri");
 }

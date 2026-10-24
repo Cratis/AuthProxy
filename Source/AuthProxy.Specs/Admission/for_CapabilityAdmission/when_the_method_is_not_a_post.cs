@@ -19,5 +19,5 @@ public class when_the_method_is_not_a_post : given.a_capability_admission
     async Task Because() => _admitted = await _admission.TryAdmit(_context, _config);
 
     [Fact] void should_not_admit_the_caller() => _admitted.ShouldBeFalse();
-    [Fact] void should_not_ask_the_verifier() => _verifier.DidNotReceiveWithAnyArgs().Verify(default!, default);
+    [Fact] void should_not_ask_the_verifier() => _verifier.DidNotReceiveWithAnyArgs().Verify(default!, TestContext.Current.CancellationToken);
 }
