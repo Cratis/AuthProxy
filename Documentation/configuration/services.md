@@ -412,9 +412,15 @@ anonymous `/reporting/api/webhook` goes to the reporting backend.
 
 For each service with a `Backend` endpoint (and `ResolveIdentityDetails` not explicitly set to
 `false`), AuthProxy calls `GET {Backend.BaseUrl}/.cratis/me` after authentication.
-The response is stored in a short-lived cookie (`.cratis-identity`) and injected as
-the `x-ms-client-principal` header on every proxied request so that backend services can read
-identity details without re-calling the identity endpoint themselves.
+The response decides admission (its `isAuthorized` verdict) and supplies `details`, which AuthProxy
+merges into the readable `.cratis-identity` cookie so a frontend can render the signed-in user without a
+round-trip. See [The two identity cookies](authentication.md#the-two-identity-cookies).
+
+The response is **not** forwarded to backends. The `x-ms-client-principal` header is built only from the
+authenticated session — the identity provider's claims plus the `anonymous` and `authenticated` roles.
+A `roles` field in the `/.cratis/me` response is ignored, so a service cannot assert roles that other
+services would then trust. To gate UI on roles the application decides itself, have the frontend read the
+application's own `/.cratis/me`, which AuthProxy passes through to it; Arc's identity provider does this.
 
 What exactly your service receives — the four identity headers, the guarantee that every value is
 US-ASCII, the `x-ms-client-principal-name*` sibling for names that are not, and why

@@ -540,7 +540,7 @@ implementation detail:
 
 | Cookie | Readable by script | Contents | Role |
 |--------|--------------------|----------|------|
-| `.cratis-identity` | Yes | Base64 JSON identity details | Lets a frontend render the signed-in user without a round-trip. **Never** treated by AuthProxy as evidence of anything. |
+| `.cratis-identity` | Yes | Base64 JSON: the user id and name, the session's roles (the provider's roles plus `anonymous` and `authenticated`) and the `details` merged from the services' `/.cratis/me` answers. Roles a service answers are not included | Lets a frontend render the signed-in user without a round-trip. **Never** treated by AuthProxy as evidence of anything. |
 | `.cratis-identity-authorization` | No (`HttpOnly`) | A sealed, unforgeable record | Carries the authorization decision that is allowed to skip the `/.cratis/me` call on later requests. |
 
 Because `.cratis-identity` is deliberately script-readable, anything a client can write must not decide

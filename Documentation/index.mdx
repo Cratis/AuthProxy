@@ -47,7 +47,7 @@ AuthProxy is a plain ASP.NET Core service. It pairs naturally with [Arc](/arc/)'
     Require a claim — a role, a group, a GitHub organization or team — before any request is forwarded. Authenticating everyone is not the same as letting everyone in.
   </SimpleCard>
   <SimpleCard title="Identity enrichment" icon="seti:json" link="/authproxy/configuration/services/#identity-enrichment">
-    Calls a <code>/.cratis/me</code> endpoint on your service and attaches the enriched identity to forwarded requests as a trusted header.
+    Calls a <code>/.cratis/me</code> endpoint on your service to decide admission and to enrich the readable identity cookie with your service's details. The forwarded identity header is built from the authenticated session only.
   </SimpleCard>
   <SimpleCard title="Multi-tenancy" icon="seti:db" link="/authproxy/configuration/tenancy/">
     Resolve the current tenant per request — from the host, a subdomain, a claim, the route, or a fixed value — with optional remote verification.
