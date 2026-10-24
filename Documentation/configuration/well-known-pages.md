@@ -22,6 +22,7 @@ condition is detected:
 | `403.html` | The identity resolver denied access. | 403 |
 | `not-authorized.html` | The caller is signed in but does not satisfy the claim requirements declared in [`Cratis:AuthProxy:Authorization`](authorization.md). | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
+| `no-organization.html` | The caller is signed in and tenant resolutions are configured, but no tenant could be resolved and no lobby redirect applies (see [Tenancy](tenancy.md) and [Tenant selection](tenant-selection.md)). | 403 |
 | `select-provider.html` | A protected resource was requested and multiple identity providers are configured, or a sign-in failed (see [Failed Sign-ins](failed-sign-ins.md)). The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider, and shows a message when a `reason` query parameter is present. | 200 |
 | `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
 | `service-unavailable.html` | The tenant selection endpoint (`TenantsEndpoint`) could not be reached or did not return a usable answer, so the caller's tenants could not be determined. | 503 |
@@ -161,6 +162,19 @@ for the complete contract and an example.
 `tenant-not-found.html` is served when tenant verification is enabled and the platform reports
 that the resolved tenant ID does not exist. See [Tenant verification](tenancy.md#tenant-verification)
 for how to configure the verification endpoint.
+
+---
+
+## No organization
+
+`no-organization.html` is served with a `403` when a user is signed in but belongs to no organization:
+tenant resolutions are configured, none resolved a tenant, and no lobby redirect applies. It is a `403`
+rather than a `401` so a frontend does not mistake it for "not signed in" and loop back to the login flow.
+See [Tenancy](tenancy.md) and [Tenant selection](tenant-selection.md).
+
+Override it by placing a `no-organization.html` in the `Cratis:AuthProxy:PagesPath` directory. The page is
+served to any caller, so a script that fetches a protected path such as `/.cratis/me` receives this HTML with
+a `403`; check the response status before parsing it.
 
 ---
 

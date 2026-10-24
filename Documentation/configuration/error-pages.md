@@ -20,6 +20,7 @@ condition is detected:
 | `404.html` | The requested resource was not found. | 404 |
 | `403.html` | The identity resolver denied access. | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
+| `no-organization.html` | The caller is signed in and tenant resolutions are configured, but no tenant could be resolved and no lobby redirect applies (see [Tenancy](tenancy.md) and [Tenant selection](tenant-selection.md)). | 403 |
 | `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
 | `service-unavailable.html` | The tenant selection endpoint (`TenantsEndpoint`) could not be reached or did not return a usable answer, so the caller's tenants could not be determined. | 503 |
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
@@ -75,6 +76,19 @@ Place asset files in the same pages directory — they are served at the `/_page
 <link rel="stylesheet" href="/_pages/styles.css" />
 <img src="/_pages/logo.svg" alt="Logo" />
 ```
+
+---
+
+## No organization page
+
+`no-organization.html` is served with a `403` when a user is signed in but is not associated with any
+organization: tenant resolutions are configured, none resolved a tenant, and no lobby redirect applies.
+It is a `403` rather than a `401` so a frontend does not take it for "not signed in" and loop back to the
+login flow. See [Tenancy](tenancy.md) and [Tenant selection](tenant-selection.md) for how a tenant is resolved.
+
+Override it like any other page: place a `no-organization.html` in the directory that
+`Cratis:AuthProxy:PagesPath` points at. The page is served to any caller, so a script that fetches a
+protected path such as `/.cratis/me` receives this HTML with a `403`; check the response status before parsing it.
 
 ---
 
