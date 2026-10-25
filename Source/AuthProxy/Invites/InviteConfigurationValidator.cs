@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.BearerRoutes;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -54,8 +55,35 @@ sealed class InviteConfigurationValidator : IValidateOptions<C.AuthProxy>
                 "A Lobby frontend URL is required when matching-tenant invitations redirect to Lobby.");
         }
 
+        ValidateMetadata(invite, failures);
+
         return failures.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(failures);
+    }
+
+    static void ValidateMetadata(C.Invite invite, List<string> failures)
+    {
+        if (string.IsNullOrWhiteSpace(invite.TokenMetadataUrl))
+        {
+            return;
+        }
+
+        if (!BearerRouteTable.TryParseAuthorityUri(invite.TokenMetadataUrl, out _, out _))
+        {
+            failures.Add("Invite.TokenMetadataUrl must be an absolute HTTPS URL (HTTP is allowed only on loopback), without a query, fragment, or user information.");
+        }
+        if (string.IsNullOrWhiteSpace(invite.Issuer) || !string.Equals(invite.Issuer, invite.Issuer.Trim(), StringComparison.Ordinal))
+        {
+            failures.Add("Invite.Issuer is required without surrounding whitespace when Invite.TokenMetadataUrl is configured.");
+        }
+        if (string.IsNullOrWhiteSpace(invite.Audience) || !string.Equals(invite.Audience, invite.Audience.Trim(), StringComparison.Ordinal))
+        {
+            failures.Add("Invite.Audience is required without surrounding whitespace when Invite.TokenMetadataUrl is configured.");
+        }
+        if (!string.IsNullOrEmpty(invite.PublicKeyPem))
+        {
+            failures.Add("Invite.PublicKeyPem must be empty when Invite.TokenMetadataUrl is configured.");
+        }
     }
 }
