@@ -45,26 +45,41 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
     public static readonly TimeSpan MaximumStaleness = TimeSpan.FromHours(24);
 
     readonly ConcurrentDictionary<(string Url, string Issuer, string Audience), InvitationTokenKeysCache> _caches = new();
+    readonly InvitationTokenKeysLifetime _lifetime = new();
     readonly CancellationTokenSource _shutdown = new();
 
     /// <inheritdoc/>
     public async Task<IReadOnlyDictionary<string, SecurityKey>?> GetSigningKeys(C.Invite invite, CancellationToken cancellationToken, bool refresh = false)
     {
+        _lifetime.Enter();
+        try
+        {
+            using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            return await GetCurrentKeys(invite, refresh, cancellation.Token);
+        }
+        finally
+        {
+            _lifetime.Exit();
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        if (_lifetime.Stop(_shutdown.Cancel, DisposeResources))
+        {
+            DisposeResources();
+        }
+    }
+
+    async Task<IReadOnlyDictionary<string, SecurityKey>?> GetCurrentKeys(C.Invite invite, bool refresh, CancellationToken cancellationToken)
+    {
         var identity = (Url: invite.TokenMetadataUrl, invite.Issuer, invite.Audience);
         var cache = _caches.GetOrAdd(identity, static _ => new InvitationTokenKeysCache());
         if (!refresh && Usable(cache.Snapshot) is { } available)
         {
-            if (cache.Gate.Wait(0))
-            {
-                if (ShouldRetrieve(cache, refresh: false))
-                {
-                    cache.BackgroundRefresh = Task.Run(() => RefreshInBackground(identity, cache));
-                }
-                else
-                {
-                    cache.Gate.Release();
-                }
-            }
+            RefreshIfDue(identity, cache);
             return available.Keys;
         }
 
@@ -88,25 +103,23 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
         }
     }
 
-    /// <inheritdoc/>
-    public void Dispose()
+    void RefreshIfDue((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache)
     {
-        _shutdown.Cancel();
-        var caches = _caches.Values.ToArray();
-        var background = Task.WhenAll(caches.Select(cache => cache.BackgroundRefresh ?? Task.CompletedTask));
-        if (background.IsCompleted)
+        if (!cache.Gate.Wait(0))
         {
-            DisposeResources(caches);
+            return;
         }
-        else
+        if (!ShouldRetrieve(cache, refresh: false) || !_lifetime.TryEnter())
         {
-            _ = background.ContinueWith(completed => DisposeResources(caches), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+            cache.Gate.Release();
+            return;
         }
+        cache.BackgroundRefresh = Task.Run(() => RefreshInBackground(identity, cache));
     }
 
-    void DisposeResources(InvitationTokenKeysCache[] caches)
+    void DisposeResources()
     {
-        foreach (var cache in caches)
+        foreach (var cache in _caches.Values)
         {
             cache.Dispose();
         }
@@ -128,21 +141,24 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
         {
             await Retrieve(identity, cache, refresh: false, _shutdown.Token);
         }
-        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        catch (OperationCanceledException) when (_lifetime.IsStopping)
         {
-            // Disposal joins this task before disposing the gate.
+            // The operation reservation keeps the gate alive until this refresh unwinds.
         }
         finally
         {
             cache.Gate.Release();
+            _lifetime.Exit();
         }
     }
 
     async Task Retrieve((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache, bool refresh, CancellationToken cancellationToken)
     {
+        // Reserve before any outbound work so caller cancellation cannot bypass failed-fetch backoff.
+        cache.RetryAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
         if (refresh)
         {
-            cache.RequestedRefreshAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
+            cache.RequestedRefreshAfter = cache.RetryAfter;
         }
         try
         {
@@ -152,6 +168,7 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
                 cache.RetryAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
                 return;
             }
+            cache.RetryAfter = DateTimeOffset.MinValue;
             cache.Snapshot = new(result.Value.Keys, timeProvider.GetUtcNow());
             cache.RefreshAfter = timeProvider.GetUtcNow() + result.Value.RefreshInterval;
             if (result.Value.Keys.Count == 0)
@@ -159,7 +176,7 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
                 logger.InvitationKeySetEmpty(identity.Url);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _shutdown.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _lifetime.IsStopping)
         {
             throw;
         }

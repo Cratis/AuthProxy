@@ -24,7 +24,7 @@ internal sealed class InvitationTokenKeysCache : IDisposable
     /// <summary>Gets or sets the next allowed requested refresh.</summary>
     internal DateTimeOffset RequestedRefreshAfter { get; set; }
 
-    /// <summary>Gets or sets the task joined before the gate is disposed.</summary>
+    /// <summary>Gets or sets the most recently scheduled background refresh.</summary>
     internal Task? BackgroundRefresh { get; set; }
 
     /// <summary>Gets or sets the last successful key snapshot.</summary>

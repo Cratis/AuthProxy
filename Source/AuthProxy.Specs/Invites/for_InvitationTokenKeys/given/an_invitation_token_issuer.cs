@@ -29,11 +29,25 @@ public class an_invitation_token_issuer : Specification
     void Destroy()
     {
         Handler.Release.TrySetResult();
+        Handler.FinishCancellation.TrySetResult();
         Provider.Dispose();
         _client.Dispose();
     }
 
     protected Task<IReadOnlyDictionary<string, SecurityKey>?> Get(bool refresh = false) => Provider.GetSigningKeys(Invite, CancellationToken.None, refresh);
+
+    protected static async Task<Exception?> ObserveFailure(Task operation)
+    {
+        try
+        {
+            await operation;
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
 
     protected class IssuerClock : TimeProvider
     {
@@ -65,10 +79,13 @@ public class an_invitation_token_issuer : Specification
         internal string? OversizedBody { get; set; }
         internal bool UnknownLength { get; set; }
         internal bool Delay { get; set; }
+        internal bool HoldCancellation { get; set; }
         internal int MetadataRequests => Volatile.Read(ref _metadataRequests);
         internal int KeyRequests => Volatile.Read(ref _keyRequests);
         internal TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         internal TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource CancellationObserved { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        internal TaskCompletionSource FinishCancellation { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -76,11 +93,7 @@ public class an_invitation_token_issuer : Specification
             if (metadata)
             {
                 Interlocked.Increment(ref _metadataRequests);
-                if (Delay)
-                {
-                    Started.TrySetResult();
-                    await Release.Task.WaitAsync(cancellationToken);
-                }
+                await DelayResponse(cancellationToken);
             }
             else
             {
@@ -98,6 +111,25 @@ public class an_invitation_token_issuer : Specification
             response.Headers.CacheControl = new() { MaxAge = MaxAge };
             response.Headers.Location = new Uri("https://sink.example.com/");
             return response;
+        }
+
+        async Task DelayResponse(CancellationToken cancellationToken)
+        {
+            if (!Delay)
+            {
+                return;
+            }
+            Started.TrySetResult();
+            try
+            {
+                await Release.Task.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (HoldCancellation)
+            {
+                CancellationObserved.TrySetResult();
+                await FinishCancellation.Task;
+                throw;
+            }
         }
     }
 
