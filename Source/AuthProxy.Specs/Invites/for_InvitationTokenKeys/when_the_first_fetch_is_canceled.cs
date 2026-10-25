@@ -6,8 +6,7 @@ namespace Cratis.AuthProxy.Invites.for_InvitationTokenKeys;
 public class when_the_first_fetch_is_canceled : given.an_invitation_token_issuer
 {
     Exception? _failure;
-    IReadOnlyDictionary<string, Microsoft.IdentityModel.Tokens.SecurityKey>? _immediateKeys;
-    int _requestsBeforeRetry;
+    int _requestsBeforeCompletion;
 
     async Task Because()
     {
@@ -17,19 +16,15 @@ public class when_the_first_fetch_is_canceled : given.an_invitation_token_issuer
         await Handler.Started.Task;
         await cancellation.CancelAsync();
         _failure = await ObserveFailure(fetching);
-        Handler.Delay = false;
-        _immediateKeys = await Get();
-        await Get(refresh: true);
-        Clock.Advance(InvitationTokenKeys.RequestedRefreshInterval - TimeSpan.FromTicks(1));
-        await Get(refresh: true);
-        _requestsBeforeRetry = Handler.MetadataRequests;
-        Clock.Advance(TimeSpan.FromTicks(1));
+        _requestsBeforeCompletion = Handler.MetadataRequests;
+        Handler.Release.SetResult();
         Keys = await Get();
+        await Get();
     }
 
     [Fact] void should_propagate_caller_cancellation() => Assert.IsType<OperationCanceledException>(_failure, exactMatch: false);
-    [Fact] void should_fail_closed_during_backoff() => _immediateKeys.ShouldBeNull();
-    [Fact] void should_not_allow_normal_or_requested_calls_to_bypass_backoff() => _requestsBeforeRetry.ShouldEqual(1);
-    [Fact] void should_retry_when_the_deadline_is_reached() => Handler.MetadataRequests.ShouldEqual(2);
-    [Fact] void should_accept_keys_after_a_successful_retry() => Keys!["known"].KeyId.ShouldEqual("known");
+    [Fact] void should_leave_one_download_running_without_waiters() => _requestsBeforeCompletion.ShouldEqual(1);
+    [Fact] void should_load_keys_without_waiting_for_a_retry_window() => Keys!["known"].KeyId.ShouldEqual("known");
+    [Fact] void should_not_fetch_again_for_the_following_request() => Handler.MetadataRequests.ShouldEqual(1);
+    [Fact] void should_complete_the_original_jwks_download() => Handler.KeyRequests.ShouldEqual(1);
 }

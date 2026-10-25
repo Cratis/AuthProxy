@@ -8,12 +8,12 @@ namespace Cratis.AuthProxy.Invites;
 /// <summary>
 /// Holds one configured invitation issuer's synchronized retrieval deadlines and last good keys.
 /// </summary>
-internal sealed class InvitationTokenKeysCache : IDisposable
+internal sealed class InvitationTokenKeysCache
 {
     KeySnapshot? _snapshot;
 
-    /// <summary>Gets the gate serializing retrievals and deadline access.</summary>
-    internal SemaphoreSlim Gate { get; } = new(1, 1);
+    /// <summary>Gets the lock protecting download admission and deadline updates.</summary>
+    internal Lock Gate { get; } = new();
 
     /// <summary>Gets or sets the automatic refresh deadline.</summary>
     internal DateTimeOffset RefreshAfter { get; set; }
@@ -24,8 +24,8 @@ internal sealed class InvitationTokenKeysCache : IDisposable
     /// <summary>Gets or sets the next allowed requested refresh.</summary>
     internal DateTimeOffset RequestedRefreshAfter { get; set; }
 
-    /// <summary>Gets or sets the most recently scheduled background refresh.</summary>
-    internal Task? BackgroundRefresh { get; set; }
+    /// <summary>Gets or sets the shared download, independent of every caller's cancellation.</summary>
+    internal Task? InFlight { get; set; }
 
     /// <summary>Gets or sets the last successful key snapshot.</summary>
     internal KeySnapshot? Snapshot
@@ -33,9 +33,6 @@ internal sealed class InvitationTokenKeysCache : IDisposable
         get => Volatile.Read(ref _snapshot);
         set => Volatile.Write(ref _snapshot, value);
     }
-
-    /// <inheritdoc/>
-    public void Dispose() => Gate.Dispose();
 
     /// <summary>
     /// Keeps a key set and its successful fetch time together for lock-free readers.

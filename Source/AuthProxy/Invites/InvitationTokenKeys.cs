@@ -79,52 +79,41 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
         var cache = _caches.GetOrAdd(identity, static _ => new InvitationTokenKeysCache());
         if (!refresh && Usable(cache.Snapshot) is { } available)
         {
-            RefreshIfDue(identity, cache);
+            _ = GetOrStartDownload(identity, cache, refresh: false);
             return available.Keys;
         }
 
-        await cache.Gate.WaitAsync(cancellationToken);
-        try
+        await GetOrStartDownload(identity, cache, refresh).WaitAsync(cancellationToken);
+        var snapshot = Usable(cache.Snapshot);
+        if (snapshot is null && cache.Snapshot is not null)
         {
-            if (ShouldRetrieve(cache, refresh))
-            {
-                await Retrieve(identity, cache, refresh, cancellationToken);
-            }
-            var snapshot = Usable(cache.Snapshot);
-            if (snapshot is null && cache.Snapshot is not null)
-            {
-                logger.InvitationKeysStale(identity.Url);
-            }
-            return snapshot?.Keys;
+            logger.InvitationKeysStale(identity.Url);
         }
-        finally
+        return snapshot?.Keys;
+    }
+
+    Task GetOrStartDownload((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache, bool refresh)
+    {
+        lock (cache.Gate)
         {
-            cache.Gate.Release();
+            if (cache.InFlight is { IsCompleted: false } active)
+            {
+                return active;
+            }
+            if (!ShouldRetrieve(cache, refresh) || !_lifetime.TryEnter())
+            {
+                return Task.CompletedTask;
+            }
+            if (refresh)
+            {
+                cache.RequestedRefreshAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
+            }
+            cache.InFlight = Task.Run(() => Retrieve(identity, cache));
+            return cache.InFlight;
         }
     }
 
-    void RefreshIfDue((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache)
-    {
-        if (!cache.Gate.Wait(0))
-        {
-            return;
-        }
-        if (!ShouldRetrieve(cache, refresh: false) || !_lifetime.TryEnter())
-        {
-            cache.Gate.Release();
-            return;
-        }
-        cache.BackgroundRefresh = Task.Run(() => RefreshInBackground(identity, cache));
-    }
-
-    void DisposeResources()
-    {
-        foreach (var cache in _caches.Values)
-        {
-            cache.Dispose();
-        }
-        _shutdown.Dispose();
-    }
+    void DisposeResources() => _shutdown.Dispose();
 
     InvitationTokenKeysCache.KeySnapshot? Usable(InvitationTokenKeysCache.KeySnapshot? snapshot) =>
         snapshot is not null && timeProvider.GetUtcNow() - snapshot.FetchedAt <= MaximumStaleness ? snapshot : null;
@@ -135,55 +124,47 @@ public sealed class InvitationTokenKeys(IHttpClientFactory httpClientFactory, IL
         return now >= cache.RetryAfter && (Usable(cache.Snapshot) is null || now >= cache.RefreshAfter || (refresh && now >= cache.RequestedRefreshAfter));
     }
 
-    async Task RefreshInBackground((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache)
+    async Task Retrieve((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache)
     {
         try
         {
-            await Retrieve(identity, cache, refresh: false, _shutdown.Token);
-        }
-        catch (OperationCanceledException) when (_lifetime.IsStopping)
-        {
-            // The operation reservation keeps the gate alive until this refresh unwinds.
-        }
-        finally
-        {
-            cache.Gate.Release();
-            _lifetime.Exit();
-        }
-    }
-
-    async Task Retrieve((string Url, string Issuer, string Audience) identity, InvitationTokenKeysCache cache, bool refresh, CancellationToken cancellationToken)
-    {
-        // Reserve before any outbound work so caller cancellation cannot bypass failed-fetch backoff.
-        cache.RetryAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
-        if (refresh)
-        {
-            cache.RequestedRefreshAfter = cache.RetryAfter;
-        }
-        try
-        {
-            var result = await FetchKeys(identity, cancellationToken);
+            var result = await FetchKeys(identity, _shutdown.Token);
             if (result is null)
             {
-                cache.RetryAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
+                BackOff(cache);
                 return;
             }
-            cache.RetryAfter = DateTimeOffset.MinValue;
-            cache.Snapshot = new(result.Value.Keys, timeProvider.GetUtcNow());
-            cache.RefreshAfter = timeProvider.GetUtcNow() + result.Value.RefreshInterval;
+            lock (cache.Gate)
+            {
+                cache.RetryAfter = DateTimeOffset.MinValue;
+                cache.Snapshot = new(result.Value.Keys, timeProvider.GetUtcNow());
+                cache.RefreshAfter = timeProvider.GetUtcNow() + result.Value.RefreshInterval;
+            }
             if (result.Value.Keys.Count == 0)
             {
                 logger.InvitationKeySetEmpty(identity.Url);
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || _lifetime.IsStopping)
+        catch (OperationCanceledException) when (_lifetime.IsStopping)
         {
-            throw;
+            // Shutdown owns cancellation; callers cancel only their wait on this shared task.
         }
         catch (Exception exception)
         {
-            cache.RetryAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
+            BackOff(cache);
             logger.InvitationMetadataUnavailable(exception, identity.Url);
+        }
+        finally
+        {
+            _lifetime.Exit();
+        }
+    }
+
+    void BackOff(InvitationTokenKeysCache cache)
+    {
+        lock (cache.Gate)
+        {
+            cache.RetryAfter = timeProvider.GetUtcNow() + RequestedRefreshInterval;
         }
     }
 
