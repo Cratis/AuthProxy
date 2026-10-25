@@ -76,9 +76,10 @@ invitation tenant claim happens to match the tenant resolved for the request.
 
 | Property | Type | Description |
 | ---------- | ------ | ------------- |
-| `PublicKeyPem` | `string` | PEM-encoded RSA public key used to verify invite token signatures. |
-| `Issuer` | `string` | Expected `iss` claim. Leave empty to skip issuer validation. |
-| `Audience` | `string` | Expected `aud` claim. Leave empty to skip audience validation. |
+| `PublicKeyPem` | `string` | PEM-encoded RSA public key used to verify invite token signatures. Leave empty when `TokenMetadataUrl` is set. |
+| `TokenMetadataUrl` | `string` | Absolute URL of Ante's invitation-token metadata. See [Invitation token keys](invitation-token-keys.md) for configuration and rotation. |
+| `Issuer` | `string` | Expected `iss` claim. Required with `TokenMetadataUrl`; otherwise leave empty to skip issuer validation. |
+| `Audience` | `string` | Expected `aud` claim. Required with `TokenMetadataUrl`; otherwise leave empty to skip audience validation. |
 | `StageUrl` | `string` | Absolute URL of the Lobby invitation authority's staging endpoint. |
 | `ExchangeUrl` | `string` | Absolute URL of the same Lobby invitation authority's completion endpoint. |
 | `TenantClaim` | `string` | Claim containing the tenant observed for invitation routing. Required by the signed protocol. Equality with the resolved tenant does not identify the invitation issuer. |
@@ -122,6 +123,7 @@ Recommended claims:
 
 | Claim | Description |
 | ------- | ------------- |
+| `kid` | JWT header identifying the signing key. Required in metadata mode. |
 | `iss` | Issuer. Must match `Invite.Issuer` when configured. |
 | `aud` | Audience. Must match `Invite.Audience` when configured. |
 | `exp` | Expiry time. Expired tokens are rejected. |
