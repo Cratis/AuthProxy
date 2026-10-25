@@ -49,7 +49,7 @@ public class an_invite_exchange : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            new InviteTokenValidator(optionsMonitor),
+            new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>()),
             optionsMonitor,
             EmptyAuthConfig(),
             Substitute.For<ITenantResolver>(),

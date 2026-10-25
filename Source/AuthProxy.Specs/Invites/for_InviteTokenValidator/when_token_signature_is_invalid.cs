@@ -29,10 +29,10 @@ public class when_token_signature_is_invalid : Specification
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
-        _validator = new InviteTokenValidator(optionsMonitor);
+        _validator = new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>());
     }
 
-    void Because() => _result = _validator.Validate(_token);
+    async Task Because() => _result = await _validator.Validate(_token, CancellationToken.None);
 
     [Fact] void should_return_false() => _result.ShouldBeFalse();
 }

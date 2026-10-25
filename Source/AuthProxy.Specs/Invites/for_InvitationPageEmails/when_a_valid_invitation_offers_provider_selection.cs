@@ -11,7 +11,7 @@ public class when_a_valid_invitation_offers_provider_selection : given.an_email_
     {
         var authentication = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authentication.CurrentValue.Returns(configuration.Authentication);
-        return new(_ => Task.CompletedTask, new InviteTokenValidator(optionsMonitor), optionsMonitor, authentication, Substitute.For<ITenantResolver>(), httpClientFactory, _errorPageProvider, Substitute.For<ILogger<InviteMiddleware>>());
+        return new(_ => Task.CompletedTask, new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>()), optionsMonitor, authentication, Substitute.For<ITenantResolver>(), httpClientFactory, _errorPageProvider, Substitute.For<ILogger<InviteMiddleware>>());
     }
 
     void Establish()

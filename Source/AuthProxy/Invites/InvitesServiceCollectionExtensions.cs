@@ -20,6 +20,15 @@ public static class InvitesServiceCollectionExtensions
     {
         builder.Services.AddSingleton<IInviteTokenValidator, InviteTokenValidator>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<IInvitationTokenKeys, InvitationTokenKeys>();
+        builder.Services.AddHttpClient(InvitationTokenKeys.HttpClientName, client =>
+        {
+            client.Timeout = InvitationTokenKeys.FetchTimeout;
+            client.MaxResponseContentBufferSize = InvitationTokenKeys.MaximumResponseSize;
+        })
+
+            // A metadata response cannot choose another address for AuthProxy to fetch.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         builder.Services.AddSingleton<IInvitationAttestationIssuer, InvitationAttestationIssuer>();
         builder.Services.AddSingleton<IInvitationEntryStateProtector, InvitationEntryStateProtector>();
         builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, InvitationAttestationConfigurationValidator>();

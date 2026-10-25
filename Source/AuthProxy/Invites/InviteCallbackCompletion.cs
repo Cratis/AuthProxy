@@ -70,7 +70,7 @@ static class InviteCallbackCompletion
         // capability that no longer validates is not answered here: the middleware already owns the
         // expired/invalid answers, and the follow-up request reaches them unchanged.
         var tokenValidator = services.GetRequiredService<IInviteTokenValidator>();
-        var validationResult = tokenValidator.ValidateDetailed(inviteToken);
+        var validationResult = await tokenValidator.ValidateDetailed(inviteToken, httpContext.RequestAborted);
         if (validationResult != InviteTokenValidationResult.Valid)
         {
             logger.InvitationCallbackTokenNoLongerValidates(context.Scheme.Name, validationResult);

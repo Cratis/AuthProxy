@@ -17,6 +17,15 @@ public class when_adding_invites : Specification
         _serviceProvider = builder.Services.BuildServiceProvider();
     }
 
+    [Fact] void should_register_invitation_token_keys() =>
+        _serviceProvider.GetRequiredService<IInvitationTokenKeys>().ShouldBeOfExactType<InvitationTokenKeys>();
+
+    [Fact] void should_limit_the_metadata_timeout() =>
+        _serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(InvitationTokenKeys.HttpClientName).Timeout.ShouldEqual(InvitationTokenKeys.FetchTimeout);
+
+    [Fact] void should_limit_the_metadata_response_buffer() =>
+        _serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient(InvitationTokenKeys.HttpClientName).MaxResponseContentBufferSize.ShouldEqual(InvitationTokenKeys.MaximumResponseSize);
+
     [Fact] void should_register_invite_token_validator() =>
         _serviceProvider.GetRequiredService<IInviteTokenValidator>().ShouldBeOfExactType<InviteTokenValidator>();
 }

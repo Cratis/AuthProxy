@@ -20,7 +20,7 @@ public class a_callback_invitation : an_email_bound_invitation
     {
         var authentication = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authentication.CurrentValue.Returns(configuration.Authentication);
-        _validator = new InviteTokenValidator(optionsMonitor);
+        _validator = new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>());
         _completion = new(_validator, optionsMonitor, authentication, Substitute.For<ITenantResolver>(), httpClientFactory, Substitute.For<ILogger<InviteMiddleware>>(), null, null, null);
         return base.CreateMiddleware(configuration, optionsMonitor, httpClientFactory);
     }

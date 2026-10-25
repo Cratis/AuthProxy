@@ -17,6 +17,11 @@ public static class BearerRouteServiceCollectionExtensions
     public static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// The maximum buffered size of an issuer metadata document or JWKS, in bytes.
+    /// </summary>
+    public static readonly int MaximumMetadataSize = 64 * 1024;
+
+    /// <summary>
     /// Registers the services bearer routes need. Registering them changes nothing for a deployment that
     /// declares no bearer route.
     /// </summary>
@@ -28,7 +33,14 @@ public static class BearerRouteServiceCollectionExtensions
     /// </remarks>
     public static WebApplicationBuilder AddBearerRoutes(this WebApplicationBuilder builder)
     {
-        builder.Services.AddHttpClient(BearerRouteDefaults.MetadataHttpClientName, client => client.Timeout = MetadataTimeout);
+        builder.Services.AddHttpClient(BearerRouteDefaults.MetadataHttpClientName, client =>
+        {
+            client.Timeout = MetadataTimeout;
+            client.MaxResponseContentBufferSize = MaximumMetadataSize;
+        })
+
+            // An issuer's response cannot choose a second address for AuthProxy to fetch.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         builder.Services.AddSingleton<IBearerIssuerMetadata, BearerIssuerMetadata>();
         builder.Services.AddSingleton<IBearerTokenValidator, BearerTokenValidator>();
         builder.Services.AddSingleton<IBearerRouteForwarder, BearerRouteForwarder>();

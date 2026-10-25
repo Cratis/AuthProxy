@@ -20,7 +20,7 @@ public class a_canonical_invite_exchange : an_invite_exchange
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            new InviteTokenValidator(optionsMonitor),
+            new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>()),
             optionsMonitor,
             authenticationOptions,
             Substitute.For<ITenantResolver>(),

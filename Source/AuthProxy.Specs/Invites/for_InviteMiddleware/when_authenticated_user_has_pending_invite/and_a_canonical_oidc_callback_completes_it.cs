@@ -17,7 +17,7 @@ public class and_a_canonical_oidc_callback_completes_it : given.a_canonical_invi
     {
         var authentication = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authentication.CurrentValue.Returns(configuration.Authentication);
-        _completion = new(new InviteTokenValidator(optionsMonitor), optionsMonitor, authentication, Substitute.For<ITenantResolver>(), httpClientFactory, Substitute.For<ILogger<InviteMiddleware>>(), CanonicalOidcFixture.Resolver(configuration.Authentication), null, null);
+        _completion = new(new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>()), optionsMonitor, authentication, Substitute.For<ITenantResolver>(), httpClientFactory, Substitute.For<ILogger<InviteMiddleware>>(), CanonicalOidcFixture.Resolver(configuration.Authentication), null, null);
         return base.CreateMiddleware(configuration, optionsMonitor, httpClientFactory);
     }
 
