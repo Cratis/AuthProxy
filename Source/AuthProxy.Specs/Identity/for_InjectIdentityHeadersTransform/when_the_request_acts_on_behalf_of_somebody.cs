@@ -7,9 +7,9 @@ using Yarp.ReverseProxy.Transforms;
 namespace Cratis.AuthProxy.Identity.for_InjectIdentityHeadersTransform;
 
 /// <summary>
-/// The represented user is forwarded as the principal, so the application authorizes as them; the actor travels beside
-/// it, with the assertion that binds both. Whatever a caller sent in those headers, and any credential of the actor's,
-/// never reaches the application.
+/// The represented user is forwarded as the principal, so the application authorizes as them. Whatever a caller sent in
+/// the on-behalf headers, and any credential of the actor's, never reaches the application; the actor and the
+/// assertion are added by the on-behalf forward transform, last.
 /// </summary>
 public class when_the_request_acts_on_behalf_of_somebody : Specification
 {
@@ -30,7 +30,7 @@ public class when_the_request_acts_on_behalf_of_somebody : Specification
             new OnBehalfSession("session-1", new OnBehalfActor("github", "actor", "actor@example.com"), TenantId, "represented-user", "ISSUE-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1)),
             _represented,
             "actor-header",
-            "signed-assertion"));
+            Substitute.For<IOnBehalfAttestations>()));
 
         _transformContext = new RequestTransformContext
         {
@@ -46,8 +46,8 @@ public class when_the_request_acts_on_behalf_of_somebody : Specification
 
     [Fact] void should_forward_the_represented_user_as_the_principal() => _transformContext.ProxyRequest.Headers.GetValues(Headers.Principal).Single().ShouldEqual(_represented.ToBase64());
     [Fact] void should_forward_the_represented_users_id() => _transformContext.ProxyRequest.Headers.GetValues(Headers.PrincipalId).Single().ShouldEqual("represented-user");
-    [Fact] void should_forward_the_actor() => _transformContext.ProxyRequest.Headers.GetValues(Headers.OnBehalfActor).Single().ShouldEqual("actor-header");
-    [Fact] void should_forward_the_assertion() => _transformContext.ProxyRequest.Headers.GetValues(Headers.OnBehalfAssertion).Single().ShouldEqual("signed-assertion");
+    [Fact] void should_not_forward_a_callers_actor() => _transformContext.ProxyRequest.Headers.Contains(Headers.OnBehalfActor).ShouldBeFalse();
+    [Fact] void should_not_forward_a_callers_assertion() => _transformContext.ProxyRequest.Headers.Contains(Headers.OnBehalfAssertion).ShouldBeFalse();
     [Fact] void should_forward_the_sessions_tenant() => _transformContext.ProxyRequest.Headers.GetValues(Headers.TenantId).Single().ShouldEqual(TenantId);
     [Fact] void should_not_forward_any_credential_of_the_actors() => _transformContext.ProxyRequest.Headers.Authorization.ShouldBeNull();
 }

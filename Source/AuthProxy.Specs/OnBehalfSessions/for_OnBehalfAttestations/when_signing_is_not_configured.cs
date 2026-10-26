@@ -13,7 +13,7 @@ public class when_signing_is_not_configured : an_on_behalf_attestation_issuer
     void Because()
     {
         _configuration.Value.OnBehalf!.Attestation = null;
-        _issued = _attestations.TryIssueForForward(_session, "principal", "actor", out _token);
+        _issued = _attestations.TryIssueForForward(_session, new OnBehalfForward("portal", HttpMethod.Get, "/"), "principal", "actor", out _token);
     }
 
     [Fact] void should_not_issue_anything() => _issued.ShouldBeFalse();

@@ -13,7 +13,7 @@ public class when_a_session_request_is_routed_to_the_granting_service : an_on_be
         RouteTo(OnBehalfConfiguration.ServiceName);
         _sessions.Resolve(_context).Returns(new OnBehalfResolution(
             OnBehalfResolutionStatus.Active,
-            new(Sessions.At(DateTimeOffset.UtcNow), Sessions.Represented(), "actor", "assertion")));
+            new(Sessions.At(DateTimeOffset.UtcNow), Sessions.Represented(), "actor", Substitute.For<IOnBehalfAttestations>())));
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

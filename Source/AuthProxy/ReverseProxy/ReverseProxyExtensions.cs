@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.AccessTokens;
 using Cratis.AuthProxy.Identity;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
@@ -47,6 +48,9 @@ public static class ReverseProxyExtensions
             {
                 ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
                 PathPrefixTransform.Apply(ctx);
+
+                // Last, so the assertion signs the path the backend receives.
+                ctx.RequestTransforms.Add(new OnBehalfForwardTransform());
             });
 
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();

@@ -42,15 +42,25 @@ public static class OnBehalfAttestationClaims
     public const string ForwardPurpose = "on-behalf-forward";
 
     /// <summary>
-    /// The HTTP method of the call the token accompanies (RFC 9449 <c language="text">htm</c>).
+    /// The HTTP method of the call or forwarded request the token accompanies (RFC 9449 <c language="text">htm</c>).
     /// </summary>
     public const string HttpMethod = "htm";
 
     /// <summary>
-    /// The scheme, authority and path of the call the token accompanies, without query or fragment
-    /// (RFC 9449 <c language="text">htu</c>).
+    /// The target the token accompanies, without query or fragment (after RFC 9449 <c language="text">htu</c>): the
+    /// scheme, authority and path of a call AuthProxy makes, and the absolute, percent-encoded path of a forwarded
+    /// request as it reaches the backend.
     /// </summary>
+    /// <remarks>
+    /// A forwarded request carries the path alone because the backend sees AuthProxy's internal address, not the one
+    /// the browser used, so only the path is something both sides agree on.
+    /// </remarks>
     public const string HttpUri = "htu";
+
+    /// <summary>
+    /// The name of the configured service a forwarded request is sent to.
+    /// </summary>
+    public const string Service = "svc";
 
     /// <summary>
     /// The base64url SHA-256 digest of the exact body bytes of the call the token accompanies. A call without a body

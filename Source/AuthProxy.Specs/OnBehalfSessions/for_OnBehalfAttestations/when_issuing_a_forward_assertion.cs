@@ -17,6 +17,8 @@ public class when_issuing_a_forward_assertion : an_on_behalf_attestation_issuer
 {
     const string PrincipalHeader = "cmVwcmVzZW50ZWQ=";
     const string ActorHeader = "YWN0b3I=";
+    const string Path = "/api/orders/42";
+    const string Service = "portal";
 
     bool _issued;
     JsonWebToken _token;
@@ -24,7 +26,7 @@ public class when_issuing_a_forward_assertion : an_on_behalf_attestation_issuer
 
     async Task Because()
     {
-        _issued = _attestations.TryIssueForForward(_session, PrincipalHeader, ActorHeader, out var token);
+        _issued = _attestations.TryIssueForForward(_session, new OnBehalfForward(Service, HttpMethod.Post, Path), PrincipalHeader, ActorHeader, out var token);
         _token = Read(token);
         _validation = await Validate(token);
     }
@@ -40,6 +42,9 @@ public class when_issuing_a_forward_assertion : an_on_behalf_attestation_issuer
     [Fact] void should_bind_the_session() => Claim(_token, OnBehalfAttestationClaims.SessionId).ShouldEqual(_session.SessionId);
     [Fact] void should_bind_the_exact_principal_header() => Claim(_token, OnBehalfAttestationClaims.PrincipalHash).ShouldEqual(Digest(Encoding.ASCII.GetBytes(PrincipalHeader)));
     [Fact] void should_bind_the_exact_actor_header() => Claim(_token, OnBehalfAttestationClaims.ActorHash).ShouldEqual(Digest(Encoding.ASCII.GetBytes(ActorHeader)));
+    [Fact] void should_bind_the_method() => Claim(_token, OnBehalfAttestationClaims.HttpMethod).ShouldEqual("POST");
+    [Fact] void should_bind_the_path() => Claim(_token, OnBehalfAttestationClaims.HttpUri).ShouldEqual(Path);
+    [Fact] void should_bind_the_service() => Claim(_token, OnBehalfAttestationClaims.Service).ShouldEqual(Service);
     [Fact] void should_name_the_signing_key() => _token.Kid.ShouldEqual(OnBehalfConfiguration.KeyId);
     [Fact] void should_carry_a_replay_identifier() => string.IsNullOrEmpty(_token.Id).ShouldBeFalse();
     [Fact] void should_expire_within_a_minute() => (_token.ValidTo - _token.IssuedAt).ShouldEqual(TimeSpan.FromSeconds(60));

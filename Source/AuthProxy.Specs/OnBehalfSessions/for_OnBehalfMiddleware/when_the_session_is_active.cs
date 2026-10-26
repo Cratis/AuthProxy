@@ -12,7 +12,7 @@ public class when_the_session_is_active : an_on_behalf_middleware
 
     void Establish()
     {
-        _active = new(Sessions.At(DateTimeOffset.UtcNow), Sessions.Represented(), "actor", "assertion");
+        _active = new(Sessions.At(DateTimeOffset.UtcNow), Sessions.Represented(), "actor", Substitute.For<IOnBehalfAttestations>());
         _sessions.Resolve(_context).Returns(new OnBehalfResolution(OnBehalfResolutionStatus.Active, _active));
     }
 

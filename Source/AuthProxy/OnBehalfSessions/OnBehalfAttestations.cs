@@ -20,10 +20,14 @@ namespace Cratis.AuthProxy.OnBehalfSessions;
 /// shared with sign-in and invitation attestation. Every token states who is acting (<c language="text">act</c>), for whom
 /// (<c language="text">sub</c>), in which tenant, for which issue and in which session, so an application never has to
 /// take any of that from an unsigned header or query parameter. A call is additionally bound to its route and body,
-/// and a forwarded request to the exact identity header values it travels with.
+/// and a forwarded request to its service, method and path and to the exact identity header values it travels with.
 /// </remarks>
 public sealed class OnBehalfAttestations(IOptionsMonitor<C.AuthProxy> configuration, TimeProvider timeProvider) : IOnBehalfAttestations
 {
+    /// <inheritdoc />
+    public bool CanSign => configuration.CurrentValue.OnBehalf?.Attestation is { } settings
+        && settings.SigningKeys.Any(_ => string.Equals(_.KeyId, settings.ActiveKeyId, StringComparison.Ordinal));
+
     /// <inheritdoc />
     public bool TryIssueForCall(string purpose, OnBehalfSession session, HttpMethod method, Uri target, byte[] body, out string token)
     {
@@ -35,9 +39,12 @@ public sealed class OnBehalfAttestations(IOptionsMonitor<C.AuthProxy> configurat
     }
 
     /// <inheritdoc />
-    public bool TryIssueForForward(OnBehalfSession session, string principalHeader, string actorHeader, out string token)
+    public bool TryIssueForForward(OnBehalfSession session, OnBehalfForward forward, string principalHeader, string actorHeader, out string token)
     {
         var claims = ClaimsFor(OnBehalfAttestationClaims.ForwardPurpose, session);
+        claims[OnBehalfAttestationClaims.HttpMethod] = forward.Method.Method;
+        claims[OnBehalfAttestationClaims.HttpUri] = forward.Path;
+        claims[OnBehalfAttestationClaims.Service] = forward.Service;
         claims[OnBehalfAttestationClaims.PrincipalHash] = Digest(Encoding.ASCII.GetBytes(principalHeader));
         claims[OnBehalfAttestationClaims.ActorHash] = Digest(Encoding.ASCII.GetBytes(actorHeader));
         return TryIssue(claims, out token);

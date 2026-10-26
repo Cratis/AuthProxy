@@ -24,7 +24,7 @@ public class and_the_request_acts_on_behalf_of_somebody : given.an_identity_midd
             new OnBehalfSession("session-1", new OnBehalfActor("aad", "user-1", "User One"), TenantId, "represented-user", "ISSUE-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1)),
             _represented,
             "actor",
-            "assertion"));
+            Substitute.For<IOnBehalfAttestations>()));
         _context.Request.Headers.Cookie = $"{Cookies.OnBehalf}=protected";
 
         _onBehalfSessions = Substitute.For<IOnBehalfSessions>();

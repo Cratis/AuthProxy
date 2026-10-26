@@ -39,15 +39,11 @@ public class InjectIdentityHeadersTransform : RequestTransform
             context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
         }
 
-        // During an on-behalf session the principal above is the represented user. The actor travels beside it, and the
-        // signed assertion binds the two exact header values, the tenant, the session and the issue together. No
-        // credential of the actor's is forwarded: the application must never be able to mistake the actor's own token
-        // for the represented user's, nor the other way round.
-        if (httpContext.TryGetOnBehalf(out var onBehalf))
+        // During an on-behalf session the principal above is the represented user. The actor and the signed assertion
+        // are added by OnBehalfForwardTransform, last, once the path the backend receives is final.
+        if (httpContext.TryGetOnBehalf(out _))
         {
             context.ProxyRequest.Headers.Authorization = null;
-            context.ProxyRequest.Headers.Add(Headers.OnBehalfActor, onBehalf.ActorHeader);
-            context.ProxyRequest.Headers.Add(Headers.OnBehalfAssertion, onBehalf.Assertion);
         }
 
         // Forward the resolved tenant if it was set by the tenancy middleware.

@@ -158,15 +158,15 @@ public sealed class OnBehalfSessions(
             ledger.Remember(session.SessionId, grant, FreshUntil(session, grant, settings));
         }
 
-        var represented = grant.Principal!;
-        var actorHeader = actor!.ToBase64();
-        if (!attestations.TryIssueForForward(session, represented.ToBase64(), actorHeader, out var assertion))
+        // The assertion is issued per request, once its service, method and path are known; a session whose assertions
+        // could not be signed is refused here rather than at forwarding.
+        if (!attestations.CanSign)
         {
             logger.AssertionCouldNotBeSigned();
             return OnBehalfResolution.Unavailable;
         }
 
-        return new(OnBehalfResolutionStatus.Active, new OnBehalfContext(session, represented, actorHeader, assertion));
+        return new(OnBehalfResolutionStatus.Active, new OnBehalfContext(session, grant.Principal!, actor!.ToBase64(), attestations));
     }
 
     /// <inheritdoc/>

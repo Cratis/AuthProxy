@@ -42,7 +42,7 @@ public class an_on_behalf_request : Specification
             new OnBehalfSession("session-1", new OnBehalfActor("github", "actor", "actor@example.com"), SessionTenant, "user", "ISSUE-1", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddHours(1)),
             new ClientPrincipal { UserId = "user" },
             "actor",
-            "assertion"));
+            Substitute.For<IOnBehalfAttestations>()));
     }
 
     protected void Resolves(params TenantResolutionResult[] results)

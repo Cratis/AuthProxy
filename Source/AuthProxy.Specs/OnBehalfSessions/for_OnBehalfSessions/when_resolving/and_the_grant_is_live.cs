@@ -23,5 +23,5 @@ public class and_the_grant_is_live : a_session_coordinator
     [Fact] void should_act_as_the_represented_user() => _result.Context!.Represented.UserId.ShouldEqual(Sessions.Subject);
     [Fact] void should_carry_the_session() => _result.Context!.Session.ShouldEqual(_session);
     [Fact] void should_forward_the_actors_subject() => (ClientPrincipal.TryFromBase64(_result.Context!.ActorHeader, out var actor) ? actor!.UserId : string.Empty).ShouldEqual(Sessions.ActorSubject);
-    [Fact] void should_carry_a_signed_assertion() => string.IsNullOrEmpty(_result.Context!.Assertion).ShouldBeFalse();
+    [Fact] void should_issue_signed_assertions_for_its_requests() => (_result.Context!.TryIssueAssertion(new(OnBehalfConfiguration.ServiceName, HttpMethod.Get, "/api"), "principal", out var assertion) && assertion.Length > 0).ShouldBeTrue();
 }

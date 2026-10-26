@@ -186,7 +186,8 @@ public class IdentityDetailsResolver(
                     logIdentifier,
                     service.EffectiveIdentityVerificationTimeout,
                     context.RequestAborted,
-                    denialWillBeLogged: mode == C.IdentityVerificationMode.Required);
+                    denialWillBeLogged: mode == C.IdentityVerificationMode.Required,
+                    onBehalf: onBehalf);
 
                 if (!Admits(outcome, mode))
                 {
