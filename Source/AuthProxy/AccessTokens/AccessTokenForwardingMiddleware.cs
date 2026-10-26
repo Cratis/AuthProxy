@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Yarp.ReverseProxy.Model;
@@ -41,6 +42,16 @@ public class AccessTokenForwardingMiddleware(
             || !IsSessionRequest(context))
         {
             await next(context);
+            return;
+        }
+
+        // The token AuthProxy holds belongs to whoever signed in — during an on-behalf session, the actor. Forwarding it
+        // would hand the application the actor's credential for a request it attributes to the represented user, and the
+        // represented user's own credential is never used. A backend that requires a token is refused instead.
+        if (context.TryGetOnBehalf(out _))
+        {
+            logger.AccessTokenNotForwardedOnBehalf(serviceName);
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
             return;
         }
 

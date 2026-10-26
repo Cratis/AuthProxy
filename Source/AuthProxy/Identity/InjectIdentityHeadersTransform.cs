@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.OnBehalfSessions;
 using Yarp.ReverseProxy.Transforms;
 
 namespace Cratis.AuthProxy.Identity;
@@ -36,6 +37,17 @@ public class InjectIdentityHeadersTransform : RequestTransform
         if (principal is not null)
         {
             context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
+        }
+
+        // During an on-behalf session the principal above is the represented user. The actor travels beside it, and the
+        // signed assertion binds the two exact header values, the tenant, the session and the issue together. No
+        // credential of the actor's is forwarded: the application must never be able to mistake the actor's own token
+        // for the represented user's, nor the other way round.
+        if (httpContext.TryGetOnBehalf(out var onBehalf))
+        {
+            context.ProxyRequest.Headers.Authorization = null;
+            context.ProxyRequest.Headers.Add(Headers.OnBehalfActor, onBehalf.ActorHeader);
+            context.ProxyRequest.Headers.Add(Headers.OnBehalfAssertion, onBehalf.Assertion);
         }
 
         // Forward the resolved tenant if it was set by the tenancy middleware.

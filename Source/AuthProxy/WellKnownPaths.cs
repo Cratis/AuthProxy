@@ -86,6 +86,38 @@ public static class WellKnownPaths
     public const string LinkComplete = "/.cratis/link/complete";
 
     /// <summary>
+    /// The well-known path prefix of the on-behalf session surface. On AuthProxy, a <c language="text">GET</c> of the bare
+    /// path describes the caller's current on-behalf session. On the application's backend, the paths below it are
+    /// the grant check and the session notifications AuthProxy calls.
+    /// </summary>
+    public const string OnBehalf = "/.cratis/on-behalf";
+
+    /// <summary>
+    /// The well-known AuthProxy path an actor <c language="text">POST</c>s to in order to start an on-behalf session.
+    /// </summary>
+    public const string OnBehalfStart = "/.cratis/on-behalf/start";
+
+    /// <summary>
+    /// The well-known AuthProxy path an actor <c language="text">POST</c>s to in order to end their on-behalf session.
+    /// </summary>
+    public const string OnBehalfEnd = "/.cratis/on-behalf/end";
+
+    /// <summary>
+    /// The well-known path of the grant check on the application's backend.
+    /// </summary>
+    public const string OnBehalfGrants = "/.cratis/on-behalf/grants";
+
+    /// <summary>
+    /// The well-known path on the application's backend that is told an on-behalf session started.
+    /// </summary>
+    public const string OnBehalfSessionStarted = "/.cratis/on-behalf/sessions/started";
+
+    /// <summary>
+    /// The well-known path on the application's backend that is told an on-behalf session ended.
+    /// </summary>
+    public const string OnBehalfSessionEnded = "/.cratis/on-behalf/sessions/ended";
+
+    /// <summary>
     /// The well-known path prefix that triggers invite-token handling.
     /// Append the token to complete the URL (e.g. <c language="text">/invite/&lt;token&gt;</c>).
     /// </summary>

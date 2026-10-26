@@ -22,6 +22,26 @@ namespace Cratis.AuthProxy.Authorization;
 /// </remarks>
 public class AccessPolicy : IAccessPolicy
 {
+    /// <summary>
+    /// Evaluates a set of claim requirements against a principal: every requirement must hold, and within one
+    /// requirement any listed value will do.
+    /// </summary>
+    /// <param name="user">The principal to evaluate.</param>
+    /// <param name="requirements">The requirements.</param>
+    /// <returns>The <see cref="AccessDecision"/>.</returns>
+    public static AccessDecision Evaluate(ClaimsPrincipal user, IEnumerable<C.ClaimRequirement> requirements)
+    {
+        foreach (var requirement in requirements)
+        {
+            if (!IsSatisfied(requirement, user))
+            {
+                return AccessDecision.Denied(requirement.Claim);
+            }
+        }
+
+        return AccessDecision.Granted;
+    }
+
     /// <inheritdoc/>
     public bool IsConfigured(C.AuthProxy config) =>
         config.Authorization.HasRequirements
@@ -50,19 +70,6 @@ public class AccessPolicy : IAccessPolicy
             : RequirementsFor(config, FindService(config, serviceName)).Concat(route.RequiredClaims);
 
         return Evaluate(user, requirements);
-    }
-
-    static AccessDecision Evaluate(ClaimsPrincipal user, IEnumerable<C.ClaimRequirement> requirements)
-    {
-        foreach (var requirement in requirements)
-        {
-            if (!IsSatisfied(requirement, user))
-            {
-                return AccessDecision.Denied(requirement.Claim);
-            }
-        }
-
-        return AccessDecision.Granted;
     }
 
     /// <summary>

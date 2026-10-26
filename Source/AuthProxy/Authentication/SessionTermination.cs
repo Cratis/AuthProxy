@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using C = Cratis.AuthProxy.Configuration;
@@ -35,6 +36,8 @@ public static class SessionTermination
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public static async Task SignOutAndClearCookies(HttpContext context, C.Session session, C.Logout logout)
     {
+        // An on-behalf session only ever extends the actor's own, so it ends with it — and the application is told.
+        await OnBehalfSessionTermination.End(context, OnBehalfSessionEndReason.ActorSessionEnded);
         await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         SessionCookieHealing.DeleteHostOnlyCopies(context, session);
         context.Response.Cookies.Delete(Cookies.Identity);
