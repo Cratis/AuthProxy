@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Collections.Concurrent;
 using Cratis.AuthProxy.Attestations;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Identity;
@@ -38,6 +39,12 @@ public sealed class OnBehalfSessions(
     /// </summary>
     public const int MaximumValueLength = 256;
 
+    /// <summary>
+    /// The grant re-checks in flight, one per session: every request of a page load finding the answer stale waits for
+    /// the same call rather than each asking the application.
+    /// </summary>
+    readonly ConcurrentDictionary<string, Lazy<Task<OnBehalfGrant>>> _rechecks = new(StringComparer.Ordinal);
+
     /// <inheritdoc/>
     public async Task<OnBehalfStartResult> Start(HttpContext context, OnBehalfStartRequest request)
     {
@@ -68,7 +75,14 @@ public sealed class OnBehalfSessions(
 
         if (cookies.TryRead(context, out var existing) && !ledger.HasEnded(existing.SessionId, out _) && existing.ExpiresAt > ledger.Now)
         {
-            return new(OnBehalfStartStatus.Conflict);
+            if (existing.Actor.Is(actor))
+            {
+                return new(OnBehalfStartStatus.Conflict);
+            }
+
+            // A session somebody else left behind on this browser is not this actor's to keep or to be blocked by. It
+            // ends, and the application hears so, before this actor's own session starts.
+            await EndSession(context, existing, OnBehalfSessionEndReason.ActorChanged);
         }
 
         var now = ledger.Now;
@@ -101,6 +115,7 @@ public sealed class OnBehalfSessions(
         }
 
         ledger.Remember(session.SessionId, grant, FreshUntil(session, grant, settings));
+        ExpireIdentityState(context);
         cookies.Write(context, session);
         logger.SessionStarted(session.SessionId);
         return new(OnBehalfStartStatus.Started, session, grant);
@@ -125,6 +140,7 @@ public sealed class OnBehalfSessions(
         if (ledger.HasEnded(session.SessionId, out var endedReason))
         {
             OnBehalfSessionCookie.Delete(context);
+            ExpireIdentityState(context);
             return new(OnBehalfResolutionStatus.Ended, Reason: endedReason);
         }
 
@@ -144,7 +160,15 @@ public sealed class OnBehalfSessions(
 
         if (!ledger.TryGetGrant(session.SessionId, out var grant))
         {
-            grant = await grants.Check(session, actor!, context.RequestAborted);
+            try
+            {
+                grant = await Recheck(session, actor!, settings).WaitAsync(context.RequestAborted);
+            }
+            catch (OperationCanceledException)
+            {
+                return OnBehalfResolution.Unavailable;
+            }
+
             switch (grant.Status)
             {
                 case OnBehalfGrantStatus.NotLive:
@@ -154,8 +178,6 @@ public sealed class OnBehalfSessions(
                 case OnBehalfGrantStatus.Indeterminate:
                     return OnBehalfResolution.Unavailable;
             }
-
-            ledger.Remember(session.SessionId, grant, FreshUntil(session, grant, settings));
         }
 
         // The assertion is issued per request, once its service, method and path are known; a session whose assertions
@@ -181,6 +203,26 @@ public sealed class OnBehalfSessions(
         return await EndSession(context, session, reason);
     }
 
+    /// <summary>
+    /// Expires the identity details cookie and the sealed authorization record, so neither outlives the identity they
+    /// were written for when a session starts or ends.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <remarks>
+    /// Both are written for whoever the request acted as. Left in place, the readable one keeps showing the frontend
+    /// the represented user after the session ended, or the actor after it started, until the next resolution.
+    /// </remarks>
+    static void ExpireIdentityState(HttpContext context)
+    {
+        context.Response.Cookies.Delete(Cookies.Identity, new CookieOptions
+        {
+            HttpOnly = false,
+            SameSite = SameSiteMode.Lax,
+            Secure = context.Request.IsHttps,
+        });
+        context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
+    }
+
     static bool IsValid(string? value) =>
         !string.IsNullOrWhiteSpace(value)
         && value.Length <= MaximumValueLength
@@ -198,6 +240,45 @@ public sealed class OnBehalfSessions(
     DateTimeOffset FreshUntil(OnBehalfSession session, OnBehalfGrant grant, C.OnBehalf settings) =>
         new[] { ledger.Now.Add(settings.RecheckInterval), grant.ValidUntil, session.ExpiresAt }.Min();
 
+    /// <summary>
+    /// Re-checks a session's grant, sharing one call among every request that needs it at the same time.
+    /// </summary>
+    /// <param name="session">The session.</param>
+    /// <param name="actor">The actor, already confirmed to be the session's.</param>
+    /// <param name="settings">The on-behalf configuration.</param>
+    /// <returns>The application's answer.</returns>
+    /// <remarks>
+    /// The shared call is not tied to the request that started it, so one request going away does not fail the others;
+    /// it is still bounded by <see cref="C.OnBehalf.Timeout"/>. A live answer is remembered before the call is
+    /// released, so a request arriving just after it finds the fresh grant instead of asking again.
+    /// </remarks>
+    Task<OnBehalfGrant> Recheck(OnBehalfSession session, ClientPrincipal actor, C.OnBehalf settings)
+    {
+        var recheck = _rechecks.GetOrAdd(
+            session.SessionId,
+            static (_, state) => new(() => state.Sessions.CheckAndRemember(state.Session, state.Actor, state.Settings)),
+            (Sessions: this, Session: session, Actor: actor, Settings: settings));
+        return recheck.Value;
+    }
+
+    async Task<OnBehalfGrant> CheckAndRemember(OnBehalfSession session, ClientPrincipal actor, C.OnBehalf settings)
+    {
+        try
+        {
+            var grant = await grants.Check(session, actor, CancellationToken.None);
+            if (grant.IsLive)
+            {
+                ledger.Remember(session.SessionId, grant, FreshUntil(session, grant, settings));
+            }
+
+            return grant;
+        }
+        finally
+        {
+            _rechecks.TryRemove(session.SessionId, out _);
+        }
+    }
+
     async Task<OnBehalfResolution> Ended(HttpContext context, OnBehalfSession session, OnBehalfSessionEndReason reason)
     {
         await EndSession(context, session, reason);
@@ -207,6 +288,7 @@ public sealed class OnBehalfSessions(
     async Task<OnBehalfEndStatus> EndSession(HttpContext context, OnBehalfSession session, OnBehalfSessionEndReason reason)
     {
         OnBehalfSessionCookie.Delete(context);
+        ExpireIdentityState(context);
 
         // Only the call that ends the session notifies, so concurrent requests discovering the same revoked grant tell
         // the application once. The notification outlives the request that triggered it: an actor closing the tab is
