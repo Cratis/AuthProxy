@@ -11,6 +11,7 @@ public class when_ending_the_session : an_on_behalf_middleware
     {
         _context.Request.Method = HttpMethods.Post;
         _context.Request.Path = WellKnownPaths.OnBehalfEnd;
+        _context.Request.Headers["Sec-Fetch-Site"] = "same-origin";
         _sessions.End(_context, OnBehalfSessionEndReason.EndedByActor).Returns(OnBehalfEndStatus.Ended);
     }
 

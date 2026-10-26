@@ -15,11 +15,20 @@ namespace Cratis.AuthProxy.OnBehalfSessions;
 /// Starting a session requires a JSON body. A cross-site HTML form cannot send one without a CORS preflight that
 /// AuthProxy never answers, so another site cannot make a support person's browser start a session.
 /// </para>
+/// <para>
+/// Both starting and ending are refused for a request the browser marks as coming from another origin — a
+/// <c language="text">Sec-Fetch-Site</c> other than <c language="text">same-origin</c> or <c language="text">none</c>, or an
+/// <c language="text">Origin</c> other than AuthProxy's own. Ending a session needs no body, so it also requires positive
+/// evidence: <c language="text">Sec-Fetch-Site: same-origin</c>, a matching <c language="text">Origin</c>, or a JSON
+/// content type, which a cross-site form cannot send either. Another site cannot end a support session, nor throw a
+/// support person out of it.
+/// </para>
 /// </remarks>
 public static class OnBehalfEndpoints
 {
     const string StartSegment = "/start";
     const string EndSegment = "/end";
+    const string SecFetchSite = "Sec-Fetch-Site";
 
     /// <summary>
     /// Answers one request under <see cref="WellKnownPaths.OnBehalf"/>.
@@ -66,6 +75,12 @@ public static class OnBehalfEndpoints
 
     static async Task Start(HttpContext context, IOnBehalfSessions sessions)
     {
+        if (IsCrossOrigin(context.Request))
+        {
+            await Refuse(context, StatusCodes.Status403Forbidden, "same-origin-required");
+            return;
+        }
+
         if (!context.Request.HasJsonContentType())
         {
             await Refuse(context, StatusCodes.Status415UnsupportedMediaType, "json-required");
@@ -137,6 +152,12 @@ public static class OnBehalfEndpoints
 
     static async Task End(HttpContext context, IOnBehalfSessions sessions)
     {
+        if (IsCrossOrigin(context.Request) || !(IsSameOrigin(context.Request) || context.Request.HasJsonContentType()))
+        {
+            await Refuse(context, StatusCodes.Status403Forbidden, "same-origin-required");
+            return;
+        }
+
         var status = await sessions.End(context, OnBehalfSessionEndReason.EndedByActor);
         if (status == OnBehalfEndStatus.EndedWithoutNotification)
         {
@@ -185,6 +206,27 @@ public static class OnBehalfEndpoints
                 return;
         }
     }
+
+    static bool IsCrossOrigin(HttpRequest request)
+    {
+        var site = request.Headers[SecFetchSite].ToString();
+        if (site.Length > 0
+            && !string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(site, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var origin = request.Headers.Origin.ToString();
+        return origin.Length > 0 && !IsOwnOrigin(request, origin);
+    }
+
+    static bool IsSameOrigin(HttpRequest request) =>
+        string.Equals(request.Headers[SecFetchSite].ToString(), "same-origin", StringComparison.OrdinalIgnoreCase)
+        || (request.Headers.Origin.ToString() is { Length: > 0 } origin && IsOwnOrigin(request, origin));
+
+    static bool IsOwnOrigin(HttpRequest request, string origin) =>
+        string.Equals(origin, $"{request.Scheme}://{request.Host.Value}", StringComparison.OrdinalIgnoreCase);
 
     static Task Refuse(HttpContext context, int statusCode, string error)
     {
