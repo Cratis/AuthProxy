@@ -143,6 +143,24 @@ public sealed class OnBehalfGrants(
             .ToArray(),
     };
 
+    /// <summary>
+    /// Reads an instant that states its offset.
+    /// </summary>
+    /// <param name="text">The ISO 8601 text.</param>
+    /// <param name="instant">The instant.</param>
+    /// <returns><see langword="true"/> when the text is a date and time with <c language="text">Z</c> or an explicit offset.</returns>
+    /// <remarks>
+    /// A date and time without an offset means a different instant on every machine that reads it, so a grant's
+    /// validity would depend on the time zone AuthProxy happens to run in. It is refused rather than guessed at.
+    /// </remarks>
+    static bool TryReadInstant(string text, out DateTimeOffset instant)
+    {
+        instant = default;
+        return DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
+            && parsed.Kind != DateTimeKind.Unspecified
+            && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out instant);
+    }
+
     OnBehalfGrant Unreadable()
     {
         logger.GrantCheckAnswerUnreadable();
@@ -173,7 +191,7 @@ public sealed class OnBehalfGrants(
         if (live is not true
             || ReadProperty(parsed, "validUntil") is not JsonValue validUntilValue
             || !validUntilValue.TryGetValue<string>(out var validUntilText)
-            || !DateTimeOffset.TryParse(validUntilText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var validUntil)
+            || !TryReadInstant(validUntilText, out var validUntil)
             || ReadProperty(parsed, "principal") is not JsonObject principalNode)
         {
             return Unreadable();
