@@ -37,6 +37,18 @@ public class OnBehalf
     public string Service { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the services an on-behalf session may reach. Leave it empty — the default — and only
+    /// <see cref="Service"/> is reachable.
+    /// </summary>
+    /// <remarks>
+    /// The represented user's identity never reaches any other service: a request an active session routes anywhere
+    /// else is refused with <c language="text">403</c>, and identity resolution during a session only asks the
+    /// services listed here. When set, it must include <see cref="Service"/> and every service whose identity
+    /// verification is <see cref="IdentityVerificationMode.Required"/>; startup validation refuses anything else.
+    /// </remarks>
+    public IList<string> Services { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets the claims the actor — the support person or agent — must carry to start an on-behalf session.
     /// At least one requirement is mandatory, so a deployment has to say who support is.
     /// </summary>
@@ -74,4 +86,17 @@ public class OnBehalf
     /// forwarded with every on-behalf request. Required: an on-behalf identity is never forwarded unsigned.
     /// </summary>
     public OnBehalfAttestation? Attestation { get; set; }
+
+    /// <summary>
+    /// Determines whether an on-behalf session may reach a service.
+    /// </summary>
+    /// <param name="service">The name of the configured service.</param>
+    /// <returns><see langword="true"/> when the service is permitted; otherwise <see langword="false"/>.</returns>
+    /// <remarks>
+    /// The permitted services are <see cref="Services"/> when it lists any, otherwise <see cref="Service"/> alone.
+    /// Service names are matched case-insensitively, exactly as the rest of AuthProxy matches them.
+    /// </remarks>
+    public bool Permits(string? service) =>
+        !string.IsNullOrWhiteSpace(service)
+        && (Services.Count > 0 ? Services : [Service]).Any(_ => string.Equals(_?.Trim(), service.Trim(), StringComparison.OrdinalIgnoreCase));
 }

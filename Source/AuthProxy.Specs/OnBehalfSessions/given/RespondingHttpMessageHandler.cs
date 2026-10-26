@@ -23,6 +23,8 @@ public class RespondingHttpMessageHandler(HttpStatusCode statusCode, string? bod
 
     public int Calls { get; private set; }
 
+    public List<Uri> RequestedUris { get; } = [];
+
     public IHttpClientFactory AsFactory()
     {
         var factory = Substitute.For<IHttpClientFactory>();
@@ -33,6 +35,7 @@ public class RespondingHttpMessageHandler(HttpStatusCode statusCode, string? bod
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         Calls++;
+        RequestedUris.Add(request.RequestUri!);
         LastRequest = request;
         LastAuthorization = request.Headers.Authorization?.ToString();
         LastHeaders.Clear();

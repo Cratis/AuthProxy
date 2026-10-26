@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.Extensions.Options;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.OnBehalfSessions;
@@ -32,6 +34,11 @@ public class OnBehalfMiddleware(
     IOnBehalfSessions sessions,
     IErrorPageProvider errorPageProvider)
 {
+    /// <summary>
+    /// The <see cref="Headers.OnBehalfRefused"/> value for a request routed to a service the session may not reach.
+    /// </summary>
+    public const string ServiceNotPermitted = "service-not-permitted";
+
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
@@ -45,6 +52,15 @@ public class OnBehalfMiddleware(
         switch (resolution.Status)
         {
             case OnBehalfResolutionStatus.Active:
+                if (!ReachesPermittedService(context, config.CurrentValue))
+                {
+                    // The represented user's identity is never sent anywhere the session was not granted for. The
+                    // session itself goes on: following a link into another service is not a reason to end it.
+                    context.Response.Headers[Headers.OnBehalfRefused] = ServiceNotPermitted;
+                    await errorPageProvider.WriteErrorPageAsync(context, WellKnownPageNames.Forbidden, StatusCodes.Status403Forbidden);
+                    return;
+                }
+
                 context.SetOnBehalf(resolution.Context!);
                 break;
 
@@ -59,5 +75,26 @@ public class OnBehalfMiddleware(
         }
 
         await next(context);
+    }
+
+    /// <summary>
+    /// Determines whether a request stays within the services an on-behalf session may reach.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="config">The current configuration.</param>
+    /// <returns><see langword="true"/> when nothing is forwarded, or it is forwarded to a permitted service.</returns>
+    /// <remarks>
+    /// Endpoint routing has already selected the proxy route, and its cluster is what the request is forwarded to. A
+    /// request no proxy route selected is answered by AuthProxy itself and reaches no service. A proxy route whose
+    /// service cannot be resolved is refused: not knowing where the identity goes is not a reason to send it.
+    /// </remarks>
+    static bool ReachesPermittedService(HttpContext context, C.AuthProxy config)
+    {
+        if (context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is null)
+        {
+            return true;
+        }
+
+        return config.OnBehalf?.Permits(ServiceRoutes.Resolve(context.Request, config)?.Name) == true;
     }
 }

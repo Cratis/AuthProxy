@@ -106,6 +106,13 @@ public static class Headers
     public const string OnBehalfEnded = "x-cratis-on-behalf-ended";
 
     /// <summary>
+    /// The response header naming why AuthProxy refused a request during an on-behalf session that is still active,
+    /// for instance <c language="text">service-not-permitted</c> for a request routed to a service the session may not
+    /// reach. Unlike <see cref="OnBehalfEnded"/>, the session goes on.
+    /// </summary>
+    public const string OnBehalfRefused = "x-cratis-on-behalf-refused";
+
+    /// <summary>
     /// Service identifier used to route requests to the appropriate service.
     /// </summary>
     /// <remarks>

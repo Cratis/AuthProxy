@@ -35,6 +35,8 @@ sealed class OnBehalfConfigurationValidator : IValidateOptions<C.AuthProxy>
 
         var failures = new List<string>();
         ValidateService(options, onBehalf, failures);
+        ValidatePermittedServices(options, onBehalf, failures);
+        ValidateIdentityVerification(options, onBehalf, failures);
         ValidateBounds(onBehalf, failures);
 
         if (!onBehalf.ActorAuthorization.HasRequirements
@@ -59,6 +61,41 @@ sealed class OnBehalfConfigurationValidator : IValidateOptions<C.AuthProxy>
         }
 
         AttestationConfigurationValidation.ValidateAbsoluteEndpoint(service.Backend.BaseUrl, $"Services.{onBehalf.Service}.Backend.BaseUrl", failures);
+    }
+
+    static void ValidatePermittedServices(C.AuthProxy options, C.OnBehalf onBehalf, List<string> failures)
+    {
+        if (onBehalf.Services.Count == 0)
+        {
+            return;
+        }
+
+        if (onBehalf.Services.Any(name => string.IsNullOrWhiteSpace(name) || !options.Services.Keys.Any(key => string.Equals(key, name.Trim(), StringComparison.OrdinalIgnoreCase))))
+        {
+            failures.Add($"{Section}.Services must only name configured services.");
+        }
+
+        if (!onBehalf.Permits(onBehalf.Service))
+        {
+            failures.Add($"{Section}.Services must include {Section}.Service, the service that grants the session.");
+        }
+    }
+
+    static void ValidateIdentityVerification(C.AuthProxy options, C.OnBehalf onBehalf, List<string> failures)
+    {
+        // A Required service has to verify every identity, the represented user's included. One the session may not
+        // reach could neither verify it nor be skipped, so the configuration is refused rather than either.
+        var unreachable = options.Services
+            .Where(_ => _.Value.ParticipatesInIdentityResolution
+                && _.Value.IdentityVerification == C.IdentityVerificationMode.Required
+                && !onBehalf.Permits(_.Key))
+            .Select(_ => _.Key)
+            .ToArray();
+
+        if (unreachable.Length > 0)
+        {
+            failures.Add($"{Section}.Services must include every service whose identity verification is Required ({string.Join(", ", unreachable)}).");
+        }
     }
 
     static void ValidateBounds(C.OnBehalf onBehalf, List<string> failures)
