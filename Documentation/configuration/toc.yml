@@ -20,6 +20,8 @@
   href: link.md
 - name: Sign-in Notifications
   href: sign-in.md
+- name: On-behalf Sessions
+  href: on-behalf-sessions.md
 - name: Data Protection Keys
   href: data-protection.md
 - name: Trusted Proxies
