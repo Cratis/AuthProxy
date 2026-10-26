@@ -22,6 +22,7 @@ public static class OnBehalfSessionEndReasons
         OnBehalfSessionEndReason.ActorSessionEnded => "actor-session-ended",
         OnBehalfSessionEndReason.ActorChanged => "actor-changed",
         OnBehalfSessionEndReason.RepresentedIdentityDenied => "represented-identity-denied",
+        OnBehalfSessionEndReason.IdentityFlowStarted => "identity-flow-started",
         _ => "ended",
     };
 }

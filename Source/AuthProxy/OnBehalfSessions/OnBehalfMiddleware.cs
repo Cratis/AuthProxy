@@ -48,6 +48,21 @@ public class OnBehalfMiddleware(
             return;
         }
 
+        if (EntersIdentityFlow(context))
+        {
+            // Invitations, registrations and account links act on the signed-in person's own account. Carrying the
+            // represented user into one would accept an invitation, register or link an account as them, so the
+            // session ends and the flow goes on as the actor.
+            if (context.Request.Cookies.ContainsKey(Cookies.OnBehalf))
+            {
+                await sessions.End(context, OnBehalfSessionEndReason.IdentityFlowStarted);
+                context.Response.Headers[Headers.OnBehalfEnded] = OnBehalfSessionEndReason.IdentityFlowStarted.ToWireValue();
+            }
+
+            await next(context);
+            return;
+        }
+
         var resolution = await sessions.Resolve(context);
         switch (resolution.Status)
         {
@@ -76,6 +91,18 @@ public class OnBehalfMiddleware(
 
         await next(context);
     }
+
+    /// <summary>
+    /// Determines whether a request is part of an invitation, registration or account-link flow.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns><see langword="true"/> when the request enters or continues one of those flows.</returns>
+    static bool EntersIdentityFlow(HttpContext context) =>
+        context.IsInvitation()
+        || context.IsRegistration()
+        || context.Request.Path.StartsWithSegments(WellKnownPaths.Link)
+        || context.HasPendingInvitation()
+        || context.HasPendingRegistration();
 
     /// <summary>
     /// Determines whether a request stays within the services an on-behalf session may reach.

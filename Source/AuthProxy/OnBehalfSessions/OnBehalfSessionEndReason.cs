@@ -43,4 +43,10 @@ public enum OnBehalfSessionEndReason
     /// The application's identity endpoint refused the represented user in the tenant (<c language="text">represented-identity-denied</c>).
     /// </summary>
     RepresentedIdentityDenied = 6,
+
+    /// <summary>
+    /// The actor's browser entered an invitation, registration or account-link flow, which acts on the signed-in
+    /// person's own account and never on the represented user's (<c language="text">identity-flow-started</c>).
+    /// </summary>
+    IdentityFlowStarted = 7,
 }
