@@ -33,144 +33,44 @@ public class TenantResolver(
     /// <inheritdoc/>
     public bool TryResolve(HttpContext context, out TenantResolutionResult result)
     {
-        var tenantId = string.Empty;
         result = new TenantResolutionResult(string.Empty, Type.None);
         context.Items.Remove(TenancyMiddleware.TenantVerificationUrlTemplateItemKey);
-        var resolutions = config.CurrentValue.TenantResolutions;
+        var current = config.CurrentValue;
 
-        if (resolutions.Count == 0)
+        if (current.TenantResolutions.Count == 0)
         {
             // No resolution configured – treat as single-tenant with empty tenant ID.
-            result = new TenantResolutionResult(string.Empty, Type.None);
             return true;
         }
 
-        foreach (var resolution in resolutions)
+        foreach (var resolution in current.TenantResolutions)
         {
-            var strategy = strategies.FirstOrDefault(s => s.Type == resolution.Strategy);
-            if (strategy is null)
+            if (TryResolveWith(context, resolution, current, out result))
             {
-                continue;
-            }
-
-            // Claim strategy
-            if (strategy is T.ISourceIdentifierStrategyTyped<T.ClaimOptions> claimStrategy)
-            {
-                var claimOptions = resolution.Options as T.ClaimOptions ?? new T.ClaimOptions();
-
-                if (!claimStrategy.TryResolveSourceIdentifier(context, claimOptions, out var sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
-                    return true;
-                }
-            }
-
-            // Specified strategy
-            else if (strategy is T.ISourceIdentifierStrategyTyped<T.SpecifiedOptions> specifiedStrategy)
-            {
-                var specifiedOptions = resolution.Options as T.SpecifiedOptions ?? new T.SpecifiedOptions();
-
-                if (!specifiedStrategy.TryResolveSourceIdentifier(context, specifiedOptions, out var sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
-                    return true;
-                }
-            }
-
-            // Default strategy
-            else if (strategy is T.ISourceIdentifierStrategyTyped<T.DefaultOptions> defaultStrategy)
-            {
-                var defaultOptions = resolution.Options as T.DefaultOptions ?? new T.DefaultOptions();
-
-                if (!defaultStrategy.TryResolveSourceIdentifier(context, defaultOptions, out var sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
-                    return true;
-                }
-            }
-            else if (strategy is T.ISourceIdentifierStrategyTyped<T.SelectionOptions> selectionStrategy)
-            {
-                var selectionOptions = resolution.Options as T.SelectionOptions ?? new T.SelectionOptions();
-
-                if (!selectionStrategy.TryResolveSourceIdentifier(context, selectionOptions, out var sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
-                    return true;
-                }
-            }
-            else if (strategy is T.ISourceIdentifierStrategyTyped<T.RouteOptions> routeStrategy)
-            {
-                var routeOptions = resolution.Options as T.RouteOptions ?? new T.RouteOptions();
-
-                if (!routeStrategy.TryResolveSourceIdentifier(context, routeOptions, out var sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
-                    return true;
-                }
-            }
-            else if (strategy is T.ISourceIdentifierStrategyTyped<T.SubHostOptions> subHostStrategy)
-            {
-                var subHostOptions = resolution.Options as T.SubHostOptions ?? new T.SubHostOptions();
-
-                if (!subHostStrategy.TryResolveSourceIdentifier(context, subHostOptions, out var sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    if (!string.IsNullOrWhiteSpace(subHostOptions.VerificationUrlTemplate))
-                    {
-                        context.Items[TenancyMiddleware.TenantVerificationUrlTemplateItemKey] = subHostOptions.VerificationUrlTemplate;
-                    }
-
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy, subHostOptions.ParentHost);
-                    return true;
-                }
-            }
-            else if (strategy is T.ISourceIdentifierStrategyTyped<object>)
-            {
-                var sourceIdentifier = context.Request.Host.Host;
-                if (string.IsNullOrEmpty(sourceIdentifier))
-                {
-                    continue;
-                }
-
-                if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, config.CurrentValue))
-                {
-                    result = new TenantResolutionResult(tenantId, resolution.Strategy);
-                    return true;
-                }
+                return true;
             }
         }
 
+        result = new TenantResolutionResult(string.Empty, Type.None);
         logger.NoStrategyResolvedTenant();
         return false;
+    }
+
+    /// <inheritdoc/>
+    public IEnumerable<TenantResolutionResult> ResolveEach(HttpContext context)
+    {
+        context.Items.Remove(TenancyMiddleware.TenantVerificationUrlTemplateItemKey);
+        var current = config.CurrentValue;
+        var results = new List<TenantResolutionResult>();
+        foreach (var resolution in current.TenantResolutions)
+        {
+            if (TryResolveWith(context, resolution, current, out var result))
+            {
+                results.Add(result);
+            }
+        }
+
+        return results;
     }
 
     private static bool HandleResolvedSourceIdentifier(
@@ -200,6 +100,134 @@ public class TenantResolver(
                      || tenantConfig.SourceIdentifiers.Contains(sourceIdentifier, StringComparer.OrdinalIgnoreCase))
             {
                 tenantId = id;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool TryResolveWith(HttpContext context, C.TenantResolution resolution, C.AuthProxy current, out TenantResolutionResult result)
+    {
+        result = new TenantResolutionResult(string.Empty, Type.None);
+        string tenantId;
+        var strategy = strategies.FirstOrDefault(s => s.Type == resolution.Strategy);
+        if (strategy is null)
+        {
+            return false;
+        }
+
+        // Claim strategy
+        if (strategy is T.ISourceIdentifierStrategyTyped<T.ClaimOptions> claimStrategy)
+        {
+            var claimOptions = resolution.Options as T.ClaimOptions ?? new T.ClaimOptions();
+
+            if (!claimStrategy.TryResolveSourceIdentifier(context, claimOptions, out var sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                result = new TenantResolutionResult(tenantId, resolution.Strategy);
+                return true;
+            }
+        }
+
+        // Specified strategy
+        else if (strategy is T.ISourceIdentifierStrategyTyped<T.SpecifiedOptions> specifiedStrategy)
+        {
+            var specifiedOptions = resolution.Options as T.SpecifiedOptions ?? new T.SpecifiedOptions();
+
+            if (!specifiedStrategy.TryResolveSourceIdentifier(context, specifiedOptions, out var sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                result = new TenantResolutionResult(tenantId, resolution.Strategy);
+                return true;
+            }
+        }
+
+        // Default strategy
+        else if (strategy is T.ISourceIdentifierStrategyTyped<T.DefaultOptions> defaultStrategy)
+        {
+            var defaultOptions = resolution.Options as T.DefaultOptions ?? new T.DefaultOptions();
+
+            if (!defaultStrategy.TryResolveSourceIdentifier(context, defaultOptions, out var sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                result = new TenantResolutionResult(tenantId, resolution.Strategy);
+                return true;
+            }
+        }
+        else if (strategy is T.ISourceIdentifierStrategyTyped<T.SelectionOptions> selectionStrategy)
+        {
+            var selectionOptions = resolution.Options as T.SelectionOptions ?? new T.SelectionOptions();
+
+            if (!selectionStrategy.TryResolveSourceIdentifier(context, selectionOptions, out var sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                result = new TenantResolutionResult(tenantId, resolution.Strategy);
+                return true;
+            }
+        }
+        else if (strategy is T.ISourceIdentifierStrategyTyped<T.RouteOptions> routeStrategy)
+        {
+            var routeOptions = resolution.Options as T.RouteOptions ?? new T.RouteOptions();
+
+            if (!routeStrategy.TryResolveSourceIdentifier(context, routeOptions, out var sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                result = new TenantResolutionResult(tenantId, resolution.Strategy);
+                return true;
+            }
+        }
+        else if (strategy is T.ISourceIdentifierStrategyTyped<T.SubHostOptions> subHostStrategy)
+        {
+            var subHostOptions = resolution.Options as T.SubHostOptions ?? new T.SubHostOptions();
+
+            if (!subHostStrategy.TryResolveSourceIdentifier(context, subHostOptions, out var sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                if (!string.IsNullOrWhiteSpace(subHostOptions.VerificationUrlTemplate))
+                {
+                    context.Items[TenancyMiddleware.TenantVerificationUrlTemplateItemKey] = subHostOptions.VerificationUrlTemplate;
+                }
+
+                result = new TenantResolutionResult(tenantId, resolution.Strategy, subHostOptions.ParentHost);
+                return true;
+            }
+        }
+        else if (strategy is T.ISourceIdentifierStrategyTyped<object>)
+        {
+            var sourceIdentifier = context.Request.Host.Host;
+            if (string.IsNullOrEmpty(sourceIdentifier))
+            {
+                return false;
+            }
+
+            if (HandleResolvedSourceIdentifier(resolution.Strategy, sourceIdentifier, out tenantId, current))
+            {
+                result = new TenantResolutionResult(tenantId, resolution.Strategy);
                 return true;
             }
         }

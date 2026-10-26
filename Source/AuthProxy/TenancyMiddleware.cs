@@ -158,13 +158,17 @@ public class TenancyMiddleware(
     /// A tenant taken from the request's address or fixed by the deployment is a statement about where the request
     /// goes, and an on-behalf session must not be carried there. A tenant taken from the actor's own claims or
     /// selection, or a fallback default, is only a statement about the actor, and the session's tenant replaces it.
+    /// <para>
+    /// Every resolution is evaluated on its own, whatever order the deployment lists them in: a claim resolution listed
+    /// first resolves for the actor and would otherwise hide a host or route addressing another tenant.
+    /// </para>
     /// </remarks>
     bool AddressesAnotherTenant(HttpContext context, string sessionTenant) =>
-        tenantResolver.TryResolve(context, out TenantResolutionResult resolution)
-        && resolution.Strategy is C.TenantSourceIdentifierResolverType.Host
-            or C.TenantSourceIdentifierResolverType.SubHost
-            or C.TenantSourceIdentifierResolverType.Route
-            or C.TenantSourceIdentifierResolverType.Specified
-        && !string.IsNullOrWhiteSpace(resolution.TenantId)
-        && !string.Equals(resolution.TenantId, sessionTenant, StringComparison.OrdinalIgnoreCase);
+        tenantResolver.ResolveEach(context).Any(resolution =>
+            resolution.Strategy is C.TenantSourceIdentifierResolverType.Host
+                or C.TenantSourceIdentifierResolverType.SubHost
+                or C.TenantSourceIdentifierResolverType.Route
+                or C.TenantSourceIdentifierResolverType.Specified
+            && !string.IsNullOrWhiteSpace(resolution.TenantId)
+            && !string.Equals(resolution.TenantId, sessionTenant, StringComparison.OrdinalIgnoreCase));
 }

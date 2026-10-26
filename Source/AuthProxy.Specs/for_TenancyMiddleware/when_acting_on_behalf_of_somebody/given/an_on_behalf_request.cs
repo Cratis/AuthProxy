@@ -45,11 +45,16 @@ public class an_on_behalf_request : Specification
             "assertion"));
     }
 
-    protected void Resolves(string tenant, C.TenantSourceIdentifierResolverType strategy) =>
+    protected void Resolves(params TenantResolutionResult[] results)
+    {
+        _tenantResolver.ResolveEach(Arg.Any<HttpContext>()).Returns(results);
         _tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>())
             .Returns(call =>
             {
-                call[1] = new TenantResolutionResult(tenant, strategy);
-                return true;
+                call[1] = results.FirstOrDefault() ?? new TenantResolutionResult(string.Empty, C.TenantSourceIdentifierResolverType.None);
+                return results.Length > 0;
             });
+    }
+
+    protected void Resolves(string tenant, C.TenantSourceIdentifierResolverType strategy) => Resolves(new TenantResolutionResult(tenant, strategy));
 }
