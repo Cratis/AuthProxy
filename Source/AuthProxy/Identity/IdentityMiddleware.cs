@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -103,7 +104,14 @@ public class IdentityMiddleware(
 
     async Task Refuse(HttpContext context, C.AuthProxy config)
     {
-        if (config.Session.TerminateOnIdentityDenial)
+        // During an on-behalf session the identity refused is the represented user's, not the actor's. The on-behalf
+        // session ends; the actor's own session is not theirs to lose over it.
+        if (context.TryGetOnBehalf(out _))
+        {
+            await OnBehalfSessionTermination.End(context, OnBehalfSessionEndReason.RepresentedIdentityDenied);
+            context.Response.Headers[Headers.OnBehalfEnded] = OnBehalfSessionEndReason.RepresentedIdentityDenied.ToWireValue();
+        }
+        else if (config.Session.TerminateOnIdentityDenial)
         {
             await SessionTermination.SignOutAndClearCookies(context, config.Session, config.Logout);
         }

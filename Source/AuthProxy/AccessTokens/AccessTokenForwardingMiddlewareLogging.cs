@@ -7,4 +7,7 @@ internal static partial class AccessTokenForwardingMiddlewareLogging
 {
     [LoggerMessage(LogLevel.Warning, "No access token could be obtained for the signed-in user for service {Service} ({Reason}); the request is refused with 401")]
     internal static partial void AccessTokenUnavailable(this ILogger logger, string service, UserAccessTokenFailure reason);
+
+    [LoggerMessage(LogLevel.Warning, "Service {Service} requires a user access token, which is never forwarded during an on-behalf session; the request is refused with 403")]
+    internal static partial void AccessTokenNotForwardedOnBehalf(this ILogger logger, string service);
 }

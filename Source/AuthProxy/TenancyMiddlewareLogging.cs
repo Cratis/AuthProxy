@@ -13,4 +13,7 @@ internal static partial class TenancyMiddlewareLogging
 
     [LoggerMessage(LogLevel.Warning, "Resolved tenant '{TenantId}' does not exist for route {Route}. Returning tenant-not-found page.")]
     internal static partial void TenantDoesNotExist(this ILogger logger, string tenantId, string route);
+
+    [LoggerMessage(LogLevel.Warning, "Request {Path} addresses a tenant other than its on-behalf session's. Returning forbidden page.")]
+    internal static partial void OnBehalfTenantConflict(this ILogger logger, string path);
 }

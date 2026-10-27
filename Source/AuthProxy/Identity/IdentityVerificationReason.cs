@@ -68,5 +68,10 @@ public enum IdentityVerificationReason
     /// <summary>
     /// The service's answer could not be read or parsed as JSON.
     /// </summary>
-    UnreadableResponse = 10
+    UnreadableResponse = 10,
+
+    /// <summary>
+    /// The call was to be made during an on-behalf session and its assertion could not be issued, so it was not made.
+    /// </summary>
+    OnBehalfAssertionUnavailable = 11
 }

@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -84,7 +85,13 @@ public class IdentityDetailsResolver(
         var verificationRequired = requiredServices.Length > 0;
         var mayReuseRecord = !hasPendingInvite
             && (!verificationRequired || session.IdentityRevalidationInterval > TimeSpan.Zero);
-        var mayReuseResult = !hasPendingInvite && session.IdentityResultCacheDuration > TimeSpan.Zero;
+
+        // An on-behalf session neither reuses nor leaves behind a remembered result: one remembered from the user's own
+        // sign-in would skip asking the application with the actor named, and one remembered from the session would
+        // later stand in for the user's own sign-in. The services asked during a session are also only those the
+        // session may reach, so a result from it never stands for the full set.
+        var onBehalf = context.TryGetOnBehalf(out var active) ? active : null;
+        var mayReuseResult = !hasPendingInvite && onBehalf is null && session.IdentityResultCacheDuration > TimeSpan.Zero;
 
         // Skipping the identity endpoints means skipping the authorization answer they carry, so what
         // permits the skip has to be something the caller could not have written. The readable
@@ -166,7 +173,7 @@ public class IdentityDetailsResolver(
             var mergedDetails = new JsonObject();
             var verifiedRequiredServices = new List<string>();
 
-            foreach (var (name, service) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution))
+            foreach (var (name, service) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && (onBehalf is null || current.OnBehalf?.Permits(_.Key) == true)))
             {
                 logger.CallingIdentityEndpointWithPrincipal(name, logIdentifier);
                 var mode = service.IdentityVerification;
@@ -179,7 +186,8 @@ public class IdentityDetailsResolver(
                     logIdentifier,
                     service.EffectiveIdentityVerificationTimeout,
                     context.RequestAborted,
-                    denialWillBeLogged: mode == C.IdentityVerificationMode.Required);
+                    denialWillBeLogged: mode == C.IdentityVerificationMode.Required,
+                    onBehalf: onBehalf);
 
                 if (!Admits(outcome, mode))
                 {
@@ -200,7 +208,7 @@ public class IdentityDetailsResolver(
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
             WriteIdentityState(context, identityResult, principal, tenantId, verifiedRequiredServices);
             logger.IdentityDetailsCookieWritten(logIdentifier);
-            if (cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero
+            if (onBehalf is null && cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero
                 && verifiedRequiredServices.Order(StringComparer.Ordinal).SequenceEqual(requiredServices, StringComparer.Ordinal))
             {
                 memoryCache.Set(cacheKey, identityResult, session.IdentityResultCacheDuration);

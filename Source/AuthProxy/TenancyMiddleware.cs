@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -53,8 +54,21 @@ public class TenancyMiddleware(
         context.Request.Headers.Remove(Headers.TokenClientId);
         context.Request.Headers.Remove(Headers.TokenScope);
 
-        // 2. Resolve tenant.
-        if (!tenantResolver.TryResolve(context, out string tenantId))
+        // 2. Resolve tenant. An on-behalf session acts in the tenant its grant was confirmed for, whatever the actor's
+        // own claims or selection say — but never in a tenant the request itself addresses differently.
+        string tenantId;
+        if (context.TryGetOnBehalf(out var onBehalf))
+        {
+            if (AddressesAnotherTenant(context, onBehalf.Session.Tenant))
+            {
+                logger.OnBehalfTenantConflict(RequestPathRedaction.Redact(context.Request.Path));
+                await errorPageProvider.WriteErrorPageAsync(context, WellKnownPageNames.Forbidden, StatusCodes.Status403Forbidden);
+                return;
+            }
+
+            tenantId = onBehalf.Session.Tenant;
+        }
+        else if (!tenantResolver.TryResolve(context, out tenantId))
         {
             // If a lobby is configured, redirect users without a resolved tenant to the lobby
             // frontend – unless this is an invite path (handled by InviteMiddleware) or the
@@ -133,4 +147,28 @@ public class TenancyMiddleware(
 
         await next(context);
     }
+
+    /// <summary>
+    /// Determines whether the request addresses a tenant other than the on-behalf session's.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="sessionTenant">The tenant the on-behalf session acts in.</param>
+    /// <returns><see langword="true"/> when the request names another tenant through its host, route or the deployment's fixed tenant.</returns>
+    /// <remarks>
+    /// A tenant taken from the request's address or fixed by the deployment is a statement about where the request
+    /// goes, and an on-behalf session must not be carried there. A tenant taken from the actor's own claims or
+    /// selection, or a fallback default, is only a statement about the actor, and the session's tenant replaces it.
+    /// <para>
+    /// Every resolution is evaluated on its own, whatever order the deployment lists them in: a claim resolution listed
+    /// first resolves for the actor and would otherwise hide a host or route addressing another tenant.
+    /// </para>
+    /// </remarks>
+    bool AddressesAnotherTenant(HttpContext context, string sessionTenant) =>
+        tenantResolver.ResolveEach(context).Any(resolution =>
+            resolution.Strategy is C.TenantSourceIdentifierResolverType.Host
+                or C.TenantSourceIdentifierResolverType.SubHost
+                or C.TenantSourceIdentifierResolverType.Route
+                or C.TenantSourceIdentifierResolverType.Specified
+            && !string.IsNullOrWhiteSpace(resolution.TenantId)
+            && !string.Equals(resolution.TenantId, sessionTenant, StringComparison.OrdinalIgnoreCase));
 }

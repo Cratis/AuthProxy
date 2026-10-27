@@ -35,5 +35,7 @@ public class when_creating_challenge_properties_for_subhost_tenant : Specificati
             result = resolvedResult;
             return true;
         }
+
+        public IEnumerable<TenantResolutionResult> ResolveEach(HttpContext context) => [resolvedResult];
     }
 }
