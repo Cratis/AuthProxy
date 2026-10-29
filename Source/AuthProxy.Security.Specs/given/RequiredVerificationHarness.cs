@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
@@ -67,6 +68,7 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
 
     readonly string _pagesPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
     readonly bool _terminateOnIdentityDenial;
+    readonly bool _secondProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RequiredVerificationHarness"/> class.
@@ -79,9 +81,19 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
     /// Initializes a new instance of the <see cref="RequiredVerificationHarness"/> class.
     /// </summary>
     /// <param name="terminateOnIdentityDenial">Whether denial terminates the local session.</param>
-    internal RequiredVerificationHarness(bool terminateOnIdentityDenial)
+    internal RequiredVerificationHarness(bool terminateOnIdentityDenial) : this(terminateOnIdentityDenial, false)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RequiredVerificationHarness"/> class.
+    /// </summary>
+    /// <param name="terminateOnIdentityDenial">Whether denial terminates the local session.</param>
+    /// <param name="secondProvider">Whether a second sign-in provider is configured.</param>
+    internal RequiredVerificationHarness(bool terminateOnIdentityDenial, bool secondProvider)
     {
         _terminateOnIdentityDenial = terminateOnIdentityDenial;
+        _secondProvider = secondProvider;
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.SelectProvider), "<html><body>Select Provider</body></html>");
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.Forbidden), $"<html><body>{ForbiddenMarker}</body></html>");
@@ -148,11 +160,15 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
     /// Whether to present a pending-registration cookie so the tenant-less request reaches identity
     /// verification.
     /// </param>
+    /// <param name="sessionProvider">The provider scheme the session records, or <see langword="null"/> for a session that records none.</param>
+    /// <param name="markSessionProvider">Whether the session properties carry the marker AuthProxy records beside the provider claim.</param>
     /// <returns>The request and the authentication-cookie chunk names it carries.</returns>
     public SessionRequest AuthenticatedRequest(
         string path,
         bool includeTenant = true,
-        bool passTenancyWithoutTenant = false)
+        bool passTenancyWithoutTenant = false,
+        string? sessionProvider = null,
+        bool markSessionProvider = true)
     {
         var options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
             .Get(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -171,10 +187,22 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
             claims.Add(new Claim(TenantClaim, TenantSourceIdentifier));
         }
 
+        if (sessionProvider is not null)
+        {
+            claims.Add(new Claim(SessionClaims.ProviderScheme, sessionProvider));
+        }
+
         var principal = new ClaimsPrincipal(
             new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+        var properties = new AuthenticationProperties();
+        if (sessionProvider is not null && markSessionProvider)
+        {
+            properties.Items["Cratis.AuthProxy.SessionProvider"] = sessionProvider;
+        }
+
         var ticket = new AuthenticationTicket(
             principal,
+            properties,
             CookieAuthenticationDefaults.AuthenticationScheme);
         var protectedTicket = options.TicketDataFormat.Protect(ticket);
         var cookieContext = new DefaultHttpContext();
@@ -244,27 +272,40 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
     {
         builder
             .UseEnvironment("Production")
-            .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"{C.AuthProxy.SectionKey}:Services:app:Backend:BaseUrl"] = Origin.BaseUrl,
-                [$"{C.AuthProxy.SectionKey}:Services:app:Frontend:BaseUrl"] = Origin.BaseUrl,
-                [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerification"] = nameof(C.IdentityVerificationMode.Required),
-                [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerificationTimeout"] = "00:00:05",
-                [$"{C.AuthProxy.SectionKey}:Services:app:AnonymousPaths:0"] = AnonymousPath,
+            .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(Configuration()));
+    }
 
-                [$"{C.AuthProxy.SectionKey}:Session:IdentityResultCacheDuration"] = "00:00:00",
-                [$"{C.AuthProxy.SectionKey}:Session:TerminateOnIdentityDenial"] = _terminateOnIdentityDenial.ToString(),
-                [$"{C.AuthProxy.SectionKey}:Logout:AdditionalCookies:0:Name"] = AdditionalSessionCookie,
+    Dictionary<string, string?> Configuration()
+    {
+        var configuration = new Dictionary<string, string?>
+        {
+            [$"{C.AuthProxy.SectionKey}:Services:app:Backend:BaseUrl"] = Origin.BaseUrl,
+            [$"{C.AuthProxy.SectionKey}:Services:app:Frontend:BaseUrl"] = Origin.BaseUrl,
+            [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerification"] = nameof(C.IdentityVerificationMode.Required),
+            [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerificationTimeout"] = "00:00:05",
+            [$"{C.AuthProxy.SectionKey}:Services:app:AnonymousPaths:0"] = AnonymousPath,
 
-                [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
+            [$"{C.AuthProxy.SectionKey}:Session:IdentityResultCacheDuration"] = "00:00:00",
+            [$"{C.AuthProxy.SectionKey}:Session:TerminateOnIdentityDenial"] = _terminateOnIdentityDenial.ToString(),
+            [$"{C.AuthProxy.SectionKey}:Logout:AdditionalCookies:0:Name"] = AdditionalSessionCookie,
 
-                [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Strategy"] = nameof(C.TenantSourceIdentifierResolverType.Claim),
-                [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Options:ClaimType"] = TenantClaim,
-                [$"{C.AuthProxy.SectionKey}:Tenants:{TenantId}:SourceIdentifiers:0"] = TenantSourceIdentifier,
+            [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
 
-                [$"{C.Authentication.SectionKey}:OidcProviders:0:Name"] = "Provider One",
-                [$"{C.Authentication.SectionKey}:OidcProviders:0:Authority"] = "https://login.example.test/one",
-                [$"{C.Authentication.SectionKey}:OidcProviders:0:ClientId"] = "client-one",
-            }));
+            [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Strategy"] = nameof(C.TenantSourceIdentifierResolverType.Claim),
+            [$"{C.AuthProxy.SectionKey}:TenantResolutions:0:Options:ClaimType"] = TenantClaim,
+            [$"{C.AuthProxy.SectionKey}:Tenants:{TenantId}:SourceIdentifiers:0"] = TenantSourceIdentifier,
+
+            [$"{C.Authentication.SectionKey}:OidcProviders:0:Name"] = "Provider One",
+            [$"{C.Authentication.SectionKey}:OidcProviders:0:Authority"] = "https://login.example.test/one",
+            [$"{C.Authentication.SectionKey}:OidcProviders:0:ClientId"] = "client-one",
+        };
+        if (_secondProvider)
+        {
+            configuration[$"{C.Authentication.SectionKey}:OidcProviders:1:Name"] = "Provider Two";
+            configuration[$"{C.Authentication.SectionKey}:OidcProviders:1:Authority"] = "https://login.example.test/two";
+            configuration[$"{C.Authentication.SectionKey}:OidcProviders:1:ClientId"] = "client-two";
+        }
+
+        return configuration;
     }
 }

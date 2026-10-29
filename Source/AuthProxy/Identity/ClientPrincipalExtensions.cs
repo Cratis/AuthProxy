@@ -6,6 +6,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -97,9 +98,10 @@ public static class ClientPrincipalExtensions
             .Distinct();
 
         // The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
-        // get to say that, so its claims in that namespace are never forwarded.
+        // get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
+        // own record of how the session was signed in and stays inside the proxy.
         var claims = user.Claims
-            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !BearerRouteClaims.IsReserved(c.Type))
+            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !IsReservedSessionMetadata(c.Type))
             .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
 
         return new ClientPrincipal
@@ -109,6 +111,7 @@ public static class ClientPrincipalExtensions
             UserDetails = userDetails,
             UserRoles = roles,
             Claims = claims,
+            AccountProvider = GetAccountProvider(user, context, authenticationScheme, isCanonical),
         };
     }
 
@@ -163,6 +166,20 @@ public static class ClientPrincipalExtensions
         {
             requestMessage.Headers.Add(Headers.PrincipalNameExtended, userDetails);
         }
+    }
+
+    static bool IsReservedSessionMetadata(string claimType) =>
+        BearerRouteClaims.IsReserved(claimType) || SessionClaims.IsReserved(claimType);
+
+    // Only a browser session records the provider that names its account; every other principal binds by its identity provider.
+    static string? GetAccountProvider(ClaimsPrincipal user, HttpContext context, string? authenticationScheme, bool isCanonical)
+    {
+        if (isCanonical || !string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return SessionProvider.TryRead(user, context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties, out var sessionScheme) ? sessionScheme : string.Empty;
     }
 
     static bool IsRoleClaim(string claimType, bool isCanonical) =>

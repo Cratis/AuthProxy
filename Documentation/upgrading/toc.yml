@@ -6,3 +6,5 @@
   href: tenant-and-service-headers.md
 - name: Selected tenant and upstream headers
   href: selected-tenant-and-upstream-headers.md
+- name: Sessions record the sign-in provider
+  href: sessions-record-the-sign-in-provider.md

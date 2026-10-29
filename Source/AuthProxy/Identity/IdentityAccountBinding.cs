@@ -113,15 +113,18 @@ internal sealed record IdentityAccountBinding
             }
 
             // The same user identifier may be issued by more than one identity provider, so the provider is
-            // part of the binding. Without one, the identifier only names an account when a single provider exists.
-            var hasProvider = !string.IsNullOrWhiteSpace(principal.IdentityProvider);
+            // part of the binding. A browser session names it by the scheme it signed in with, because the identity
+            // provider of an OIDC session is the same for every scheme. Without one, the identifier only names an
+            // account when a single provider exists.
+            var provider = principal.AccountProvider ?? principal.IdentityProvider;
+            var hasProvider = !string.IsNullOrWhiteSpace(provider);
             if (!hasProvider && configuredProviderCount > 1)
             {
                 binding = null!;
                 return false;
             }
 
-            binding = new(LegacyKind, hasProvider ? principal.IdentityProvider : string.Empty, string.Empty, principal.UserId);
+            binding = new(LegacyKind, hasProvider ? provider : string.Empty, string.Empty, principal.UserId);
             return true;
         }
 
