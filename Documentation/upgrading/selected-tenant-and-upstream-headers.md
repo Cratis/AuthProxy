@@ -51,6 +51,7 @@ selected tenant, including anonymous, invitation and registration paths.
 - `TenantRevalidationInterval` set to `0` now means the signed selection is trusted until it changes.
 - Deployments with more than one replica need a shared Data Protection key ring for the signed cookie, as they
   already do for sessions.
+- Users whose principal names no identity provider must sign in again when more than one provider is configured, because a user identifier alone does not name one account.
 - There is no setting to keep the previous behavior of forwarding a tenant that was not confirmed.
 
 ## Tenant identifiers

@@ -4,6 +4,8 @@
 using System.Security.Cryptography;
 using Cratis.AuthProxy.Identity;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
 
@@ -13,11 +15,12 @@ namespace Cratis.AuthProxy.Tenancy;
 /// account that selected it.
 /// </summary>
 /// <param name="dataProtectionProvider">The data-protection provider.</param>
+/// <param name="config">The auth proxy configuration, used to tell whether more than one identity provider is configured.</param>
 /// <remarks>
 /// Values written by earlier versions hold a plain tenant identifier. They are reported as
 /// <see cref="SelectedTenantCookieState.Legacy"/> so the caller can confirm them and write a protected value.
 /// </remarks>
-public sealed class SelectedTenantCookie(IDataProtectionProvider dataProtectionProvider)
+public sealed class SelectedTenantCookie(IDataProtectionProvider dataProtectionProvider, IOptionsMonitor<C.AuthProxy>? config = null)
 {
     /// <summary>
     /// The data-protection purpose the cookie is sealed under.
@@ -106,10 +109,10 @@ public sealed class SelectedTenantCookie(IDataProtectionProvider dataProtectionP
         }
     }
 
-    static bool TryGetAccount(HttpContext context, out IdentityAccountBinding account)
+    bool TryGetAccount(HttpContext context, out IdentityAccountBinding account)
     {
         account = null!;
         var principal = context.BuildClientPrincipal();
-        return principal is not null && IdentityAccountBinding.TryCreate(principal, out account);
+        return principal is not null && IdentityAccountBinding.TryCreate(principal, config?.CurrentValue.Authentication.TotalProviderCount ?? 1, out account);
     }
 }

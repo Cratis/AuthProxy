@@ -6,9 +6,9 @@ using Cratis.AuthProxy.Identity.for_IdentityAuthorizationCache.given;
 namespace Cratis.AuthProxy.Identity.for_IdentityAuthorizationCache;
 
 /// <summary>
-/// Specifies the released tenant and user identifier reuse behavior for legacy principals.
+/// Specifies that a legacy authorization recorded for one identity provider is not reused for the same user identifier from another provider.
 /// </summary>
-public class when_reusing_a_legacy_authorization : a_recorded_canonical_authorization
+public class when_reusing_a_legacy_authorization_from_another_provider : a_recorded_canonical_authorization
 {
     bool _result;
 
@@ -20,5 +20,5 @@ public class when_reusing_a_legacy_authorization : a_recorded_canonical_authoriz
         _result = _cache.IsAuthorized(context, presented, TenantId);
     }
 
-    [Fact] void should_be_authorized() => _result.ShouldBeTrue();
+    [Fact] void should_not_be_authorized() => _result.ShouldBeFalse();
 }

@@ -89,7 +89,7 @@ public class IdentityAuthorizationCache(
     /// <inheritdoc/>
     public void Record(HttpContext context, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices)
     {
-        if (!IdentityAccountBinding.TryCreate(principal, out var account))
+        if (!IdentityAccountBinding.TryCreate(principal, config.CurrentValue.Authentication.TotalProviderCount, out var account))
         {
             return;
         }
@@ -123,7 +123,7 @@ public class IdentityAuthorizationCache(
     /// <inheritdoc/>
     public bool IsAuthorized(HttpContext context, ClientPrincipal principal, string tenantId)
     {
-        if (!IdentityAccountBinding.TryCreate(principal, out var account))
+        if (!IdentityAccountBinding.TryCreate(principal, config.CurrentValue.Authentication.TotalProviderCount, out var account))
         {
             return false;
         }

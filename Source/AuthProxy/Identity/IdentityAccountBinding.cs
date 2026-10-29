@@ -23,7 +23,7 @@ internal sealed record IdentityAccountBinding
     /// Initializes a structured account binding.
     /// </summary>
     /// <param name="kind">The versioned binding kind.</param>
-    /// <param name="providerKey">The canonical provider key, or an empty value for legacy.</param>
+    /// <param name="providerKey">The canonical provider key, or the legacy principal's identity provider.</param>
     /// <param name="issuer">The canonical issuer, or an empty value for legacy.</param>
     /// <param name="subject">The canonical subject or legacy user identifier.</param>
     public IdentityAccountBinding(string kind, string providerKey, string issuer, string subject)
@@ -77,7 +77,19 @@ internal sealed record IdentityAccountBinding
     /// <param name="principal">The client principal to validate.</param>
     /// <param name="binding">The validated account binding when successful.</param>
     /// <returns><see langword="true"/> when the principal is legacy without reserved claims and carries a non-blank, trimmed user identifier, or carries one valid canonical tuple; otherwise <see langword="false"/>.</returns>
-    public static bool TryCreate(ClientPrincipal principal, out IdentityAccountBinding binding)
+    public static bool TryCreate(ClientPrincipal principal, out IdentityAccountBinding binding) => TryCreate(principal, 1, out binding);
+
+    /// <summary>
+    /// Attempts to create a reusable account binding from a client principal, given the number of configured identity providers.
+    /// </summary>
+    /// <param name="principal">The client principal to validate.</param>
+    /// <param name="configuredProviderCount">The number of identity providers configured for sign-in.</param>
+    /// <param name="binding">The validated account binding when successful.</param>
+    /// <returns>
+    /// <see langword="true"/> when a reusable binding was created. A legacy principal without an identity provider has no
+    /// reusable binding when more than one provider is configured, because its user identifier alone does not name one account.
+    /// </returns>
+    public static bool TryCreate(ClientPrincipal principal, int configuredProviderCount, out IdentityAccountBinding binding)
     {
         var reservedClaims = principal.Claims
             .Where(claim => claim.Type.StartsWith(ReservedClaimPrefix, StringComparison.OrdinalIgnoreCase))
@@ -100,7 +112,16 @@ internal sealed record IdentityAccountBinding
                 return false;
             }
 
-            binding = new(LegacyKind, string.Empty, string.Empty, principal.UserId);
+            // The same user identifier may be issued by more than one identity provider, so the provider is
+            // part of the binding. Without one, the identifier only names an account when a single provider exists.
+            var hasProvider = !string.IsNullOrWhiteSpace(principal.IdentityProvider);
+            if (!hasProvider && configuredProviderCount > 1)
+            {
+                binding = null!;
+                return false;
+            }
+
+            binding = new(LegacyKind, hasProvider ? principal.IdentityProvider : string.Empty, string.Empty, principal.UserId);
             return true;
         }
 

@@ -272,7 +272,7 @@ public class TenantSelectionMiddleware(
 
         var tenantId = cookie.TenantId;
         var principal = context.BuildClientPrincipal();
-        var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), out var account);
+        var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), config.CurrentValue.Authentication.TotalProviderCount, out var account);
         var cached = hasBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, tenantId), out _);
         var legacy = cookie.State == Tenancy.SelectedTenantCookieState.Legacy;
         var interval = config.CurrentValue.Session.TenantRevalidationInterval;
@@ -362,7 +362,7 @@ public class TenantSelectionMiddleware(
         }
 
         var principal = context.BuildClientPrincipal();
-        if (principal is null || !IdentityAccountBinding.TryCreate(principal, out var account))
+        if (principal is null || !IdentityAccountBinding.TryCreate(principal, config.CurrentValue.Authentication.TotalProviderCount, out var account))
         {
             return;
         }
