@@ -6,6 +6,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -90,6 +91,13 @@ public static class ClientPrincipalExtensions
             ?? string.Empty;
 
         var isCanonical = canonicalResolution?.IsConfigured == true && canonicalResolution.Succeeded;
+        var isCookieSession = string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal);
+        string? accountProvider = null;
+        if (isCookieSession && !isCanonical)
+        {
+            accountProvider = SessionProvider.TryRead(user, out var sessionScheme) ? sessionScheme : string.Empty;
+        }
+
         var roles = user.Claims
             .Where(claim => IsRoleClaim(claim.Type, isCanonical))
             .Select(c => c.Value)
@@ -97,9 +105,10 @@ public static class ClientPrincipalExtensions
             .Distinct();
 
         // The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
-        // get to say that, so its claims in that namespace are never forwarded.
+        // get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
+        // own record of how the session was signed in and stays inside the proxy.
         var claims = user.Claims
-            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !BearerRouteClaims.IsReserved(c.Type))
+            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !BearerRouteClaims.IsReserved(c.Type) && !SessionClaims.IsReserved(c.Type))
             .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
 
         return new ClientPrincipal
@@ -109,6 +118,7 @@ public static class ClientPrincipalExtensions
             UserDetails = userDetails,
             UserRoles = roles,
             Claims = claims,
+            AccountProvider = accountProvider,
         };
     }
 

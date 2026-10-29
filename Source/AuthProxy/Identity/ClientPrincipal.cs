@@ -45,6 +45,15 @@ public class ClientPrincipal
     public IEnumerable<ClientPrincipalClaim> Claims { get; set; } = [];
 
     /// <summary>
+    /// Gets the provider that names this principal's account when it was built from a browser session. Never
+    /// serialized, so neither an upstream nor a token can set it: <see langword="null"/> when the principal was not
+    /// built from a browser session (bind by <see cref="IdentityProvider"/>), empty when the session records no
+    /// provider, otherwise the recorded sign-in scheme.
+    /// </summary>
+    [JsonIgnore]
+    internal string? AccountProvider { get; init; }
+
+    /// <summary>
     /// Attempts to deserialize a <see cref="ClientPrincipal"/> from a base64-encoded header value.
     /// </summary>
     /// <param name="base64">The base64-encoded JSON string to deserialize.</param>

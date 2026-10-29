@@ -169,6 +169,11 @@ public static class AuthenticationServiceCollectionExtensions
                 await ValidateCanonicalSession(context);
             }
 
+            if (context.Principal is not null)
+            {
+                await SessionProvider.Validate(context);
+            }
+
             await UserTokenSessions.RenewRetention(context);
         };
 
@@ -598,6 +603,9 @@ public static class AuthenticationServiceCollectionExtensions
         // into the auth cookie by the RemoteAuthenticationHandler that signs the ticket in), and notify the
         // application of the sign-in — scoped here to the logged-out to signed-in transition rather than every
         // proxied request. The notification never throws, so a notification failure can never break the sign-in.
+        // The same scheme is also recorded as a claim on the session itself, so an account from a provider without
+        // canonical identity is named by the provider it signed in with.
+        SessionProvider.Stamp(context.Principal!, context.Scheme.Name);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);

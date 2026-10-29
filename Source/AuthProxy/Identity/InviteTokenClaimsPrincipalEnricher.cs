@@ -77,6 +77,7 @@ public class InviteTokenClaimsPrincipalEnricher(
             UserDetails = principal.UserDetails,
             UserRoles = principal.UserRoles,
             Claims = claims,
+            AccountProvider = principal.AccountProvider,
         };
     }
 }

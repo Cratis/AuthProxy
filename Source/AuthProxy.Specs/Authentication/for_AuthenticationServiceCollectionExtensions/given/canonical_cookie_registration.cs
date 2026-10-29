@@ -45,6 +45,11 @@ public class canonical_cookie_registration : Specification
     protected OpenIdConnectOptions _oidcOptions;
     protected IServiceProvider _services;
 
+    /// <summary>
+    /// The principal of the most recently issued OIDC ticket.
+    /// </summary>
+    protected ClaimsPrincipal? _issuedPrincipal;
+
     void Establish()
     {
         _authentication = InitialAuthentication();
@@ -117,6 +122,7 @@ public class canonical_cookie_registration : Specification
             _oidcOptions,
             new AuthenticationTicket(principal, properties, ProviderScheme));
         await _oidcOptions.Events.OnTicketReceived(ticketContext);
+        _issuedPrincipal = ticketContext.Principal;
         return ticketContext.Properties!;
     }
 
@@ -264,6 +270,17 @@ public class canonical_cookie_registration : Specification
             new Claim(CanonicalIdentityClaims.Subject, Subject)
         ],
         ProviderScheme));
+
+    protected static C.Authentication TwoProviderAuthentication() => new()
+    {
+        OidcProviders = [new C.OidcProvider { Name = "Microsoft", Authority = "https://login.example.com/common/v2.0", ClientId = "registration-client", ClientSecret = ClientSecret }],
+        OAuthProviders = [new C.OAuthProvider { Name = "GitHub", ClientId = "registration-client", ClientSecret = ClientSecret }]
+    };
+
+    protected static ClaimsPrincipal LegacyPrincipal(string? recordedProvider) =>
+        new(new ClaimsIdentity(
+            recordedProvider is null ? [new Claim("sub", Subject)] : [new Claim("sub", Subject), new Claim(SessionClaims.ProviderScheme, recordedProvider)],
+            ProviderScheme));
 
     protected static ClaimsPrincipal LegacyPrincipal() =>
         new(new ClaimsIdentity([new Claim("sub", Subject)], ProviderScheme));
