@@ -48,6 +48,7 @@ public static class ReverseProxyExtensions
             {
                 ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
                 ctx.RequestTransforms.Add(new ProxyOwnedCookiesTransform());
+                ctx.RequestTransforms.Add(new CallerAuthorizationHeaderTransform());
                 PathPrefixTransform.Apply(ctx);
 
                 // Last, so the assertion signs the path the backend receives.

@@ -28,6 +28,12 @@ public class AccessTokenForwardingMiddleware(
     ILogger<AccessTokenForwardingMiddleware> logger)
 {
     /// <summary>
+    /// The <see cref="HttpContext.Items"/> key set to <see langword="true"/> when AuthProxy wrote the
+    /// <c language="text">Authorization</c> header of the request itself.
+    /// </summary>
+    public const string ForwardedItemKey = "Cratis.AuthProxy.AccessTokenForwarded";
+
+    /// <summary>
     /// Handles the request.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
@@ -77,6 +83,7 @@ public class AccessTokenForwardingMiddleware(
         }
 
         context.Request.Headers.Authorization = $"Bearer {result.Token}";
+        context.Items[ForwardedItemKey] = true;
         await next(context);
     }
 
