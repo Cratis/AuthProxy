@@ -24,6 +24,6 @@ public class when_the_selected_tenant_was_confirmed_recently : given.a_tenant_se
     [Fact] void should_continue() => _nextCalled.ShouldBeTrue();
     [Fact] void should_not_call_the_tenant_endpoint_again() => _endpointCalls.ShouldEqual(0);
 
-    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? (string)confirmed : string.Empty;
+    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? confirmed as string ?? string.Empty : string.Empty;
     string SetCookies => _context.Response.Headers.SetCookie.ToString();
 }

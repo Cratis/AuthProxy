@@ -21,6 +21,6 @@ public class when_the_tenant_cookie_value_was_altered : given.a_tenant_selection
     [Fact] void should_delete_the_selected_tenant_cookie() => SetCookies.ShouldContain($"{Cookies.Tenant}=;");
     [Fact] void should_offer_the_tenant_choice() => _errorPageProvider.Received(1).WriteErrorPageAsync(Arg.Any<HttpContext>(), WellKnownPageNames.SelectTenant, StatusCodes.Status200OK);
 
-    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? (string)confirmed : string.Empty;
+    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? confirmed as string ?? string.Empty : string.Empty;
     string SetCookies => _context.Response.Headers.SetCookie.ToString();
 }

@@ -13,11 +13,10 @@ public class a_selected_tenant_cookie : Specification
 
     protected static DefaultHttpContext SignedInAs(string oid)
     {
-        var context = new DefaultHttpContext
+        return new DefaultHttpContext
         {
             User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", oid)], "aad"))
         };
-        return context;
     }
 
     protected static DefaultHttpContext RequestCarrying(DefaultHttpContext responder, string oid)

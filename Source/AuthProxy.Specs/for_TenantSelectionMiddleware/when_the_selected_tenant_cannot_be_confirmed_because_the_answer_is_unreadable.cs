@@ -22,6 +22,6 @@ public class when_the_selected_tenant_cannot_be_confirmed_because_the_answer_is_
     [Fact] void should_not_cache_the_answer() => _context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");
     [Fact] void should_keep_the_selected_tenant_cookie() => SetCookies.ShouldNotContain($"{Cookies.Tenant}=;");
 
-    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? (string)confirmed : string.Empty;
+    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? confirmed as string ?? string.Empty : string.Empty;
     string SetCookies => _context.Response.Headers.SetCookie.ToString();
 }

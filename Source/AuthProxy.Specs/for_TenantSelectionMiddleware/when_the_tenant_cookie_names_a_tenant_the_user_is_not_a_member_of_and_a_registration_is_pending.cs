@@ -21,6 +21,6 @@ public class when_the_tenant_cookie_names_a_tenant_the_user_is_not_a_member_of_a
     [Fact] void should_not_confirm_a_tenant() => Confirmed.ShouldEqual(string.Empty);
     [Fact] void should_delete_the_selected_tenant_cookie() => SetCookies.ShouldContain($"{Cookies.Tenant}=;");
 
-    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? (string)confirmed : string.Empty;
+    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? confirmed as string ?? string.Empty : string.Empty;
     string SetCookies => _context.Response.Headers.SetCookie.ToString();
 }

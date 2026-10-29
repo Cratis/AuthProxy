@@ -21,6 +21,6 @@ public class when_the_tenant_cookie_was_written_by_an_earlier_version_and_the_us
     [Fact] void should_confirm_with_the_tenant_endpoint_once() => _endpointCalls.ShouldEqual(1);
     [Fact] void should_reissue_the_cookie_signed() => given.signed_selected_tenant_cookies.ReadBack(_context).ShouldEqual(new SelectedTenantCookieValue(SelectedTenantCookieState.Bound, "tenant-a"));
 
-    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? (string)confirmed : string.Empty;
+    string Confirmed => _context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var confirmed) ? confirmed as string ?? string.Empty : string.Empty;
     string SetCookies => _context.Response.Headers.SetCookie.ToString();
 }
