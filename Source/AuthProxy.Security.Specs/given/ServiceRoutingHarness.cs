@@ -46,7 +46,9 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     public ServiceRoutingHarness()
     {
         // Protocol specs need a real HTTP upgrade feature, not TestServer's in-memory WebSocket feature.
-        UseKestrel(0);
+        // The port comes from UseUrls in ConfigureWebHost: UseKestrel(port) rewrites the addresses after the minimal-hosting
+        // app may already have started, which races under load and binds localhost:5000.
+        UseKestrel();
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.SelectProvider), "<html><body>Select Provider</body></html>");
 
@@ -151,6 +153,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     {
         // These origins record routing, not identity verdicts. Keep service claim authorization enabled.
         builder
+            .UseUrls("http://127.0.0.1:0")
             .UseEnvironment("Production")
             .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(WithSettings(new Dictionary<string, string?>
             {
