@@ -25,7 +25,7 @@ public class when_building_from_a_legacy_oidc_session_with_a_recorded_provider :
             User = principal
         };
         context.Features.Set<IAuthenticateResultFeature>(new TestAuthenticateResultFeature(
-            AuthenticateResult.Success(new AuthenticationTicket(principal, CookieAuthenticationDefaults.AuthenticationScheme))));
+            AuthenticateResult.Success(new AuthenticationTicket(principal, new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" }), CookieAuthenticationDefaults.AuthenticationScheme))));
         _context = context;
     }
 

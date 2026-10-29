@@ -17,7 +17,7 @@ public class when_validating_a_legacy_cookie_ticket_with_a_recorded_provider_and
     async Task Because()
     {
         UseAuthentication(TwoProviderAuthentication());
-        _result = await Validate(LegacyPrincipal("microsoft"), new AuthenticationProperties());
+        _result = await Validate(LegacyPrincipal("microsoft"), new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" }));
     }
 
     [Fact] void should_accept_the_ticket() => _result.Accepted.ShouldBeTrue();

@@ -605,7 +605,7 @@ public static class AuthenticationServiceCollectionExtensions
         // proxied request. The notification never throws, so a notification failure can never break the sign-in.
         // The same scheme is also recorded as a claim on the session itself, so an account from a provider without
         // canonical identity is named by the provider it signed in with.
-        SessionProvider.Stamp(context.Principal!, context.Scheme.Name);
+        SessionProvider.Stamp(context.Principal!, context.Properties, context.Scheme.Name);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);

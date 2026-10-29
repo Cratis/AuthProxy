@@ -18,7 +18,7 @@ public class when_validating_a_legacy_cookie_ticket_with_a_duplicated_recorded_p
     {
         var principal = LegacyPrincipal("microsoft");
         principal.Identities.First().AddClaim(new Claim(SessionClaims.ProviderScheme, "github"));
-        _result = await Validate(principal, new AuthenticationProperties());
+        _result = await Validate(principal, new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" }));
     }
 
     [Fact] void should_reject_the_ticket() => _result.Accepted.ShouldBeFalse();

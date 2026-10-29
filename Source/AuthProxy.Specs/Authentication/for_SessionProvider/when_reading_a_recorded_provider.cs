@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Authentication;
+
 namespace Cratis.AuthProxy.Authentication.for_SessionProvider;
 
 /// <summary>
@@ -15,8 +17,8 @@ public class when_reading_a_recorded_provider : Specification
     void Because()
     {
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim(SessionClaims.ProviderScheme, "microsoft")], "x"));
-        _result = SessionProvider.TryRead(principal, out _scheme);
-        _state = SessionProvider.Inspect(principal);
+        _result = SessionProvider.TryRead(principal, new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" }), out _scheme);
+        _state = SessionProvider.Inspect(principal, new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" }));
     }
 
     [Fact] void should_read_it() => _result.ShouldBeTrue();

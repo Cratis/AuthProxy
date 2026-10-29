@@ -111,7 +111,7 @@ public static class ClientPrincipalExtensions
             UserDetails = userDetails,
             UserRoles = roles,
             Claims = claims,
-            AccountProvider = GetAccountProvider(user, authenticationScheme, isCanonical),
+            AccountProvider = GetAccountProvider(user, context, authenticationScheme, isCanonical),
         };
     }
 
@@ -172,14 +172,14 @@ public static class ClientPrincipalExtensions
         BearerRouteClaims.IsReserved(claimType) || SessionClaims.IsReserved(claimType);
 
     // Only a browser session records the provider that names its account; every other principal binds by its identity provider.
-    static string? GetAccountProvider(ClaimsPrincipal user, string? authenticationScheme, bool isCanonical)
+    static string? GetAccountProvider(ClaimsPrincipal user, HttpContext context, string? authenticationScheme, bool isCanonical)
     {
         if (isCanonical || !string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal))
         {
             return null;
         }
 
-        return SessionProvider.TryRead(user, out var sessionScheme) ? sessionScheme : string.Empty;
+        return SessionProvider.TryRead(user, context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties, out var sessionScheme) ? sessionScheme : string.Empty;
     }
 
     static bool IsRoleClaim(string claimType, bool isCanonical) =>

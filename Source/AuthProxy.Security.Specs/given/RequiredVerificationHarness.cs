@@ -161,12 +161,14 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
     /// verification.
     /// </param>
     /// <param name="sessionProvider">The provider scheme the session records, or <see langword="null"/> for a session that records none.</param>
+    /// <param name="markSessionProvider">Whether the session properties carry the marker AuthProxy records beside the provider claim.</param>
     /// <returns>The request and the authentication-cookie chunk names it carries.</returns>
     public SessionRequest AuthenticatedRequest(
         string path,
         bool includeTenant = true,
         bool passTenancyWithoutTenant = false,
-        string? sessionProvider = null)
+        string? sessionProvider = null,
+        bool markSessionProvider = true)
     {
         var options = Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
             .Get(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -192,8 +194,15 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
 
         var principal = new ClaimsPrincipal(
             new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+        var properties = new AuthenticationProperties();
+        if (sessionProvider is not null && markSessionProvider)
+        {
+            properties.Items["Cratis.AuthProxy.SessionProvider"] = sessionProvider;
+        }
+
         var ticket = new AuthenticationTicket(
             principal,
+            properties,
             CookieAuthenticationDefaults.AuthenticationScheme);
         var protectedTicket = options.TicketDataFormat.Protect(ticket);
         var cookieContext = new DefaultHttpContext();

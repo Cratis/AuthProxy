@@ -30,5 +30,6 @@ public class when_a_provider_supplies_a_session_provider_claim : configured_cano
     }
 
     [Fact] void should_keep_exactly_one_provider_scheme() => _ticketContext.Principal!.FindAll(SessionClaims.ProviderScheme).Count().ShouldEqual(1);
+    [Fact] void should_record_the_marker_for_the_completing_scheme() => _ticketContext.Properties!.Items[SessionProvider.MarkerStateKey].ShouldEqual("microsoft");
     [Fact] void should_record_the_completing_scheme() => _ticketContext.Principal!.FindFirst(SessionClaims.ProviderScheme)!.Value.ShouldEqual("microsoft");
 }
