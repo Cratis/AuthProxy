@@ -31,7 +31,13 @@ internal static partial class TenantVerifierLogging
     /// <param name="logger">The logger to write to.</param>
     /// <param name="exception">The exception that was thrown.</param>
     /// <param name="tenantId">The tenant identifier being verified.</param>
-    /// <param name="url">The URL that was contacted.</param>
-    [LoggerMessage(LogLevel.Error, "Error contacting tenant verification service for '{TenantId}' at '{Url}'.")]
-    internal static partial void TenantVerificationError(this ILogger<TenantVerifier> logger, Exception exception, string tenantId, string url);
+    [LoggerMessage(LogLevel.Error, "Error contacting tenant verification service for '{TenantId}'.")]
+    internal static partial void TenantVerificationError(this ILogger<TenantVerifier> logger, Exception exception, string tenantId);
+
+    /// <summary>
+    /// Logs that a tenant identifier was refused before any verification call was made.
+    /// </summary>
+    /// <param name="logger">The logger to write to.</param>
+    [LoggerMessage(LogLevel.Warning, "A tenant identifier that is not usable was not verified.")]
+    internal static partial void TenantIdentifierNotUsable(this ILogger<TenantVerifier> logger);
 }

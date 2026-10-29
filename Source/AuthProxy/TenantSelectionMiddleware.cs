@@ -175,7 +175,7 @@ public class TenantSelectionMiddleware(
     async Task HandleTenantSelection(HttpContext context, Tenancy.SelectionOptions selectionOptions)
     {
         var tenantId = context.Request.Query["tenantId"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(tenantId))
+        if (!Tenancy.TenantIdentifier.IsUsable(tenantId))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
@@ -399,7 +399,7 @@ public class TenantSelectionMiddleware(
             return new(
                 Succeeded: true,
                 tenants
-                    .Where(_ => !string.IsNullOrWhiteSpace(_.Id) && !string.IsNullOrWhiteSpace(_.Name))
+                    .Where(_ => Tenancy.TenantIdentifier.IsUsable(_.Id) && !string.IsNullOrWhiteSpace(_.Name))
                     .DistinctBy(_ => _.Id, StringComparer.OrdinalIgnoreCase)
                     .ToList());
         }

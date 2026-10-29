@@ -34,7 +34,13 @@ public class TenantVerifier(
             return true;
         }
 
-        var url = urlTemplate.Replace("{tenantId}", tenantId, StringComparison.Ordinal);
+        if (!TenantIdentifier.IsUsable(tenantId))
+        {
+            logger.TenantIdentifierNotUsable();
+            return false;
+        }
+
+        var url = urlTemplate.Replace("{tenantId}", Uri.EscapeDataString(tenantId), StringComparison.Ordinal);
         using var client = httpClientFactory.CreateClient();
 
         try
@@ -57,7 +63,7 @@ public class TenantVerifier(
         }
         catch (Exception ex)
         {
-            logger.TenantVerificationError(ex, tenantId, url);
+            logger.TenantVerificationError(ex, tenantId);
             return false;
         }
     }

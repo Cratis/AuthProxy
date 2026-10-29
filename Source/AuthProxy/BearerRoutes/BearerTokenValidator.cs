@@ -26,7 +26,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     /// <summary>
     /// The longest tenant identifier accepted from a token.
     /// </summary>
-    public const int MaximumTenantIdLength = 256;
+    public const int MaximumTenantIdLength = Tenancy.TenantIdentifier.MaximumLength;
 
     const string BearerPrefix = "Bearer ";
     const string ScopeClaimType = "scope";
@@ -34,9 +34,6 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
     static readonly SearchValues<char> _tokenCharacters = SearchValues.Create(
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~+/=");
-
-    static readonly SearchValues<char> _tenantCharacters = SearchValues.Create(
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~");
 
     static readonly JsonWebTokenHandler _handler = new() { MapInboundClaims = false };
 
@@ -301,10 +298,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         return value.Length > 0;
     }
 
-    static bool IsUsableTenantId(string tenantId) =>
-        tenantId is not "." and not ".."
-        && tenantId.Length <= MaximumTenantIdLength
-        && tenantId.AsSpan().IndexOfAnyExcept(_tenantCharacters) < 0;
+    static bool IsUsableTenantId(string tenantId) => Tenancy.TenantIdentifier.IsUsable(tenantId);
 
     static bool IsSingleValueIdentityClaim(string type) =>
         string.Equals(type, SubjectClaimType, StringComparison.OrdinalIgnoreCase)
