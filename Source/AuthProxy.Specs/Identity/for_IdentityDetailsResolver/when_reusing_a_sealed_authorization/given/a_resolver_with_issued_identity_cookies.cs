@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using Cratis.Arc.Identity;
@@ -48,12 +49,12 @@ public class a_resolver_with_issued_identity_cookies : when_identity_verificatio
     {
         var context = new DefaultHttpContext();
         await _resolver.Resolve(context, principal, tenant);
-        return context.Response.Headers.SetCookie.Select(_ => _!.Split(';', 2)[0]).ToArray();
+        return context.Response.Headers.SetCookie.Select(_ => _.Split(';', 2)[0]).ToArray();
     }
 
     protected static JsonElement ReadableCookieIn(HttpContext context)
     {
-        var cookie = context.Response.Headers.SetCookie.Single(_ => _!.StartsWith($"{Cookies.Identity}=", StringComparison.Ordinal))!;
+        var cookie = context.Response.Headers.SetCookie.Single(_ => _.StartsWith($"{Cookies.Identity}=", StringComparison.Ordinal));
         var value = Uri.UnescapeDataString(cookie.Split(';', 2)[0].Split('=', 2)[1]);
         using var document = JsonDocument.Parse(Convert.FromBase64String(value));
         return document.RootElement.Clone();
@@ -61,5 +62,5 @@ public class a_resolver_with_issued_identity_cookies : when_identity_verificatio
 
     protected void CarryReadableCookie(string value) => _context.Request.Headers.Cookie = $"{_bobSealedCookie}; {Cookies.Identity}={value}";
 
-    protected static string Encode(string json) => Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+    protected static string Encode([StringSyntax(StringSyntaxAttribute.Json)] string json) => Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
 }
