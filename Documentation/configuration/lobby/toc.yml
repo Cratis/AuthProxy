@@ -4,5 +4,7 @@
   href: invitation-for-creating-organization.md
 - name: Invitation to Organization
   href: invitation-to-organization.md
+- name: Invitation Token Keys
+  href: invitation-token-keys.md
 - name: Registration
   href: registration.md

@@ -72,7 +72,7 @@ public class an_invite_exchange_with_recorded_logs : an_invite_exchange
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            new InviteTokenValidator(optionsMonitor),
+            new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>()),
             optionsMonitor,
             authenticationConfig,
             Substitute.For<ITenantResolver>(),

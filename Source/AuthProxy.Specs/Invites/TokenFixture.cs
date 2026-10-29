@@ -34,6 +34,8 @@ static class TokenFixture
     /// <param name="expires">The token expiry time; defaults to one hour from now.</param>
     /// <param name="notBefore">The earliest time the token is valid; defaults to one minute ago.</param>
     /// <param name="additionalClaims">Optional additional claims to include in the token.</param>
+    /// <param name="keyId">Optional signing-key identifier included in the JWT header.</param>
+    /// <param name="algorithm">The RSA signing algorithm; defaults to RS256.</param>
     /// <returns>The compact-serialized signed JWT string.</returns>
     public static string CreateToken(
         RsaSecurityKey signingKey,
@@ -41,8 +43,15 @@ static class TokenFixture
         string audience = "test-audience",
         DateTime? expires = null,
         DateTime? notBefore = null,
-        IEnumerable<Claim>? additionalClaims = null)
+        IEnumerable<Claim>? additionalClaims = null,
+        string? keyId = null,
+        string algorithm = SecurityAlgorithms.RsaSha256)
     {
+        if (keyId is not null)
+        {
+            signingKey = signingKey.Rsa is { } rsa ? new RsaSecurityKey(rsa) : new RsaSecurityKey(signingKey.Parameters);
+            signingKey.KeyId = keyId;
+        }
         var handler = new JsonWebTokenHandler();
         var descriptor = new SecurityTokenDescriptor
         {
@@ -50,7 +59,7 @@ static class TokenFixture
             Audience = audience,
             Expires = expires ?? DateTime.UtcNow.AddHours(1),
             NotBefore = notBefore ?? DateTime.UtcNow.AddMinutes(-1),
-            SigningCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256),
+            SigningCredentials = new SigningCredentials(signingKey, algorithm),
             Claims = additionalClaims?
                 .GroupBy(_ => _.Type, StringComparer.Ordinal)
                 .ToDictionary(_ => _.Key, ClaimValue, StringComparer.Ordinal),

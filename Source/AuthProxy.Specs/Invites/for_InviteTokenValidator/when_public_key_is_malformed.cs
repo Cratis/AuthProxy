@@ -7,7 +7,7 @@ public class when_public_key_is_malformed : Specification
 {
     InviteTokenValidationResult _result;
 
-    void Establish()
+    async Task Establish()
     {
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         options.CurrentValue.Returns(new C.AuthProxy
@@ -18,8 +18,8 @@ public class when_public_key_is_malformed : Specification
             }
         });
 
-        var validator = new InviteTokenValidator(options);
-        _result = validator.ValidateDetailed("any-token");
+        var validator = new InviteTokenValidator(options, Substitute.For<IInvitationTokenKeys>());
+        _result = await validator.ValidateDetailed("any-token", CancellationToken.None);
     }
 
     [Fact]

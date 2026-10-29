@@ -91,7 +91,7 @@ public class when_staging_an_attested_invitation : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            new InviteTokenValidator(configurationMonitor),
+            new InviteTokenValidator(configurationMonitor, Substitute.For<IInvitationTokenKeys>()),
             configurationMonitor,
             authentication,
             Substitute.For<ITenantResolver>(),

@@ -22,7 +22,7 @@ public class when_getting_claim_from_token_that_does_not_have_the_claim : Specif
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
-        _validator = new InviteTokenValidator(optionsMonitor);
+        _validator = new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>());
     }
 
     void Because() => _result = _validator.TryGetClaim(_token, "nonexistent_claim", out _claimValue);

@@ -9,19 +9,26 @@ namespace Cratis.AuthProxy.Configuration;
 public class Invite
 {
     /// <summary>
+    /// Gets or sets the absolute URL of the lobby's invitation-token issuer metadata,
+    /// e.g. <c language="text">https://lobby.example.com/.well-known/ante/invitation-token</c>.
+    /// When set, Issuer and Audience are required and PublicKeyPem must be empty.
+    /// </summary>
+    public string TokenMetadataUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the RSA public key PEM used to verify invite token signatures.
     /// </summary>
     public string PublicKeyPem { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the expected token issuer (<c language="text">iss</c> claim).
-    /// Leave empty to skip issuer validation.
+    /// Required when TokenMetadataUrl is set; otherwise leave empty to skip issuer validation.
     /// </summary>
     public string Issuer { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the expected token audience (<c language="text">aud</c> claim).
-    /// Leave empty to skip audience validation.
+    /// Required when TokenMetadataUrl is set; otherwise leave empty to skip audience validation.
     /// </summary>
     public string Audience { get; set; } = string.Empty;
 

@@ -27,7 +27,7 @@ public class when_getting_claim_from_token_that_has_the_claim : Specification
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         optionsMonitor.CurrentValue.Returns(config);
 
-        _validator = new InviteTokenValidator(optionsMonitor);
+        _validator = new InviteTokenValidator(optionsMonitor, Substitute.For<IInvitationTokenKeys>());
     }
 
     void Because() => _result = _validator.TryGetClaim(_token, ClaimType, out _claimValue);

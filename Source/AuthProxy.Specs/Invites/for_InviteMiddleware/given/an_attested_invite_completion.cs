@@ -190,7 +190,7 @@ public class an_attested_invite_completion : Specification
                 _nextCalled = true;
                 return Task.CompletedTask;
             },
-            new InviteTokenValidator(inviteOptions),
+            new InviteTokenValidator(inviteOptions, Substitute.For<IInvitationTokenKeys>()),
             inviteOptions,
             authenticationOptions,
             Substitute.For<ITenantResolver>(),

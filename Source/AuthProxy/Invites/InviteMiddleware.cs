@@ -168,7 +168,7 @@ public class InviteMiddleware(
         if (context.User.Identity?.IsAuthenticated == true
             && context.TryGetPendingInvitationToken(out var inviteToken))
         {
-            var outcome = AssessPendingInvitation(context, inviteToken, out var pendingValidationResult);
+            var (outcome, pendingValidationResult) = await AssessPendingInvitation(context, inviteToken);
             if (outcome != PendingInvitationOutcome.NotEstablished)
             {
                 await AnswerPendingInvitation(context, inviteToken, outcome, pendingValidationResult);
@@ -409,20 +409,19 @@ public class InviteMiddleware(
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="inviteToken">The pending invitation capability.</param>
-    /// <param name="validationResult">The re-validation result of the capability.</param>
     /// <returns>The outcome the request must be answered with, or <see cref="PendingInvitationOutcome.NotEstablished"/> when it falls through to Phase 1.</returns>
-    PendingInvitationOutcome AssessPendingInvitation(HttpContext context, string inviteToken, out InviteTokenValidationResult validationResult)
+    async Task<(PendingInvitationOutcome Outcome, InviteTokenValidationResult ValidationResult)> AssessPendingInvitation(HttpContext context, string inviteToken)
     {
         // Re-validate the invite token before forwarding it (Phase 2). The token arrives from the
         // HTTP-only .cratis-invite cookie, but HTTP-only only blocks browser JS - an authenticated
         // caller can still set the cookie to a self-crafted token. AuthProxy must therefore be the
         // authoritative invite-token validator across BOTH phases, re-checking the RSA signature,
         // issuer, audience and lifetime here before handing the token to the exchange endpoint.
-        validationResult = tokenValidator.ValidateDetailed(inviteToken);
+        var validationResult = await tokenValidator.ValidateDetailed(inviteToken, context.RequestAborted);
         if (validationResult != InviteTokenValidationResult.Valid)
         {
             logger.InviteExchangeTokenValidationFailed(validationResult);
-            return PendingInvitationOutcome.Rejected;
+            return (PendingInvitationOutcome.Rejected, validationResult);
         }
 
         // A session that already completed this exact invitation on its own provider callback is never
@@ -430,7 +429,7 @@ public class InviteMiddleware(
         // Clear it and take the caller where the completed invitation leads.
         if (WasInvitationCompletedByThisSession(context, inviteToken))
         {
-            return PendingInvitationOutcome.AlreadyCompleted;
+            return (PendingInvitationOutcome.AlreadyCompleted, validationResult);
         }
 
         // "Authenticated" and "authenticated for this invitation" are different facts, and only the
@@ -442,7 +441,7 @@ public class InviteMiddleware(
         // nothing else is exchanged.
         if (WasAuthenticatedForInvitation(context, inviteToken, tokenValidator))
         {
-            return PendingInvitationOutcome.Authenticated;
+            return (PendingInvitationOutcome.Authenticated, validationResult);
         }
 
         // Not a failure - the invitation is still pending and still valid, it just has no identity to
@@ -450,7 +449,7 @@ public class InviteMiddleware(
         // invitation's own provider selection (Phase 1), or lets the pipeline reach the challenge
         // endpoint the caller is already on their way to.
         logger.InviteSessionWasNotEstablishedByTheInvitation();
-        return PendingInvitationOutcome.NotEstablished;
+        return (PendingInvitationOutcome.NotEstablished, validationResult);
     }
 
     Task AnswerPendingInvitation(
@@ -478,7 +477,7 @@ public class InviteMiddleware(
             return;
         }
 
-        var validationResult = tokenValidator.ValidateDetailed(token);
+        var validationResult = await tokenValidator.ValidateDetailed(token, context.RequestAborted);
         if (validationResult != InviteTokenValidationResult.Valid)
         {
             logger.InviteTokenValidationFailed(validationResult);

@@ -9,23 +9,20 @@ namespace Cratis.AuthProxy.Invites;
 public interface IInviteTokenValidator
 {
     /// <summary>
-    /// Validates the invite <paramref name="token"/> against the configured public key and claims.
+    /// Validates an invitation token asynchronously, including issuer key retrieval when configured.
     /// </summary>
     /// <param name="token">The raw JWT string to validate.</param>
-    /// <returns><see langword="true"/> if the token is valid; otherwise <see langword="false"/>.</returns>
-    bool Validate(string token);
+    /// <param name="cancellationToken">Cancellation of the request.</param>
+    /// <returns>Whether the token passes all checks.</returns>
+    Task<bool> Validate(string token, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Validates the invite <paramref name="token"/> and returns a detailed <see cref="InviteTokenValidationResult"/>
-    /// that distinguishes between a well-formed but expired token and one that is outright invalid.
+    /// Validates an invitation token asynchronously and distinguishes validly signed expiry from invalid input.
     /// </summary>
     /// <param name="token">The raw JWT string to validate.</param>
-    /// <returns>
-    /// <see cref="InviteTokenValidationResult.Valid"/> if the token passes all checks;
-    /// <see cref="InviteTokenValidationResult.Expired"/> if the token was validly signed but has expired;
-    /// <see cref="InviteTokenValidationResult.Invalid"/> for any other failure (bad signature, malformed, etc.).
-    /// </returns>
-    InviteTokenValidationResult ValidateDetailed(string token);
+    /// <param name="cancellationToken">Cancellation of the request.</param>
+    /// <returns>The detailed validation result.</returns>
+    Task<InviteTokenValidationResult> ValidateDetailed(string token, CancellationToken cancellationToken);
 
     /// <summary>
     /// Reads the value of a named claim directly from the token payload without re-validating the signature.

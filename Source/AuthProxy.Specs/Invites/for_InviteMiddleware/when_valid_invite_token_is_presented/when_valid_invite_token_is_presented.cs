@@ -13,7 +13,7 @@ public class when_valid_invite_token_is_presented : Specification
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
-        tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Valid);
+        tokenValidator.ValidateDetailed(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(InviteTokenValidationResult.Valid);
 
         var config = new C.AuthProxy
         {

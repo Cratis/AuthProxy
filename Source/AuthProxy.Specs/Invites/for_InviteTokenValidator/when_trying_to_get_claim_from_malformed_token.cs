@@ -19,7 +19,7 @@ public class when_trying_to_get_claim_from_malformed_token : Specification
             }
         });
 
-        var validator = new InviteTokenValidator(options);
+        var validator = new InviteTokenValidator(options, Substitute.For<IInvitationTokenKeys>());
         _success = validator.TryGetClaim("not-a-jwt", "sub", out _claimValue);
     }
 

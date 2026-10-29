@@ -13,7 +13,7 @@ public class when_expired_invite_token_is_presented : Specification
     void Establish()
     {
         var tokenValidator = Substitute.For<IInviteTokenValidator>();
-        tokenValidator.ValidateDetailed(Arg.Any<string>()).Returns(InviteTokenValidationResult.Expired);
+        tokenValidator.ValidateDetailed(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(InviteTokenValidationResult.Expired);
 
         var config = new C.AuthProxy();
         var optionsMonitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
