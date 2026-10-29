@@ -3,7 +3,7 @@
 
 namespace Cratis.AuthProxy.Tenancy.for_ClaimSourceIdentifierStrategy;
 
-public class when_x_ms_client_principal_header_contains_matching_claim : Specification
+public class when_only_the_inbound_principal_header_carries_the_claim : Specification
 {
     ClaimSourceIdentifierStrategy _strategy;
     DefaultHttpContext _context;
@@ -30,6 +30,6 @@ public class when_x_ms_client_principal_header_contains_matching_claim : Specifi
 
     void Because() => _succeeded = _strategy.TryResolveSourceIdentifier(_context, _options, out _sourceIdentifier);
 
-    [Fact] void should_succeed() => _succeeded.ShouldBeTrue();
-    [Fact] void should_return_the_tenant_from_header_claim() => _sourceIdentifier.ShouldEqual("tenant-from-header");
+    [Fact] void should_not_resolve() => _succeeded.ShouldBeFalse();
+    [Fact] void should_not_return_a_value() => _sourceIdentifier.ShouldEqual(string.Empty);
 }
