@@ -13,11 +13,11 @@ namespace Cratis.AuthProxy;
 
 /// <summary>
 /// Middleware that handles tenant selection for authenticated users when the selection strategy is configured.
-/// A tenant resolved from the selection cookie is periodically re-validated against the tenant endpoint
-/// (bounded by <see cref="C.Session.TenantRevalidationInterval"/>) so revoked tenant access takes effect
-/// without calling the backend on every request. If the tenant endpoint is unavailable, callers without
-/// a resolved tenant receive HTTP 503; re-validation of an already selected tenant continues to fail open.
-/// A session without a forwardable identity is terminated rather than reported as an endpoint outage.
+/// A selected tenant is forwarded only after it has been confirmed for the signed-in account: the selection
+/// cookie is bound to that account, and the confirmation is repeated against the tenant endpoint at the
+/// interval set by <see cref="C.Session.TenantRevalidationInterval"/>. When the tenant endpoint cannot answer,
+/// the request is not forwarded with that tenant. A session without a forwardable identity is terminated
+/// rather than reported as an endpoint outage.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
@@ -25,6 +25,7 @@ namespace Cratis.AuthProxy;
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="errorPageProvider">The error page provider used to serve the selection and service-unavailable pages.</param>
 /// <param name="memoryCache">The memory cache used to bound how often the selected tenant is re-validated.</param>
+/// <param name="selectedTenantCookie">The selected-tenant cookie, bound to the signed-in account.</param>
 /// <param name="logger">The logger.</param>
 public class TenantSelectionMiddleware(
     RequestDelegate next,
@@ -33,6 +34,7 @@ public class TenantSelectionMiddleware(
     IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
     IMemoryCache memoryCache,
+    Tenancy.SelectedTenantCookie selectedTenantCookie,
     ILogger<TenantSelectionMiddleware> logger)
 {
     const string RevalidationCacheKeyPrefix = "TenantSelectionRevalidation";
@@ -47,16 +49,6 @@ public class TenantSelectionMiddleware(
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.User.Identity?.IsAuthenticated != true
-            || context.IsInvitation()
-            || context.IsRegistration()
-            || context.IsAuthenticationBootstrap()
-
-            // A path the deployment declares anonymous is served without regard to who is asking, so it
-            // stays reachable for a caller who happens to be signed in without having chosen a tenant.
-            // Without this, declaring a path anonymous only opens it to callers with no session at all.
-            || context.IsAnonymousPath(config.CurrentValue)
-            || context.HasPendingInvitation()
-            || context.HasPendingRegistration()
 
             // An on-behalf session acts in the one tenant its grant was confirmed for. Offering the actor a choice
             // would be offering them the represented user's other tenants, which nobody granted.
@@ -72,27 +64,23 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        if (context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant))
+        var exempt = IsExemptFromTenantSelection(context);
+        if (!exempt && context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant))
         {
             await HandleTenantSelection(context, selectionOptions);
             return;
         }
 
-        if (tenantResolver.TryResolve(context, out TenantResolutionResult resolution))
+        // A selected tenant is confirmed for the signed-in account on every request, including the paths that
+        // are otherwise served without tenant selection.
+        if (await ConfirmSelectedTenant(context, selectionOptions, exempt))
         {
-            if (await IsResolvedTenantStillValid(context, selectionOptions, resolution))
-            {
-                await next(context);
-                return;
-            }
+            return;
+        }
 
-            // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
-            // replay the request without it so the regular selection flow (or the no-tenant machinery
-            // further down the pipeline) takes over.
-            context.Response.Cookies.Delete(Cookies.Tenant);
-            context.Response.Cookies.Delete(Cookies.Tenants);
-            context.Response.StatusCode = StatusCodes.Status302Found;
-            context.Response.Headers.Location = context.GetPathAndQuery();
+        if (exempt || tenantResolver.TryResolve(context, out TenantResolutionResult _))
+        {
+            await next(context);
             return;
         }
 
@@ -128,12 +116,12 @@ public class TenantSelectionMiddleware(
 
         if (tenantOptions.Count == 1)
         {
-            context.Response.Cookies.Append(Cookies.Tenant, tenantOptions[0].Id, new CookieOptions
+            if (!selectedTenantCookie.TryWrite(context, tenantOptions[0].Id))
             {
-                HttpOnly = true,
-                SameSite = SameSiteMode.Lax,
-                Secure = context.Request.IsHttps,
-            });
+                await HandleInvalidSession(context);
+                return;
+            }
+
             context.Response.Cookies.Delete(Cookies.Tenants);
             MarkTenantAsRevalidated(context, tenantOptions[0].Id);
             context.Response.StatusCode = StatusCodes.Status302Found;
@@ -175,7 +163,7 @@ public class TenantSelectionMiddleware(
     async Task HandleTenantSelection(HttpContext context, Tenancy.SelectionOptions selectionOptions)
     {
         var tenantId = context.Request.Query["tenantId"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(tenantId))
+        if (!Tenancy.TenantIdentifier.IsUsable(tenantId))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
@@ -205,12 +193,12 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        context.Response.Cookies.Append(Cookies.Tenant, tenantId, new CookieOptions
+        if (!selectedTenantCookie.TryWrite(context, tenantId))
         {
-            HttpOnly = true,
-            SameSite = SameSiteMode.Lax,
-            Secure = context.Request.IsHttps,
-        });
+            await HandleInvalidSession(context);
+            return;
+        }
+
         MarkTenantAsRevalidated(context, tenantId);
 
         // The tenant list is intentionally retained (not deleted) so a multi-tenant user keeps the
@@ -244,55 +232,119 @@ public class TenantSelectionMiddleware(
     }
 
     /// <summary>
-    /// Determines whether a resolved tenant may still be honored. Only tenants resolved from the
-    /// selection cookie are subject to re-validation — every other strategy derives the tenant from
-    /// the request itself. A successful re-validation is cached for the configured interval so the
-    /// tenant endpoint is not called on every request; when the endpoint answers authoritatively that
-    /// the tenant is no longer available to the user the selection is considered revoked. Transport
-    /// failures fail open so a transient backend outage cannot lock every user out.
+    /// Determines whether the request is served without tenant selection: invitations, registrations,
+    /// authentication bootstrap, declared anonymous paths and pending invitation or registration sessions.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <returns><see langword="true"/> when no tenant is chosen for the request; otherwise <see langword="false"/>.</returns>
+    bool IsExemptFromTenantSelection(HttpContext context) =>
+        context.IsInvitation()
+        || context.IsRegistration()
+        || context.IsAuthenticationBootstrap()
+
+        // A path the deployment declares anonymous is served without regard to who is asking, so it
+        // stays reachable for a caller who happens to be signed in without having chosen a tenant.
+        || context.IsAnonymousPath(config.CurrentValue)
+        || context.HasPendingInvitation()
+        || context.HasPendingRegistration();
+
+    /// <summary>
+    /// Confirms the tenant named by the selected-tenant cookie for the signed-in account and records it on the request.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="selectionOptions">The selection strategy options carrying the tenant endpoint.</param>
-    /// <param name="resolution">The tenant resolution outcome for the request.</param>
-    /// <returns><see langword="true"/> when the resolved tenant may be honored; otherwise <see langword="false"/>.</returns>
-    async Task<bool> IsResolvedTenantStillValid(HttpContext context, Tenancy.SelectionOptions selectionOptions, TenantResolutionResult resolution)
+    /// <param name="exempt">Whether the request is served without tenant selection.</param>
+    /// <returns><see langword="true"/> when a response was written and the request ends here; otherwise <see langword="false"/>.</returns>
+    async Task<bool> ConfirmSelectedTenant(HttpContext context, Tenancy.SelectionOptions selectionOptions, bool exempt)
     {
-        if (resolution.Strategy != C.TenantSourceIdentifierResolverType.Selection)
-        {
-            return true;
-        }
-
-        var interval = config.CurrentValue.Session.TenantRevalidationInterval;
-        if (interval <= TimeSpan.Zero)
-        {
-            return true;
-        }
-
-        var principal = context.BuildClientPrincipal();
-        if (principal is null)
-        {
-            return true;
-        }
-
-        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, out var account);
-        if (hasReusableBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, resolution.TenantId), out _))
-        {
-            return true;
-        }
-
-        var tenantOptions = await GetTenantOptions(context, selectionOptions);
-        if (!tenantOptions.Succeeded)
-        {
-            return true;
-        }
-
-        if (!tenantOptions.Tenants.Any(_ => string.Equals(_.Id, resolution.TenantId, StringComparison.OrdinalIgnoreCase)))
+        var cookie = selectedTenantCookie.Read(context);
+        if (cookie.State == Tenancy.SelectedTenantCookieState.None)
         {
             return false;
         }
 
-        MarkTenantAsRevalidated(context, resolution.TenantId);
+        if (cookie.State == Tenancy.SelectedTenantCookieState.Invalid)
+        {
+            logger.SelectedTenantCookieRejected();
+            Tenancy.SelectedTenantCookie.Delete(context);
+            return false;
+        }
+
+        var tenantId = cookie.TenantId;
+        var principal = context.BuildClientPrincipal();
+        var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), config.CurrentValue.Authentication.TotalProviderCount, out var account);
+        var cached = hasBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, tenantId), out _);
+        var legacy = cookie.State == Tenancy.SelectedTenantCookieState.Legacy;
+        var interval = config.CurrentValue.Session.TenantRevalidationInterval;
+
+        if (cached || (!legacy && interval <= TimeSpan.Zero))
+        {
+            Confirm(context, tenantId, legacy);
+            return false;
+        }
+
+        var result = await GetTenantOptions(context, selectionOptions);
+        if (!result.HasIdentity)
+        {
+            if (exempt)
+            {
+                return false;
+            }
+
+            await HandleInvalidSession(context);
+            return true;
+        }
+
+        if (!result.Succeeded)
+        {
+            logger.SelectedTenantNotConfirmed();
+            return !exempt && await RejectUnconfirmed(context);
+        }
+
+        if (!result.Tenants.Any(_ => string.Equals(_.Id, tenantId, StringComparison.OrdinalIgnoreCase)))
+        {
+            // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
+            // replay the request without it so the regular selection flow takes over.
+            Tenancy.SelectedTenantCookie.Delete(context);
+            context.Response.Cookies.Delete(Cookies.Tenants);
+            if (exempt)
+            {
+                return false;
+            }
+
+            context.Response.StatusCode = StatusCodes.Status302Found;
+            context.Response.Headers.Location = context.GetPathAndQuery();
+            return true;
+        }
+
+        MarkTenantAsRevalidated(context, tenantId);
+        Confirm(context, tenantId, legacy);
+        return false;
+    }
+
+    async Task<bool> RejectUnconfirmed(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        if (context.IsDocumentNavigation())
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.ServiceUnavailable,
+                StatusCodes.Status503ServiceUnavailable);
+            return true;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
         return true;
+    }
+
+    void Confirm(HttpContext context, string tenantId, bool reissue)
+    {
+        context.Items[Tenancy.SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey] = tenantId;
+        if (reissue)
+        {
+            selectedTenantCookie.TryWrite(context, tenantId);
+        }
     }
 
     /// <summary>
@@ -310,7 +362,7 @@ public class TenantSelectionMiddleware(
         }
 
         var principal = context.BuildClientPrincipal();
-        if (principal is null || !IdentityAccountBinding.TryCreate(principal, out var account))
+        if (principal is null || !IdentityAccountBinding.TryCreate(principal, config.CurrentValue.Authentication.TotalProviderCount, out var account))
         {
             return;
         }
@@ -399,7 +451,7 @@ public class TenantSelectionMiddleware(
             return new(
                 Succeeded: true,
                 tenants
-                    .Where(_ => !string.IsNullOrWhiteSpace(_.Id) && !string.IsNullOrWhiteSpace(_.Name))
+                    .Where(_ => Tenancy.TenantIdentifier.IsUsable(_.Id) && !string.IsNullOrWhiteSpace(_.Name))
                     .DistinctBy(_ => _.Id, StringComparer.OrdinalIgnoreCase)
                     .ToList());
         }

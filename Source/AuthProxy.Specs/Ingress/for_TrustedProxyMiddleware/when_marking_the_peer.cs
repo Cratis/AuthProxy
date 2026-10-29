@@ -34,7 +34,7 @@ public class when_marking_the_peer : Specification
 
     async Task Because()
     {
-        var middleware = new AuthProxy.Ingress.TrustedProxyMiddleware(_ => Task.CompletedTask, _policy);
+        var middleware = new AuthProxy.Ingress.TrustedProxyMiddleware(_ => Task.CompletedTask, _policy, new Cratis.AuthProxy.given.RecordingLogger<AuthProxy.Ingress.TrustedProxyMiddleware>());
         await middleware.InvokeAsync(_trusted);
         await middleware.InvokeAsync(_untrusted);
     }

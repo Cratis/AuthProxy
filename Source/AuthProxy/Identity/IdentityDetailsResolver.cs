@@ -74,7 +74,7 @@ public class IdentityDetailsResolver(
         var current = config.CurrentValue;
         var session = current.Session;
         var hasPendingInvite = context.HasPendingInvitation();
-        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, out var account);
+        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, current.Authentication.TotalProviderCount, out var account);
         var logIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account";
 
         // Every short-circuit below is a remembered answer standing in for asking again, so where the answer

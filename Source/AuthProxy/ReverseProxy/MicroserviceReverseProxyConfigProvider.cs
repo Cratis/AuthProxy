@@ -58,6 +58,11 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     internal const string AccessTokenMetadataKey = "Cratis.AuthProxy.AccessToken";
 
     /// <summary>
+    /// The cluster metadata key holding the service's setting for the caller's Authorization header, when not the default.
+    /// </summary>
+    internal const string CallerAuthorizationHeaderMetadataKey = "Cratis.AuthProxy.CallerAuthorizationHeader";
+
+    /// <summary>
     /// The cluster metadata key binding the access token policy to its versioned destination.
     /// </summary>
     internal const string DestinationMetadataKey = "Cratis.AuthProxy.Destination";
@@ -557,7 +562,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             if (ms.Backend is not null)
             {
                 var destinationId = BackendDestinationId(key, ms);
-                var metadata = ClusterMetadata(key, BackendEndpoint, ms.AccessToken);
+                var metadata = ClusterMetadata(key, BackendEndpoint, ms.CallerAuthorizationHeader, ms.AccessToken);
                 metadata[DestinationMetadataKey] = destinationId;
                 clusters.Add(ClusterFor(config, ms, ms.Backend) with
                 {
@@ -582,7 +587,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     {
                         ["destination1"] = new() { Address = ms.Frontend.BaseUrl }
                     },
-                    Metadata = ClusterMetadata(key, FrontendEndpoint),
+                    Metadata = ClusterMetadata(key, FrontendEndpoint, ms.CallerAuthorizationHeader),
                 });
             }
         }
@@ -590,13 +595,22 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         return clusters;
     }
 
-    static Dictionary<string, string> ClusterMetadata(string key, string endpoint, C.ServiceAccessToken? accessToken = null)
+    static Dictionary<string, string> ClusterMetadata(
+        string key,
+        string endpoint,
+        C.CallerAuthorizationHeaderForwarding callerAuthorizationHeader,
+        C.ServiceAccessToken? accessToken = null)
     {
         var metadata = new Dictionary<string, string>
         {
             [ServiceMetadataKey] = key,
             [EndpointMetadataKey] = endpoint,
         };
+        if (callerAuthorizationHeader != C.CallerAuthorizationHeaderForwarding.Default)
+        {
+            metadata[CallerAuthorizationHeaderMetadataKey] = callerAuthorizationHeader.ToString();
+        }
+
         if (accessToken is not null)
         {
             metadata[AccessTokenMetadataKey] = JsonSerializer.Serialize(accessToken);

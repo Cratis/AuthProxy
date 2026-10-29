@@ -55,7 +55,22 @@ public class a_canonical_tenant_selection_middleware : Specification
             clients,
             Substitute.For<IErrorPageProvider>(),
             memoryCache,
+            signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
+    }
+
+    protected static ITenantResolver ResolverReflectingConfirmation()
+    {
+        var resolver = Substitute.For<ITenantResolver>();
+        resolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>())
+            .Returns(callInfo =>
+            {
+                var context = callInfo.Arg<HttpContext>();
+                var confirmed = context.Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var tenant);
+                callInfo[1] = new TenantResolutionResult(confirmed ? (string)tenant! : string.Empty, C.TenantSourceIdentifierResolverType.Selection);
+                return confirmed;
+            });
+        return resolver;
     }
 
     protected DefaultHttpContext ContextFor(string authenticationScheme)

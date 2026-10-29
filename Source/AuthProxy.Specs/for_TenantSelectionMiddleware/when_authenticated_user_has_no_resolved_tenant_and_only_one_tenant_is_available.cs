@@ -55,6 +55,7 @@ public class when_authenticated_user_has_no_resolved_tenant_and_only_one_tenant_
             httpClientFactory,
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
@@ -66,7 +67,7 @@ public class when_authenticated_user_has_no_resolved_tenant_and_only_one_tenant_
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_set_tenant_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.Tenant}=tenant-a");
+    [Fact] void should_set_tenant_cookie_bound_to_the_signed_in_account() => given.signed_selected_tenant_cookies.ReadBack(_context).ShouldEqual(new SelectedTenantCookieValue(SelectedTenantCookieState.Bound, "tenant-a"));
     [Fact] void should_redirect_to_original_path() => _context.Response.Headers.Location.ToString().ShouldEqual("/products?view=list");
     [Fact] void should_not_serve_select_tenant_page() => _errorPageProvider.DidNotReceive().WriteErrorPageAsync(Arg.Any<HttpContext>(), Arg.Any<string>(), Arg.Any<int>());
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();

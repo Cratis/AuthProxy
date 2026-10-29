@@ -51,17 +51,20 @@ public class when_selected_tenant_cannot_be_revalidated_because_the_endpoint_is_
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";
         _context.Response.Body = new MemoryStream();
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
+        given.signed_selected_tenant_cookies.Seed(_context, "tenant-a");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_fail_open_and_call_next() => _nextCalled.ShouldBeTrue();
+    [Fact] void should_not_forward_the_request() => _nextCalled.ShouldBeFalse();
+    [Fact] void should_answer_service_unavailable() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
     [Fact] void should_not_delete_the_selected_tenant_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain($"{Cookies.Tenant}=;");
 
     sealed class ThrowingTenantsHandler : HttpMessageHandler

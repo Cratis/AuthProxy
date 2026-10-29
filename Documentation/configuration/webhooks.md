@@ -47,6 +47,7 @@ Declare the specific path the provider posts to:
 - Strips every inbound `x-ms-client-principal*` header and the tenant header (`x-cratis-tenant-id`, and the
   legacy `Tenant-ID`), exactly as it does for every other request. A caller cannot assert an identity.
 - Injects no principal headers, because there is no session.
+- Does not forward AuthProxy's own cookies. The caller's `Authorization` header is forwarded unless the service sets `CallerAuthorizationHeader` to `Strip`.
 
 ### What AuthProxy does not do
 

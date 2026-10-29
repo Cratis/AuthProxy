@@ -12,18 +12,18 @@ public class when_revalidating_a_selected_tenant_for_canonical_identities : a_ca
 {
     async Task Because()
     {
-        var tenantResolver = Substitute.For<ITenantResolver>();
-        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>())
-            .Returns(callInfo =>
-            {
-                callInfo[1] = new TenantResolutionResult(TenantId, C.TenantSourceIdentifierResolverType.Selection);
-                return true;
-            });
-        var middleware = CreateMiddleware(tenantResolver, new MemoryCache(new MemoryCacheOptions()));
+        var middleware = CreateMiddleware(ResolverReflectingConfirmation(), new MemoryCache(new MemoryCacheOptions()));
 
-        await middleware.InvokeAsync(ContextFor("provider-a"));
-        await middleware.InvokeAsync(ContextFor("provider-a"));
-        await middleware.InvokeAsync(ContextFor("provider-b"));
+        await middleware.InvokeAsync(SelectedFor("provider-a"));
+        await middleware.InvokeAsync(SelectedFor("provider-a"));
+        await middleware.InvokeAsync(SelectedFor("provider-b"));
+    }
+
+    DefaultHttpContext SelectedFor(string provider)
+    {
+        var context = ContextFor(provider);
+        signed_selected_tenant_cookies.Seed(context, TenantId);
+        return context;
     }
 
     [Fact] void should_reuse_the_exact_tuple_only() => _handler.Calls.ShouldEqual(2);

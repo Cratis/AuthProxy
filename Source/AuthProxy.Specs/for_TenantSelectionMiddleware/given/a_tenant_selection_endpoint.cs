@@ -9,17 +9,20 @@ public class a_tenant_selection_endpoint : Specification
 {
     protected TenantSelectionMiddleware _middleware;
     protected DefaultHttpContext _context;
+    protected C.AuthProxy _authProxyConfig;
     protected IErrorPageProvider _errorPageProvider;
     protected bool _nextCalled;
     protected int _endpointCalls;
     protected HttpStatusCode? _endpointStatus;
     protected string _endpointBody = "[]";
     protected Exception _endpointFailure = new HttpRequestException("Tenant endpoint is unavailable");
+    protected const string AnonymousPath = "/api/portal/report";
+    protected const string Tenants2 = """[{"id":"tenant-a","name":"Tenant A"},{"id":"tenant-b","name":"Tenant B"}]""";
 
     void Establish()
     {
         var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        config.CurrentValue.Returns(new C.AuthProxy
+        _authProxyConfig = new C.AuthProxy
         {
             TenantResolutions =
             [
@@ -32,7 +35,8 @@ public class a_tenant_selection_endpoint : Specification
                     }
                 }
             ]
-        });
+        };
+        config.CurrentValue.Returns(_authProxyConfig);
 
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(new TenantsHandler(this)));
@@ -52,10 +56,11 @@ public class a_tenant_selection_endpoint : Specification
                 return Task.CompletedTask;
             },
             config,
-            Substitute.For<ITenantResolver>(),
+            ResolverReflectingConfirmation(),
             httpClientFactory,
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
@@ -64,6 +69,25 @@ public class a_tenant_selection_endpoint : Specification
         _context.Response.Body = new MemoryStream();
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
     }
+
+    static ITenantResolver ResolverReflectingConfirmation()
+    {
+        var resolver = Substitute.For<ITenantResolver>();
+        resolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>())
+            .Returns(callInfo =>
+            {
+                var confirmed = callInfo.Arg<HttpContext>().Items.TryGetValue(SelectionSourceIdentifierStrategy.ConfirmedTenantItemKey, out var tenant);
+                callInfo[1] = new TenantResolutionResult(confirmed ? (string)tenant! : string.Empty, C.TenantSourceIdentifierResolverType.Selection);
+                return confirmed;
+            });
+        return resolver;
+    }
+
+    protected void ServeAnonymousPath() =>
+        _authProxyConfig.Services = new Dictionary<string, C.Service>
+        {
+            ["test"] = new() { Backend = new C.ServiceEndpoint { BaseUrl = "http://backend.test/" }, AnonymousPaths = [AnonymousPath] },
+        };
 
     sealed class TenantsHandler(a_tenant_selection_endpoint specification) : HttpMessageHandler
     {

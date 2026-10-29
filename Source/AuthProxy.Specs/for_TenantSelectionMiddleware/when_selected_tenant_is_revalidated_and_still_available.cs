@@ -55,6 +55,7 @@ public class when_selected_tenant_is_revalidated_and_still_available : Specifica
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
     }
 
@@ -73,6 +74,7 @@ public class when_selected_tenant_is_revalidated_and_still_available : Specifica
         context.Request.Path = "/products";
         context.Response.Body = new MemoryStream();
         context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
+        given.signed_selected_tenant_cookies.Seed(context, "tenant-a");
         return context;
     }
 

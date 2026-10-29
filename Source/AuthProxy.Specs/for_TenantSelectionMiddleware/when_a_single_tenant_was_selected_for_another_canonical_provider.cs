@@ -12,19 +12,14 @@ public class when_a_single_tenant_was_selected_for_another_canonical_provider : 
 {
     async Task Because()
     {
-        var calls = 0;
-        var tenantResolver = Substitute.For<ITenantResolver>();
-        tenantResolver.TryResolve(Arg.Any<HttpContext>(), out Arg.Any<TenantResolutionResult>())
-            .Returns(callInfo =>
-            {
-                calls++;
-                callInfo[1] = new TenantResolutionResult(TenantId, C.TenantSourceIdentifierResolverType.Selection);
-                return calls > 1;
-            });
-        var middleware = CreateMiddleware(tenantResolver, new MemoryCache(new MemoryCacheOptions()));
+        var middleware = CreateMiddleware(ResolverReflectingConfirmation(), new MemoryCache(new MemoryCacheOptions()));
 
-        await middleware.InvokeAsync(ContextFor("provider-a"));
-        await middleware.InvokeAsync(ContextFor("provider-b"));
+        var first = ContextFor("provider-a");
+        await middleware.InvokeAsync(first);
+
+        var second = ContextFor("provider-b");
+        second.Request.Headers.Cookie = signed_selected_tenant_cookies.Value(first);
+        await middleware.InvokeAsync(second);
     }
 
     [Fact] void should_revalidate_the_second_provider_tuple() => _handler.Calls.ShouldEqual(2);

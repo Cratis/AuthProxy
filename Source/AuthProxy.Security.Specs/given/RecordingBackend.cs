@@ -42,13 +42,20 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// </remarks>
     public const string SignInNotificationPath = "/.security-spec/sign-ins";
 
+    /// <summary>
+    /// The path of the tenants endpoint.
+    /// </summary>
+    public const string TenantsPath = "/.security-spec/tenants";
+
     readonly WebApplication _app;
     readonly IdentityResponder _identityResponder;
+    readonly TenantsResponder _tenantsResponder;
 
-    RecordingBackend(WebApplication app, string baseUrl, IdentityResponder identityResponder)
+    RecordingBackend(WebApplication app, string baseUrl, IdentityResponder identityResponder, TenantsResponder tenantsResponder)
     {
         _app = app;
         _identityResponder = identityResponder;
+        _tenantsResponder = tenantsResponder;
         BaseUrl = baseUrl;
     }
 
@@ -71,6 +78,20 @@ public sealed class RecordingBackend : IAsyncDisposable
         get => _identityResponder.Respond;
         set => _identityResponder.Respond = value;
     }
+
+    /// <summary>
+    /// Gets or sets what the origin answers on the tenants endpoint a tenant selection deployment points at.
+    /// </summary>
+    public Func<IResult> TenantsResponse
+    {
+        get => _tenantsResponder.Respond;
+        set => _tenantsResponder.Respond = value;
+    }
+
+    /// <summary>
+    /// Gets the absolute URL of the tenants endpoint.
+    /// </summary>
+    public string TenantsUrl => $"{BaseUrl.TrimEnd('/')}{TenantsPath}";
 
     /// <summary>
     /// Gets every request the proxy has forwarded, most recent last.
@@ -99,10 +120,12 @@ public sealed class RecordingBackend : IAsyncDisposable
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton<RecordingState>();
         builder.Services.AddSingleton<IdentityResponder>();
+        builder.Services.AddSingleton<TenantsResponder>();
 
         var app = builder.Build();
         var state = app.Services.GetRequiredService<RecordingState>();
         var identityResponder = app.Services.GetRequiredService<IdentityResponder>();
+        var tenantsResponder = app.Services.GetRequiredService<TenantsResponder>();
 
         app.UseWebSockets();
         app.Use(async (context, next) =>
@@ -125,6 +148,8 @@ public sealed class RecordingBackend : IAsyncDisposable
         // empty object means "authorized, nothing to add" to a best-effort deployment, which keeps a spec's
         // 403 attributable to the behavior under test rather than to the origin refusing.
         app.MapGet(WellKnownPaths.IdentityDetails, (IdentityResponder responder) => responder.Respond());
+
+        app.MapGet(TenantsPath, (TenantsResponder responder) => responder.Respond());
 
         app.MapPost(SignInNotificationPath, async (HttpContext context, RecordingState recording) =>
         {
@@ -157,7 +182,7 @@ public sealed class RecordingBackend : IAsyncDisposable
             .Addresses
             .First();
 
-        var backend = new RecordingBackend(app, address, identityResponder);
+        var backend = new RecordingBackend(app, address, identityResponder, tenantsResponder);
         state.Attach(backend.Received, backend.SignInNotifications);
 
         return backend;
@@ -217,6 +242,14 @@ public sealed class RecordingBackend : IAsyncDisposable
     sealed class IdentityResponder
     {
         public Func<IResult> Respond { get; set; } = () => Results.Json(new { });
+    }
+
+    /// <summary>
+    /// Holds what the origin currently answers on the tenants endpoint.
+    /// </summary>
+    sealed class TenantsResponder
+    {
+        public Func<IResult> Respond { get; set; } = () => Results.Json(Array.Empty<object>());
     }
 
     /// <summary>

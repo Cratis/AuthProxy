@@ -103,6 +103,15 @@ public static class SessionCookieHealing
         return RequestCookieNames(context).Any(_ => BelongsTo(name, _));
     }
 
+    /// <summary>
+    /// Gets whether a cookie name is the session cookie itself or one of its chunks.
+    /// </summary>
+    /// <param name="name">The name of the session cookie.</param>
+    /// <param name="candidate">The cookie name to test.</param>
+    /// <returns><see langword="true"/> when the candidate is the cookie or a chunk of it.</returns>
+    internal static bool BelongsTo(string name, string candidate) =>
+        string.Equals(candidate, name, StringComparison.Ordinal) || IsChunkOf(name, candidate);
+
     static bool CanDeleteHostOnly(HttpContext context, C.Session session)
     {
         var domain = SessionCookie.DomainOf(session)?.TrimStart('.');
@@ -135,9 +144,6 @@ public static class SessionCookieHealing
             context.Response.Headers.Append(HeaderNames.SetCookie, expiry.ToString());
         }
     }
-
-    static bool BelongsTo(string name, string candidate) =>
-        string.Equals(candidate, name, StringComparison.Ordinal) || IsChunkOf(name, candidate);
 
     static bool IsChunkOf(string name, string candidate) =>
         candidate.StartsWith(name, StringComparison.Ordinal)

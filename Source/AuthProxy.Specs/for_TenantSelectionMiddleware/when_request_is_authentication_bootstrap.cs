@@ -39,6 +39,7 @@ public class when_request_is_authentication_bootstrap : Specification
             Substitute.For<IHttpClientFactory>(),
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

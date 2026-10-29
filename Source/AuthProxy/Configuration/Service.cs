@@ -232,6 +232,18 @@ public class Service
     public ServiceAccessToken? AccessToken { get; set; }
 
     /// <summary>
+    /// Gets or sets whether the <c language="text">Authorization</c> header a caller sent is forwarded to this service.
+    /// Defaults to <see cref="CallerAuthorizationHeaderForwarding.Default"/>.
+    /// </summary>
+    /// <remarks>
+    /// By default the header is removed on requests authenticated by the AuthProxy session and kept on requests with no
+    /// session. <see cref="CallerAuthorizationHeaderForwarding.Forward"/> keeps it everywhere and
+    /// <see cref="CallerAuthorizationHeaderForwarding.Strip"/> removes it everywhere. A token AuthProxy obtains through
+    /// <see cref="AccessToken"/> is always forwarded.
+    /// </remarks>
+    public CallerAuthorizationHeaderForwarding CallerAuthorizationHeader { get; set; } = CallerAuthorizationHeaderForwarding.Default;
+
+    /// <summary>
     /// Gets or sets the back-channel client-credentials configuration for this service.
     /// When configured, AuthProxy can verify client credentials against the service and mint scoped bearer tokens.
     /// </summary>

@@ -73,13 +73,38 @@ public class TenantResolver(
         return results;
     }
 
-    private static bool HandleResolvedSourceIdentifier(
+    bool HandleResolvedSourceIdentifier(
+          Type strategyType,
+          string sourceIdentifier,
+          out string tenantId,
+          C.AuthProxy config)
+    {
+        if (HandleKnownSourceIdentifier(strategyType, sourceIdentifier, out tenantId, config)
+            && !T.TenantIdentifier.IsUsable(tenantId))
+        {
+            logger.UnusableTenantIdentifier(strategyType);
+            tenantId = string.Empty;
+            return false;
+        }
+
+        return !string.IsNullOrEmpty(tenantId);
+    }
+
+    bool HandleKnownSourceIdentifier(
           Type strategyType,
           string sourceIdentifier,
           out string tenantId,
           C.AuthProxy config)
     {
         tenantId = string.Empty;
+
+        if (strategyType is Type.Route or Type.Claim
+            && !string.IsNullOrWhiteSpace(sourceIdentifier)
+            && !T.TenantIdentifier.IsUsable(sourceIdentifier))
+        {
+            logger.UnusableTenantIdentifier(strategyType);
+            return false;
+        }
 
         // Specified, Default, and SubHost strategies return a fixed tenant ID directly.
         if (strategyType == Type.Specified || strategyType == Type.Default || strategyType == Type.SubHost || strategyType == Type.Selection)
