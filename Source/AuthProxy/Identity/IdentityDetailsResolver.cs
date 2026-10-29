@@ -99,7 +99,9 @@ public class IdentityDetailsResolver(
         // examined here, so sending any value for it used to be enough to be treated as authorized, for as
         // long as the caller chose to keep sending it. The sealed record is checked instead, and it is
         // checked against this principal and this tenant.
-        if (mayReuseRecord && authorizationCache.IsAuthorized(context, principal, tenantId))
+        // The readable cookie can only cause more checking, never less, so it stays non-evidence.
+        var canReuseRecord = mayReuseRecord && !ReadableIdentityNamesAnotherCaller(context, principal);
+        if (canReuseRecord && authorizationCache.IsAuthorized(context, principal, tenantId))
         {
             return BuildAuthorizedResult(principal, details: null);
         }
@@ -278,6 +280,59 @@ public class IdentityDetailsResolver(
             SameSite = SameSiteMode.Lax,
             Secure = context.Request.IsHttps,
         });
+
+    static bool ReadableIdentityNamesAnotherCaller(HttpContext context, ClientPrincipal principal)
+    {
+        if (!context.Request.Cookies.TryGetValue(Cookies.Identity, out var value) || string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        if (value.Length > MaxIdentityCookieValueLength)
+        {
+            return true;
+        }
+
+        var bytes = new byte[value.Length];
+        if (!Convert.TryFromBase64String(value, bytes, out var bytesWritten))
+        {
+            return true;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(bytes.AsMemory(0, bytesWritten));
+            return !ReadableIdentityMatchesCaller(document.RootElement, principal);
+        }
+        catch (JsonException)
+        {
+            // Unreadable identity state must be resolved again, not trusted to display the caller.
+            return true;
+        }
+    }
+
+    static bool ReadableIdentityMatchesCaller(JsonElement identity, ClientPrincipal principal)
+    {
+        if (identity.ValueKind != JsonValueKind.Object || !identity.TryGetProperty("id", out var id))
+        {
+            return false;
+        }
+
+        if (id.ValueKind != JsonValueKind.String || !string.Equals(id.GetString(), principal.UserId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var name = identity.TryGetProperty("name", out var property) ? property : default;
+        return ReadableNameMatchesCaller(name, principal.UserDetails);
+    }
+
+    static bool ReadableNameMatchesCaller(JsonElement name, string expectedName) => name.ValueKind switch
+    {
+        JsonValueKind.Undefined or JsonValueKind.Null => expectedName.Length == 0,
+        JsonValueKind.String => string.Equals(name.GetString(), expectedName, StringComparison.Ordinal),
+        _ => false
+    };
 
     IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>
         new(

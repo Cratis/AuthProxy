@@ -550,6 +550,11 @@ sealed value rather than left to the cookie's `Max-Age`, which a non-browser cli
 record that cannot be unsealed (for example after a data-protection key rotation) is not a failure: the
 caller is simply re-authorized against the services.
 
+A readable identity that names a different user or display name, or cannot be read within the cookie-size
+limit, also prevents sealed-record reuse. AuthProxy resolves identity again for the current caller and
+rewrites the readable cookie. A missing or empty readable cookie does not prevent reuse. This display-state
+check can only force more checking; it never grants authorization or skips required verification.
+
 AuthProxy still reads unexpired version-one authorization records issued for legacy identities. That legacy
 format separated the expiry, raw subject, and tenant with `|`, so compatibility is limited to presented legacy
 subjects and tenant IDs that do not contain that delimiter. A delimiter-bearing value is rejected and the caller
