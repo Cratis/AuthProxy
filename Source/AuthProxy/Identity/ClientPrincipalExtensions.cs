@@ -91,13 +91,6 @@ public static class ClientPrincipalExtensions
             ?? string.Empty;
 
         var isCanonical = canonicalResolution?.IsConfigured == true && canonicalResolution.Succeeded;
-        var isCookieSession = string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal);
-        string? accountProvider = null;
-        if (isCookieSession && !isCanonical)
-        {
-            accountProvider = SessionProvider.TryRead(user, out var sessionScheme) ? sessionScheme : string.Empty;
-        }
-
         var roles = user.Claims
             .Where(claim => IsRoleClaim(claim.Type, isCanonical))
             .Select(c => c.Value)
@@ -108,7 +101,7 @@ public static class ClientPrincipalExtensions
         // get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
         // own record of how the session was signed in and stays inside the proxy.
         var claims = user.Claims
-            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !BearerRouteClaims.IsReserved(c.Type) && !SessionClaims.IsReserved(c.Type))
+            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !IsReservedSessionMetadata(c.Type))
             .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
 
         return new ClientPrincipal
@@ -118,7 +111,7 @@ public static class ClientPrincipalExtensions
             UserDetails = userDetails,
             UserRoles = roles,
             Claims = claims,
-            AccountProvider = accountProvider,
+            AccountProvider = GetAccountProvider(user, authenticationScheme, isCanonical),
         };
     }
 
@@ -173,6 +166,20 @@ public static class ClientPrincipalExtensions
         {
             requestMessage.Headers.Add(Headers.PrincipalNameExtended, userDetails);
         }
+    }
+
+    static bool IsReservedSessionMetadata(string claimType) =>
+        BearerRouteClaims.IsReserved(claimType) || SessionClaims.IsReserved(claimType);
+
+    // Only a browser session records the provider that names its account; every other principal binds by its identity provider.
+    static string? GetAccountProvider(ClaimsPrincipal user, string? authenticationScheme, bool isCanonical)
+    {
+        if (isCanonical || !string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return SessionProvider.TryRead(user, out var sessionScheme) ? sessionScheme : string.Empty;
     }
 
     static bool IsRoleClaim(string claimType, bool isCanonical) =>

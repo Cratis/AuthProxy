@@ -41,10 +41,7 @@ internal static class SessionProvider
     internal static bool TryRead(ClaimsPrincipal principal, out string scheme)
     {
         var claims = principal.Claims.Where(_ => SessionClaims.IsReserved(_.Type)).ToArray();
-        if (claims.Length == 1
-            && string.Equals(claims[0].Type, SessionClaims.ProviderScheme, StringComparison.Ordinal)
-            && !string.IsNullOrWhiteSpace(claims[0].Value)
-            && string.Equals(claims[0].Value, claims[0].Value.Trim(), StringComparison.Ordinal))
+        if (claims.Length == 1 && IsWellFormed(claims[0]))
         {
             scheme = claims[0].Value;
             return true;
@@ -53,6 +50,11 @@ internal static class SessionProvider
         scheme = string.Empty;
         return false;
     }
+
+    static bool IsWellFormed(Claim claim) =>
+        string.Equals(claim.Type, SessionClaims.ProviderScheme, StringComparison.Ordinal)
+        && !string.IsNullOrWhiteSpace(claim.Value)
+        && string.Equals(claim.Value, claim.Value.Trim(), StringComparison.Ordinal);
 
     /// <summary>
     /// Inspects whether the session records its provider.
