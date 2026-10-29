@@ -91,9 +91,11 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     const int PrefixApiOrder = 3;
     const int PrefixOrder = 4;
     const int HeaderApiOrder = 10;
-    const int QueryApiOrder = 11;
+    const int CanonicalQueryApiOrder = 11;
+    const int QueryApiOrder = 12;
     const int HeaderOrder = 20;
-    const int QueryOrder = 21;
+    const int CanonicalQueryOrder = 21;
+    const int QueryOrder = 22;
     const int HostApiOrder = 30;
     const int HostOrder = 31;
 
@@ -454,34 +456,9 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             Order = HeaderApiOrder,
         };
 
-        // Query-parameter–matched API route (adds the header for downstream).
-        // Ordered behind the header-matched route rather than beside it: a caller that sends both a
-        // x-cratis-microservice header and a ?service= parameter satisfies both, and two candidates at the same order
-        // with the same template are an AmbiguousMatchException. Endpoint selection runs ahead of
-        // authentication, so that surfaces to an unauthenticated caller as a bare 500 — trivially
-        // reachable, and in Development a stack trace. A distinct order makes the header win instead.
-        yield return new RouteConfig
-        {
-            RouteId = $"{microserviceKey}-backend-query-api",
-            Metadata = ServiceMetadata(serviceName),
-            ClusterId = BackendClusterId(microserviceKey),
-            AuthorizationPolicy = "default",
-            Match = new RouteMatch
-            {
-                Path = "/api/{**catch-all}",
-                QueryParameters =
-                [
-                    new RouteQueryParameter
-                    {
-                        Name = ServiceRoutes.ServiceQueryParameter,
-                        Mode = QueryParameterMatchMode.Exact,
-                        IsCaseSensitive = false,
-                        Values = [microserviceKey],
-                    }
-                ],
-            },
-            Order = QueryApiOrder,
-        };
+        // Distinct orders prevent ambiguity: headers win, then a matching canonical query, then legacy.
+        yield return QueryRoute(serviceName, ServiceRoutes.CanonicalServiceQueryParameter, CanonicalQueryApiOrder, backend: true);
+        yield return QueryRoute(serviceName, ServiceRoutes.ServiceQueryParameter, QueryApiOrder, backend: true);
 
         // Plain /api catch-all when there is only one microservice.
         if (isSingle)
@@ -526,29 +503,37 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             Order = HeaderOrder,
         };
 
-        // Query-parameter–matched frontend route, ordered behind the header-matched one for the same
-        // reason as the backend pair: satisfying both must select one route, not raise an ambiguity.
-        yield return new RouteConfig
+        // Frontend selectors remain behind every backend selector.
+        yield return QueryRoute(serviceName, ServiceRoutes.CanonicalServiceQueryParameter, CanonicalQueryOrder, backend: false);
+        yield return QueryRoute(serviceName, ServiceRoutes.ServiceQueryParameter, QueryOrder, backend: false);
+    }
+
+    static RouteConfig QueryRoute(string serviceName, string parameter, int order, bool backend)
+    {
+        var microserviceKey = serviceName.ToLowerInvariant();
+        var endpoint = backend ? "backend" : "frontend";
+        var selector = parameter == ServiceRoutes.CanonicalServiceQueryParameter ? "canonical-query" : "query";
+        return new RouteConfig
         {
-            RouteId = $"{microserviceKey}-frontend-query",
+            RouteId = $"{microserviceKey}-{endpoint}-{selector}{(backend ? "-api" : string.Empty)}",
             Metadata = ServiceMetadata(serviceName),
-            ClusterId = FrontendClusterId(microserviceKey),
+            ClusterId = backend ? BackendClusterId(microserviceKey) : FrontendClusterId(microserviceKey),
             AuthorizationPolicy = "default",
             Match = new RouteMatch
             {
-                Path = "/{**catch-all}",
+                Path = backend ? "/api/{**catch-all}" : "/{**catch-all}",
                 QueryParameters =
                 [
                     new RouteQueryParameter
                     {
-                        Name = ServiceRoutes.ServiceQueryParameter,
+                        Name = parameter,
                         Mode = QueryParameterMatchMode.Exact,
                         IsCaseSensitive = false,
                         Values = [microserviceKey],
                     }
                 ],
             },
-            Order = QueryOrder,
+            Order = order,
         };
     }
 

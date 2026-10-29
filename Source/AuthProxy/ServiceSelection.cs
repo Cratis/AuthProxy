@@ -11,8 +11,8 @@ namespace Cratis.AuthProxy;
 /// <remarks>
 /// Arc names it <see cref="Headers.ServiceId"/>; earlier AuthProxy releases named it
 /// <see cref="Headers.LegacyServiceId"/>. Both are accepted so an existing client keeps working, and the
-/// current name wins when a request carries both. The <c language="text">service</c> query parameter is a separate fallback the
-/// callers apply themselves.
+/// current name wins when a request carries both. Matching <c language="text">x-cratis-microservice</c> and legacy
+/// <c language="text">service</c> query parameters are separate fallbacks the callers apply themselves, in that order.
 /// </remarks>
 static class ServiceSelection
 {
