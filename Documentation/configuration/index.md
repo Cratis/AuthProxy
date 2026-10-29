@@ -21,6 +21,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
       "Services": { ... },
       "Session": { ... },
       "SignIn": { ... },
+      "OnBehalf": { ... },
       "Logout": { ... },
       "Ingress": { ... },
       "Invite": { ... },
@@ -39,6 +40,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Authentication](authentication.md) | OIDC providers, OAuth 2.0 providers such as GitHub, JWT Bearer configuration, and bearer routes for access tokens from an external authorization server. |
 | [Authorization](authorization.md) | Requiring a claim — a role, a group, a GitHub organization or team — before any request is forwarded. |
 | [Admission](admission.md) | Answering nothing at all until a caller presents a capability your own verifier admits, for a deployment whose existence is not meant to be discoverable. |
+| [On-behalf Sessions](on-behalf-sessions.md) | Letting a support person or agent act on behalf of one user in one tenant, for one issue, while the application confirms a live grant. |
 | [Tenancy](tenancy.md) | How the auth proxy resolves the current tenant from each request, and how to verify tenant existence. |
 | [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
 | [Data Protection Keys](data-protection.md) | Sharing the key ring that encrypts sessions and tokens between replicas: a file system, Azure Blob Storage or Redis, with optional Azure Key Vault key protection. |

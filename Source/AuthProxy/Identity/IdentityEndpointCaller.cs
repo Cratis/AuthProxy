@@ -3,6 +3,7 @@
 
 using System.Net;
 using System.Text.Json.Nodes;
+using Cratis.AuthProxy.OnBehalfSessions;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -33,6 +34,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
     /// <param name="timeout">How long to wait for an answer. Non-positive leaves the wait unbounded.</param>
     /// <param name="cancellationToken">The caller's own request lifetime.</param>
     /// <param name="denialWillBeLogged">Whether the resolver will log failures as Required denials.</param>
+    /// <param name="onBehalf">The active on-behalf session the call is made for, if any.</param>
     /// <returns>What the service established, and the details it supplied.</returns>
     /// <remarks>
     /// Nothing here throws. Every way the call can fail is a fact about the service, and a fact is what the
@@ -47,7 +49,8 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         string logIdentifier,
         TimeSpan timeout,
         CancellationToken cancellationToken,
-        bool denialWillBeLogged = false)
+        bool denialWillBeLogged = false,
+        OnBehalfContext? onBehalf = null)
     {
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
         logger.CallingIdentityEndpoint(url, serviceName);
@@ -58,6 +61,21 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         var tenant = HeaderValue.ToTransportValue(tenantId);
         request.Headers.Add(Headers.TenantId, tenant);
         request.Headers.Add(Headers.LegacyTenantId, tenant);
+
+        // During an on-behalf session the principal is the represented user. The call says so exactly as a forwarded
+        // request does, so the application can tell support access from the user's own sign-in here too.
+        if (onBehalf is not null)
+        {
+            var forward = new OnBehalfForward(serviceName, HttpMethod.Get, request.RequestUri!.AbsolutePath);
+            if (!onBehalf.TryIssueAssertion(forward, request.Headers.GetValues(Headers.Principal).Single(), out var assertion))
+            {
+                logger.OnBehalfAssertionUnavailable(serviceName);
+                return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.OnBehalfAssertionUnavailable);
+            }
+
+            request.Headers.Add(Headers.OnBehalfActor, onBehalf.ActorHeader);
+            request.Headers.Add(Headers.OnBehalfAssertion, assertion);
+        }
 
         using var timeoutSource = timeout > TimeSpan.Zero
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)

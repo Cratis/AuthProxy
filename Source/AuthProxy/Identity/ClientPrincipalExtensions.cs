@@ -4,6 +4,7 @@
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.BearerRoutes;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.Identity;
@@ -15,8 +16,8 @@ namespace Cratis.AuthProxy.Identity;
 public static class ClientPrincipalExtensions
 {
     /// <summary>
-    /// Builds a <see cref="ClientPrincipal"/> from the authenticated
-    /// <see cref="ClaimsPrincipal"/> on the given <paramref name="context"/>.
+    /// Builds the <see cref="ClientPrincipal"/> the request acts as: the represented user while an on-behalf session
+    /// is active on it, otherwise the authenticated caller (see <see cref="BuildActorClientPrincipal"/>).
     /// Returns <see langword="null"/> when the user is not authenticated.
     /// </summary>
     /// <param name="context">The <see cref="HttpContext"/> to read the claims from.</param>
@@ -24,7 +25,25 @@ public static class ClientPrincipalExtensions
     /// A populated <see cref="ClientPrincipal"/> when the user is authenticated;
     /// <see langword="null"/> otherwise.
     /// </returns>
-    public static ClientPrincipal? BuildClientPrincipal(this HttpContext context)
+    /// <remarks>
+    /// Everything that identifies the caller to an application — the forwarded headers, the identity endpoint call,
+    /// the identity details cookie — reads this, so an active on-behalf session changes all of them at once and none
+    /// of them can be left presenting the actor as the user.
+    /// </remarks>
+    public static ClientPrincipal? BuildClientPrincipal(this HttpContext context) =>
+        context.TryGetOnBehalf(out var onBehalf) ? onBehalf.Represented : context.BuildActorClientPrincipal();
+
+    /// <summary>
+    /// Builds a <see cref="ClientPrincipal"/> from the authenticated <see cref="ClaimsPrincipal"/> on the given
+    /// <paramref name="context"/> — the caller's own identity, whether or not they act on behalf of somebody else.
+    /// Returns <see langword="null"/> when the user is not authenticated.
+    /// </summary>
+    /// <param name="context">The <see cref="HttpContext"/> to read the claims from.</param>
+    /// <returns>
+    /// A populated <see cref="ClientPrincipal"/> when the user is authenticated;
+    /// <see langword="null"/> otherwise.
+    /// </returns>
+    public static ClientPrincipal? BuildActorClientPrincipal(this HttpContext context)
     {
         var user = context.User;
         if (user.Identity?.IsAuthenticated != true)

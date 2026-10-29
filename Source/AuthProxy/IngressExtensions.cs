@@ -11,6 +11,7 @@ using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.KeyRing;
 using Cratis.AuthProxy.Links;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.AuthProxy.Registrations;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Tenancy;
@@ -112,6 +113,9 @@ public static class IngressExtensions
         // untouched for a deployment that declares no bearer route.
         builder.AddBearerRoutes();
 
+        // The on-behalf gate is placed by UseIngress too, and is inert until the OnBehalf section is configured.
+        builder.AddActingOnBehalf();
+
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, KeyRingConfigurationValidator>();
         builder.Services
             .AddDataProtection()
@@ -210,6 +214,10 @@ public static class IngressExtensions
         app.UseMiddleware<ProxyOwnedFlowMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<AccessControlMiddleware>();
+
+        // After the deployment's gates, so an actor must be allowed in as themselves before acting as anybody, and
+        // before tenant selection, tenancy and identity resolution, so all three see the represented user.
+        app.UseMiddleware<OnBehalfMiddleware>();
         app.UseMiddleware<TenantSelectionMiddleware>();
         app.UseMiddleware<TenancyMiddleware>();
         app.UseMiddleware<InviteMiddleware>();

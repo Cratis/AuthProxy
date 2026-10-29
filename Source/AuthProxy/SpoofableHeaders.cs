@@ -20,6 +20,10 @@ namespace Cratis.AuthProxy;
 /// been forwarded in or that a downstream reads it from by default: <see cref="Headers.TenantId"/> and
 /// <see cref="Headers.LegacyTenantId"/>. Only the tenant the proxy resolved itself is ever written back.
 /// </para>
+/// <para>
+/// Every on-behalf header is matched by <see cref="Headers.OnBehalfPrefix"/> for the same reason: a caller must never
+/// be able to name an actor, or present an assertion, that AuthProxy did not issue for this request.
+/// </para>
 /// </remarks>
 static class SpoofableHeaders
 {
@@ -49,6 +53,7 @@ static class SpoofableHeaders
 
     static bool IsSpoofable(string name) =>
         name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
         || string.Equals(name, Headers.TenantId, StringComparison.OrdinalIgnoreCase)
         || string.Equals(name, Headers.LegacyTenantId, StringComparison.OrdinalIgnoreCase);
 }

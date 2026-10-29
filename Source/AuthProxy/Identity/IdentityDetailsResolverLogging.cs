@@ -17,6 +17,9 @@ internal static partial class IdentityDetailsResolverLogging
     [LoggerMessage(LogLevel.Debug, "Calling identity endpoint for service '{Service}' with UserId={UserId}")]
     internal static partial void CallingIdentityEndpointWithPrincipal(this ILogger logger, string service, string userId);
 
+    [LoggerMessage(LogLevel.Error, "The on-behalf assertion for the identity endpoint of service '{Service}' could not be issued; the endpoint was not called")]
+    internal static partial void OnBehalfAssertionUnavailable(this ILogger logger, string service);
+
     [LoggerMessage(Message = "Error calling identity endpoint for service '{Service}'")]
     internal static partial void ErrorCallingIdentityEndpoint(this ILogger logger, Exception exception, string service, LogLevel level);
 

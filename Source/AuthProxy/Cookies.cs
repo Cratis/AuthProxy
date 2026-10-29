@@ -38,6 +38,16 @@ public static class Cookies
     public const string EntryTransaction = ".cratis-entry";
 
     /// <summary>
+    /// HTTP-only cookie marking an on-behalf session, kept apart from the actor's own session cookie.
+    /// </summary>
+    /// <remarks>
+    /// It carries the protected session record — who is acting, for whom, in which tenant, for which issue — and
+    /// never the represented user's identity or any credential. It is worth nothing without the actor's own session:
+    /// a request whose signed-in caller is not the actor it names ends the on-behalf session instead of using it.
+    /// </remarks>
+    public const string OnBehalf = ".cratis-on-behalf";
+
+    /// <summary>
     /// Short-lived HTTP-only cookie used to carry the invite token across the OIDC redirect.
     /// </summary>
     public const string InviteToken = ".cratis-invite";

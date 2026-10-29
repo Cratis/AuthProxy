@@ -4,6 +4,7 @@
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.Identity;
+using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -55,7 +56,11 @@ public class TenantSelectionMiddleware(
             // Without this, declaring a path anonymous only opens it to callers with no session at all.
             || context.IsAnonymousPath(config.CurrentValue)
             || context.HasPendingInvitation()
-            || context.HasPendingRegistration())
+            || context.HasPendingRegistration()
+
+            // An on-behalf session acts in the one tenant its grant was confirmed for. Offering the actor a choice
+            // would be offering them the represented user's other tenants, which nobody granted.
+            || context.TryGetOnBehalf(out _))
         {
             await next(context);
             return;
