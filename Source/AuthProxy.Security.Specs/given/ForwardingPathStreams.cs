@@ -23,7 +23,7 @@ public class ForwardingPathStreams(ForwardingPathHarness harness)
             socket.Options.SetRequestHeader(header.Key, string.Join(',', header.Value));
         }
         using var deadline = Deadline();
-        var uri = new UriBuilder(new Uri(client.BaseAddress!, request.RequestUri!)) { Scheme = "ws" }.Uri;
+        var uri = new UriBuilder(new Uri(client.BaseAddress, request.RequestUri)) { Scheme = "ws" }.Uri;
         await socket.ConnectAsync(uri, deadline.Token);
         await AssertPayload(socket, deadline.Token);
         await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", deadline.Token);

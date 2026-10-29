@@ -15,12 +15,13 @@ public class when_a_forwarding_rule_refuses_a_bearer_route : Specification
     [InlineData(true)]
     public async Task should_never_call_the_transport(bool serviceMissing)
     {
-        var config = new C.AuthProxy { Services = new Dictionary<string, C.Service> { ["app"] = new()
+        var service = new C.Service
         {
             Backend = new() { BaseUrl = "https://backend.example.test/" },
             DeniedPaths = [new() { Path = "/mcp" }],
             BearerRoutes = [new() { PathPrefix = "/mcp", Issuers = [new() { Issuer = "https://issuer.example.test/" }], Audiences = ["api"], AcceptWithoutIdentityVerification = true }]
-        } } };
+        };
+        var config = new C.AuthProxy { Services = new Dictionary<string, C.Service> { ["app"] = service } };
         var route = BearerRouteTable.All(config).Single();
         if (serviceMissing) config.Services.Clear();
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();

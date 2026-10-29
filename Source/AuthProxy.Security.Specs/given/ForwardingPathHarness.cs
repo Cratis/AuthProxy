@@ -25,7 +25,7 @@ public class ForwardingPathHarness : ServiceRoutingHarness
         using var http = CreateSecurityClient();
         using var deadline = Deadline();
         using var client = new TcpClient();
-        await client.ConnectAsync(http.BaseAddress!.Host, http.BaseAddress.Port, deadline.Token);
+        await client.ConnectAsync(http.BaseAddress.Host, http.BaseAddress.Port, deadline.Token);
         await using var stream = client.GetStream();
         var request = new StringBuilder($"{method} {requestTarget} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n");
         if (authenticated)

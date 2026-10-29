@@ -111,7 +111,7 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
     public HttpClient CreateSecurityClient()
     {
         StartServer();
-        var address = Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        var address = Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>().Addresses.Single();
 
         return CreateClient(new WebApplicationFactoryClientOptions
         {
