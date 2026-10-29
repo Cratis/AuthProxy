@@ -309,6 +309,11 @@ public class IdentityDetailsResolver(
             // Unreadable identity state must be resolved again, not trusted to display the caller.
             return true;
         }
+        catch (InvalidOperationException)
+        {
+            // Parsing can succeed even when GetString cannot decode malformed Unicode.
+            return true;
+        }
     }
 
     static bool ReadableIdentityMatchesCaller(JsonElement identity, ClientPrincipal principal)
