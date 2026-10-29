@@ -43,7 +43,7 @@ public class ObservableConnections(ServiceRoutingHarness harness)
         AssertDestination(service, request);
     }
 
-    internal async Task DeniedWebSocket(HttpClient client, HttpRequestMessage request)
+    internal async Task DeniedWebSocket(HttpClient client, HttpRequestMessage request, HttpStatusCode expected = HttpStatusCode.Forbidden)
     {
         harness.ClearOrigins();
         request.RequestUri = new Uri(client.BaseAddress, request.RequestUri);
@@ -52,17 +52,17 @@ public class ObservableConnections(ServiceRoutingHarness harness)
         using var timeout = Deadline();
         var uri = new UriBuilder(request.RequestUri) { Scheme = "ws" }.Uri;
         await Assert.ThrowsAsync<WebSocketException>(() => socket.ConnectAsync(uri, timeout.Token));
-        Assert.Equal(HttpStatusCode.Forbidden, socket.HttpStatusCode);
+        Assert.Equal(expected, socket.HttpStatusCode);
         AssertNoOrigin(request);
     }
 
-    internal async Task DeniedServerSentEvents(HttpClient client, HttpRequestMessage request)
+    internal async Task DeniedServerSentEvents(HttpClient client, HttpRequestMessage request, HttpStatusCode expected = HttpStatusCode.Forbidden)
     {
         harness.ClearOrigins();
         request.Headers.Accept.ParseAdd("text/event-stream");
         using var timeout = Deadline();
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(expected, response.StatusCode);
         AssertNoOrigin(request);
     }
 

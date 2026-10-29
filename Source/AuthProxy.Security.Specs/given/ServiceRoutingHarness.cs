@@ -140,13 +140,19 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
         }
     }
 
+    /// <summary>Adds settings for a specialized service-routing scenario.</summary>
+    /// <param name="settings">The settings applied to the proxy.</param>
+    protected virtual void AddSettings(IDictionary<string, string?> settings)
+    {
+    }
+
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // These origins record routing, not identity verdicts. Keep service claim authorization enabled.
         builder
             .UseEnvironment("Production")
-            .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
+            .ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(WithSettings(new Dictionary<string, string?>
             {
                 [$"{C.AuthProxy.SectionKey}:Services:reports:PathPrefix"] = ReportsPrefix,
                 [$"{C.AuthProxy.SectionKey}:Services:reports:StripPathPrefix"] = "true",
@@ -176,11 +182,17 @@ public class ServiceRoutingHarness : WebApplicationFactory<Program>
                 [$"{C.Authentication.SectionKey}:OidcProviders:0:Name"] = "Provider One",
                 [$"{C.Authentication.SectionKey}:OidcProviders:0:Authority"] = "https://login.example.test/one",
                 [$"{C.Authentication.SectionKey}:OidcProviders:0:ClientId"] = "client-one",
-            }))
+            })))
             .ConfigureTestServices(services => services
                 .AddAuthentication(HeaderAuthenticationHandler.Scheme)
                 .AddScheme<AuthenticationSchemeOptions, HeaderAuthenticationHandler>(
                     HeaderAuthenticationHandler.Scheme,
                     _ => { }));
+    }
+
+    IDictionary<string, string?> WithSettings(IDictionary<string, string?> settings)
+    {
+        AddSettings(settings);
+        return settings;
     }
 }
