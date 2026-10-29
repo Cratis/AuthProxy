@@ -202,6 +202,9 @@ warn: AuthProxy is running in Configured trusted-proxy mode with no trusted prox
       A future major release will refuse to start in this state.
 ```
 
+While in this state AuthProxy also logs one warning per process the first time a caller at a public address sends
+`X-Forwarded-For` or `X-Forwarded-Proto`. The message does not include the address. Nothing else changes.
+
 > [!IMPORTANT]
 > Treat the warning as a task, not as noise. A future major release turns this condition into a refusal to
 > start. Declaring `TrustedProxies` — or stating `TrustAny` deliberately, if that genuinely describes your

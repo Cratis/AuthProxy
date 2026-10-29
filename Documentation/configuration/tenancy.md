@@ -60,7 +60,9 @@ Configure them under `Cratis:AuthProxy:TenantResolutions`:
 }
 ```
 
-If `ClaimType` is omitted, AuthProxy falls back to reading `X-MS-CLIENT-PRINCIPAL`.
+If `ClaimType` is omitted, the `http://schemas.microsoft.com/identity/claims/tenantid` claim is read. The claim is read from the signed-in user only; a principal header sent by the caller is never used.
+
+Every strategy applies the same rule to the value it resolves: letters, digits and `-._~`, at most 256 characters. A value outside the rule does not resolve, and the tenant verification URL escapes the identifier it is given.
 
 This is also how you resolve a tenant carried on an AuthProxy-issued client-credentials bearer token —
 point `ClaimType` at `cratis/tenant`. See

@@ -55,8 +55,23 @@ When the endpoint answers authoritatively that the tenant is no longer available
 `.cratis-tenant` and `.cratis-tenants` cookies are deleted and the request is replayed without them —
 the user lands back in the regular selection flow (or the no-tenant handling when nothing remains).
 Revoked tenant access therefore takes effect within the interval, without waiting for the browser
-session to end. Transport failures fail open so a transient backend outage cannot lock users out;
-the next lapse of the window retries.
+session to end. The selection is confirmed again on every request, including anonymous, invitation and registration paths,
+and a tenant is forwarded only after it was confirmed for the signed-in account.
+
+### The cookie is tied to the account
+
+`.cratis-tenant` is signed with the application's Data Protection keys and tied to the account that selected
+it, so a value copied from another browser or account is not accepted and is removed. Deployments with more
+than one replica need a shared Data Protection key ring, as they already do for sessions. A cookie written by an
+earlier version is confirmed against `TenantsEndpoint` on first use and reissued in the new form, which costs one
+call per user after the upgrade.
+
+### When the endpoint cannot answer
+
+A tenant that has not been confirmed within the window is not forwarded while `TenantsEndpoint` cannot answer.
+A normal request receives `503`; on an anonymous or registration path the request continues with no tenant.
+Setting `TenantRevalidationInterval` to zero means the signed selection is trusted until it changes, rather than
+being checked again.
 
 A user with exactly **one** tenant never receives `.cratis-tenants` (it is removed when the single
 tenant is auto-selected), so no switcher is shown for single-tenant users.

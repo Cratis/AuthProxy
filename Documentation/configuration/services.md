@@ -52,6 +52,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
 | `BearerRoutes` | `BearerRouteConfig[]` | `[]` | Path prefixes authenticated by an access token from an external authorization server instead of a browser session. See [Bearer routes](#bearer-routes). |
+| `CallerAuthorizationHeader` | `Default` \| `Forward` \| `Strip` | `Default` | Whether the `Authorization` header a caller sent reaches this service. `Default` removes it on requests authenticated by the AuthProxy session and keeps it on requests without a session. See [Caller Authorization header](#caller-authorization-header). |
 | `AccessToken` | `ServiceAccessTokenConfig` | `null` | Forwards the signed-in user's access token for this service's audience to its backend. See [Forwarding the user's access token](#forwarding-the-users-access-token). |
 
 ### ServiceEndpointConfig properties
@@ -395,6 +396,7 @@ anonymous `/reporting/api/webhook` goes to the reporting backend.
   tenant, because tenant selection is skipped along with everything else. Handle a declared path as
   tenant-optional: it already has to work for a caller with no identity at all, so identity without a
   tenant is a strictly better-informed case of the same thing.
+- AuthProxy's own cookies are not forwarded; the caller's `Authorization` header is kept unless the service sets `CallerAuthorizationHeader` to `Strip`.
 - The application remains responsible for authorizing these paths. This only stops the proxy from
   demanding a login before the application is ever reached.
 - A declared prefix is claimed for the whole proxy. An anonymous caller cannot send an `x-cratis-microservice`
@@ -879,7 +881,8 @@ provider must be configured. AuthProxy refuses to start otherwise.
   token. The token replaces any `Authorization` header the browser sent.
 - Requests to the `Frontend`, requests on [anonymous paths](#anonymous-paths), and machine callers that
   authenticate with their own bearer token ([client credentials](#client-credentials) or JWT bearer) are
-  forwarded as before.
+  forwarded as before. A session request to the `Frontend` no longer carries the caller's own `Authorization` header
+  unless the service sets [`CallerAuthorizationHeader`](#caller-authorization-header) to `Forward`.
 - Tokens stay bound to the backend and audience selected for the request across configuration reloads.
   Changing only `Backend.BaseUrl` obtains a token again instead of reusing one cached for the previous backend,
   even when the session, provider, scopes, and resource are unchanged.
@@ -905,3 +908,17 @@ restart and are not shared between replicas. With several replicas, route each s
 (sticky sessions). Otherwise a request that lands on another replica is refused with `401` until the user
 signs in again. Sessions that began before `AccessToken` was configured hold no refresh token either, so
 their users sign in again once.
+
+## Caller Authorization header
+
+`CallerAuthorizationHeader` controls whether the `Authorization` header a caller sent reaches a service.
+
+| Value | Requests authenticated by the AuthProxy session | Requests without a session |
+|-------|-------------------------------------------------|----------------------------|
+| `Default` | removed | kept |
+| `Forward` | kept | kept |
+| `Strip` | removed | removed |
+
+A token AuthProxy obtains for the service, and the bearer token of a caller AuthProxy itself authenticated,
+are always forwarded. AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
+every other cookie arrives unchanged.
