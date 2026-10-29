@@ -39,13 +39,6 @@ public class IdentityDetailsResolver(
     IIdentityAuthorizationCache authorizationCache,
     ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
 {
-    const string CacheKeyPurpose = "IdentityDetails";
-
-    /// <summary>
-    /// The label a denial is logged under when the request never reached a service to be refused by one.
-    /// </summary>
-    const string ResolutionQueueLabel = "identity-resolution";
-
     /// <summary>
     /// The longest encoded value the readable identity cookie is allowed to carry. Browsers refuse a cookie
     /// larger than 4096 bytes (name and attributes included) and reverse proxies reject a response whose headers
@@ -53,6 +46,13 @@ public class IdentityDetailsResolver(
     /// is not published through the cookie at all: a cookie is a cache of the identity, never the only copy of it.
     /// </summary>
     internal const int MaxIdentityCookieValueLength = 3072;
+
+    const string CacheKeyPurpose = "IdentityDetails";
+
+    /// <summary>
+    /// The label a denial is logged under when the request never reached a service to be refused by one.
+    /// </summary>
+    const string ResolutionQueueLabel = "identity-resolution";
 
     static readonly JsonSerializerOptions _cookieSerializerOptions = new()
     {

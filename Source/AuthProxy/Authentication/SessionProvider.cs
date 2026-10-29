@@ -69,11 +69,6 @@ internal static class SessionProvider
         return false;
     }
 
-    static bool IsWellFormed(Claim claim) =>
-        string.Equals(claim.Type, SessionClaims.ProviderScheme, StringComparison.Ordinal)
-        && !string.IsNullOrWhiteSpace(claim.Value)
-        && string.Equals(claim.Value, claim.Value.Trim(), StringComparison.Ordinal);
-
     /// <summary>
     /// Inspects whether the session records its provider.
     /// </summary>
@@ -86,7 +81,7 @@ internal static class SessionProvider
     /// </remarks>
     internal static SessionProviderState Inspect(ClaimsPrincipal principal, AuthenticationProperties? properties)
     {
-        if (properties is null || !properties.Items.ContainsKey(MarkerStateKey))
+        if (properties?.Items.ContainsKey(MarkerStateKey) != true)
         {
             return SessionProviderState.Missing;
         }
@@ -141,4 +136,9 @@ internal static class SessionProvider
             await context.HttpContext.SignOutAsync(context.Scheme.Name);
         }
     }
+
+    static bool IsWellFormed(Claim claim) =>
+        string.Equals(claim.Type, SessionClaims.ProviderScheme, StringComparison.Ordinal)
+        && !string.IsNullOrWhiteSpace(claim.Value)
+        && string.Equals(claim.Value, claim.Value.Trim(), StringComparison.Ordinal);
 }

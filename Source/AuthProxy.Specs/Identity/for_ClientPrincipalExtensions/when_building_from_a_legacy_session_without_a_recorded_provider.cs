@@ -1,9 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,8 +31,8 @@ public class when_building_from_a_legacy_session_without_a_recorded_provider : S
 
     void Because() => _result = _context.BuildClientPrincipal();
 
-    [Fact] void should_have_an_empty_account_provider() => _result!.AccountProvider.ShouldEqual(string.Empty);
-    [Fact] void should_keep_the_forwarded_identity_provider() => _result!.IdentityProvider.ShouldEqual("AuthenticationTypes.Federation");
+    [Fact] void should_have_an_empty_account_provider() => _result.AccountProvider.ShouldEqual(string.Empty);
+    [Fact] void should_keep_the_forwarded_identity_provider() => _result.IdentityProvider.ShouldEqual("AuthenticationTypes.Federation");
 
     sealed class TestAuthenticateResultFeature(AuthenticateResult result) : IAuthenticateResultFeature
     {

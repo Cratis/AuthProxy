@@ -29,7 +29,7 @@ public class when_the_identity_details_are_too_large_for_a_cookie : Specificatio
         optionsMonitor.CurrentValue.Returns(config);
 
         // A few hundred grants, as a long-lived maintainer accumulates: well past what a cookie or an ingress buffer carries.
-        var grants = string.Join(",", Enumerable.Range(0, 400).Select(_ => $"{{\"projectId\":\"{Guid.NewGuid()}\",\"role\":1}}"));
+        var grants = string.Join(',', Enumerable.Range(0, 400).Select(_ => $"{{\"projectId\":\"{Guid.NewGuid()}\",\"role\":1}}"));
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, "{\"projectAccess\":[" + grants + "]}")));

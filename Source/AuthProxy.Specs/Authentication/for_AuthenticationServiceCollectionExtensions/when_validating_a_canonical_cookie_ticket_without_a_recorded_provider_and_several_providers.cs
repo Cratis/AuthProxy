@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExtensions.given;
-using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExtensions;
 
