@@ -15,13 +15,31 @@ namespace Cratis.AuthProxy.Ingress;
 /// </remarks>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="policy">The policy deciding which peers are trusted.</param>
-public class TrustedProxyMiddleware(RequestDelegate next, ITrustedProxyPolicy policy)
+/// <param name="logger">The logger.</param>
+public class TrustedProxyMiddleware(RequestDelegate next, ITrustedProxyPolicy policy, ILogger<TrustedProxyMiddleware> logger)
 {
+    int _warned;
+
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public Task InvokeAsync(HttpContext context)
     {
-        context.MarkTrustedProxyPeer(policy.IsTrusted(context.Connection.RemoteIpAddress));
+        var peer = context.Connection.RemoteIpAddress;
+        context.MarkTrustedProxyPeer(policy.IsTrusted(peer));
+        WarnOnce(context, peer);
 
         return next(context);
+    }
+
+    void WarnOnce(HttpContext context, System.Net.IPAddress? peer)
+    {
+        if (!policy.IsLegacyAllowAll
+            || !(context.Request.Headers.ContainsKey("X-Forwarded-For") || context.Request.Headers.ContainsKey("X-Forwarded-Proto"))
+            || !PublicAddress.Is(peer)
+            || Interlocked.Exchange(ref _warned, 1) == 1)
+        {
+            return;
+        }
+
+        logger.ForwardedHeadersFromPublicAddress();
     }
 }
