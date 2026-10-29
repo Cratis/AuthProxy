@@ -57,12 +57,14 @@ public class when_tenant_revalidation_is_disabled : Specification
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";
         _context.Response.Body = new MemoryStream();
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
+        given.signed_selected_tenant_cookies.Seed(_context, "tenant-a");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);

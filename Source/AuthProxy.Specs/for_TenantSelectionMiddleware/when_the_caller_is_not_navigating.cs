@@ -67,6 +67,7 @@ public class when_the_caller_is_not_navigating : Specification
             httpClientFactory,
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

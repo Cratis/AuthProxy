@@ -55,6 +55,7 @@ public class when_authenticated_user_has_no_resolved_tenant_and_selection_strate
             httpClientFactory,
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

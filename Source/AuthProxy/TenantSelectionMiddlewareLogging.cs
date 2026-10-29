@@ -13,4 +13,10 @@ internal static partial class TenantSelectionMiddlewareLogging
 
     [LoggerMessage(LogLevel.Warning, "Tenant endpoint did not return a usable response ({ExceptionType})")]
     internal static partial void TenantEndpointReturnedUnusableResponse(this ILogger logger, string exceptionType);
+
+    [LoggerMessage(LogLevel.Warning, "The selected-tenant cookie was not valid for the signed-in account and was removed")]
+    internal static partial void SelectedTenantCookieRejected(this ILogger logger);
+
+    [LoggerMessage(LogLevel.Warning, "The selected tenant could not be confirmed because the tenant endpoint did not answer")]
+    internal static partial void SelectedTenantNotConfirmed(this ILogger logger);
 }

@@ -48,6 +48,7 @@ public class when_selecting_a_tenant : Specification
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
@@ -59,7 +60,7 @@ public class when_selecting_a_tenant : Specification
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 
-    [Fact] void should_set_selected_tenant_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.Tenant}=tenant-b");
+    [Fact] void should_set_selected_tenant_cookie_bound_to_the_signed_in_account() => given.signed_selected_tenant_cookies.ReadBack(_context).ShouldEqual(new SelectedTenantCookieValue(SelectedTenantCookieState.Bound, "tenant-b"));
     [Fact] void should_write_the_selected_tenant_cookie_as_a_session_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain("expires=");
     [Fact] void should_not_give_the_selected_tenant_cookie_a_max_age() => _context.Response.Headers.SetCookie.ToString().ShouldNotContain("max-age=");
     [Fact] void should_redirect_to_return_url() => _context.Response.Headers.Location.ToString().ShouldEqual("/dashboard");

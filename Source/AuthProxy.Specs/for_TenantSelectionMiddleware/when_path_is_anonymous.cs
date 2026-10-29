@@ -77,6 +77,7 @@ public class when_path_is_anonymous : Specification
             httpClientFactory,
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();

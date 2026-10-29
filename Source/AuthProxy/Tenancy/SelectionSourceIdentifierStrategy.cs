@@ -6,10 +6,16 @@ using C = Cratis.AuthProxy.Configuration;
 namespace Cratis.AuthProxy.Tenancy;
 
 /// <summary>
-/// Resolves the tenant directly from the selected-tenant cookie.
+/// Resolves the tenant the signed-in user selected, once it has been confirmed for that user. The selected-tenant
+/// cookie itself is never read here: the tenant selection step confirms it and records the outcome on the request.
 /// </summary>
 public class SelectionSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<SelectionOptions>
 {
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key holding the tenant that was confirmed for the signed-in user.
+    /// </summary>
+    public const string ConfirmedTenantItemKey = "Cratis.AuthProxy.ConfirmedSelectedTenant";
+
     /// <inheritdoc/>
     public C.TenantSourceIdentifierResolverType Type => C.TenantSourceIdentifierResolverType.Selection;
 
@@ -18,13 +24,14 @@ public class SelectionSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<
     {
         sourceIdentifier = string.Empty;
 
-        if (!context.Request.Cookies.TryGetValue(Cookies.Tenant, out var tenantId)
-            || string.IsNullOrWhiteSpace(tenantId))
+        if (context.Items.TryGetValue(ConfirmedTenantItemKey, out var confirmed)
+            && confirmed is string tenantId
+            && !string.IsNullOrWhiteSpace(tenantId))
         {
-            return false;
+            sourceIdentifier = tenantId;
+            return true;
         }
 
-        sourceIdentifier = tenantId;
-        return true;
+        return false;
     }
 }

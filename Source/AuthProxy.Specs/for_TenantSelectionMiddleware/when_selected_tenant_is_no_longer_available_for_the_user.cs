@@ -54,6 +54,7 @@ public class when_selected_tenant_is_no_longer_available_for_the_user : Specific
             httpClientFactory,
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
+            given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
         _context = new DefaultHttpContext();
@@ -61,6 +62,7 @@ public class when_selected_tenant_is_no_longer_available_for_the_user : Specific
         _context.Request.QueryString = new QueryString("?view=list");
         _context.Response.Body = new MemoryStream();
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
+        given.signed_selected_tenant_cookies.Seed(_context, "tenant-revoked");
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
