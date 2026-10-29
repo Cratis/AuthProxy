@@ -17,5 +17,16 @@ public class when_the_path_is_not_canonical : given.a_policy
     [InlineData("/a\0b")]
     [InlineData("/a?b")]
     [InlineData("/a#b")]
+    [InlineData("/private.")]
+    [InlineData("/private./")]
+    [InlineData("/a./b")]
+    [InlineData("/private ")]
+    [InlineData("/pri vate")]
+    [InlineData("/private\t")]
+    [InlineData("/private\u00a0")]
+    [InlineData("/private\uff0f")]
+    [InlineData("/private\uff3c")]
+    [InlineData("/pr\u0131vate")]
+    [InlineData("/pr\u017fvate")]
     public void should_refuse_the_path(string path) => Evaluate(path).ShouldEqual(ForwardingPathRefusal.NonCanonicalPath);
 }

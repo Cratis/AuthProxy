@@ -34,5 +34,8 @@ public enum ForwardingPathEntryRejection
     InvalidMatch = 8,
 
     /// <summary>A method is not an ASCII HTTP token.</summary>
-    InvalidMethod = 9
+    InvalidMethod = 9,
+
+    /// <summary>A path segment ends in a dot that an origin could trim.</summary>
+    TrailingDot = 10
 }

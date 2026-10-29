@@ -513,9 +513,15 @@ a WebSocket upgrade or server-sent event stream opens an upstream connection.
 
 When either list is configured, AuthProxy refuses decoded request paths containing residual `%`,
 backslash (`\`), semicolon (`;`), repeated separators (`//`), `.` or `..` segments, control characters,
-or `?` or `#`. It also refuses requests carrying any of `X-HTTP-Method-Override`, `X-HTTP-Method`, or
-`X-Method-Override`, regardless of the header value. These restrictions avoid a different interpretation
-at the origin: some servers collapse separators, treat semicolons specially, or decode the path again.
+any whitespace, any non-ASCII character, or `?` or `#`. Segments ending in `.` are also refused: IIS and
+Windows-based origins can trim trailing dots or whitespace and serve a denied resource such as
+`/private` when asked for `/private.` or `/private%20`. Refusing non-ASCII paths also prevents fullwidth
+solidus (`U+FF0F`), fullwidth reverse solidus (`U+FF3C`), and Unicode case-folding ambiguities.
+
+With either list configured, AuthProxy also refuses requests carrying any of
+`X-HTTP-Method-Override`, `X-HTTP-Method`, or `X-Method-Override`, based on header presence regardless
+of its value, including an empty value. These restrictions avoid a different interpretation at the
+origin: some servers collapse separators, treat semicolons specially, or decode the path again.
 For example, `/api/allowed/%252e%252e/other` becomes `/api/allowed/%2e%2e/other` after one decode; an
 origin that decodes again could resolve it outside the allowed prefix. AuthProxy refuses the residual
 percent encoding instead of relying on the origin's normalization. Kestrel may reject a malformed
@@ -523,7 +529,8 @@ request with `400` before it reaches the policy.
 
 Configuration paths must be rooted literal paths using only ASCII letters, digits, `-`, `.`, `_`, `~`,
 and `/`. No whitespace, encoding, query, fragment, wildcard, route template, empty interior segment or
-dot segment is allowed. Invalid rules stop startup rather than silently dropping a restriction.
+dot segment is allowed, and no segment may end in a dot. The same whitespace and non-ASCII restrictions
+apply to configuration entries. Invalid rules stop startup rather than silently dropping a restriction.
 
 ### Authentication, refusals and limits
 
@@ -544,6 +551,11 @@ authenticated request can still trigger those existing calls; they do not carry 
 path, query, method or body. Paths AuthProxy answers itself, such as `/.cratis/providers`, are also
 outside this forwarding policy. An application request to an origin's `/.cratis/commands` or
 `/.cratis/queries` is not an AuthProxy-owned endpoint and is subject to the rules.
+
+Route snapshots and the live policy options are published independently during configuration reload.
+A request can observe an earlier policy while the matching YARP route snapshot is being replaced.
+When introducing or tightening a policy, deploy or restart AuthProxy under controlled traffic rather
+than treating live reload as an atomic security cutover.
 
 When neither list is configured on a service, forwarding behavior is unchanged.
 

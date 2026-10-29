@@ -76,7 +76,7 @@ public class ForwardingPathHarness : ServiceRoutingHarness
         settings[$"{reports}:ForwardedPaths:4:Match"] = "Exact";
         AddPaths(settings, $"{reports}:DeniedPaths", ["/api/allowed/secret"]);
         settings[$"{reports}:AnonymousPaths:1"] = "/reports/api/hook";
-        AddPaths(settings, $"{portal}:DeniedPaths", ["/.cratis/commands", "/.cratis/queries", "/openapi", "/api/report", "/api/items"]);
+        AddPaths(settings, $"{portal}:DeniedPaths", ["/.cratis/commands", "/.cratis/queries", "/openapi", "/api/report", "/api/items", "/private"]);
         settings[$"{portal}:DeniedPaths:3:Methods:0"] = "GET";
         settings[$"{portal}:DeniedPaths:4:Methods:0"] = "DELETE";
     }

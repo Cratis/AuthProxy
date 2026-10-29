@@ -62,7 +62,8 @@ public static class ForwardingPathPolicy
     /// <param name="path">The decoded path, not the query or raw target.</param>
     /// <returns>Whether the path is unambiguous.</returns>
     public static bool IsUnambiguous(PathString path) => BearerRouteTable.IsUnambiguous(path)
-        && !(path.Value ?? string.Empty).Any(character => char.IsControl(character) || character is '?' or '#');
+        && !HasTrailingDot(path)
+        && !(path.Value ?? string.Empty).Any(character => !char.IsAscii(character) || char.IsControl(character) || char.IsWhiteSpace(character) || character is '?' or '#');
 
     /// <summary>Evaluates a request against the selected service's compiled forwarding policy.</summary>
     /// <param name="request">The request.</param>
@@ -101,8 +102,16 @@ public static class ForwardingPathPolicy
         if (path.Any(char.IsWhiteSpace)) return ForwardingPathEntryRejection.Whitespace;
         if (path.AsSpan().ContainsAnyExcept(_literalPathCharacters)) return ForwardingPathEntryRejection.DisallowedCharacter;
         if (path.Contains("//", StringComparison.Ordinal)) return ForwardingPathEntryRejection.EmptySegment;
-        return path.Split('/').Any(segment => string.Equals(segment, ".", StringComparison.Ordinal) || string.Equals(segment, "..", StringComparison.Ordinal)) ? ForwardingPathEntryRejection.DotSegment : ForwardingPathEntryRejection.None;
+        return ValidateSegments(path);
     }
+
+    static ForwardingPathEntryRejection ValidateSegments(PathString path)
+    {
+        if (path.Value!.Split('/').Any(segment => string.Equals(segment, ".", StringComparison.Ordinal) || string.Equals(segment, "..", StringComparison.Ordinal))) return ForwardingPathEntryRejection.DotSegment;
+        return HasTrailingDot(path) ? ForwardingPathEntryRejection.TrailingDot : ForwardingPathEntryRejection.None;
+    }
+
+    static bool HasTrailingDot(PathString path) => (path.Value ?? string.Empty).Split('/').Any(segment => segment.EndsWith('.'));
 
     static PathString Normalize(PathString path)
     {

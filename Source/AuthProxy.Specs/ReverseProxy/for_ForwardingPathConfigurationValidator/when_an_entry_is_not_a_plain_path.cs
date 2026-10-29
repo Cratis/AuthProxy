@@ -24,6 +24,12 @@ public class when_an_entry_is_not_a_plain_path : Specification
     [InlineData("/a:b")]
     [InlineData("/a@b")]
     [InlineData("/café")]
+    [InlineData("/private.")]
+    [InlineData("/a./b")]
+    [InlineData("/private./")]
+    [InlineData("/private\t")]
+    [InlineData("/private\uff0f")]
+    [InlineData("/private\uff3c")]
     [InlineData("/a\0b")]
     [InlineData("/a\nb")]
     public void should_name_the_service_list_index_and_reason(string path)
