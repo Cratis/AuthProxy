@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy.BearerRoutes;
 
 internal static partial class BearerRoutesLogging
 {
+    [LoggerMessage(LogLevel.Information, "Refused to forward {Method} {Path} to service '{Service}' (forwarding policy)")]
+    internal static partial void ForwardingPathRefused(this ILogger logger, string method, string path, string service);
+
     [LoggerMessage(LogLevel.Warning, "The metadata at '{MetadataAddress}' does not name the configured issuer '{Issuer}'. Tokens from that issuer are refused until it does.")]
     internal static partial void IssuerMetadataNamesAnotherIssuer(this ILogger logger, string issuer, string metadataAddress);
 

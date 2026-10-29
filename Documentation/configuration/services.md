@@ -50,10 +50,22 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `ActivityTimeout` | `TimeSpan` | The root `ActivityTimeout`, then `00:05:00` | How long a request proxied to this service may sit idle before AuthProxy cancels it. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
+| `ForwardedPaths` | `ForwardingPathRuleConfig[]` | `[]` | Service-relative paths and methods that may be forwarded. Empty permits anything not denied. See [Forwarded and denied paths](#forwarded-and-denied-paths). |
+| `DeniedPaths` | `ForwardingPathRuleConfig[]` | `[]` | Service-relative paths and methods never forwarded, even when an allow rule matches. See [Forwarded and denied paths](#forwarded-and-denied-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
 | `BearerRoutes` | `BearerRouteConfig[]` | `[]` | Path prefixes authenticated by an access token from an external authorization server instead of a browser session. See [Bearer routes](#bearer-routes). |
 | `CallerAuthorizationHeader` | `Default` \| `Forward` \| `Strip` | `Default` | Whether the `Authorization` header a caller sent reaches this service. `Default` removes it on requests authenticated by the AuthProxy session and keeps it on requests without a session. See [Caller Authorization header](#caller-authorization-header). |
 | `AccessToken` | `ServiceAccessTokenConfig` | `null` | Forwards the signed-in user's access token for this service's audience to its backend. See [Forwarding the user's access token](#forwarding-the-users-access-token). |
+
+### ForwardingPathRuleConfig properties
+
+Each entry in `ForwardedPaths` or `DeniedPaths` is a literal path rule.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `Path` | `string` | `""` (invalid) | Rooted literal path relative to the service endpoint's `BaseUrl`, after optional prefix stripping. |
+| `Match` | `Prefix` \| `Exact` | `Prefix` | Match a segment prefix and its descendants, or only the exact path. Root `/` requires `Exact`. |
+| `Methods` | `string[]` | `[]` | HTTP method tokens. Empty matches every method; `GET` also covers `HEAD` and extended CONNECT WebSockets. |
 
 ### ServiceEndpointConfig properties
 
@@ -412,6 +424,140 @@ anonymous `/reporting/api/webhook` goes to the reporting backend.
   unresolved-tenant refusal and the tenant-selection page are all skipped for it, so a user who happens to
   be signed in — without having chosen a tenant — still gets the application's response rather than a
   chooser page.
+
+---
+
+## Forwarded and denied paths
+
+Use `DeniedPaths` to hide application endpoints such as `/.cratis/commands`, `/.cratis/queries`,
+`/openapi`, or diagnostics without removing them from the application. Use `ForwardedPaths` when you
+want to expose only a small surface, such as an API or tool endpoint, rather than the whole service.
+Both settings belong to each service under `Cratis:AuthProxy:Services`:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "portal": {
+          "Backend": { "BaseUrl": "http://portal-api:8080/" },
+          "Frontend": { "BaseUrl": "http://portal-web:3000/" },
+          "DeniedPaths": [
+            { "Path": "/.cratis/commands" },
+            { "Path": "/.cratis/queries" },
+            { "Path": "/openapi" },
+            { "Path": "/diagnostics" }
+          ]
+        },
+        "reports": {
+          "PathPrefix": "/reports",
+          "StripPathPrefix": true,
+          "Backend": { "BaseUrl": "http://reports-api:8080/" },
+          "Frontend": { "BaseUrl": "http://reports-web:3000/" },
+          "AnonymousPaths": [ "/reports/api/health" ],
+          "ForwardedPaths": [
+            { "Path": "/api" },
+            { "Path": "/", "Match": "Exact" }
+          ],
+          "DeniedPaths": [
+            { "Path": "/api/private" }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+### Matching and precedence
+
+Rules are **case-insensitive**, and a single trailing slash does not change a match. A `Prefix` rule
+matches whole path segments, not a string prefix; an `Exact` rule matches only that path.
+
+| Rule | Matches | Does not match |
+|------|---------|----------------|
+| `/openapi`, `Prefix` | `/openapi`, `/OPENAPI/`, `/openapi/v1.json` | `/openapix` |
+| `/api/health`, `Exact` | `/api/health`, `/API/HEALTH/` | `/api/health/details` |
+| `/`, `Exact` | `/` (including an empty path after stripping) | `/index.html`, `/api` |
+
+A matching deny rule always wins. If `ForwardedPaths` is nonempty, at least one allow rule must match
+the path **and** method. If it is empty, any path not denied may be forwarded. Do not use a root prefix
+to mean “everything”: `/` is valid only with `Exact`, for example to expose a frontend's index.
+
+Case-insensitive allow rules do not change how the origin routes requests. If your frontend is
+case-sensitive, `/API/x` and `/api/x` may select different resources there even though the same rule
+allows both. Prefer lowercase allow entries and ensure the resources they cover are safe to expose.
+
+### Public paths versus service-relative paths
+
+Forwarding rules match the path **after** optional `StripPathPrefix` removal, relative to the selected
+backend or frontend's `BaseUrl`. They do not include the query string or `PathBase`. `AnonymousPaths`,
+in contrast, names public paths before stripping:
+
+| Setting on a service mounted at `/reports`, with stripping enabled | Entry | Public request |
+|------------------------------------------------------------------|-------|----------------|
+| `AnonymousPaths` | `/reports/api/health` | `/reports/api/health` may skip sign-in |
+| `ForwardedPaths` | `/api/health` | `/reports/api/health` may reach the origin as `/api/health` |
+| `DeniedPaths` | `/api/private` | `/reports/api/private` must not reach the origin |
+
+The policy belongs to the **service entry**, not the origin URL. It follows the service selected by a
+host, path prefix, routing header, query selector or legacy selector. If several service entries point
+to the same origin, configure the policy on **every entry** that needs the restriction.
+
+### HTTP methods and unambiguous paths
+
+An empty `Methods` list matches every HTTP method. Method names are case-insensitive ASCII HTTP tokens.
+`GET` also covers `HEAD`; no other method is implied, so `OPTIONS` requires its own rule when you use a
+method-scoped allow list. WebSockets using HTTP/2 extended CONNECT count as `GET`. The policy runs before
+a WebSocket upgrade or server-sent event stream opens an upstream connection.
+
+When either list is configured, AuthProxy refuses decoded request paths containing residual `%`,
+backslash (`\`), semicolon (`;`), repeated separators (`//`), `.` or `..` segments, control characters,
+any whitespace, any non-ASCII character, or `?` or `#`. Segments ending in `.` are also refused: IIS and
+Windows-based origins can trim trailing dots or whitespace and serve a denied resource such as
+`/private` when asked for `/private.` or `/private%20`. Refusing non-ASCII paths also prevents fullwidth
+solidus (`U+FF0F`), fullwidth reverse solidus (`U+FF3C`), and Unicode case-folding ambiguities.
+
+With either list configured, AuthProxy also refuses requests carrying any of
+`X-HTTP-Method-Override`, `X-HTTP-Method`, or `X-Method-Override`, based on header presence regardless
+of its value, including an empty value. These restrictions avoid a different interpretation at the
+origin: some servers collapse separators, treat semicolons specially, or decode the path again.
+For example, `/api/allowed/%252e%252e/other` becomes `/api/allowed/%2e%2e/other` after one decode; an
+origin that decodes again could resolve it outside the allowed prefix. AuthProxy refuses the residual
+percent encoding instead of relying on the origin's normalization. Kestrel may reject a malformed
+request with `400` before it reaches the policy.
+
+Configuration paths must be rooted literal paths using only ASCII letters, digits, `-`, `.`, `_`, `~`,
+and `/`. No whitespace, encoding, query, fragment, wildcard, route template, empty interior segment or
+dot segment is allowed, and no segment may end in a dot. The same whitespace and non-ASCII restrictions
+apply to configuration entries. Invalid rules stop startup rather than silently dropping a restriction.
+
+### Authentication, refusals and limits
+
+The policy applies to **every forwarded request**, including declared anonymous paths, bearer routes,
+and bearer resource-metadata paths. These declarations do not implicitly add allow rules. If a service's
+forwarding policy refuses one of its anonymous or bearer declarations, AuthProxy logs a startup warning;
+correct the conflicting configuration rather than relying on the declaration to override the policy.
+
+Authentication and authorization still run first. A caller without a session receives today's
+unauthenticated response rather than learning which authenticated paths are refused. A forwarding-policy
+refusal returns the same uniform `404 Not Found` response as other uniform refusals, with
+`Cache-Control: no-store`, no redirect, no authentication challenge and no `Allow` or `Set-Cookie` header.
+The existing malformed bearer-path check can still return `400` before the forwarding policy runs.
+
+This is not a filter on AuthProxy's own calls: identity enrichment through `/.cratis/me`, tenant
+verification or listing, and registration calls are **not governed** by these lists. A refused
+authenticated request can still trigger those existing calls; they do not carry the refused request's
+path, query, method or body. Paths AuthProxy answers itself, such as `/.cratis/providers`, are also
+outside this forwarding policy. An application request to an origin's `/.cratis/commands` or
+`/.cratis/queries` is not an AuthProxy-owned endpoint and is subject to the rules.
+
+Route snapshots and the live policy options are published independently during configuration reload.
+A request can observe an earlier policy while the matching YARP route snapshot is being replaced.
+When introducing or tightening a policy, deploy or restart AuthProxy under controlled traffic rather
+than treating live reload as an atomic security cutover.
+
+When neither list is configured on a service, forwarding behavior is unchanged.
 
 ---
 

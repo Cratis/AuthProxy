@@ -56,6 +56,7 @@ public static class ReverseProxyExtensions
             });
 
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardingPathConfigurationValidator>();
 
         return builder;
     }
@@ -69,6 +70,7 @@ public static class ReverseProxyExtensions
     {
         app.MapReverseProxy(proxy =>
         {
+            proxy.UseMiddleware<ForwardingPathMiddleware>();
             proxy.UseMiddleware<AccessTokenForwardingMiddleware>();
 
             // The stages MapReverseProxy() runs when it is given no pipeline of its own.
