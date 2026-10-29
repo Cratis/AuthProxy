@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy.ReverseProxy;
 
 internal static partial class MicroserviceReverseProxyConfigProviderLogging
 {
+    [LoggerMessage(LogLevel.Warning, "Service '{Service}' declares {Kind} '{Path}', but its forwarding policy refuses it; requests there are answered 404.")]
+    internal static partial void ForwardingPathConflict(this ILogger logger, string service, string kind, string path);
+
     [LoggerMessage(LogLevel.Warning, "Anonymous path '{Path}' is declared by more than one service. Service '{ServingService}' serves it; the declaration on '{IgnoredService}' has no effect, and requests below that prefix will not reach it.")]
     internal static partial void AnonymousPathAlreadyClaimed(this ILogger logger, string path, string servingService, string ignoredService);
 

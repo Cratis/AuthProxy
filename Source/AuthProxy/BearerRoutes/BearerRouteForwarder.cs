@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;
@@ -46,6 +47,15 @@ public sealed class BearerRouteForwarder(
     /// <inheritdoc/>
     public async Task Forward(HttpContext context, ResolvedBearerRoute route, BearerForwardedIdentity? identity)
     {
+        var current = config.CurrentValue;
+        current.Services.TryGetValue(route.ServiceName, out var service);
+        if (service is null || ForwardingPathPolicy.Evaluate(context.Request, service, context.Request.Path) != ForwardingPathRefusal.None)
+        {
+            logger.ForwardingPathRefused(context.Request.Method, RequestPathRedaction.Redact(context.Request.Path), route.ServiceName);
+            await UniformDenial.Write(context);
+            return;
+        }
+
         if (identity is null)
         {
             context.Items.Remove(BearerRouteDefaults.ForwardedIdentityItemKey);
@@ -55,12 +65,10 @@ public sealed class BearerRouteForwarder(
             context.Items[BearerRouteDefaults.ForwardedIdentityItemKey] = identity;
         }
 
-        var current = config.CurrentValue;
-        current.Services.TryGetValue(route.ServiceName, out var service);
         var requestConfig = new ForwarderRequestConfig
         {
-            ActivityTimeout = service?.Backend?.ActivityTimeout
-                ?? service?.ActivityTimeout
+            ActivityTimeout = service.Backend?.ActivityTimeout
+                ?? service.ActivityTimeout
                 ?? current.ActivityTimeout
                 ?? C.AuthProxy.DefaultActivityTimeout,
         };

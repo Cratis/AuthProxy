@@ -117,6 +117,22 @@ public class Service
     /// </remarks>
     public IList<string> AnonymousPaths { get; set; } = [];
 
+    /// <summary>Gets or sets the service-relative paths that may be forwarded; empty permits any path not denied.</summary>
+    /// <remarks>
+    /// Both lists are opt-in: when both are empty, forwarding is unchanged. Paths are relative to the endpoint
+    /// BaseUrl, after optional StripPathPrefix removal. Deny rules win. When either list is set, non-canonical
+    /// request paths are refused. This is not an authentication exemption and does not govern AuthProxy's own
+    /// calls, such as /.cratis/me, tenant verification or registration.
+    /// </remarks>
+    public IList<ForwardingPathRule> ForwardedPaths { get; set; } = [];
+
+    /// <summary>Gets or sets the service-relative paths that must never be forwarded.</summary>
+    /// <remarks>
+    /// Deny rules take precedence over allow rules, including for authenticated callers. Paths and opt-in
+    /// behavior follow <see cref="ForwardedPaths"/>; AuthProxy's own calls remain outside this policy.
+    /// </remarks>
+    public IList<ForwardingPathRule> DeniedPaths { get; set; } = [];
+
     /// <summary>
     /// Gets or sets the authorization requirements that apply to requests routed to this service.
     /// </summary>

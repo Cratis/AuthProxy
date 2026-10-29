@@ -152,6 +152,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             var key = name.ToLowerInvariant();
 
             ReportRefusedAnonymousPaths(key, ms, logger);
+            ForwardingPathDeclarations.Warn(name, ms, logger);
             routes.AddRange(AnonymousRoutes(name, ms, claimedAnonymousPaths, logger));
             routes.AddRange(PathPrefixRoutes(name, ms));
             routes.AddRange(HostRoutes(name, ms));
