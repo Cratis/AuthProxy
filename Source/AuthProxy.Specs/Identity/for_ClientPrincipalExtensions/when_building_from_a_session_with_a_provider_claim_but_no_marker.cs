@@ -3,7 +3,6 @@
 
 using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,9 +32,9 @@ public class when_building_from_a_session_with_a_provider_claim_but_no_marker : 
 
     void Because() => _result = _context.BuildClientPrincipal();
 
-    [Fact] void should_not_trust_the_claim() => _result!.AccountProvider.ShouldEqual(string.Empty);
-    [Fact] void should_keep_the_forwarded_identity_provider() => _result!.IdentityProvider.ShouldEqual("AuthenticationTypes.Federation");
-    [Fact] void should_not_forward_the_session_claim() => _result!.Claims.Any(_ => SessionClaims.IsReserved(_.Type)).ShouldBeFalse();
+    [Fact] void should_not_trust_the_claim() => _result.AccountProvider.ShouldEqual(string.Empty);
+    [Fact] void should_keep_the_forwarded_identity_provider() => _result.IdentityProvider.ShouldEqual("AuthenticationTypes.Federation");
+    [Fact] void should_not_forward_the_session_claim() => _result.Claims.Any(_ => SessionClaims.IsReserved(_.Type)).ShouldBeFalse();
 
     sealed class TestAuthenticateResultFeature(AuthenticateResult result) : IAuthenticateResultFeature
     {

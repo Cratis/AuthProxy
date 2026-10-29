@@ -105,13 +105,14 @@ public class AccessPolicy : IAccessPolicy
     /// <remarks>
     /// A request that matches no service route is not forwarded at all. When it still names a service in the
     /// <c language="text">x-cratis-microservice</c> header (or legacy <c language="text">Service-ID</c>) or the
-    /// <c language="text">service</c> query parameter, that service's requirements apply anyway — the stricter
+    /// <c language="text">x-cratis-microservice</c> query parameter (then legacy <c language="text">service</c>), that service's requirements apply anyway — the stricter
     /// answer costs nothing for a request that goes nowhere. An unknown header does not hide a query-selected
     /// service's requirements. A request that names none gets only the root requirements.
     /// </remarks>
     static C.Service? NamedService(HttpContext context, C.AuthProxy config)
     {
         return FindService(config, ServiceSelection.FromHeaders(context.Request.Headers))
+            ?? FindService(config, context.Request.Query[ServiceRoutes.CanonicalServiceQueryParameter].FirstOrDefault())
             ?? FindService(config, context.Request.Query[ServiceRoutes.ServiceQueryParameter].FirstOrDefault());
     }
 

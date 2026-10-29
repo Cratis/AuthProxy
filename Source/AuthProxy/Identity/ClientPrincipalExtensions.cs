@@ -171,7 +171,14 @@ public static class ClientPrincipalExtensions
     static bool IsReservedSessionMetadata(string claimType) =>
         BearerRouteClaims.IsReserved(claimType) || SessionClaims.IsReserved(claimType);
 
-    // Only a browser session records the provider that names its account; every other principal binds by its identity provider.
+    /// <summary>
+    /// Only a browser session records the provider that names its account; every other principal binds by its identity provider.
+    /// </summary>
+    /// <param name="user">The principal to bind.</param>
+    /// <param name="context">The request carrying the authentication result.</param>
+    /// <param name="authenticationScheme">The scheme that authenticated the principal.</param>
+    /// <param name="isCanonical">Whether the principal already carries a canonical identity.</param>
+    /// <returns>The recorded session provider, an empty string when unrecorded, or null for other principals.</returns>
     static string? GetAccountProvider(ClaimsPrincipal user, HttpContext context, string? authenticationScheme, bool isCanonical)
     {
         if (isCanonical || !string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal))

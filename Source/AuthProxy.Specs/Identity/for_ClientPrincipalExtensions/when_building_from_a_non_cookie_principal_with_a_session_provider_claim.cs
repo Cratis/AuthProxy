@@ -4,7 +4,6 @@
 using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cratis.AuthProxy.Identity.for_ClientPrincipalExtensions;
@@ -33,8 +32,8 @@ public class when_building_from_a_non_cookie_principal_with_a_session_provider_c
 
     void Because() => _result = _context.BuildClientPrincipal();
 
-    [Fact] void should_not_have_an_account_provider() => _result!.AccountProvider.ShouldBeNull();
-    [Fact] void should_not_forward_the_session_claim() => _result!.Claims.Any(_ => SessionClaims.IsReserved(_.Type)).ShouldBeFalse();
+    [Fact] void should_not_have_an_account_provider() => _result.AccountProvider.ShouldBeNull();
+    [Fact] void should_not_forward_the_session_claim() => _result.Claims.Any(_ => SessionClaims.IsReserved(_.Type)).ShouldBeFalse();
 
     sealed class TestAuthenticateResultFeature(AuthenticateResult result) : IAuthenticateResultFeature
     {

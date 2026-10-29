@@ -19,7 +19,7 @@ namespace Cratis.AuthProxy.ReverseProxy;
 ///   <item>Anonymous paths (<see cref="C.Service.AnonymousPaths"/>), which do not require service authentication and are resolved only from a selected proxy endpoint.</item>
 ///   <item>Host and path prefix together (<see cref="C.Service.Hosts"/> and <see cref="C.Service.PathPrefix"/>).</item>
 ///   <item>Path prefix alone.</item>
-///   <item>The <c language="text">x-cratis-microservice</c> header (or legacy <c language="text">Service-ID</c>), then the <c language="text">service</c> query parameter.</item>
+///   <item>The <c language="text">x-cratis-microservice</c> header (or legacy <c language="text">Service-ID</c>), then a matching <c language="text">x-cratis-microservice</c> query parameter, then legacy <c language="text">service</c>.</item>
 ///   <item>Host alone.</item>
 ///   <item>The single configured service, when it declares neither hosts nor a path prefix.</item>
 /// </list>
@@ -35,9 +35,14 @@ public static class ServiceRoutes
     public const string ApiPathPrefix = "/api";
 
     /// <summary>
-    /// The query-string parameter naming the target service.
+    /// The legacy query-string parameter naming the target service.
     /// </summary>
     public const string ServiceQueryParameter = "service";
+
+    /// <summary>
+    /// The canonical query-string parameter naming the target service.
+    /// </summary>
+    public const string CanonicalServiceQueryParameter = Headers.ServiceId;
 
     /// <summary>
     /// The route metadata key carrying the path prefix to remove from the forwarded path.
@@ -213,7 +218,7 @@ public static class ServiceRoutes
 
         return ByPathPrefix(services, path, _ => HostsOf(_).Any(host => Matches(host, request)))
             ?? ByPathPrefix(services, path, _ => _.Hosts.Count == 0)
-            ?? ByName(services, path, header, request.Query[ServiceQueryParameter])
+            ?? ByName(services, path, [header, request.Query[CanonicalServiceQueryParameter], request.Query[ServiceQueryParameter]])
             ?? services.FirstOrDefault(_ => PathPrefixOf(_.Service) is null && HostsOf(_.Service).Any(host => Matches(host, request)));
     }
 
@@ -225,22 +230,23 @@ public static class ServiceRoutes
             .Select(_ => _.Routed)
             .FirstOrDefault();
 
-    static RoutedService? ByName(RoutedService[] services, PathString path, StringValues header, StringValues query)
+    static RoutedService? ByName(RoutedService[] services, PathString path, StringValues[] selectors)
     {
-        RoutedService? Named(StringValues values, Func<C.Service, bool> serves) =>
-            services.FirstOrDefault(_ => serves(_.Service) && values.Any(value => string.Equals(value, _.Name, StringComparison.OrdinalIgnoreCase)));
+        RoutedService? Named(Func<C.Service, bool> serves) =>
+            selectors.Select(values => services.FirstOrDefault(_ => serves(_.Service) && values.Any(value => string.Equals(value, _.Name, StringComparison.OrdinalIgnoreCase))))
+                .FirstOrDefault(_ => _ is not null);
 
         // The backend routes only take /api, and come first; the frontend routes take every path.
         if (path.StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            var backend = Named(header, _ => _.Backend is not null) ?? Named(query, _ => _.Backend is not null);
+            var backend = Named(_ => _.Backend is not null);
             if (backend is not null)
             {
                 return backend;
             }
         }
 
-        return Named(header, _ => _.Frontend is not null) ?? Named(query, _ => _.Frontend is not null);
+        return Named(_ => _.Frontend is not null);
     }
 
     static bool IsUnderApi(string prefix) => new PathString(prefix).StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);

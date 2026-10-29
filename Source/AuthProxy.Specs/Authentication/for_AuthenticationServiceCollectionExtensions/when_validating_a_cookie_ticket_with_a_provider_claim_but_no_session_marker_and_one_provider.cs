@@ -3,7 +3,6 @@
 
 using Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExtensions.given;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExtensions;
 

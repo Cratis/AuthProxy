@@ -89,17 +89,21 @@ path prefix (see below), or when the client names the service with one of:
 | Mechanism | Example |
 |-----------|---------|
 | `x-cratis-microservice` request header | `x-cratis-microservice: portal` |
-| `service` query parameter | `?service=portal` |
+| `x-cratis-microservice` query parameter | `?x-cratis-microservice=portal` |
+| `service` query parameter (legacy alias) | `?service=portal` |
 
 `x-cratis-microservice` is the header an Arc frontend sends for HTTP requests when it sets a microservice.
 The `Service-ID` header earlier releases used is still accepted inbound and means the same thing;
 `x-cratis-microservice` wins when both are sent. A header naming an unknown service does not match a route,
-so a valid `?service=` can still select the target and its authorization requirements.
+so a matching query parameter can still select the target and its authorization requirements.
+Within each backend/frontend route category, queries are tried after headers: a matching
+`?x-cratis-microservice=` wins over `?service=`. An unknown or empty canonical query value does not match,
+so a valid legacy query can still select the service.
 
-Arc's WebSocket and SSE observable connections instead send `?x-cratis-microservice=` by default.
-AuthProxy does not route on that query argument yet. In a multi-service deployment, configure Arc with
-`Globals.microserviceWSQueryArgument = 'service';` so observable connections use `?service=`.
-The selected identifier is forwarded under both header names, including when selected by `?service=`.
+Arc's WebSocket and SSE observable connections send `?x-cratis-microservice=` by default, which AuthProxy
+accepts. The previous `Globals.microserviceWSQueryArgument = 'service';` override is no longer required;
+clients using it remain compatible.
+The selected identifier is forwarded under both header names, including when selected by either query alias.
 Forwarding `Service-ID` is deprecated and will be removed in a future major release; move backends to
 `x-cratis-microservice`.
 
@@ -148,12 +152,13 @@ When more than one rule could match a request, the first one in this list wins:
 1. [Anonymous paths](#anonymous-paths).
 2. A `PathPrefix` on one of the service's `Hosts`.
 3. A `PathPrefix` on a service without `Hosts`, which matches on every host.
-4. The `x-cratis-microservice` header (or legacy `Service-ID`), then the `service` query parameter.
+4. The `x-cratis-microservice` header (or legacy `Service-ID`), then a matching `x-cratis-microservice` query parameter, then legacy `service`.
 5. `Hosts` on a service without a `PathPrefix`.
 6. The single-service catch-all routes.
 
 A path prefix claims its part of the URL, so it wins over a header or query parameter naming another
-service. A host is only a default for the requests on it: a frontend served from `portal.example.com` can
+service. Within step 4, matching `/api/...` backend routes take precedence over frontend routes, even
+when the frontend has the preferred selector. A host is only a default for the requests on it: a frontend served from `portal.example.com` can
 still call another service's backend by naming it in `x-cratis-microservice`, as Arc frontends do.
 
 The service a request is routed to is also the service whose [authorization requirements](authorization.md)
@@ -201,7 +206,7 @@ WebSocket upgrades and server-sent events follow the same routes as any other re
 #### Several hosts, one sign-in
 
 A host routes a request; it does not isolate one service from another. A service-selection header or
-`?service=` still beats the host, so a frontend served from one host can call another service's backend by
+either query alias still beats the host, so a frontend served from one host can call another service's backend by
 naming it, and that service's [authorization requirements](authorization.md) apply to the call. Its response is
 readable by scripts on the first host, and `SameSite=Lax` does not separate sibling subdomains. Do not put
 applications that must not read each other's data behind one AuthProxy.

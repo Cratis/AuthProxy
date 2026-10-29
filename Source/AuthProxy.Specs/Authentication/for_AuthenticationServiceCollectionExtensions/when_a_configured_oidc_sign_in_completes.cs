@@ -1,8 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExtensions.given;
 using System.IdentityModel.Tokens.Jwt;
+using Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExtensions.given;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 
@@ -29,6 +29,6 @@ public class when_a_configured_oidc_sign_in_completes : configured_canonical_pro
         await _oidcOptions.Events.OnTicketReceived(_ticketContext);
     }
 
-    [Fact] void should_record_exactly_one_provider_scheme() => _ticketContext.Principal!.FindAll(SessionClaims.ProviderScheme).Count().ShouldEqual(1);
-    [Fact] void should_record_the_oidc_scheme() => _ticketContext.Principal!.FindFirst(SessionClaims.ProviderScheme)!.Value.ShouldEqual("microsoft");
+    [Fact] void should_record_exactly_one_provider_scheme() => _ticketContext.Principal.FindAll(SessionClaims.ProviderScheme).Count().ShouldEqual(1);
+    [Fact] void should_record_the_oidc_scheme() => _ticketContext.Principal.FindFirst(SessionClaims.ProviderScheme).Value.ShouldEqual("microsoft");
 }
