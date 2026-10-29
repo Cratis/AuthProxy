@@ -37,6 +37,7 @@ public class a_forwarding_request : Specification
 
     protected Task Invoke()
     {
+        _continued = false;
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(_config);
         return new ForwardingPathMiddleware(Continue, monitor, NullLogger<ForwardingPathMiddleware>.Instance).InvokeAsync(_context);

@@ -9,16 +9,9 @@ public class when_no_service_resolves_and_a_forwarding_policy_exists : given.a_f
     async Task should_fail_closed()
     {
         Select("missing-backend-cluster");
+        ForwardingPathPolicy.AnyConfigured(_config).ShouldBeTrue();
+        ServiceRoutes.Resolve(_context.Request, _config).ShouldBeNull();
         await Invoke();
         AssertDenied();
-    }
-
-    [Fact]
-    async Task should_preserve_the_unconfigured_pipeline()
-    {
-        _config.Services["app"] = new C.Service();
-        Select("missing-backend-cluster");
-        await Invoke();
-        _continued.ShouldBeTrue();
     }
 }

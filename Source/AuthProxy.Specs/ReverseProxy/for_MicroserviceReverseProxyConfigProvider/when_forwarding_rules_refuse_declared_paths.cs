@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.given;
+
 namespace Cratis.AuthProxy.ReverseProxy.for_MicroserviceReverseProxyConfigProvider;
 
 public class when_forwarding_rules_refuse_declared_paths : Specification
@@ -14,7 +16,10 @@ public class when_forwarding_rules_refuse_declared_paths : Specification
         var service = Service();
         service.ForwardedPaths = [new() { Path = "/api/other" }];
         var logger = Build(service);
-        Warnings(logger).ShouldContain($"Service 'reports' declares {kind} '{path}', but its forwarding policy refuses it; requests there are answered 404.");
+        var warnings = Warnings(logger);
+        warnings.Length.ShouldEqual(3);
+        warnings.ShouldContain($"Service 'reports' declares {kind} '{path}', but its forwarding policy refuses it; requests there are answered 404.");
+        service.ForwardedPaths.Single().Path.ShouldEqual("/api/other");
     }
 
     [Fact]
@@ -43,20 +48,16 @@ public class when_forwarding_rules_refuse_declared_paths : Specification
         }]
     };
 
-    static ILogger<MicroserviceReverseProxyConfigProvider> Build(C.Service service)
+    static RecordingLogger<MicroserviceReverseProxyConfigProvider> Build(C.Service service)
     {
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(new C.AuthProxy { Services = new Dictionary<string, C.Service> { ["reports"] = service } });
-        var logger = Substitute.For<ILogger<MicroserviceReverseProxyConfigProvider>>();
-        logger.IsEnabled(LogLevel.Warning).Returns(true);
+        var logger = new RecordingLogger<MicroserviceReverseProxyConfigProvider>();
         using var provider = new MicroserviceReverseProxyConfigProvider(monitor, logger);
         return logger;
     }
 
-    static string[] Warnings(ILogger logger) => logger.ReceivedCalls()
-        .Where(call => string.Equals(call.GetMethodInfo().Name, nameof(ILogger.Log), StringComparison.Ordinal))
-        .Select(call => call.GetArguments())
-        .Where(arguments => Equals(arguments[0], LogLevel.Warning))
-        .Select(arguments => arguments[2]?.ToString() ?? string.Empty)
+    static string[] Warnings(RecordingLogger<MicroserviceReverseProxyConfigProvider> logger) => logger.Messages
+        .Where((_, index) => logger.Levels[index] == LogLevel.Warning)
         .ToArray();
 }

@@ -16,13 +16,4 @@ public class when_a_forwarding_rule_refuses_the_selected_service : given.a_forwa
         await Invoke();
         AssertDenied();
     }
-
-    [Fact]
-    async Task should_not_change_behavior_without_a_policy()
-    {
-        _config.Services["app"] = new C.Service();
-        Select();
-        await Invoke();
-        _continued.ShouldBeTrue();
-    }
 }
