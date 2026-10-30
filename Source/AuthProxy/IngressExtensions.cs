@@ -37,7 +37,7 @@ public static class IngressExtensions
     /// Standard guidance for containerized ASP.NET images, and incompatible with declaring the boundary
     /// here: setting it has <c language="text">ConfigureWebDefaults</c> clear the known-proxy and known-network lists and
     /// call <c language="text">UseForwardedHeaders</c> before any application middleware — so the peer
-    /// <see cref="Ingress.TrustedProxyMiddleware"/> records is already the one the header replaced.
+    /// <see cref="TrustedProxyMiddleware"/> records is already the one the header replaced.
     /// </remarks>
     public const string ForwardedHeadersEnvironmentVariable = "ASPNETCORE_FORWARDEDHEADERS_ENABLED";
 
@@ -171,6 +171,10 @@ public static class IngressExtensions
         app.UseMiddleware<TrustedProxyMiddleware>();
         app.UseForwardedHeaders();
 
+        // Wraps everything after it, so the check sees the Set-Cookie headers of the whole response — the proxy's
+        // own cookies and any a backend adds — as the response starts.
+        app.UseMiddleware<SetCookieSizeMiddleware>();
+
         // Ahead of the pages map and the static files, because both are served before authentication by
         // design — a gate placed anywhere later would leave them public whatever it decided. It short-
         // circuits on its first line for every deployment that has not opted in.
@@ -204,7 +208,7 @@ public static class IngressExtensions
         // absent one. It does nothing for a deployment that configures neither a cookie domain nor a name.
         app.UseMiddleware<SessionCookieHealingMiddleware>();
         app.UseMiddleware<LogoutMiddleware>();
-        app.UseMiddleware<Authentication.SelectProviderMiddleware>();
+        app.UseMiddleware<SelectProviderMiddleware>();
         app.UseMiddleware<LinkMiddleware>();
 
         // The invitation and registration flows are answered by their own middleware further down, and both
@@ -220,7 +224,7 @@ public static class IngressExtensions
         app.UseMiddleware<OnBehalfMiddleware>();
         app.UseMiddleware<TenantSelectionMiddleware>();
         app.UseMiddleware<TenancyMiddleware>();
-        app.UseMiddleware<InviteMiddleware>();
+        app.UseInviteMiddleware();
         app.UseMiddleware<RegistrationMiddleware>();
         app.UseMiddleware<IdentityMiddleware>();
         app.UseMiddleware<InviteRedirectMiddleware>();

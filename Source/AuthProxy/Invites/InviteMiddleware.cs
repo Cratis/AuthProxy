@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Diagnostics.CodeAnalysis;
-using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -46,28 +45,20 @@ namespace Cratis.AuthProxy.Invites;
 /// return visit to the invitation URL never re-runs the exchange or re-offers provider selection.
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
+/// <param name="invitations">The invitation lifecycle that stages, binds and completes invitations.</param>
 /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="authConfig">The authentication configuration monitor, used to determine how many providers are available.</param>
-/// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
-/// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
-/// <param name="canonicalIdentityResolver">The shared canonical identity resolver, or <see langword="null"/> for legacy-compatible direct construction.</param>
-/// <param name="attestationIssuer">The signed invitation-attestation issuer, or <see langword="null"/> for legacy-compatible direct construction.</param>
-/// <param name="entryStateProtector">The protected invitation-entry state service, or <see langword="null"/> for legacy-compatible direct construction.</param>
 public class InviteMiddleware(
     RequestDelegate next,
+    InvitationLifecycle invitations,
     IInviteTokenValidator tokenValidator,
     IOptionsMonitor<C.AuthProxy> config,
     IOptionsMonitor<C.Authentication> authConfig,
-    ITenantResolver tenantResolver,
-    IHttpClientFactory httpClientFactory,
     IErrorPageProvider errorPageProvider,
-    ILogger<InviteMiddleware> logger,
-    ICanonicalIdentityResolver? canonicalIdentityResolver,
-    IInvitationAttestationIssuer? attestationIssuer,
-    IInvitationEntryStateProtector? entryStateProtector)
+    ILogger<InviteMiddleware> logger)
 {
     /// <summary>The route prefix that triggers invite handling.</summary>
     public const string InvitePathPrefix = WellKnownPaths.InvitePathPrefix;
@@ -90,16 +81,58 @@ public class InviteMiddleware(
         Converters = { new JsonStringEnumConverter() }
     };
 
-    readonly InviteCompletion _completion = new(
-        tokenValidator,
-        config,
-        authConfig,
-        tenantResolver,
-        httpClientFactory,
-        logger,
-        canonicalIdentityResolver,
-        attestationIssuer,
-        entryStateProtector);
+    /// <summary>
+    /// Initializes an instance preserving the previously released constructor contract, composing its own invitation lifecycle.
+    /// </summary>
+    /// <param name="next">The next middleware in the pipeline.</param>
+    /// <param name="tokenValidator">The validator for invite JWT tokens.</param>
+    /// <param name="config">The auth proxy configuration monitor.</param>
+    /// <param name="authConfig">The authentication configuration monitor.</param>
+    /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
+    /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
+    /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
+    /// <param name="logger">The logger.</param>
+    /// <param name="canonicalIdentityResolver">The shared canonical identity resolver, or <see langword="null"/> for legacy-compatible direct construction.</param>
+    /// <param name="attestationIssuer">The signed invitation-attestation issuer, or <see langword="null"/> for legacy-compatible direct construction.</param>
+    /// <param name="entryStateProtector">The protected invitation-entry state service, or <see langword="null"/> for legacy-compatible direct construction.</param>
+    public InviteMiddleware(
+        RequestDelegate next,
+        IInviteTokenValidator tokenValidator,
+        IOptionsMonitor<C.AuthProxy> config,
+        IOptionsMonitor<C.Authentication> authConfig,
+        ITenantResolver tenantResolver,
+        IHttpClientFactory httpClientFactory,
+        IErrorPageProvider errorPageProvider,
+        ILogger<InviteMiddleware> logger,
+        ICanonicalIdentityResolver? canonicalIdentityResolver,
+        IInvitationAttestationIssuer? attestationIssuer,
+        IInvitationEntryStateProtector? entryStateProtector)
+        : this(
+            next,
+            new InvitationLifecycle(
+                new InviteCompletion(
+                    tokenValidator,
+                    config,
+                    authConfig,
+                    tenantResolver,
+                    httpClientFactory,
+                    logger,
+                    canonicalIdentityResolver,
+                    attestationIssuer,
+                    entryStateProtector),
+                config,
+                tenantResolver,
+                httpClientFactory,
+                logger,
+                attestationIssuer,
+                entryStateProtector),
+            tokenValidator,
+            config,
+            authConfig,
+            errorPageProvider,
+            logger)
+    {
+    }
 
     /// <summary>
     /// Initializes a legacy-compatible instance that sanitizes reserved canonical claims without resolving canonical providers.
@@ -376,12 +409,6 @@ public class InviteMiddleware(
     static bool FixedTimeEquals(string expected, string actual) =>
         CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(actual));
 
-    static bool IsStagingConfigured([NotNullWhen(true)] C.Invite? invite, string inviteToken) =>
-        invite is not null
-        && inviteToken.Length <= InviteCompletion.MaximumAttestedInvitationTokenLength
-        && !string.IsNullOrWhiteSpace(invite.StageUrl)
-        && !string.IsNullOrWhiteSpace(invite.TenantClaim);
-
     bool IsAttestedProtocolEnabled() => config.CurrentValue.Invite?.Attestation is not null;
 
     /// <summary>
@@ -486,14 +513,12 @@ public class InviteMiddleware(
         InvitationEntryState? entryState = null;
         if (plan.Attested)
         {
-            var staging = await StageInvitation(context, token);
-            if (!staging.Succeeded)
+            entryState = await invitations.Stage(context, token);
+            if (entryState is null)
             {
                 await WriteInvitationInvalid(context, StatusCodes.Status401Unauthorized);
                 return;
             }
-
-            entryState = staging.State;
         }
 
         AppendInvitationCookies(context, token, entryState);
@@ -582,7 +607,7 @@ public class InviteMiddleware(
 
         if (entryState is not null)
         {
-            context.Response.Cookies.Append(Cookies.InvitationEntryState, entryStateProtector!.Protect(entryState), CreateInvitationCookieOptions(context));
+            context.Response.Cookies.Append(Cookies.InvitationEntryState, invitations.ProtectEntryState(entryState), CreateInvitationCookieOptions(context));
         }
     }
 
@@ -611,21 +636,7 @@ public class InviteMiddleware(
     async Task ChallengeSingleProvider(HttpContext context, string token, OidcProviderInfo provider, InvitationEntryState? entryState)
     {
         var scheme = OidcProviderScheme.FromName(provider.Name);
-        var returnUrl = context.GetPathAndQuery();
-        var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl);
-        if (entryState is not null)
-        {
-            InvitationAuthenticationState.Bind(properties, entryState);
-        }
-        else if (InvitationAuthenticationState.TryBindPendingInvitation(context, properties))
-        {
-            // Nothing was staged, so bind the capability this challenge is being started for. It is
-            // what proves, on the way back, that the session completing the invitation is the one
-            // this invitation challenged for. The request's own cookie cannot say so — it is being
-            // written by this very response.
-            InvitationAuthenticationState.BindCapability(properties, token);
-        }
-        else
+        if (!invitations.TryCreateChallengeProperties(context, token, entryState, out var properties))
         {
             await WriteInvitationInvalid(context, StatusCodes.Status401Unauthorized);
             return;
@@ -659,7 +670,7 @@ public class InviteMiddleware(
     {
         PendingInvitationCookies.Delete(context);
 
-        if (_completion.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
+        if (invitations.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
         {
             context.Items[LobbyRedirectUrlItemKey] = lobbyRedirectUrl;
         }
@@ -676,7 +687,7 @@ public class InviteMiddleware(
     /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
     async Task CompleteInvitation(HttpContext context, string inviteToken)
     {
-        var exchangeResult = await _completion.ExchangeForRequest(context, inviteToken);
+        var exchangeResult = await invitations.Exchange(context, inviteToken);
         PendingInvitationCookies.Delete(context);
 
         if (await TryAnswerExchangeRefusal(context, exchangeResult))
@@ -685,7 +696,7 @@ public class InviteMiddleware(
         }
 
         if (exchangeResult == InviteExchangeResult.Success
-            && _completion.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
+            && invitations.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
         {
             context.Items[LobbyRedirectUrlItemKey] = lobbyRedirectUrl;
         }
@@ -739,74 +750,6 @@ public class InviteMiddleware(
                 WellKnownPageNames.InvitationInvalid,
                 StatusCodes.Status403Forbidden);
             return true;
-        }
-
-        return false;
-    }
-
-    async Task<(bool Succeeded, InvitationEntryState? State)> StageInvitation(HttpContext context, string inviteToken)
-    {
-        var invite = config.CurrentValue.Invite;
-        var entryState = TryCreateEntryState(context, inviteToken, invite);
-        if (entryState is null
-            || !attestationIssuer!.TryIssueStage(entryState, out var attestation))
-        {
-            return (false, null);
-        }
-
-        var body = new InvitationStageRequest(
-            entryState.InvitationTransaction,
-            inviteToken,
-            entryState.InvitationChallenge);
-        var staged = await PostStageRequest(context, invite!, attestation, body);
-        return staged ? (true, entryState) : (false, null);
-    }
-
-    InvitationEntryState? TryCreateEntryState(HttpContext context, string inviteToken, C.Invite? invite)
-    {
-        if (!IsStagingConfigured(invite, inviteToken)
-            || attestationIssuer is null
-            || entryStateProtector is null
-            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
-            || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
-        {
-            return null;
-        }
-
-        return new InvitationEntryState(
-            tenantId,
-            invitationId,
-            InvitationAttestationIssuer.CreateOpaqueValue(),
-            InvitationAttestationIssuer.CreateOpaqueValue(),
-            InvitationAuthenticationState.ComputeCapabilityHash(inviteToken),
-            DateTimeOffset.UtcNow.AddMinutes(15));
-    }
-
-    async Task<bool> PostStageRequest(
-        HttpContext context,
-        C.Invite invite,
-        string attestation,
-        InvitationStageRequest body)
-    {
-        using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, invite.StageUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
-        request.Content = JsonContent.Create(body);
-
-        try
-        {
-            using var response = await client.SendAsync(request, context.RequestAborted);
-            if (response.IsSuccessStatusCode)
-            {
-                return true;
-            }
-
-            logger.InviteExchangeEndpointFailed((int)response.StatusCode);
-        }
-        catch (Exception exception)
-        {
-            logger.FailedToCallInviteExchangeEndpoint(exception, invite.StageUrl);
         }
 
         return false;
