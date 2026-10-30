@@ -7,6 +7,7 @@ using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.ServiceDiscovery;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.ReverseProxy;
@@ -25,6 +26,8 @@ public static class ReverseProxyExtensions
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ActivityTimeoutConfigurationValidator>();
+        builder.Services.TryAddSingleton<IReplicaDiscovery, DnsReplicaDiscovery>();
+        builder.Services.AddSingleton<IDestinationResolver, ReplicaDestinationResolver>();
         builder.Services.AddSingleton<MicroserviceReverseProxyConfigProvider>();
         builder.Services.AddDistributedMemoryCache();
         builder.Services.TryAddSingleton(TimeProvider.System);
@@ -56,6 +59,7 @@ public static class ReverseProxyExtensions
             });
 
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, StickyRoutingConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardingPathConfigurationValidator>();
 
         return builder;

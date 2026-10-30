@@ -19,7 +19,8 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// bearer token keep their own <c language="text">Authorization</c> header, and anonymous paths are forwarded as they are.
 /// When no token can be obtained the request is refused with <c language="text">401</c>, never forwarded without the token
 /// the backend expects. A configuration reload snapshot whose destinations do not match the token policy is refused
-/// with <c language="text">503</c> before obtaining a token.
+/// with <c language="text">503</c> before obtaining a token. The check covers the replica destinations of a sticky
+/// service, which carry the binding as the prefix of their id.
 /// </remarks>
 /// <param name="next">The next middleware in the proxy pipeline.</param>
 /// <param name="logger">The <see cref="ILogger"/> for diagnostics.</param>
@@ -111,8 +112,8 @@ public class AccessTokenForwardingMiddleware(
         proxy.Cluster.Config.Metadata!.TryGetValue(MicroserviceReverseProxyConfigProvider.DestinationMetadataKey, out var destinationId)
         && proxy.AvailableDestinations.Count > 0
         && proxy.AllDestinations.Count > 0
-        && proxy.AvailableDestinations.All(destination => string.Equals(destination.DestinationId, destinationId, StringComparison.Ordinal))
-        && proxy.AllDestinations.All(destination => string.Equals(destination.DestinationId, destinationId, StringComparison.Ordinal));
+        && proxy.AvailableDestinations.All(destination => ReplicaDestinations.BelongsTo(destination.DestinationId, destinationId))
+        && proxy.AllDestinations.All(destination => ReplicaDestinations.BelongsTo(destination.DestinationId, destinationId));
 
     static bool IsSessionRequest(HttpContext context) =>
         context.User.Identity?.IsAuthenticated == true

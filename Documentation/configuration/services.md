@@ -73,6 +73,7 @@ Each entry in `ForwardedPaths` or `DeniedPaths` is a literal path rule.
 |----------|------|-------------|
 | `BaseUrl` | `string` | Base URL of the endpoint (e.g. `http://my-service:8080/`). |
 | `ActivityTimeout` | `TimeSpan` | Idle limit for this endpoint alone (`Backend` or `Frontend`). Overrides the service and root values. See [Timeouts and streaming](#timeouts-and-streaming). |
+| `StickyRouting` | `StickyRouting` | Backend only. Opt-in pinning of each browser to one backend replica. See [Sticky routing](#sticky-routing). |
 
 ### ServiceClientCredentialsConfig properties
 
@@ -314,6 +315,99 @@ to know:
   have an idle limit of its own.
 - **Reconnect on the client.** Browsers reconnect an `EventSource` on their own; a WebSocket client needs
   its own reconnect logic. A dropped stream is the normal way an idle one ends.
+
+---
+
+## Sticky routing
+
+Sticky routing pins each browser to one replica of a service's backend. Use it when the backend keeps per-replica caches and a user's requests should keep landing on the replica that holds their cache. It is off by default; a service without it is proxied exactly as before.
+
+### Enable it
+
+The replicas must be individually reachable by DNS. On Kubernetes that means a headless Service (`clusterIP: None`) with the same selector as the normal Service:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-headless
+spec:
+  clusterIP: None
+  selector:
+    app: core
+  ports:
+    - port: 8080
+```
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "core": {
+          "Backend": {
+            "BaseUrl": "http://core:8080/",
+            "StickyRouting": {
+              "Enabled": true,
+              "ReplicaHost": "core-headless",
+              "RefreshInterval": "00:00:15"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+As environment variables: `Cratis__AuthProxy__Services__core__Backend__StickyRouting__Enabled=true`, plus `...__ReplicaHost` and `...__RefreshInterval`.
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `Enabled` | `false` | Turns sticky routing on for this backend. |
+| `ReplicaHost` | host of `BaseUrl` | DNS name that resolves to the replicas. Must be a DNS host name: no scheme, port, path or IP address. |
+| `RefreshInterval` | `00:00:15` | How often the replicas are discovered again. Between one second and one hour. |
+
+### What is pinned
+
+Only requests to the service's backend are pinned. Identity calls such as `/.cratis/me` and client-credentials verification still go to `BaseUrl`.
+
+AuthProxy sets a per-service cookie named `.cratis-affinity-<service>` (service key in lower case). It is host-only, `HttpOnly`, `SameSite=Lax` and `Secure` when the request is HTTPS. Its value is data-protected, names a replica by an opaque id and contains no address or identity. AuthProxy removes it before forwarding, so the backend never sees it.
+
+If several AuthProxy replicas run without a shared Data Protection key ring, one replica cannot read the cookie another set. The user is then re-pinned. Nothing fails, but stickiness is lost, so share the key ring.
+
+### Discovery, fallback and refresh
+
+AuthProxy resolves `ReplicaHost` and publishes each address as its own destination. It resolves again every `RefreshInterval`, so rollouts are followed. When the pinned replica disappears or fails, the request goes to another replica and the user is re-pinned.
+
+- If DNS fails, the last known replicas are kept, as long as the service configuration is unchanged.
+- If DNS answers with no usable address, or fails and nothing is known, AuthProxy falls back to `BaseUrl`.
+- After a failure or an empty answer, the next attempt is made after at most five seconds.
+
+### Address filtering
+
+Loopback, link-local (including the `169.254.169.254` metadata address), unspecified, multicast and reserved addresses are dropped. At most 64 replicas are used.
+
+### Host and TLS
+
+Requests to a replica keep the `Host` header of the configured `BaseUrl`. For HTTPS backends that host drives SNI and certificate validation, so the backend certificate must be valid for the `BaseUrl` host. A spoofed DNS answer fails TLS. For HTTP backends, trust in cluster DNS is the same as for resolving `BaseUrl` today.
+
+### Access tokens
+
+Forwarding the user's access token keeps working: every replica carries the same destination binding as `BaseUrl`.
+
+### Not a security boundary
+
+Stickiness is a hint for caches. Backends must still scope what they serve by user and tenant.
+
+### Validation
+
+Startup fails with the full configuration key when:
+
+- `StickyRouting` is set on `Frontend`, `Registration` or `Invite:Lobby`; it only applies to `Backend`.
+- `ReplicaHost` is not stated and the host of `BaseUrl` is not a DNS name, or `ReplicaHost` is not a DNS host name.
+- `RefreshInterval` is outside one second to one hour.
+- The service name cannot name a cookie. Use letters, digits, `.`, `_` and `-`, starting with a letter or digit.
 
 ---
 
