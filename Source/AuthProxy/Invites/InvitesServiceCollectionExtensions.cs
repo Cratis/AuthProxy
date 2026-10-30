@@ -12,7 +12,8 @@ namespace Cratis.AuthProxy.Invites;
 public static class InvitesServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the <see cref="IInviteTokenValidator"/> and the shared invitation completion.
+    /// Registers the <see cref="IInviteTokenValidator"/>, the shared invitation completion and the
+    /// <see cref="InvitationLifecycle"/> that <see cref="InviteMiddleware"/> receives.
     /// </summary>
     /// <param name="builder">The <see cref="WebApplicationBuilder"/> to configure.</param>
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
@@ -41,6 +42,25 @@ public static class InvitesServiceCollectionExtensions
             sp.GetRequiredService<IHttpClientFactory>(),
             sp.GetRequiredService<ILogger<InviteCompletion>>(),
             sp.GetRequiredService<ICanonicalIdentityResolver>(),
+            sp.GetRequiredService<IInvitationAttestationIssuer>(),
+            sp.GetRequiredService<IInvitationEntryStateProtector>()));
+
+        // The middleware's own completion keeps logging under the middleware category, so it is not the registered IInviteCompletion.
+        builder.Services.AddSingleton(sp => new InvitationLifecycle(
+            new InviteCompletion(
+                sp.GetRequiredService<IInviteTokenValidator>(),
+                sp.GetRequiredService<IOptionsMonitor<Configuration.AuthProxy>>(),
+                sp.GetRequiredService<IOptionsMonitor<Configuration.Authentication>>(),
+                sp.GetRequiredService<ITenantResolver>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                sp.GetRequiredService<ILogger<InviteMiddleware>>(),
+                sp.GetRequiredService<ICanonicalIdentityResolver>(),
+                sp.GetRequiredService<IInvitationAttestationIssuer>(),
+                sp.GetRequiredService<IInvitationEntryStateProtector>()),
+            sp.GetRequiredService<IOptionsMonitor<Configuration.AuthProxy>>(),
+            sp.GetRequiredService<ITenantResolver>(),
+            sp.GetRequiredService<IHttpClientFactory>(),
+            sp.GetRequiredService<ILogger<InviteMiddleware>>(),
             sp.GetRequiredService<IInvitationAttestationIssuer>(),
             sp.GetRequiredService<IInvitationEntryStateProtector>()));
 
