@@ -491,6 +491,8 @@ answers `502` with "upstream sent too big header while reading response header f
 `proxy-buffer-size` of 4k, and the browser keeps failing the same way until its cookies are cleared.
 
 - AuthProxy keeps the provider's access and refresh tokens out of the session cookie for OIDC and OAuth providers alike.
+- AuthProxy logs a warning when the `Set-Cookie` headers on a response total more than 3.5 KB. It lists each cookie
+  by name and header size, never its value, so you can see which cookie is large and size the buffer to match.
 - Set `proxy-buffer-size: "16k"` in the ingress-nginx controller ConfigMap, or the matching per-Ingress annotation
   `nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"`, so a callback that sets many cookies still fits.
 
