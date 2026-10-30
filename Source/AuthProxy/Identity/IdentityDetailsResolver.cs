@@ -77,10 +77,7 @@ public class IdentityDetailsResolver(
         var hasPendingInvite = context.HasPendingInvitation();
 
         // Every exit path, the sealed fast path included, must retire a legacy copy of the readable cookie.
-        if (!session.EmitIdentityDetailsCookie && context.Request.Cookies.ContainsKey(Cookies.Identity))
-        {
-            ExpireIdentityCookie(context);
-        }
+        RetireLegacyIdentityCookie(context, session);
 
         var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, current.Authentication.TotalProviderCount, out var account);
         var logIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account";
@@ -275,6 +272,19 @@ public class IdentityDetailsResolver(
         return budgets.Count > 0 && budgets.TrueForAll(budget => budget > TimeSpan.Zero)
             ? budgets.Aggregate(TimeSpan.Zero, (total, budget) => total + budget)
             : Timeout.InfiniteTimeSpan;
+    }
+
+    /// <summary>
+    /// Expires a readable identity cookie the request still carries when the deployment no longer writes it.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="session">The session settings of the configuration snapshot in use.</param>
+    static void RetireLegacyIdentityCookie(HttpContext context, C.Session session)
+    {
+        if (!session.EmitIdentityDetailsCookie && context.Request.Cookies.ContainsKey(Cookies.Identity))
+        {
+            ExpireIdentityCookie(context);
+        }
     }
 
     /// <summary>
