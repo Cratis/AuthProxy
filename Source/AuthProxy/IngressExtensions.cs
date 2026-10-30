@@ -220,7 +220,7 @@ public static class IngressExtensions
         app.UseMiddleware<OnBehalfMiddleware>();
         app.UseMiddleware<TenantSelectionMiddleware>();
         app.UseMiddleware<TenancyMiddleware>();
-        app.UseMiddleware<InviteMiddleware>();
+        app.UseInviteMiddleware();
         app.UseMiddleware<RegistrationMiddleware>();
         app.UseMiddleware<IdentityMiddleware>();
         app.UseMiddleware<InviteRedirectMiddleware>();
