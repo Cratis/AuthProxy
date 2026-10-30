@@ -171,6 +171,10 @@ public static class IngressExtensions
         app.UseMiddleware<TrustedProxyMiddleware>();
         app.UseForwardedHeaders();
 
+        // Wraps everything after it, so the check sees the Set-Cookie headers of the whole response — the proxy's
+        // own cookies and any a backend adds — as the response starts.
+        app.UseMiddleware<SetCookieSizeMiddleware>();
+
         // Ahead of the pages map and the static files, because both are served before authentication by
         // design — a gate placed anywhere later would leave them public whatever it decided. It short-
         // circuits on its first line for every deployment that has not opted in.
