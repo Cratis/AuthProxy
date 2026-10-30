@@ -400,7 +400,11 @@ public static class AuthenticationServiceCollectionExtensions
         options.ClientId = provider.ClientId;
         options.ClientSecret = provider.ClientSecret;
         options.CallbackPath = $"/signin-{scheme}";
-        options.SaveTokens = true;
+
+        // The provider's access and refresh tokens stay out of the session cookie. Nothing in the proxy
+        // reads them back from it, and they are the largest items a ticket can carry, and a bigger session
+        // cookie pushes the sign-in callback's response headers toward an ingress's header buffer limit (#225).
+        options.SaveTokens = false;
 
         // Lax + SameAsRequest keeps the handshake cookie flowing across the provider redirect,
         // marks it Secure whenever the site runs on HTTPS, and still supports local HTTP
