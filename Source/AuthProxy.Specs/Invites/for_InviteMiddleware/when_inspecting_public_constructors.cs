@@ -51,6 +51,17 @@ public class when_inspecting_public_constructors : Specification
         typeof(IInvitationEntryStateProtector)
     ];
 
+    static Type[] InvitationLifecycleParameterTypes =>
+    [
+        typeof(RequestDelegate),
+        typeof(InvitationLifecycle),
+        typeof(IInviteTokenValidator),
+        typeof(IOptionsMonitor<C.AuthProxy>),
+        typeof(IOptionsMonitor<C.Authentication>),
+        typeof(IErrorPageProvider),
+        typeof(ILogger<InviteMiddleware>)
+    ];
+
     static bool HasParameters(System.Reflection.ConstructorInfo constructor, Type[] expected) =>
         constructor.GetParameters().Select(_ => _.ParameterType).SequenceEqual(expected);
 }
