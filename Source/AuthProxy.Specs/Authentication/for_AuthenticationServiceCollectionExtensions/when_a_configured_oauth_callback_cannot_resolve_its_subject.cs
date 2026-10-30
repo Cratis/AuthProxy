@@ -26,9 +26,9 @@ public class when_a_configured_oauth_callback_cannot_resolve_its_subject : confi
     }
 
     [Fact] void should_fail_the_callback() => _ticketContext.Result.Failure.ShouldNotBeNull();
-    [Fact] void should_not_apply_an_enriched_principal() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.ProviderKey).ShouldBeNull();
-    [Fact] void should_not_add_protocol_assurance() => _ticketContext.Principal!.FindFirst("acr").ShouldBeNull();
-    [Fact] void should_not_stamp_the_provider() => _ticketContext.Properties!.Items.ContainsKey(AuthenticationServiceCollectionExtensions.AuthenticationSchemeStateKey).ShouldBeFalse();
-    [Fact] void should_not_record_a_fingerprint() => _ticketContext.Properties!.Items.ContainsKey(CanonicalSessionRegistrationFingerprint.StateKey).ShouldBeFalse();
+    [Fact] void should_not_apply_an_enriched_principal() => _ticketContext.Principal.FindFirst(CanonicalIdentityClaims.ProviderKey).ShouldBeNull();
+    [Fact] void should_not_add_protocol_assurance() => _ticketContext.Principal.FindFirst("acr").ShouldBeNull();
+    [Fact] void should_not_stamp_the_provider() => _ticketContext.Properties.Items.ContainsKey(AuthenticationServiceCollectionExtensions.AuthenticationSchemeStateKey).ShouldBeFalse();
+    [Fact] void should_not_record_a_fingerprint() => _ticketContext.Properties.Items.ContainsKey(CanonicalSessionRegistrationFingerprint.StateKey).ShouldBeFalse();
     [Fact] async Task should_not_notify_sign_in() => await _notifier.DidNotReceive().Notify(Arg.Any<HttpContext>(), Arg.Any<ClaimsPrincipal?>(), Arg.Any<string?>());
 }
