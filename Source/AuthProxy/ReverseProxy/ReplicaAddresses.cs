@@ -16,6 +16,8 @@ static class ReplicaAddresses
     /// </summary>
     internal const int MaximumReplicas = 64;
 
+    static readonly IPAddress _awsIPv6Metadata = IPAddress.Parse("fd00:ec2::254");
+
     /// <summary>
     /// Builds the replica URIs for a set of addresses.
     /// </summary>
@@ -32,6 +34,14 @@ static class ReplicaAddresses
             .Take(MaximumReplicas)
             .Select(address => new UriBuilder(baseUrl) { Host = address.ToString() }.Uri)];
 
+    /// <summary>
+    /// Whether an address can be a replica. Rejected: loopback, unspecified, IPv4 0.0.0.0/8, 169.254.0.0/16
+    /// (including cloud metadata), IPv4 multicast and reserved, IPv6 link-local, IPv6 multicast and the AWS IPv6
+    /// metadata address fd00:ec2::254. Only that address is rejected from fd00::/8, as ULA is valid for pod networks.
+    /// IPv4-mapped IPv6 forms are normalised by <see cref="From"/> first, so they are rejected like the IPv4 address they carry.
+    /// </summary>
+    /// <param name="address">The address to check.</param>
+    /// <returns>True if it can be a replica.</returns>
     static bool IsReplicaCandidate(IPAddress address)
     {
         if (IPAddress.IsLoopback(address)
@@ -46,7 +56,7 @@ static class ReplicaAddresses
         return address.AddressFamily switch
         {
             AddressFamily.InterNetwork => IsPublicOrPrivateIPv4(address.GetAddressBytes()),
-            AddressFamily.InterNetworkV6 => !address.IsIPv6LinkLocal && !address.IsIPv6Multicast,
+            AddressFamily.InterNetworkV6 => !address.IsIPv6LinkLocal && !address.IsIPv6Multicast && !address.Equals(_awsIPv6Metadata),
             _ => false,
         };
     }

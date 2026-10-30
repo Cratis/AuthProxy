@@ -386,7 +386,7 @@ AuthProxy resolves `ReplicaHost` and publishes each address as its own destinati
 
 ### Address filtering
 
-Loopback, link-local (including the `169.254.169.254` metadata address), unspecified, multicast and reserved addresses are dropped. At most 64 replicas are used.
+Loopback, link-local (including the `169.254.169.254` and `fd00:ec2::254` metadata addresses, also in IPv4-mapped form), unspecified, multicast and reserved addresses are dropped. At most 64 replicas are used.
 
 ### Host and TLS
 
