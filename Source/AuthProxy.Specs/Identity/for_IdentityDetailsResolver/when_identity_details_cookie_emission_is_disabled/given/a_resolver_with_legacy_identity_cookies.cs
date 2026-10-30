@@ -24,17 +24,17 @@ public class a_resolver_with_legacy_identity_cookies : when_reusing_a_sealed_aut
     protected string AliceReadableValue => _aliceReadableCookie.Split('=', 2)[1];
 
     protected static bool ExpiresReadableCookie(HttpContext context) =>
-        context.Response.Headers.SetCookie.Any(_ => _!.StartsWith($"{Cookies.Identity}=;", StringComparison.Ordinal)
+        context.Response.Headers.SetCookie.Any(_ => _.StartsWith($"{Cookies.Identity}=;", StringComparison.Ordinal)
             && _.Contains("expires=", StringComparison.OrdinalIgnoreCase));
 
     protected static bool WritesReadableValue(HttpContext context) =>
-        context.Response.Headers.SetCookie.Any(_ => _!.StartsWith($"{Cookies.Identity}=", StringComparison.Ordinal)
+        context.Response.Headers.SetCookie.Any(_ => _.StartsWith($"{Cookies.Identity}=", StringComparison.Ordinal)
             && _.Split(';', 2)[0].Split('=', 2)[1].Length > 0);
 
     protected static bool TouchesReadableCookie(HttpContext context) =>
-        context.Response.Headers.SetCookie.Any(_ => _!.StartsWith($"{Cookies.Identity}=", StringComparison.Ordinal));
+        context.Response.Headers.SetCookie.Any(_ => _.StartsWith($"{Cookies.Identity}=", StringComparison.Ordinal));
 
     protected static bool WritesSealedRecord(HttpContext context) =>
-        context.Response.Headers.SetCookie.Any(_ => _!.StartsWith($"{Cookies.IdentityAuthorization}=", StringComparison.Ordinal)
+        context.Response.Headers.SetCookie.Any(_ => _.StartsWith($"{Cookies.IdentityAuthorization}=", StringComparison.Ordinal)
             && _.Split(';', 2)[0].Split('=', 2)[1].Length > 0);
 }
