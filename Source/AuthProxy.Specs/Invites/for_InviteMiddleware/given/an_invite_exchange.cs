@@ -141,6 +141,17 @@ public class an_invite_exchange : Specification
         InvitationSessionFixture.GivenSessionEstablishedBeforeTheInvitation(_context);
     }
 
+    /// <summary>
+    /// Places the given token in the pending invite cookie while the caller's session was issued after the
+    /// invitation came into existence but carries no invitation binding.
+    /// </summary>
+    /// <param name="token">The token to carry in the <c language="text">.cratis-invite</c> cookie.</param>
+    protected void GivenPendingInviteCookieOnASessionWithoutTheInvitationBinding(string token)
+    {
+        _context.Request.Headers.Cookie = $"{Cookies.InviteToken}={token}";
+        InvitationSessionFixture.GivenSessionEstablishedAfterTheInvitationWithoutItsBinding(_context);
+    }
+
     static IOptionsMonitor<C.Authentication> EmptyAuthConfig()
     {
         var monitor = Substitute.For<IOptionsMonitor<C.Authentication>>();

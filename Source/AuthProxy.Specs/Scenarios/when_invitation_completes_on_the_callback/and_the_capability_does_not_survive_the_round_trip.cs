@@ -8,8 +8,9 @@ namespace Cratis.AuthProxy.Scenarios.when_invitation_completes_on_the_callback;
 /// <summary>
 /// End-to-end scenario: a provider callback arrives with a pending invitation cookie but without the
 /// invitation's own capability binding — the challenge was started for something else entirely. Nothing is
-/// exchanged on the callback and the pending invitation is left alone; the post-login middleware remains the
-/// one to answer it, and does, on the follow-up request the real session cookie authenticates.
+/// exchanged on the callback and the pending invitation is left alone. The real session cookie that
+/// authenticates the follow-up request carries no invitation binding, so that request does not complete the
+/// invitation either: nothing is exchanged and the invitation stays pending.
 /// </summary>
 /// <param name="factory">The shared application factory.</param>
 public class and_the_capability_does_not_survive_the_round_trip(CallbackAuthProxyFactory factory) : IClassFixture<CallbackAuthProxyFactory>, IAsyncLifetime
@@ -67,12 +68,12 @@ public class and_the_capability_does_not_survive_the_round_trip(CallbackAuthProx
         Assert.Equal(0, _exchangeCallsDuringCallback);
 
     [Fact]
-    public void should_complete_the_invitation_through_the_middleware_on_the_follow_up() =>
-        Assert.Equal(
+    public void should_not_complete_the_invitation_on_the_follow_up() =>
+        Assert.NotEqual(
             $"{CallbackAuthProxyFactory.LobbyUrl}?invitationId={_invitationId}",
             _followUp.Headers.Location?.ToString());
 
     [Fact]
-    public void should_exchange_exactly_once_on_the_follow_up() =>
-        Assert.Equal(1, _exchangeCallsDuringFollowUp);
+    public void should_not_exchange_on_the_follow_up() =>
+        Assert.Equal(0, _exchangeCallsDuringFollowUp);
 }

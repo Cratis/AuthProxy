@@ -140,11 +140,17 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     /// <see langword="false"/> to model the browser that was already signed in when the invitation
     /// was opened — the session AuthProxy must refuse to complete an invitation with.
     /// </param>
+    /// <param name="sessionCarriesTheInvitationBinding">
+    /// Whether a session established by the invitation carries the invitation's challenge binding. Set this to
+    /// <see langword="false"/> to model a session issued after the invitation came into existence that the
+    /// provider round-trip returned without the binding.
+    /// </param>
     /// <returns>A configured <see cref="HttpClient"/> that does not follow redirects.</returns>
     public HttpClient CreateTestClient(
         bool authenticated = false,
         string? inviteTokenCookie = null,
-        bool sessionEstablishedByTheInvitation = true)
+        bool sessionEstablishedByTheInvitation = true,
+        bool sessionCarriesTheInvitationBinding = true)
     {
         var client = CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -159,6 +165,11 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
         if (!sessionEstablishedByTheInvitation)
         {
             client.DefaultRequestHeaders.Add(TestAuthHandler.PreExistingSessionHeader, "true");
+        }
+
+        if (!sessionCarriesTheInvitationBinding)
+        {
+            client.DefaultRequestHeaders.Add(TestAuthHandler.UnboundSessionHeader, "true");
         }
 
         if (!string.IsNullOrEmpty(inviteTokenCookie))
@@ -177,7 +188,8 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
     /// A real provider handshake returns the challenge properties AuthProxy started it with, so a session
     /// established for a pending invitation carries that invitation's capability binding. This stands in for
     /// that, and <see cref="PreExistingSessionHeader"/> turns it off to model the opposite case: a browser
-    /// already signed in before the invitation was ever opened.
+    /// already signed in before the invitation was ever opened. <see cref="UnboundSessionHeader"/> models a
+    /// session issued afterwards that nevertheless came back without the binding.
     /// </remarks>
     public class TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -188,6 +200,7 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
         public const string Scheme = "TestScheme";
         public const string AuthHeader = "X-Test-Auth";
         public const string PreExistingSessionHeader = "X-Test-Pre-Existing-Session";
+        public const string UnboundSessionHeader = "X-Test-Unbound-Session";
 
         /// <inheritdoc/>
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -203,16 +216,22 @@ public class AuthProxyFactory : WebApplicationFactory<Program>
             };
             var identity = new ClaimsIdentity(claims, Scheme);
 
-            // A pre-existing session predates any invitation; a fresh one was signed in just now. The
-            // issue instant is the framework-persisted fact the gate reads, so the handler models exactly
-            // that - and deliberately does NOT fabricate the capability binding the real provider round
-            // trip may or may not deliver, which once made these scenarios pass while production looped.
+            // A pre-existing session predates any invitation and carries no binding; a fresh one was signed
+            // in just now for the invitation the browser is carrying, so it holds that invitation's binding -
+            // unless the scenario says the round-trip dropped it.
+            var preExisting = Request.Headers.ContainsKey(PreExistingSessionHeader);
             var properties = new AuthenticationProperties
             {
-                IssuedUtc = Request.Headers.ContainsKey(PreExistingSessionHeader)
+                IssuedUtc = preExisting
                     ? DateTimeOffset.UtcNow.AddDays(-7)
                     : DateTimeOffset.UtcNow.AddSeconds(5),
             };
+
+            var carriesBinding = !preExisting && !Request.Headers.ContainsKey(UnboundSessionHeader);
+            if (carriesBinding && Request.Cookies.TryGetValue(Cookies.InviteToken, out var pendingInvitation))
+            {
+                InvitationAuthenticationState.BindCapability(properties, pendingInvitation);
+            }
 
             var ticket = new AuthenticationTicket(new ClaimsPrincipal(identity), properties, Scheme);
             return Task.FromResult(AuthenticateResult.Success(ticket));

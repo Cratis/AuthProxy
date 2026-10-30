@@ -80,4 +80,14 @@ public class an_invitation_entry : Specification
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "134365")], "github"));
         InvitationSessionFixture.GivenSessionEstablishedBeforeTheInvitation(_context);
     }
+
+    /// <summary>
+    /// Signs the caller in with a session issued after the invitation came into existence that carries no
+    /// invitation binding, as when the provider round-trip drops the challenge properties.
+    /// </summary>
+    protected void GivenASessionWithoutTheInvitationBinding()
+    {
+        _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "134365")], "github"));
+        InvitationSessionFixture.GivenSessionEstablishedAfterTheInvitationWithoutItsBinding(_context);
+    }
 }
