@@ -34,6 +34,7 @@ public class canonical_cookie_registration : Specification
     protected const string Subject = "subject-42";
 
     C.Authentication _authentication;
+    bool _authenticationIsInvalid;
     IAuthenticationService _authenticationService;
     string? _signedOutScheme;
     protected CookieAuthenticationOptions _cookieOptions;
@@ -54,7 +55,9 @@ public class canonical_cookie_registration : Specification
     {
         _authentication = InitialAuthentication();
         var authenticationMonitor = Substitute.For<IOptionsMonitor<C.Authentication>>();
-        authenticationMonitor.CurrentValue.Returns(_ => _authentication);
+        authenticationMonitor.CurrentValue.Returns(_ => _authenticationIsInvalid
+            ? throw new OptionsValidationException(string.Empty, typeof(C.Authentication), ["invalid"])
+            : _authentication);
 
         var builder = WebApplication.CreateBuilder();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -175,6 +178,11 @@ public class canonical_cookie_registration : Specification
             && _.Value?.StartsWith("v1:", StringComparison.Ordinal) == true);
 
     protected void UseAuthentication(C.Authentication authentication) => _authentication = authentication;
+
+    /// <summary>
+    /// Makes every later read of the current authentication configuration fail options validation.
+    /// </summary>
+    protected void UseInvalidAuthentication() => _authenticationIsInvalid = true;
 
     protected static C.Authentication InitialAuthentication(
         string name = "Microsoft",
