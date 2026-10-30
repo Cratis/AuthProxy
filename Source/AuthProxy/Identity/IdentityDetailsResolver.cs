@@ -16,7 +16,8 @@ namespace Cratis.AuthProxy.Identity;
 /// <summary>
 /// Calls every service's <c language="text">/.cratis/me</c> endpoint to retrieve application-specific
 /// identity details, merges the JSON results, converts them to an <see cref="IdentityProviderResult"/>
-/// and stores it in the <c language="text">.cratis-identity</c> response cookie as a base64-encoded JSON string.
+/// and stores it in the <c language="text">.cratis-identity</c> response cookie as a base64-encoded JSON string,
+/// unless <see cref="C.Session.EmitIdentityDetailsCookie"/> is turned off.
 /// </summary>
 /// <param name="config">The auth proxy configuration.</param>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
@@ -74,6 +75,10 @@ public class IdentityDetailsResolver(
         var current = config.CurrentValue;
         var session = current.Session;
         var hasPendingInvite = context.HasPendingInvitation();
+
+        // Every exit path, the sealed fast path included, must retire a legacy copy of the readable cookie.
+        RetireLegacyIdentityCookie(context, session);
+
         var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, current.Authentication.TotalProviderCount, out var account);
         var logIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account";
 
@@ -113,7 +118,7 @@ public class IdentityDetailsResolver(
 
         if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
         {
-            WriteIdentityState(context, cached, principal, tenantId, requiredServices);
+            WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
             logger.IdentityDetailsCacheHit(logIdentifier);
             return cached;
         }
@@ -166,7 +171,7 @@ public class IdentityDetailsResolver(
             // Double-check inside the lock — another request may have populated the cache while we waited.
             if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
             {
-                WriteIdentityState(context, cached, principal, tenantId, requiredServices);
+                WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
                 logger.IdentityDetailsCacheHit(logIdentifier);
                 return cached;
             }
@@ -208,7 +213,7 @@ public class IdentityDetailsResolver(
             }
 
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
-            WriteIdentityState(context, identityResult, principal, tenantId, verifiedRequiredServices);
+            WriteIdentityState(context, identityResult, principal, tenantId, verifiedRequiredServices, session.EmitIdentityDetailsCookie);
             logger.IdentityDetailsCookieWritten(logIdentifier);
             if (onBehalf is null && cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero
                 && verifiedRequiredServices.Order(StringComparer.Ordinal).SequenceEqual(requiredServices, StringComparer.Ordinal))
@@ -267,6 +272,19 @@ public class IdentityDetailsResolver(
         return budgets.Count > 0 && budgets.TrueForAll(budget => budget > TimeSpan.Zero)
             ? budgets.Aggregate(TimeSpan.Zero, (total, budget) => total + budget)
             : Timeout.InfiniteTimeSpan;
+    }
+
+    /// <summary>
+    /// Expires a readable identity cookie the request still carries when the deployment no longer writes it.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="session">The session settings of the configuration snapshot in use.</param>
+    static void RetireLegacyIdentityCookie(HttpContext context, C.Session session)
+    {
+        if (!session.EmitIdentityDetailsCookie && context.Request.Cookies.ContainsKey(Cookies.Identity))
+        {
+            ExpireIdentityCookie(context);
+        }
     }
 
     /// <summary>
@@ -395,12 +413,18 @@ public class IdentityDetailsResolver(
         return IdentityProviderResult.Unauthorized;
     }
 
-    void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices)
+    void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices, bool emitReadableCookie)
     {
-        // Two cookies, deliberately: the readable one the frontend renders from, and the sealed record
+        // Two cookies, deliberately: the readable one the frontend renders from (optional, see
+        // Session.EmitIdentityDetailsCookie), and the sealed record
         // that is allowed to skip this resolution next time. They are written together so the authorized
         // outcome and the proof of it can never drift apart.
         authorizationCache.Record(context, principal, tenantId, verifiedRequiredServices);
+
+        if (!emitReadableCookie)
+        {
+            return;
+        }
 
         var json = JsonSerializer.Serialize(result, _cookieSerializerOptions);
         var encoded = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));

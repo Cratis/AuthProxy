@@ -133,6 +133,17 @@ call to preserve the default behavior, where the authenticated session remains a
 See [Identity verification](../configuration/services.md#identity-enrichment) for the denial matrix
 and the direct configuration equivalent.
 
+### Readable identity cookie
+
+```csharp
+authproxy.WithoutIdentityDetailsCookie();
+```
+
+This sets the global `Session:EmitIdentityDetailsCookie` setting to `false`. AuthProxy stops writing the
+script-readable `.cratis-identity` cookie and expires any copy a browser still sends. Identity verification
+and the sealed authorization record are unaffected. Call it only once every frontend reads identity from
+`/.cratis/me`. See [The two identity cookies](../configuration/authentication.md#the-two-identity-cookies).
+
 ### Anonymous paths
 
 Declare the request paths on a service that should be served without a session — a magic-link

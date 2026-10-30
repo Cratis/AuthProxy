@@ -498,6 +498,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
         "CookieName": ".Cratis.AuthProxy.Auth.v2",
         "CookieDomain": "",
         "TerminateOnIdentityDenial": false,
+        "EmitIdentityDetailsCookie": true,
         "IdentityRevalidationInterval": "00:10:00",
         "TenantRevalidationInterval": "00:10:00"
       }
@@ -513,6 +514,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 | `CookieName` | `.Cratis.AuthProxy.Auth.v2` | Name of the session cookie. Set it to keep two AuthProxy deployments under one parent domain from reading each other's sessions, or to retire an old cookie. Changing it signs users out once. It has to be a valid cookie name, and the `__Host-` prefix is refused when `CookieDomain` is set. |
 | `CookieDomain` | `""` (host-only) | Domain the session cookie is scoped to, for example `.example.com`, so one sign-in is honored on every host under it. Empty keeps today's host-only cookie. See [One proxy, several hosts](one-proxy-several-hosts.md). |
 | `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. |
+| `EmitIdentityDetailsCookie` | `true` | Whether AuthProxy writes the readable `.cratis-identity` cookie. Set `false` once every frontend reads identity from `/.cratis/me`; AuthProxy then stops writing it and expires any copy a browser still sends. Verification and the sealed authorization record are unaffected. |
 | `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative means no bound: with any Required service (the default) no authorization record is written; when every participating service is BestEffort it falls back to ten minutes. The independent in-memory result cache still applies. |
 | `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative disables re-validation. |
 
@@ -554,6 +556,18 @@ A readable identity that names a different user or display name, or cannot be re
 limit, also prevents sealed-record reuse. AuthProxy resolves identity again for the current caller and
 rewrites the readable cookie. A missing or empty readable cookie does not prevent reuse. This display-state
 check can only force more checking; it never grants authorization or skips required verification.
+
+#### Turning the readable cookie off
+
+Set `Session:EmitIdentityDetailsCookie` to `false` to stop writing `.cratis-identity`. Only the sealed
+`.cratis-identity-authorization` cookie is written, and any readable copy a request still carries is
+expired. A missing readable cookie keeps sealed-record reuse. A legacy copy naming another user still forces
+one re-resolution and is then expired.
+
+Frontends on Arc 22.46 or later read identity from `/.cratis/me`; see the
+[Arc migration guide](https://github.com/Cratis/Arc/blob/main/Documentation/backend/csharp/identity/migrating-from-the-identity-cookie.md).
+Arc's frontend still falls back to the cookie when `/.cratis/me` answers `404`, so do not enable the
+setting while any frontend sharing the session depends on that fallback.
 
 AuthProxy still reads unexpired version-one authorization records issued for legacy identities. That legacy
 format separated the expiry, raw subject, and tenant with `|`, so compatibility is limited to presented legacy
