@@ -183,7 +183,7 @@ public class an_attested_invitation_staging : Specification
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Request = request;
-            Body = await request.Content!.ReadAsStringAsync(cancellationToken);
+            Body = await request.Content.ReadAsStringAsync(cancellationToken);
             return new HttpResponseMessage(StatusCode);
         }
     }

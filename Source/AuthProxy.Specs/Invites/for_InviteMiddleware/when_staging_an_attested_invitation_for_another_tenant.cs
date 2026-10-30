@@ -9,7 +9,7 @@ public class when_staging_an_attested_invitation_for_another_tenant : given.an_a
 {
     void Establish() => _context.Items[TenancyMiddleware.TenantIdItemKey] = "another-tenant";
 
-    async Task Because() => await ((InviteMiddleware)_context.Items["middleware"]!).InvokeAsync(_context);
+    async Task Because() => await ((InviteMiddleware)_context.Items["middleware"]).InvokeAsync(_context);
 
     [Fact] void should_answer_invitation_invalid_with_unauthorized() => _errorPages.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.InvitationInvalid, StatusCodes.Status401Unauthorized);
     [Fact] void should_not_call_the_stage_endpoint() => _handler.Request.ShouldBeNull();
