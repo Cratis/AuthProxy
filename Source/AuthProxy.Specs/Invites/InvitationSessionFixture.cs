@@ -29,13 +29,20 @@ static class InvitationSessionFixture
     /// therefore carrying no invitation binding at all.
     /// </summary>
     /// <param name="context">The context to establish the session on.</param>
-    /// <remarks>
-    /// The issue instant is part of the fact being modeled: the completion gate falls back to comparing it
-    /// against the invitation's own issue instant when the capability binding is absent, so a session from
-    /// before the invitation existed must genuinely carry an older one.
-    /// </remarks>
     public static void GivenSessionEstablishedBeforeTheInvitation(HttpContext context) =>
         GivenSession(context, _ => { }, DateTimeOffset.UtcNow.AddDays(-7));
+
+    /// <summary>
+    /// Establishes a session issued after the invitation came into existence that carries no invitation
+    /// binding — for example one the provider round-trip returned without AuthProxy's challenge properties.
+    /// </summary>
+    /// <param name="context">The context to establish the session on.</param>
+    /// <remarks>
+    /// The issue instant is deliberately later than the invitation's own: the session's age is not evidence
+    /// of which invitation, if any, it answers, so it must be refused all the same.
+    /// </remarks>
+    public static void GivenSessionEstablishedAfterTheInvitationWithoutItsBinding(HttpContext context) =>
+        GivenSession(context, _ => { }, DateTimeOffset.UtcNow.AddSeconds(5));
 
     static void GivenSession(HttpContext context, Action<AuthenticationProperties> bind, DateTimeOffset issuedUtc)
     {
