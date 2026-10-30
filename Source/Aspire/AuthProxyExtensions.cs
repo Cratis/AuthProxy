@@ -199,6 +199,25 @@ public static class AuthProxyExtensions
         builder.WithEnvironment($"{ConfigPrefix}__Session__TerminateOnIdentityDenial", bool.TrueString);
 
     /// <summary>
+    /// Stops AuthProxy writing the script-readable <c language="text">.cratis-identity</c> cookie.
+    /// </summary>
+    /// <typeparam name="T">The resource type (must support environment variables).</typeparam>
+    /// <param name="builder">The resource builder.</param>
+    /// <returns>The same <see cref="IResourceBuilder{T}"/> for chaining.</returns>
+    /// <remarks>
+    /// This is a global session setting rather than a per-service setting. Required verification and the
+    /// sealed authorization record are unaffected; any existing copy of the cookie a browser sends is expired.
+    /// <para>
+    /// Not calling this method preserves the released behavior: the cookie is still written. Call it only once
+    /// every frontend sharing the session reads identity from <c language="text">/.cratis/me</c>.
+    /// </para>
+    /// </remarks>
+    public static IResourceBuilder<T> WithoutIdentityDetailsCookie<T>(
+        this IResourceBuilder<T> builder)
+        where T : IResourceWithEnvironment =>
+        builder.WithEnvironment($"{ConfigPrefix}__Session__EmitIdentityDetailsCookie", bool.FalseString);
+
+    /// <summary>
     /// Registers a frontend (SPA / static-assets) endpoint for a named service in AuthProxy.
     /// </summary>
     /// <typeparam name="T">The resource type (must support environment variables).</typeparam>

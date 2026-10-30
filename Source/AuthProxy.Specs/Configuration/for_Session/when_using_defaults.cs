@@ -14,4 +14,5 @@ public class when_using_defaults : Specification
     [Fact] void should_preserve_the_session_on_identity_denial() => _session.TerminateOnIdentityDenial.ShouldBeFalse();
     [Fact] void should_revalidate_identity_every_ten_minutes() => _session.IdentityRevalidationInterval.ShouldEqual(TimeSpan.FromMinutes(10));
     [Fact] void should_revalidate_the_selected_tenant_every_ten_minutes() => _session.TenantRevalidationInterval.ShouldEqual(TimeSpan.FromMinutes(10));
+    [Fact] void should_emit_the_identity_details_cookie() => _session.EmitIdentityDetailsCookie.ShouldBeTrue();
 }

@@ -113,6 +113,18 @@ public class Session
     public TimeSpan IdentityResultCacheDuration { get; set; } = DefaultIdentityResultCacheDuration;
 
     /// <summary>
+    /// Gets or sets whether AuthProxy writes the script-readable <c language="text">.cratis-identity</c> cookie.
+    /// Defaults to <see langword="true"/>.
+    /// </summary>
+    /// <remarks>
+    /// When <see langword="false"/>, AuthProxy does not write the cookie and expires any copy a request carries. Identity
+    /// resolution, required verification and the sealed authorization record are unaffected. Turn it off only
+    /// when every frontend that shares the session reads identity from <c language="text">/.cratis/me</c>
+    /// (Arc 22.46 or later). It defaults to <see langword="true"/> for compatibility.
+    /// </remarks>
+    public bool EmitIdentityDetailsCookie { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets how long a selected tenant is trusted before it is re-validated against the tenant
     /// selection endpoint, so revoked tenant access takes effect without per-request backend calls.
     /// Set to zero or a negative value to disable re-validation.

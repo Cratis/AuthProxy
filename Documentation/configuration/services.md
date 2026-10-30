@@ -566,7 +566,7 @@ When neither list is configured on a service, forwarding behavior is unchanged.
 For each service with a `Backend` endpoint (and `ResolveIdentityDetails` not explicitly set to
 `false`), AuthProxy calls `GET {Backend.BaseUrl}/.cratis/me` after authentication.
 The response decides admission (its `isAuthorized` verdict) and supplies `details`, which AuthProxy
-merges into the readable `.cratis-identity` cookie so a frontend can render the signed-in user without a
+merges into the readable `.cratis-identity` cookie (unless `Session:EmitIdentityDetailsCookie` is `false`) so a frontend can render the signed-in user without a
 round-trip. See [The two identity cookies](authentication.md#the-two-identity-cookies).
 
 The response is **not** forwarded to backends. The `x-ms-client-principal` header is built only from the
