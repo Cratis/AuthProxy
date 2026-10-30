@@ -41,5 +41,6 @@ public class when_registering_oauth_provider_options : Specification
     [Fact] void should_include_configured_scope() => _options.Scope.Contains("read:user").ShouldBeTrue();
     [Fact] void should_include_configured_authorization_parameters() => _options.AdditionalAuthorizationParameters["prompt"].ShouldEqual("select_account");
     [Fact] void should_register_ticket_creation_event() => _options.Events.OnCreatingTicket.ShouldNotBeNull();
+    [Fact] void should_not_save_tokens_in_the_session_cookie() => _options.SaveTokens.ShouldBeFalse();
     [Fact] void should_register_ticket_received_event() => _options.Events.OnTicketReceived.ShouldNotBeNull();
 }
