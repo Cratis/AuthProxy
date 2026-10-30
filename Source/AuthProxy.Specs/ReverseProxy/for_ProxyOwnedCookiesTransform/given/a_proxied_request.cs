@@ -13,13 +13,14 @@ public class a_proxied_request : Specification
 {
     protected string? _sessionCookieName;
     protected string[] _cookies = [];
+    protected Dictionary<string, C.Service> _services = [];
     protected RequestTransformContext _transformContext;
 
     protected string? Forwarded => _transformContext.ProxyRequest.Headers.TryGetValues("Cookie", out var values) ? string.Join(" | ", values) : null;
 
     protected async Task Apply()
     {
-        var options = new C.AuthProxy { Session = new C.Session { CookieName = _sessionCookieName } };
+        var options = new C.AuthProxy { Session = new C.Session { CookieName = _sessionCookieName }, Services = _services };
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(options);
         var services = new ServiceCollection().AddSingleton(monitor).BuildServiceProvider();

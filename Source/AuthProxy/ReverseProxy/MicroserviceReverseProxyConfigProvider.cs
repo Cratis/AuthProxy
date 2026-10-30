@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -66,6 +67,18 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// The cluster metadata key binding the access token policy to its versioned destination.
     /// </summary>
     internal const string DestinationMetadataKey = "Cratis.AuthProxy.Destination";
+
+    /// <summary>
+    /// The destination metadata key marking the configured destination of a sticky service, holding the DNS host
+    /// its replicas are discovered through.
+    /// </summary>
+    internal const string ReplicaHostMetadataKey = "Cratis.AuthProxy.ReplicaHost";
+
+    /// <summary>
+    /// The destination metadata key holding how often the replicas are discovered again, formatted as a
+    /// constant <see cref="TimeSpan"/> (the "c" format, invariant culture).
+    /// </summary>
+    internal const string ReplicaRefreshMetadataKey = "Cratis.AuthProxy.ReplicaRefresh";
 
     /// <summary>
     /// The <see cref="EndpointMetadataKey"/> value of a service's backend cluster.
@@ -550,7 +563,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                 var destinationId = BackendDestinationId(key, ms);
                 var metadata = ClusterMetadata(key, BackendEndpoint, ms.CallerAuthorizationHeader, ms.AccessToken);
                 metadata[DestinationMetadataKey] = destinationId;
-                clusters.Add(ClusterFor(config, ms, ms.Backend) with
+                var cluster = ClusterFor(config, ms, ms.Backend) with
                 {
                     ClusterId = BackendClusterId(key),
 
@@ -561,7 +574,10 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                         [destinationId] = new() { Address = ms.Backend.BaseUrl }
                     },
                     Metadata = metadata,
-                });
+                };
+                clusters.Add(ms.Backend.StickyRouting is { Enabled: true } sticky
+                    ? Stick(cluster, key, destinationId, ms.Backend, sticky)
+                    : cluster);
             }
 
             if (ms.Frontend is not null)
@@ -580,6 +596,57 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
         return clusters;
     }
+
+    /// <summary>
+    /// Turns a backend cluster into a sticky one: the configured destination becomes the seed that the
+    /// <see cref="ReplicaDestinationResolver"/> replaces with the discovered replicas, browsers are pinned with a
+    /// data-protected affinity cookie, and replicas that fail are taken out of rotation.
+    /// </summary>
+    /// <param name="cluster">The non-sticky backend cluster.</param>
+    /// <param name="key">The lower-cased service key.</param>
+    /// <param name="destinationId">The id of the configured destination.</param>
+    /// <param name="backend">The backend endpoint.</param>
+    /// <param name="sticky">The sticky routing settings.</param>
+    /// <returns>The sticky cluster.</returns>
+    static ClusterConfig Stick(ClusterConfig cluster, string key, string destinationId, C.ServiceEndpoint backend, C.StickyRouting sticky) => cluster with
+    {
+        Destinations = new Dictionary<string, DestinationConfig>
+        {
+            [destinationId] = new()
+            {
+                Address = backend.BaseUrl,
+                Metadata = new Dictionary<string, string>
+                {
+                    [ServiceMetadataKey] = key,
+                    [ReplicaHostMetadataKey] = ReplicaHostOf(backend, sticky),
+                    [ReplicaRefreshMetadataKey] = sticky.RefreshInterval.ToString("c", CultureInfo.InvariantCulture),
+                },
+            },
+        },
+        SessionAffinity = new SessionAffinityConfig
+        {
+            Enabled = true,
+            Policy = "Cookie",
+            FailurePolicy = "Redistribute",
+            AffinityKeyName = Cookies.AffinityFor(key),
+            Cookie = new SessionAffinityCookieConfig
+            {
+                Path = "/",
+                HttpOnly = true,
+                SecurePolicy = CookieSecurePolicy.SameAsRequest,
+                SameSite = SameSiteMode.Lax,
+                IsEssential = true,
+            },
+        },
+        HealthCheck = new HealthCheckConfig
+        {
+            Passive = new PassiveHealthCheckConfig { Enabled = true, Policy = "TransportFailureRate" },
+            AvailableDestinationsPolicy = "HealthyOrPanic",
+        },
+    };
+
+    static string ReplicaHostOf(C.ServiceEndpoint backend, C.StickyRouting sticky) =>
+        (string.IsNullOrWhiteSpace(sticky.ReplicaHost) ? new Uri(backend.BaseUrl).IdnHost : sticky.ReplicaHost.Trim()).ToLowerInvariant();
 
     static Dictionary<string, string> ClusterMetadata(
         string key,
@@ -612,7 +679,9 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             return "destination1";
         }
 
-        var binding = JsonSerializer.Serialize(new { Address = service.Backend?.BaseUrl, Policy = service.AccessToken });
+        var binding = service.Backend is { StickyRouting: { Enabled: true } sticky } backend
+            ? JsonSerializer.Serialize(new { Address = backend.BaseUrl, Policy = service.AccessToken, ReplicaHost = ReplicaHostOf(backend, sticky) })
+            : JsonSerializer.Serialize(new { Address = service.Backend?.BaseUrl, Policy = service.AccessToken });
         var version = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(binding)));
 
         return $"{key}-backend-destination-{version}";

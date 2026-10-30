@@ -103,4 +103,17 @@ public static class Cookies
     /// logout by matching this prefix.
     /// </summary>
     public const string NoncePrefix = ".AspNetCore.OpenIdConnect.Nonce.";
+
+    /// <summary>
+    /// Name prefix of the per-service affinity cookies. Each is HTTP-only and data-protected, names a replica of
+    /// the service's backend, and carries no identity.
+    /// </summary>
+    public const string AffinityPrefix = ".cratis-affinity-";
+
+    /// <summary>
+    /// Gets the name of the affinity cookie of a service.
+    /// </summary>
+    /// <param name="serviceKey">The lower-cased service key.</param>
+    /// <returns>The cookie name.</returns>
+    public static string AffinityFor(string serviceKey) => AffinityPrefix + serviceKey;
 }

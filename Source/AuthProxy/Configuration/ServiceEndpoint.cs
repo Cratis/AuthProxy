@@ -24,4 +24,10 @@ public class ServiceEndpoint
     /// Only supported on Backend and Frontend endpoints; setting this on Registration fails configuration validation.
     /// </summary>
     public TimeSpan? ActivityTimeout { get; set; }
+
+    /// <summary>
+    /// Gets or sets the opt-in setting that pins each browser to one replica of the backend.
+    /// Only supported on Backend endpoints; setting it elsewhere fails configuration validation.
+    /// </summary>
+    public StickyRouting? StickyRouting { get; set; }
 }

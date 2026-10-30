@@ -43,10 +43,13 @@ public class ProxyOwnedCookiesTransform : RequestTransform
 
         var options = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue;
         var sessionCookie = SessionCookie.NameOf(options.Session);
+        var affinityCookies = options.Services.Keys
+            .Select(key => Cookies.AffinityFor(key.ToLowerInvariant()))
+            .ToHashSet(StringComparer.Ordinal);
 
         var kept = values
             .SelectMany(value => value.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-            .Where(pair => !IsOwnedByProxy(pair, sessionCookie))
+            .Where(pair => !IsOwnedByProxy(pair, sessionCookie, affinityCookies))
             .ToArray();
 
         context.ProxyRequest.Headers.Remove(HeaderNames.Cookie);
@@ -58,10 +61,10 @@ public class ProxyOwnedCookiesTransform : RequestTransform
         return ValueTask.CompletedTask;
     }
 
-    static bool IsOwnedByProxy(string pair, string sessionCookie)
+    static bool IsOwnedByProxy(string pair, string sessionCookie, HashSet<string> affinityCookies)
     {
         var separator = pair.IndexOf('=', StringComparison.Ordinal);
         var name = separator < 0 ? pair : pair[..separator].Trim();
-        return _proxyCookies.Contains(name) || SessionCookieHealing.BelongsTo(sessionCookie, name);
+        return _proxyCookies.Contains(name) || affinityCookies.Contains(name) || SessionCookieHealing.BelongsTo(sessionCookie, name);
     }
 }
