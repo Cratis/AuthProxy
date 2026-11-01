@@ -1,0 +1,44 @@
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Application": {
+        "EnvironmentName": "development",
+        "Development": true,
+        "Onboarding": true,
+        "Providers": [
+          { "Kind": "EntraId", "Identity": "EntraId" },
+          { "Kind": "GitHub", "Identity": "GitHub" },
+          { "Kind": "Google", "Identity": "Google" },
+          { "Kind": "Apple", "Identity": "Apple" },
+          { "Kind": "OpenId", "Identity": "Partner" }
+        ],
+        "Environment": {
+          "authentication.providers.EntraId.tenantId": "00000000-0000-0000-0000-000000000001",
+          "authentication.providers.EntraId.clientId": "placeholder-entra-client-id",
+          "authentication.providers.EntraId.clientSecret": "placeholder-entra-client-secret",
+          "authentication.providers.EntraId.scopes": "offline_access",
+          "authentication.providers.GitHub.clientId": "placeholder-github-client-id",
+          "authentication.providers.GitHub.clientSecret": "placeholder-github-client-secret",
+          "authentication.providers.Google.clientId": "placeholder-google-client-id",
+          "authentication.providers.Google.clientSecret": "placeholder-google-client-secret",
+          "authentication.providers.Apple.clientId": "placeholder-apple-client-id",
+          "authentication.providers.Apple.clientSecret": "placeholder-apple-client-secret",
+          "authentication.providers.Apple.responseMode": "FormPost",
+          "authentication.providers.Apple.scopes": "name email",
+          "authentication.providers.Partner.authority": "http://localhost:5556/dex",
+          "authentication.providers.Partner.clientId": "placeholder-partner-client-id",
+          "authentication.providers.Partner.clientSecret": "placeholder-partner-client-secret",
+          "onboarding.stageUrl": "http://localhost:8080/_invite/stage",
+          "onboarding.exchangeUrl": "http://localhost:8080/_invite/exchange",
+          "onboarding.tokenMetadataUrl": "http://localhost:8080/.well-known/ante/invitation-token",
+          "onboarding.issuer": "urn:cratis:ante:placeholder:default",
+          "onboarding.audience": "urn:cratis:ante:placeholder:default:lobby",
+          "onboarding.lobbyFrontendBaseUrl": "http://localhost:8080/",
+          "onboarding.attestation.issuer": "urn:cratis:authproxy:placeholder",
+          "onboarding.attestation.audience": "urn:cratis:ante:placeholder:default",
+          "onboarding.attestation.keyId": "placeholder-key-1"
+        }
+      }
+    }
+  }
+}
