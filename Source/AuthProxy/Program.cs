@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy;
+using Cratis.AuthProxy.ApplicationContract;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Identity;
@@ -15,6 +16,17 @@ using Cratis.AuthProxy.Tenancy;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddEnvironmentVariables();
+
+try
+{
+    builder.AddApplicationContract();
+}
+catch (ApplicationContractException exception)
+{
+    // A configuration mistake is reported by name and exits; the message never carries a value.
+    await Console.Error.WriteLineAsync($"AuthProxy cannot start: {exception.Message}");
+    return 78;
+}
 
 builder.AddIngressConfiguration();
 builder.AddIngressAuthentication();
@@ -40,3 +52,4 @@ app.UseIngress();
 
 await app.RunAsync();
 
+return 0;
