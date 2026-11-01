@@ -79,6 +79,8 @@ var authproxy = builder.AddAuthProxy("authproxy", tag: "latest")
     .WithHostTenantResolution();
 ```
 
+Running a modeled Cratis application? AuthProxy starts from its Screenplay model and Cratis environment through the [application configuration contract](./Documentation/configuration/application-contract.md).
+
 Read the [full documentation](https://www.cratis.io/authproxy/) for the complete configuration reference — authentication, authorization, tenancy, services, invites and lobby, webhooks, trusted proxies, and more.
 
 ## How it fits with Cratis Arc
