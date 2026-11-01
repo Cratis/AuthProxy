@@ -2,6 +2,8 @@
   href: index.md
 - name: Authentication
   href: authentication.md
+- name: Application Configuration Contract
+  href: application-contract.md
 - name: Authorization
   href: authorization.md
 - name: Admission
