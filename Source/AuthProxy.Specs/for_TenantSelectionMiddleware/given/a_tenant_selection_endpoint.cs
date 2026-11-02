@@ -16,6 +16,7 @@ public class a_tenant_selection_endpoint : Specification
     protected int _endpointCalls;
     protected HttpStatusCode? _endpointStatus;
     protected string _endpointBody = "[]";
+    protected Func<int, Task> _beforeEndpointAnswers = _ => Task.CompletedTask;
     protected Exception _endpointFailure = new HttpRequestException("Tenant endpoint is unavailable");
     protected const string AnonymousPath = "/api/portal/report";
     protected const string Tenants2 = """[{"id":"tenant-a","name":"Tenant A"},{"id":"tenant-b","name":"Tenant B"}]""";
@@ -93,15 +94,16 @@ public class a_tenant_selection_endpoint : Specification
 
     sealed class TenantsHandler(a_tenant_selection_endpoint specification) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            specification._endpointCalls++;
+            var call = ++specification._endpointCalls;
+            await specification._beforeEndpointAnswers(call);
             return specification._endpointStatus is { } status
-                ? Task.FromResult(new HttpResponseMessage(status)
+                ? new HttpResponseMessage(status)
                 {
                     Content = new StringContent(specification._endpointBody)
-                })
-                : Task.FromException<HttpResponseMessage>(specification._endpointFailure);
+                }
+                : throw specification._endpointFailure;
         }
     }
 }
