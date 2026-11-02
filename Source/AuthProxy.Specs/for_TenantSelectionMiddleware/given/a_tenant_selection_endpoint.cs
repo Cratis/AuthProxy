@@ -8,6 +8,7 @@ namespace Cratis.AuthProxy.for_TenantSelectionMiddleware.given;
 public class a_tenant_selection_endpoint : Specification
 {
     protected TenantSelectionMiddleware _middleware;
+    protected MemoryCache _memoryCache;
     protected DefaultHttpContext _context;
     protected C.AuthProxy _authProxyConfig;
     protected IErrorPageProvider _errorPageProvider;
@@ -21,6 +22,7 @@ public class a_tenant_selection_endpoint : Specification
 
     void Establish()
     {
+        _memoryCache = new MemoryCache(new MemoryCacheOptions());
         var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         _authProxyConfig = new C.AuthProxy
         {
@@ -59,7 +61,7 @@ public class a_tenant_selection_endpoint : Specification
             ResolverReflectingConfirmation(),
             httpClientFactory,
             _errorPageProvider,
-            new MemoryCache(new MemoryCacheOptions()),
+            _memoryCache,
             given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
