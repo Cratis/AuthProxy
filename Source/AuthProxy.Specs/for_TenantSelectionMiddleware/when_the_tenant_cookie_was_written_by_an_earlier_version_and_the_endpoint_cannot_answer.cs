@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Net;
-
 namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 
 public class when_the_tenant_cookie_was_written_by_an_earlier_version_and_the_endpoint_cannot_answer : given.a_tenant_selection_endpoint

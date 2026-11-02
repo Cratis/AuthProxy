@@ -31,7 +31,7 @@ public class when_the_tenant_cookie_value_was_altered(TenantSelectionHarness har
 
     [Fact]
     public void should_not_forward_the_request_with_any_tenant() =>
-        Assert.Empty(harness.Origin.Received.Where(request => request.Value(Headers.TenantId) is { Length: > 0 }));
+        Assert.DoesNotContain(harness.Origin.Received, request => request.Value(Headers.TenantId) is { Length: > 0 });
 
     [Fact]
     public void should_delete_the_selected_tenant_cookie() =>

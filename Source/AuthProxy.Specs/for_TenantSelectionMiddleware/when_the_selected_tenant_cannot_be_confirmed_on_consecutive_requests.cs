@@ -1,8 +1,6 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Net;
-
 namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 
 public class when_the_selected_tenant_cannot_be_confirmed_on_consecutive_requests : given.a_tenant_selection_endpoint
