@@ -116,4 +116,10 @@ public static class Cookies
     /// <param name="serviceKey">The lower-cased service key.</param>
     /// <returns>The cookie name.</returns>
     public static string AffinityFor(string serviceKey) => AffinityPrefix + serviceKey;
+
+    /// <summary>
+    /// Strict, HTTP-only cookie holding the antiforgery token of the proxy's own forms. Named explicitly so it can
+    /// never collide with an antiforgery cookie of a proxied service, and removed from requests forwarded to services.
+    /// </summary>
+    public const string Antiforgery = ".cratis-antiforgery";
 }

@@ -124,6 +124,12 @@ public static class WellKnownPageNames
     public const string LinkSelectProvider = "link-select-provider.html";
 
     /// <summary>
+    /// The confirmation page a navigation to a provider's link path is answered with. Its form posts back to the
+    /// same path with an antiforgery token, and only that post starts the provider challenge.
+    /// </summary>
+    public const string LinkConfirm = "link-confirm.html";
+
+    /// <summary>
     /// The page a completed credential link ends on, served at <c language="text">/.cratis/link/complete</c>. It
     /// broadcasts the completion on the link flow's <c language="text">BroadcastChannel</c> and closes its window.
     /// </summary>

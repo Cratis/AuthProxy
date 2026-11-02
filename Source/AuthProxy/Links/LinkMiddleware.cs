@@ -2,7 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authentication;
+using System.Net;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Cratis.AuthProxy.ErrorPages;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -49,6 +52,16 @@ public class LinkMiddleware(
     /// </summary>
     public const string LinkTokenPropertyKey = "Cratis.AuthProxy.LinkToken";
 
+    /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key carrying the binding of the account that started the link.
+    /// </summary>
+    public const string LinkSessionBindingPropertyKey = "Cratis.AuthProxy.LinkSessionBinding";
+
+    /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key carrying the provider the link was started for.
+    /// </summary>
+    public const string LinkSchemePropertyKey = "Cratis.AuthProxy.LinkScheme";
+
     const string CompleteSegment = "complete";
 
     static readonly HashSet<string> _framedDestinations = new(StringComparer.Ordinal) { "iframe", "frame", "embed", "object" };
@@ -73,6 +86,13 @@ public class LinkMiddleware(
             return;
         }
 
+        if (segment.Length > 0 && !IsSupportedMethod(context.Request.Method))
+        {
+            context.Response.Headers.Allow = "GET, POST";
+            context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
+            return;
+        }
+
         if (segment.Length > 0 && !SchemeExists(segment))
         {
             logger.LinkProviderNotConfigured(segment);
@@ -88,7 +108,18 @@ public class LinkMiddleware(
             return;
         }
 
-        var token = context.Request.Query["token"].FirstOrDefault();
+        // Starting a challenge changes state, so it is only ever done for a confirmed form post. A GET to a
+        // provider's path shows the confirmation page instead and never reaches the provider.
+        var confirming = segment.Length > 0 && HttpMethods.IsPost(context.Request.Method);
+        if (confirming && !await ProxyAntiforgery.IsValidAsync(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        var token = confirming
+            ? context.Request.Form["token"].FirstOrDefault()
+            : context.Request.Query["token"].FirstOrDefault();
         if (string.IsNullOrWhiteSpace(token))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -106,12 +137,33 @@ public class LinkMiddleware(
             return;
         }
 
+        var returnUrl = confirming
+            ? context.Request.Form["returnUrl"].FirstOrDefault()
+            : context.Request.Query["returnUrl"].FirstOrDefault();
+
+        if (!confirming)
+        {
+            await WriteConfirmation(context, segment, token, returnUrl);
+            return;
+        }
+
+        // The account that confirmed is the account the link will be recorded for: the session the request
+        // arrived with is read here, and the callback must find the same account again.
+        var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!LinkSessionBinding.TryCreate(session.Principal, out var binding))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
         var properties = new AuthenticationProperties
         {
-            RedirectUri = ResolveReturnUrl(context.Request.Query["returnUrl"].FirstOrDefault()),
+            RedirectUri = ResolveReturnUrl(returnUrl),
         };
         properties.Items[LinkModePropertyKey] = "true";
         properties.Items[LinkTokenPropertyKey] = token;
+        properties.Items[LinkSessionBindingPropertyKey] = binding;
+        properties.Items[LinkSchemePropertyKey] = segment;
 
         logger.InitiatingLink(segment);
         await context.ChallengeAsync(segment, properties);
@@ -147,6 +199,35 @@ public class LinkMiddleware(
     {
         var destination = request.Headers["Sec-Fetch-Dest"].FirstOrDefault();
         return destination is not null && _framedDestinations.Contains(destination);
+    }
+
+    static bool IsSupportedMethod(string method) => HttpMethods.IsGet(method) || HttpMethods.IsPost(method);
+
+    static string EncodeForPage(string value) =>
+        WebUtility.HtmlEncode(value).Replace("{", "&#123;", StringComparison.Ordinal).Replace("}", "&#125;", StringComparison.Ordinal).Replace("_", "&#95;", StringComparison.Ordinal);
+
+    Task WriteConfirmation(HttpContext context, string segment, string token, string? returnUrl)
+    {
+        var config = authConfig.CurrentValue;
+        var providerName = config.OidcProviders.Select(provider => provider.Name).Concat(config.OAuthProviders.Select(provider => provider.Name))
+            .FirstOrDefault(name => OidcProviderScheme.FromName(name) == segment) ?? segment;
+
+        FrameEmbedding.Deny(context);
+        return context.RequestServices
+            .GetRequiredService<IErrorPageProvider>()
+            .WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.LinkConfirm,
+                StatusCodes.Status200OK,
+                new Dictionary<string, string>
+                {
+                    [LinkConfirmationTokens.Action] = EncodeForPage($"{WellKnownPaths.Link}/{segment}"),
+                    [LinkConfirmationTokens.Provider] = EncodeForPage(providerName),
+                    [LinkConfirmationTokens.Token] = EncodeForPage(token),
+                    [LinkConfirmationTokens.ReturnUrl] = EncodeForPage(returnUrl ?? string.Empty),
+                    [LinkConfirmationTokens.FieldName] = WebUtility.HtmlEncode(ProxyAntiforgery.FormFieldName),
+                    [LinkConfirmationTokens.RequestToken] = EncodeForPage(ProxyAntiforgery.IssueRequestToken(context)),
+                });
     }
 
     bool SchemeExists(string scheme)

@@ -30,7 +30,8 @@ public class ProxyOwnedCookiesTransform : RequestTransform
         Cookies.Providers,
         Cookies.Tenants,
         Cookies.Tenant,
-        Cookies.LogoutRedirect
+        Cookies.LogoutRedirect,
+        Cookies.Antiforgery
     };
 
     /// <inheritdoc/>
