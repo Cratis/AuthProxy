@@ -297,12 +297,22 @@ public class TenantSelectionMiddleware(
 
         if (!result.Succeeded)
         {
+            if (hasBinding)
+            {
+                memoryCache.Remove(RevalidationCacheKey(account, tenantId));
+            }
+
             logger.SelectedTenantNotConfirmed();
             return !exempt && await RejectUnconfirmed(context);
         }
 
         if (!result.Tenants.Any(_ => string.Equals(_.Id, tenantId, StringComparison.OrdinalIgnoreCase)))
         {
+            if (hasBinding)
+            {
+                memoryCache.Remove(RevalidationCacheKey(account, tenantId));
+            }
+
             // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
             // replay the request without it so the regular selection flow takes over.
             Tenancy.SelectedTenantCookie.Delete(context);
