@@ -38,8 +38,12 @@ internal static class LinkConfirmationPage
                 });
     }
 
-    // Values are substituted into a template that is itself scanned for tokens, so the characters a token is
-    // made of are encoded as well.
+    /// <summary>
+    /// Encodes a value for substitution into a template that is itself scanned for tokens, so the characters a
+    /// token is made of are encoded as well.
+    /// </summary>
+    /// <param name="value">The value to encode.</param>
+    /// <returns>The encoded value.</returns>
     static string Encode(string value) =>
         WebUtility.HtmlEncode(value)
             .Replace("{", "&#123;", StringComparison.Ordinal)
