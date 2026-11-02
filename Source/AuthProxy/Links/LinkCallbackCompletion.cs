@@ -83,9 +83,12 @@ public static class LinkCallbackCompletion
     static async Task<bool> BelongsToThisSession(TicketReceivedContext context, AuthenticationProperties properties)
     {
         if (!properties.Items.TryGetValue(LinkMiddleware.LinkSchemePropertyKey, out var scheme)
-            || !string.Equals(scheme, context.Scheme.Name, StringComparison.Ordinal)
-            || !properties.Items.TryGetValue(LinkMiddleware.LinkSessionBindingPropertyKey, out var bound)
-            || string.IsNullOrEmpty(bound))
+            || !string.Equals(scheme, context.Scheme.Name, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!properties.Items.TryGetValue(LinkMiddleware.LinkSessionBindingPropertyKey, out var bound) || string.IsNullOrEmpty(bound))
         {
             return false;
         }

@@ -86,45 +86,20 @@ public class LinkMiddleware(
             return;
         }
 
-        if (segment.Length > 0 && !IsSupportedMethod(context.Request.Method))
+        var rejection = await Reject(context, segment);
+        if (rejection is { } status)
         {
-            context.Response.Headers.Allow = "GET, POST";
-            context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
-            return;
-        }
-
-        if (segment.Length > 0 && !SchemeExists(segment))
-        {
-            logger.LinkProviderNotConfigured(segment);
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            return;
-        }
-
-        // Linking augments an existing account, so it requires a signed-in user. An anonymous request has
-        // no primary account to link to — reject it instead of starting a challenge.
-        if (context.User.Identity?.IsAuthenticated != true)
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.StatusCode = status;
             return;
         }
 
         // Starting a challenge changes state, so it is only ever done for a confirmed form post. A GET to a
         // provider's path shows the confirmation page instead and never reaches the provider.
-        var confirming = segment.Length > 0 && HttpMethods.IsPost(context.Request.Method);
-        if (confirming && !await ProxyAntiforgery.IsValidAsync(context))
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            return;
-        }
-
-        var token = confirming
-            ? context.Request.Form["token"].FirstOrDefault()
-            : context.Request.Query["token"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            return;
-        }
+        var confirming = IsConfirmation(context, segment);
+        var request = new LinkRequest(
+            segment,
+            ReadValue(context, confirming, "token") ?? string.Empty,
+            ReadValue(context, confirming, "returnUrl"));
 
         // The bare link path is the flow's embeddable front door: the provider-selection page, which opens
         // the chosen provider's challenge in its own top-level window. A *framed* navigation to a specific
@@ -137,36 +112,14 @@ public class LinkMiddleware(
             return;
         }
 
-        var returnUrl = confirming
-            ? context.Request.Form["returnUrl"].FirstOrDefault()
-            : context.Request.Query["returnUrl"].FirstOrDefault();
-
-        if (!confirming)
+        if (confirming)
         {
-            await WriteConfirmation(context, segment, token, returnUrl);
-            return;
+            await Challenge(context, request);
         }
-
-        // The account that confirmed is the account the link will be recorded for: the session the request
-        // arrived with is read here, and the callback must find the same account again.
-        var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        if (!LinkSessionBinding.TryCreate(session.Principal, out var binding))
+        else
         {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return;
+            await WriteConfirmation(context, request);
         }
-
-        var properties = new AuthenticationProperties
-        {
-            RedirectUri = ResolveReturnUrl(returnUrl),
-        };
-        properties.Items[LinkModePropertyKey] = "true";
-        properties.Items[LinkTokenPropertyKey] = token;
-        properties.Items[LinkSessionBindingPropertyKey] = binding;
-        properties.Items[LinkSchemePropertyKey] = segment;
-
-        logger.InitiatingLink(segment);
-        await context.ChallengeAsync(segment, properties);
     }
 
     /// <summary>
@@ -201,13 +154,75 @@ public class LinkMiddleware(
         return destination is not null && _framedDestinations.Contains(destination);
     }
 
+    static bool IsConfirmation(HttpContext context, string segment) => segment.Length > 0 && HttpMethods.IsPost(context.Request.Method);
+
+    static string? ReadValue(HttpContext context, bool fromForm, string name) =>
+        fromForm
+            ? context.Request.Form[name].FirstOrDefault()
+            : context.Request.Query[name].FirstOrDefault();
+
     static bool IsSupportedMethod(string method) => HttpMethods.IsGet(method) || HttpMethods.IsPost(method);
 
     static string EncodeForPage(string value) =>
         WebUtility.HtmlEncode(value).Replace("{", "&#123;", StringComparison.Ordinal).Replace("}", "&#125;", StringComparison.Ordinal).Replace("_", "&#95;", StringComparison.Ordinal);
 
-    Task WriteConfirmation(HttpContext context, string segment, string token, string? returnUrl)
+    async Task<int?> Reject(HttpContext context, string segment)
     {
+        if (segment.Length > 0 && !IsSupportedMethod(context.Request.Method))
+        {
+            context.Response.Headers.Allow = "GET, POST";
+            return StatusCodes.Status405MethodNotAllowed;
+        }
+
+        if (segment.Length > 0 && !SchemeExists(segment))
+        {
+            logger.LinkProviderNotConfigured(segment);
+            return StatusCodes.Status404NotFound;
+        }
+
+        // Linking augments an existing account, so it requires a signed-in user. An anonymous request has
+        // no primary account to link to — reject it instead of starting a challenge.
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            return StatusCodes.Status401Unauthorized;
+        }
+
+        var confirming = IsConfirmation(context, segment);
+        if (confirming && !await ProxyAntiforgery.IsValidAsync(context))
+        {
+            return StatusCodes.Status400BadRequest;
+        }
+
+        return string.IsNullOrWhiteSpace(ReadValue(context, confirming, "token")) ? StatusCodes.Status400BadRequest : null;
+    }
+
+    async Task Challenge(HttpContext context, LinkRequest request)
+    {
+        // The account that confirmed is the account the link will be recorded for: the session the request
+        // arrived with is read here, and the callback must find the same account again.
+        var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!LinkSessionBinding.TryCreate(session.Principal, out var binding))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = ResolveReturnUrl(request.ReturnUrl),
+        };
+        properties.Items[LinkModePropertyKey] = "true";
+        properties.Items[LinkTokenPropertyKey] = request.Token;
+        properties.Items[LinkSessionBindingPropertyKey] = binding;
+        properties.Items[LinkSchemePropertyKey] = request.Provider;
+
+        logger.InitiatingLink(request.Provider);
+        await context.ChallengeAsync(request.Provider, properties);
+    }
+
+    Task WriteConfirmation(HttpContext context, LinkRequest request)
+    {
+        var (segment, token, returnUrl) = request;
         var config = authConfig.CurrentValue;
         var providerName = config.OidcProviders.Select(provider => provider.Name).Concat(config.OAuthProviders.Select(provider => provider.Name))
             .FirstOrDefault(name => OidcProviderScheme.FromName(name) == segment) ?? segment;
