@@ -10,6 +10,7 @@ public class when_a_link_is_confirmed_without_a_valid_antiforgery_token : given.
     void Establish()
     {
         _context.Request.Path = $"{WellKnownPaths.Link}/github";
+        _context.Request.QueryString = QueryString.Create("token", "the-link-token");
         PostForm(new Dictionary<string, string> { ["token"] = "the-link-token" });
     }
 

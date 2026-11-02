@@ -9,4 +9,5 @@ namespace Cratis.AuthProxy.Links;
 /// <param name="Provider">The scheme of the provider to link.</param>
 /// <param name="Token">The one-time link token.</param>
 /// <param name="ReturnUrl">The caller-supplied return URL, when one was given.</param>
-internal record LinkRequest(string Provider, string Token, string? ReturnUrl);
+/// <param name="Confirmed">Whether the values came from a confirmed form post rather than from the query string.</param>
+internal record LinkRequest(string Provider, string Token, string? ReturnUrl, bool Confirmed);

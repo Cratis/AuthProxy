@@ -1,9 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using System.Net;
 using Cratis.AuthProxy.Authentication;
-using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
@@ -86,20 +84,19 @@ public class LinkMiddleware(
             return;
         }
 
-        var rejection = await Reject(context, segment);
+        var rejection = Reject(context, segment);
         if (rejection is { } status)
         {
             context.Response.StatusCode = status;
             return;
         }
 
-        // Starting a challenge changes state, so it is only ever done for a confirmed form post. A GET to a
-        // provider's path shows the confirmation page instead and never reaches the provider.
-        var confirming = IsConfirmation(context, segment);
-        var request = new LinkRequest(
-            segment,
-            ReadValue(context, confirming, "token") ?? string.Empty,
-            ReadValue(context, confirming, "returnUrl"));
+        var request = await LinkRequestReader.Read(context, segment);
+        if (request is null)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
 
         // The bare link path is the flow's embeddable front door: the provider-selection page, which opens
         // the chosen provider's challenge in its own top-level window. A *framed* navigation to a specific
@@ -112,13 +109,13 @@ public class LinkMiddleware(
             return;
         }
 
-        if (confirming)
+        if (request.Confirmed)
         {
             await Challenge(context, request);
         }
         else
         {
-            await WriteConfirmation(context, request);
+            await LinkConfirmationPage.Write(context, request, ProviderName(request.Provider));
         }
     }
 
@@ -154,27 +151,20 @@ public class LinkMiddleware(
         return destination is not null && _framedDestinations.Contains(destination);
     }
 
-    static bool IsConfirmation(HttpContext context, string segment) => segment.Length > 0 && HttpMethods.IsPost(context.Request.Method);
-
-    static string? ReadValue(HttpContext context, bool fromForm, string name) =>
-        fromForm
-            ? context.Request.Form[name].FirstOrDefault()
-            : context.Request.Query[name].FirstOrDefault();
-
-    static bool IsSupportedMethod(string method) => HttpMethods.IsGet(method) || HttpMethods.IsPost(method);
-
-    static string EncodeForPage(string value) =>
-        WebUtility.HtmlEncode(value).Replace("{", "&#123;", StringComparison.Ordinal).Replace("}", "&#125;", StringComparison.Ordinal).Replace("_", "&#95;", StringComparison.Ordinal);
-
-    async Task<int?> Reject(HttpContext context, string segment)
+    int? Reject(HttpContext context, string segment)
     {
-        if (segment.Length > 0 && !IsSupportedMethod(context.Request.Method))
+        if (segment.Length == 0)
+        {
+            return context.User.Identity?.IsAuthenticated == true ? null : StatusCodes.Status401Unauthorized;
+        }
+
+        if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsPost(context.Request.Method))
         {
             context.Response.Headers.Allow = "GET, POST";
             return StatusCodes.Status405MethodNotAllowed;
         }
 
-        if (segment.Length > 0 && !SchemeExists(segment))
+        if (!SchemeExists(segment))
         {
             logger.LinkProviderNotConfigured(segment);
             return StatusCodes.Status404NotFound;
@@ -182,18 +172,7 @@ public class LinkMiddleware(
 
         // Linking augments an existing account, so it requires a signed-in user. An anonymous request has
         // no primary account to link to — reject it instead of starting a challenge.
-        if (context.User.Identity?.IsAuthenticated != true)
-        {
-            return StatusCodes.Status401Unauthorized;
-        }
-
-        var confirming = IsConfirmation(context, segment);
-        if (confirming && !await ProxyAntiforgery.IsValidAsync(context))
-        {
-            return StatusCodes.Status400BadRequest;
-        }
-
-        return string.IsNullOrWhiteSpace(ReadValue(context, confirming, "token")) ? StatusCodes.Status400BadRequest : null;
+        return context.User.Identity?.IsAuthenticated == true ? null : StatusCodes.Status401Unauthorized;
     }
 
     async Task Challenge(HttpContext context, LinkRequest request)
@@ -220,29 +199,12 @@ public class LinkMiddleware(
         await context.ChallengeAsync(request.Provider, properties);
     }
 
-    Task WriteConfirmation(HttpContext context, LinkRequest request)
+    string ProviderName(string scheme)
     {
-        var (segment, token, returnUrl) = request;
         var config = authConfig.CurrentValue;
-        var providerName = config.OidcProviders.Select(provider => provider.Name).Concat(config.OAuthProviders.Select(provider => provider.Name))
-            .FirstOrDefault(name => OidcProviderScheme.FromName(name) == segment) ?? segment;
-
-        FrameEmbedding.Deny(context);
-        return context.RequestServices
-            .GetRequiredService<IErrorPageProvider>()
-            .WriteErrorPageAsync(
-                context,
-                WellKnownPageNames.LinkConfirm,
-                StatusCodes.Status200OK,
-                new Dictionary<string, string>
-                {
-                    [LinkConfirmationTokens.Action] = EncodeForPage($"{WellKnownPaths.Link}/{segment}"),
-                    [LinkConfirmationTokens.Provider] = EncodeForPage(providerName),
-                    [LinkConfirmationTokens.Token] = EncodeForPage(token),
-                    [LinkConfirmationTokens.ReturnUrl] = EncodeForPage(returnUrl ?? string.Empty),
-                    [LinkConfirmationTokens.FieldName] = WebUtility.HtmlEncode(ProxyAntiforgery.FormFieldName),
-                    [LinkConfirmationTokens.RequestToken] = EncodeForPage(ProxyAntiforgery.IssueRequestToken(context)),
-                });
+        return config.OidcProviders.Select(provider => provider.Name)
+            .Concat(config.OAuthProviders.Select(provider => provider.Name))
+            .FirstOrDefault(name => OidcProviderScheme.FromName(name) == scheme) ?? scheme;
     }
 
     bool SchemeExists(string scheme)
