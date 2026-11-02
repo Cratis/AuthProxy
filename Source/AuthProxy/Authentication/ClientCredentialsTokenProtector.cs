@@ -26,7 +26,9 @@ public class ClientCredentialsTokenProtector(
         .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.v1")
         .ToTimeLimitedDataProtector();
 
-    // Refresh tokens issued by earlier versions. They are read, never issued; their own expiry is their family deadline.
+    /// <summary>
+    /// Reads refresh tokens issued by earlier versions. They are never issued; their own expiry is their family deadline.
+    /// </summary>
     readonly ITimeLimitedDataProtector _legacyRefreshProtector = dataProtectionProvider
         .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.Refresh.v1")
         .ToTimeLimitedDataProtector();

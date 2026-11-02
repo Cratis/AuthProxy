@@ -1,11 +1,11 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
-using Cratis.AuthProxy.Authentication;
 using System.Net;
+using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.ErrorPages;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Cratis.AuthProxy.ErrorPages;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 

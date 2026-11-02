@@ -44,21 +44,3 @@ public static class TokenEndpoint
         return new TokenResponse(response.StatusCode, JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement);
     }
 }
-
-/// <summary>
-/// The outcome of a token endpoint call.
-/// </summary>
-/// <param name="Status">The HTTP status code.</param>
-/// <param name="Body">The parsed JSON body.</param>
-public record TokenResponse(System.Net.HttpStatusCode Status, JsonElement Body)
-{
-    /// <summary>
-    /// Gets the refresh token, when the response carries one.
-    /// </summary>
-    public string RefreshToken => Body.GetProperty("refresh_token").GetString()!;
-
-    /// <summary>
-    /// Gets the error code, when the response is an error.
-    /// </summary>
-    public string? Error => Body.TryGetProperty("error", out var error) ? error.GetString() : null;
-}

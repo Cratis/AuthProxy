@@ -29,11 +29,6 @@ public static class ClientCredentialsDefaults
     public const string RefreshGrantType = "refresh_token";
 
     /// <summary>
-    /// The default lifetime of a chain of refreshed tokens, counted from the original client-credentials grant.
-    /// </summary>
-    public static readonly TimeSpan DefaultRefreshTokenFamilyLifetime = TimeSpan.FromDays(30);
-
-    /// <summary>
     /// The claim type that stores the target service key.
     /// </summary>
     public const string ServiceClaimType = "cratis/service";
@@ -49,6 +44,11 @@ public static class ClientCredentialsDefaults
     /// resolve the tenant for client-credentials-authenticated requests.
     /// </summary>
     public const string TenantClaimType = "cratis/tenant";
+
+    /// <summary>
+    /// The default lifetime of a chain of refreshed tokens, counted from the original client-credentials grant.
+    /// </summary>
+    public static readonly TimeSpan DefaultRefreshTokenFamilyLifetime = TimeSpan.FromDays(30);
 
     /// <summary>
     /// The <see cref="HttpContext.Items"/> key under which the composite scheme selector stashes an

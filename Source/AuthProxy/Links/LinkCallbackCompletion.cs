@@ -77,6 +77,9 @@ public static class LinkCallbackCompletion
     /// not get the session cookie sent along, so when there is no session on the callback the flow state alone is
     /// relied on. Whenever a session is present it must be the account that started the link.
     /// </remarks>
+    /// <param name="context">The ticket-received context raised by the remote authentication handler.</param>
+    /// <param name="properties">The round-tripped challenge properties carrying the flow state.</param>
+    /// <returns><see langword="true"/> when the callback may proceed to the exchange; otherwise <see langword="false"/>.</returns>
     static async Task<bool> BelongsToThisSession(TicketReceivedContext context, AuthenticationProperties properties)
     {
         if (!properties.Items.TryGetValue(LinkMiddleware.LinkSchemePropertyKey, out var scheme)
