@@ -297,10 +297,7 @@ public class TenantSelectionMiddleware(
 
         if (!result.Succeeded)
         {
-            if (hasBinding)
-            {
-                memoryCache.Remove(RevalidationCacheKey(account, tenantId));
-            }
+            ForgetConfirmation(hasBinding, account, tenantId);
 
             logger.SelectedTenantNotConfirmed();
             return !exempt && await RejectUnconfirmed(context);
@@ -308,10 +305,7 @@ public class TenantSelectionMiddleware(
 
         if (!result.Tenants.Any(_ => string.Equals(_.Id, tenantId, StringComparison.OrdinalIgnoreCase)))
         {
-            if (hasBinding)
-            {
-                memoryCache.Remove(RevalidationCacheKey(account, tenantId));
-            }
+            ForgetConfirmation(hasBinding, account, tenantId);
 
             // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
             // replay the request without it so the regular selection flow takes over.
@@ -378,6 +372,14 @@ public class TenantSelectionMiddleware(
         }
 
         memoryCache.Set(RevalidationCacheKey(account, tenantId), true, interval);
+    }
+
+    void ForgetConfirmation(bool hasBinding, IdentityAccountBinding account, string tenantId)
+    {
+        if (hasBinding)
+        {
+            memoryCache.Remove(RevalidationCacheKey(account, tenantId));
+        }
     }
 
     bool IsSafeRelativeUrl(string? url) => RelativeRedirect.IsSameSiteRelative(url);
