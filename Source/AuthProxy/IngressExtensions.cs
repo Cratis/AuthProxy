@@ -71,6 +71,7 @@ public static class IngressExtensions
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SignInCallbackHostConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ClientCredentialsConfigurationValidator>();
         builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
 
         // The forwarded-headers middleware and everything downstream that asks whether a request came through

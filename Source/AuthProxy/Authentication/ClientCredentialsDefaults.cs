@@ -29,6 +29,11 @@ public static class ClientCredentialsDefaults
     public const string RefreshGrantType = "refresh_token";
 
     /// <summary>
+    /// The default lifetime of a chain of refreshed tokens, counted from the original client-credentials grant.
+    /// </summary>
+    public static readonly TimeSpan DefaultRefreshTokenFamilyLifetime = TimeSpan.FromDays(30);
+
+    /// <summary>
     /// The claim type that stores the target service key.
     /// </summary>
     public const string ServiceClaimType = "cratis/service";

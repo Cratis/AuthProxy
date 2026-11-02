@@ -150,7 +150,10 @@ public class ClientCredentialsServiceResolver(
                 continue;
             }
 
-            yield return new ConfiguredClientCredentialsService(name, routePrefix, verificationUri);
+            yield return new ConfiguredClientCredentialsService(name, routePrefix, verificationUri)
+            {
+                RefreshTokenFamilyLifetime = service.ClientCredentials.RefreshTokenFamilyLifetime,
+            };
         }
     }
 

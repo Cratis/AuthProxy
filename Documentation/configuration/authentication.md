@@ -907,11 +907,28 @@ credentials:
    and a new refresh token for the same service, client, and tenant — the response shape is
    identical to the one shown above.
 
-Refresh tokens are valid for 30 days and are not re-verified against the downstream service on
-refresh — since the client secret is not resent, AuthProxy trusts the refresh token itself rather
-than calling back to the target service. There is no revocation list: a leaked refresh token
-remains usable until it naturally expires, so treat it as a credential and keep its exposure to the
-same standard as a client secret.
+Refreshing is secretless: refresh tokens are not re-verified against the downstream service, since
+the client secret is not resent, so AuthProxy trusts the refresh token itself rather than calling
+back to the target service. Rotating the client secret at the service therefore does not end an
+existing chain of refresh tokens. There is no revocation list: a leaked refresh token remains
+usable until it expires, so treat it as a credential and keep its exposure to the same standard as
+a client secret.
+
+Every chain of refreshed tokens has one absolute deadline, counted from the original
+`client_credentials` grant. It defaults to 30 days and is set per service with
+`Cratis:AuthProxy:Services:<key>:ClientCredentials:RefreshTokenFamilyLifetime` (for example
+`30.00:00:00`; it must be greater than zero). Refreshing returns a new refresh token with the
+same deadline and never extends it, and access tokens never outlive it. Each refresh token also
+expires after 30 days without being used. When the deadline passes, `/.cratis/token` answers
+`401 Unauthorized` with `error: "invalid_grant"` and the client requests a new token with its
+client credentials.
+
+Refresh tokens issued by earlier versions keep working until their own original expiry, which
+becomes the deadline of the chain they start.
+
+During a rolling upgrade, a replica still on an earlier version rejects the refresh tokens issued by
+an upgraded replica, and a downgrade has the same effect. Clients may then need to request a new
+token with their client credentials while the rollout completes.
 
 An expired or unrecognized refresh token is rejected with `401 Unauthorized` and
 `error: "invalid_grant"`. Refresh tokens cannot be used as access tokens (and vice versa) — each is

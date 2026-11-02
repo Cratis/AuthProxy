@@ -25,7 +25,8 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
         "AnonymousPaths": [ "/welcome", "/api/webhooks/payments" ],
         "ClientCredentials": {
           "RoutePrefix": "/api",
-          "VerificationPath": "/.cratis/client-credentials/verify"
+          "VerificationPath": "/.cratis/client-credentials/verify",
+          "RefreshTokenFamilyLifetime": "30.00:00:00"
         }
       },
       "catalog": {
@@ -81,6 +82,7 @@ Each entry in `ForwardedPaths` or `DeniedPaths` is a literal path rule.
 |----------|------|-------------|
 | `RoutePrefix` | `string` | Route prefix that AuthProxy-issued bearer tokens are allowed to access (for example `/api`). |
 | `VerificationPath` | `string` | Internal verification endpoint. Relative values are resolved against `Backend.BaseUrl`; absolute values are used as-is. |
+| `RefreshTokenFamilyLifetime` | `TimeSpan` | How long a chain of refreshed tokens can be used, counted from the original `client_credentials` grant. Refreshing never extends it. Must be greater than zero. Defaults to `30.00:00:00` (30 days). |
 
 ---
 
