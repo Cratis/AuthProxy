@@ -127,7 +127,8 @@ public class Session
     /// <summary>
     /// Gets or sets how long a selected tenant is trusted before it is re-validated against the tenant
     /// selection endpoint, so revoked tenant access takes effect without per-request backend calls.
-    /// Set to zero or a negative value to disable re-validation.
+    /// Zero or a negative value trusts a signed selection until it changes; a selection written by an earlier
+    /// version is still confirmed against the endpoint once.
     /// </summary>
     public TimeSpan TenantRevalidationInterval { get; set; } = DefaultRevalidationInterval;
 }
