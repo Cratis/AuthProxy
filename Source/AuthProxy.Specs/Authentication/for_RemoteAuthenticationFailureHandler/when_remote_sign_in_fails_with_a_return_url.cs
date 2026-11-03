@@ -34,8 +34,8 @@ public class when_remote_sign_in_fails_with_a_return_url : given.a_remote_authen
     [Fact] void should_clear_the_correlation_cookie_at_the_root_path() =>
         _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.CorrelationPrefix}abc=; expires");
 
-    [Fact] void should_clear_the_correlation_cookie_at_the_callback_path() =>
-        _context.Response.Headers.SetCookie.ToString().ShouldContain("path=/signin-microsoft");
+    [Fact] void should_only_clear_at_the_root_path() =>
+        _context.Response.Headers.SetCookie.ToString().ShouldNotContain("path=/signin-microsoft");
 
     [Fact] void should_clear_the_nonce_cookie() =>
         _context.Response.Headers.SetCookie.ToString().ShouldContain($"{Cookies.NoncePrefix}def=; expires");

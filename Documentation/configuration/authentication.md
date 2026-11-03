@@ -484,12 +484,15 @@ may then get through, see [Authorization](authorization.md).
 
 ## Response header size behind an ingress
 
-A sign-in callback can set several cookies at once: the session cookie, the readable identity cookie, the
-identity authorization cache, the tenant cookies, and expiry headers that clear leftover cookies from earlier
-attempts. Together they can pass the default response header buffer of a reverse proxy. ingress-nginx
+A sign-in callback can set several cookies at once: the session cookie, expiry headers for this attempt's
+sign-in and invitation cookies, and expiry headers that clear leftover cookies from earlier attempts. The readable
+identity cookie, the identity authorization cache and the tenant cookies are set on later requests, not on the
+callback. Together the callback's cookies can pass the default response header buffer of a reverse proxy. ingress-nginx
 answers `502` with "upstream sent too big header while reading response header from upstream" at its default
 `proxy-buffer-size` of 4k, and the browser keeps failing the same way until its cookies are cleared.
 
+- AuthProxy clears leftover sign-in cookies from earlier attempts a bounded amount per response, so retries cannot
+  grow the callback's headers; the rest expire within an hour.
 - AuthProxy keeps the provider's access and refresh tokens out of the session cookie for OIDC and OAuth providers alike.
 - AuthProxy logs a warning when the `Set-Cookie` headers on a response total more than 3.5 KB. It lists each cookie
   by name and header size, never its value, so you can see which cookie is large and size the buffer to match.
