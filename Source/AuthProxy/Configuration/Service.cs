@@ -43,6 +43,19 @@ public class Service
     public IList<string> Hosts { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets whether this service is reached through the plain catch-all routes - every path no other service
+    /// claims - although other services are configured.
+    /// </summary>
+    /// <remarks>
+    /// A deployment with exactly one service, declaring neither <see cref="Hosts"/> nor a <see cref="PathPrefix"/>, gets
+    /// the catch-all routes for it without saying so. Adding a second service - a gRPC endpoint under its own prefix, say -
+    /// would otherwise take them away and leave the first reachable only by a service-selection header. Set this on the
+    /// first to keep them. At most one service may set it, and that service declares neither hosts nor a path prefix;
+    /// every other service is then reached only through its own hosts, prefix or selection header.
+    /// </remarks>
+    public bool Default { get; set; }
+
+    /// <summary>
     /// Gets or sets the path prefix that routes requests to this service, for example <c language="text">/reporting</c>.
     /// Every request under the prefix goes to this service: <c language="text">{PathPrefix}/api/...</c> to the backend, and
     /// everything else under the prefix to the frontend.

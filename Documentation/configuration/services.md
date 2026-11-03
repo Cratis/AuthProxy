@@ -46,6 +46,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `Hosts` | `string[]` | `[]` | Host names (with an optional port) that route to this service. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
 | `PathPrefix` | `string` | `""` | Path prefix that routes to this service, for example `/reporting`. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
 | `StripPathPrefix` | `bool` | `false` | Remove `PathPrefix` from the forwarded path and send it in `X-Forwarded-Prefix`. |
+| `Default` | `bool` | `false` | Keeps the plain catch-all routes on this service although other services are configured. At most one service sets it, and it declares neither `Hosts` nor a `PathPrefix`. See [gRPC services](grpc-services.md#keeping-the-application-the-default). |
 | `ResolveIdentityDetails` | `bool?` | `true` when Backend is set | Whether to call `/.cratis/me` on this service **at all**. See [Identity enrichment](#identity-enrichment). |
 | `IdentityVerification` | `Required` \| `BestEffort` | `Required` | What that call's answer **means**. `Required` fails closed; `BestEffort` is the explicit opt-in for an endpoint that only enriches. See [Identity enrichment](#identity-enrichment). |
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
@@ -75,6 +76,7 @@ Each entry in `ForwardedPaths` or `DeniedPaths` is a literal path rule.
 | `BaseUrl` | `string` | Base URL of the endpoint (e.g. `http://my-service:8080/`). |
 | `ActivityTimeout` | `TimeSpan` | Idle limit for this endpoint alone (`Backend` or `Frontend`). Overrides the service and root values. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `StickyRouting` | `StickyRouting` | Backend only. Opt-in pinning of each browser to one backend replica. See [Sticky routing](#sticky-routing). |
+| `Protocol` | `Default` \| `Http2` | The HTTP version requests are forwarded with. `Http2` demands HTTP/2 also over plain HTTP, which a gRPC backend needs. See [gRPC services](grpc-services.md#forwarding-over-http2). |
 
 ### ServiceClientCredentialsConfig properties
 

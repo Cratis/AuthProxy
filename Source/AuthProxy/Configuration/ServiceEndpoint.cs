@@ -30,4 +30,12 @@ public class ServiceEndpoint
     /// Only supported on Backend endpoints; setting it elsewhere fails configuration validation.
     /// </summary>
     public StickyRouting? StickyRouting { get; set; }
+
+    /// <summary>
+    /// Gets or sets the HTTP version requests are forwarded to this endpoint with. Set
+    /// <see cref="BackendProtocol.Http2"/> for a gRPC service: over plain HTTP only HTTP/2 with prior knowledge carries
+    /// gRPC, and the default would forward HTTP/1.1. Applies to the requests the proxy forwards; its own calls to the
+    /// service (identity details, registration) are unaffected.
+    /// </summary>
+    public BackendProtocol Protocol { get; set; }
 }

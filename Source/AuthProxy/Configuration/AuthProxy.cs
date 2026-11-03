@@ -84,6 +84,12 @@ public class AuthProxy
     public Management? Management { get; set; }
 
     /// <summary>
+    /// Gets or sets the HTTP/2-only listener an ingress hands gRPC calls to.
+    /// Leave it unset — the default — and no additional socket is opened.
+    /// </summary>
+    public GrpcListener? GrpcListener { get; set; }
+
+    /// <summary>
     /// Gets or sets the logout configuration, including the post-logout redirect allow-list.
     /// </summary>
     public Logout Logout { get; set; } = new();

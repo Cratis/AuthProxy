@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Globalization;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
@@ -151,7 +152,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     {
         var routes = new List<RouteConfig>();
         var services = config.Services;
-        var isSingleMicroservice = ServiceRoutes.UsesSingleServiceDefaults(config);
+        var catchAll = ServiceRoutes.CatchAllService(config);
 
         // A declared prefix is matched without any service-selection header or query parameter, so two
         // services declaring the same prefix would emit two routes with an identical template and an
@@ -172,7 +173,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             if (ms.Backend is not null)
             {
-                routes.AddRange(BackendRoutes(name, isSingleMicroservice));
+                routes.AddRange(BackendRoutes(name, string.Equals(name, catchAll, StringComparison.Ordinal)));
             }
 
             if (ms.Frontend is not null)
@@ -181,12 +182,12 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             }
         }
 
-        // In a single-microservice deployment also add a plain catch-all so the
-        // frontend is reachable without any routing header or query parameter. A single service that declares
-        // hosts or a path prefix asked to be reached only through them, so it gets no catch-all.
-        if (isSingleMicroservice)
+        // In a single-microservice deployment - or for the service that says it is the default - also add a plain
+        // catch-all so the frontend is reachable without any routing header or query parameter. A single service that
+        // declares hosts or a path prefix asked to be reached only through them, so it gets no catch-all.
+        if (catchAll is not null)
         {
-            var (name, ms) = services.First();
+            var (name, ms) = (catchAll, services[catchAll]);
             var key = name.ToLowerInvariant();
 
             if (ms.Frontend is not null)
@@ -695,7 +696,8 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// <param name="endpoint">The endpoint.</param>
     /// <returns>A cluster with its request settings filled in.</returns>
     /// <remarks>
-    /// The most specific statement wins: the endpoint's own, then its service's, then the root's, then
+    /// The endpoint's <see cref="C.ServiceEndpoint.Protocol"/> decides the HTTP version the cluster forwards with.
+    /// For the activity timeout the most specific statement wins: the endpoint's own, then its service's, then the root's, then
     /// <see cref="C.AuthProxy.DefaultActivityTimeout"/>. The same value governs plain requests, WebSocket
     /// sessions and Server-Sent Events streams, because YARP measures all of them as time since data last
     /// moved in either direction.
@@ -708,6 +710,11 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                 ?? service.ActivityTimeout
                 ?? config.ActivityTimeout
                 ?? C.AuthProxy.DefaultActivityTimeout,
+
+            // Over plain HTTP, HttpClient negotiates nothing: HTTP/2 is used only when it is demanded exactly, which is
+            // what a gRPC backend needs (see C.BackendProtocol.Http2).
+            Version = endpoint.Protocol == C.BackendProtocol.Http2 ? HttpVersion.Version20 : null,
+            VersionPolicy = endpoint.Protocol == C.BackendProtocol.Http2 ? HttpVersionPolicy.RequestVersionExact : null,
         },
     };
 
