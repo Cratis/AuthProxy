@@ -60,6 +60,9 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
     /// <summary>The address the provider's authorization endpoint answers on.</summary>
     public const string ProviderAuthorizationEndpoint = "http://idp.test/authorize";
 
+    /// <summary>The path on the console origin that records a credential-link exchange.</summary>
+    public const string LinkExchangePath = "/.security-spec/link-exchange";
+
     /// <summary>An origin a sign-out may return to that is not under <see cref="Domain"/>.</summary>
     public const string OutsideTheDomainOrigin = "http://marketing.other.test";
 
@@ -75,6 +78,14 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
     {
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.SelectProvider), "<html><body>Select Provider</body></html>");
+
+        const string confirmationPage =
+            "<html><body><form method=\"post\" action=\"__CRATIS_LINK_ACTION__\">" +
+            "<input type=\"hidden\" name=\"token\" value=\"__CRATIS_LINK_TOKEN__\" />" +
+            "<input type=\"hidden\" name=\"returnUrl\" value=\"__CRATIS_LINK_RETURN_URL__\" />" +
+            "<input type=\"hidden\" name=\"__CRATIS_LINK_ANTIFORGERY_FIELD__\" value=\"__CRATIS_LINK_ANTIFORGERY_TOKEN__\" />" +
+            "</form></body></html>";
+        File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.LinkConfirm), confirmationPage);
 
         ConsoleOrigin = RecordingBackend.Start().GetAwaiter().GetResult();
         OperationsOrigin = RecordingBackend.Start().GetAwaiter().GetResult();
@@ -233,6 +244,7 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
             [$"{C.AuthProxy.SectionKey}:Services:chronicle:Frontend:BaseUrl"] = ChronicleOrigin.BaseUrl,
 
             [$"{C.AuthProxy.SectionKey}:PagesPath"] = _pagesPath,
+            [$"{C.AuthProxy.SectionKey}:Link:ExchangeUrl"] = $"{ConsoleOrigin.BaseUrl.TrimEnd('/')}{LinkExchangePath}",
 
             // A trusted destination for a sign-out that lies outside the cookie domain, so a spec can show that a
             // sign-in is still refused there.
