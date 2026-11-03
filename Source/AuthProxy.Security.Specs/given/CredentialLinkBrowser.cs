@@ -31,6 +31,7 @@ public sealed partial class CredentialLinkBrowser(SessionCookieHarness harness)
             $"{LinkPath}?token={LinkToken}",
             session));
         var cookie = SessionCookieHarness.SessionFrom(page).FirstOrDefault(_ => _.StartsWith($"{Cookies.Antiforgery}=", StringComparison.Ordinal)) ?? string.Empty;
+
         // The page HTML-encodes the value as the attribute is written; a browser decodes it before posting the form.
         var token = System.Net.WebUtility.HtmlDecode(FormTokenPattern.Match(await page.Content.ReadAsStringAsync()).Groups["token"].Value);
         return (page, cookie, token);
