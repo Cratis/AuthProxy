@@ -297,12 +297,16 @@ public class TenantSelectionMiddleware(
 
         if (!result.Succeeded)
         {
+            ForgetConfirmation(hasBinding, account, tenantId);
+
             logger.SelectedTenantNotConfirmed();
             return !exempt && await RejectUnconfirmed(context);
         }
 
         if (!result.Tenants.Any(_ => string.Equals(_.Id, tenantId, StringComparison.OrdinalIgnoreCase)))
         {
+            ForgetConfirmation(hasBinding, account, tenantId);
+
             // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
             // replay the request without it so the regular selection flow takes over.
             Tenancy.SelectedTenantCookie.Delete(context);
@@ -370,6 +374,14 @@ public class TenantSelectionMiddleware(
         memoryCache.Set(RevalidationCacheKey(account, tenantId), true, interval);
     }
 
+    void ForgetConfirmation(bool hasBinding, IdentityAccountBinding account, string tenantId)
+    {
+        if (hasBinding)
+        {
+            memoryCache.Remove(RevalidationCacheKey(account, tenantId));
+        }
+    }
+
     bool IsSafeRelativeUrl(string? url) => RelativeRedirect.IsSameSiteRelative(url);
 
     bool TryGetSelectionOptions(C.AuthProxy authProxyConfig, out Tenancy.SelectionOptions selectionOptions)
@@ -394,7 +406,7 @@ public class TenantSelectionMiddleware(
 
     /// <summary>
     /// Fetches an authoritative tenant list, distinguishing no tenant access from an unavailable endpoint.
-    /// Unavailability is surfaced as HTTP 503 during selection, but fails open during cookie re-validation.
+    /// Unavailability is surfaced as HTTP 503 both during selection and when confirming a selected tenant.
     /// A missing forwardable identity is a separate outcome that terminates the session during selection.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
@@ -470,9 +482,9 @@ public class TenantSelectionMiddleware(
     /// The outcome of calling the tenant endpoint. <c language="text">Succeeded</c> is <see langword="false"/> when
     /// the endpoint could not give an authoritative answer (unreachable, server error, unparseable body)
     /// or no forwardable identity exists; <c language="text">HasIdentity</c> distinguishes the session failure.
-    /// an authoritative "no tenants" answer has <c language="text">Succeeded</c> <see langword="true"/> with an empty list.
-    /// An unavailable result produces HTTP 503 during selection, but permits an already selected tenant
-    /// to continue during re-validation.
+    /// An authoritative "no tenants" answer has <c language="text">Succeeded</c> <see langword="true"/> with an empty list.
+    /// An unavailable result produces HTTP 503 both during selection and when confirming a selected tenant;
+    /// on paths served without tenant selection the request continues with no tenant.
     /// </summary>
     /// <param name="Succeeded">Whether the endpoint gave an authoritative answer.</param>
     /// <param name="Tenants">The tenants available to the user when the call succeeded.</param>

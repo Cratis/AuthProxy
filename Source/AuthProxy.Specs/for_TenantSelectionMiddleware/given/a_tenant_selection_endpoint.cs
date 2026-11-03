@@ -8,6 +8,7 @@ namespace Cratis.AuthProxy.for_TenantSelectionMiddleware.given;
 public class a_tenant_selection_endpoint : Specification
 {
     protected TenantSelectionMiddleware _middleware;
+    protected MemoryCache _memoryCache;
     protected DefaultHttpContext _context;
     protected C.AuthProxy _authProxyConfig;
     protected IErrorPageProvider _errorPageProvider;
@@ -15,12 +16,14 @@ public class a_tenant_selection_endpoint : Specification
     protected int _endpointCalls;
     protected HttpStatusCode? _endpointStatus;
     protected string _endpointBody = "[]";
+    protected Func<int, Task> _beforeEndpointAnswers = _ => Task.CompletedTask;
     protected Exception _endpointFailure = new HttpRequestException("Tenant endpoint is unavailable");
     protected const string AnonymousPath = "/api/portal/report";
     protected const string Tenants2 = """[{"id":"tenant-a","name":"Tenant A"},{"id":"tenant-b","name":"Tenant B"}]""";
 
     void Establish()
     {
+        _memoryCache = new MemoryCache(new MemoryCacheOptions());
         var config = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         _authProxyConfig = new C.AuthProxy
         {
@@ -59,7 +62,7 @@ public class a_tenant_selection_endpoint : Specification
             ResolverReflectingConfirmation(),
             httpClientFactory,
             _errorPageProvider,
-            new MemoryCache(new MemoryCacheOptions()),
+            _memoryCache,
             given.signed_selected_tenant_cookies.Instance,
             Substitute.For<ILogger<TenantSelectionMiddleware>>());
 
@@ -91,15 +94,16 @@ public class a_tenant_selection_endpoint : Specification
 
     sealed class TenantsHandler(a_tenant_selection_endpoint specification) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            specification._endpointCalls++;
+            var call = ++specification._endpointCalls;
+            await specification._beforeEndpointAnswers(call);
             return specification._endpointStatus is { } status
-                ? Task.FromResult(new HttpResponseMessage(status)
+                ? new HttpResponseMessage(status)
                 {
                     Content = new StringContent(specification._endpointBody)
-                })
-                : Task.FromException<HttpResponseMessage>(specification._endpointFailure);
+                }
+                : throw specification._endpointFailure;
         }
     }
 }

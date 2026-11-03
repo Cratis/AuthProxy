@@ -208,8 +208,7 @@ If the signed-in session no longer has a forwardable identity, AuthProxy signs t
 of reporting a service outage. Navigations redirect to provider selection with `reason=invalid-session`;
 other callers receive `401`.
 
-Revalidation of an already-selected tenant fails open during an endpoint outage, so a transient
-failure does not revoke an existing tenant selection.
+A selected tenant that has not been confirmed within `Session.TenantRevalidationInterval` is not forwarded while `TenantsEndpoint` cannot answer: requests receive `503`, and anonymous, invitation and registration paths continue with no tenant. See [tenant selection](tenant-selection.md#when-the-endpoint-cannot-answer).
 
 ---
 
