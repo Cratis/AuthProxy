@@ -11,7 +11,8 @@ proof-of-control building block behind an application's "add a credential" featu
 
 ```text
 GET /.cratis/link?token=<one-time-link-token>                                  → embeddable provider-selection page
-GET /.cratis/link/{scheme}?returnUrl=<relative-url>&token=<one-time-link-token> → challenge for one provider
+GET /.cratis/link/{scheme}?returnUrl=<relative-url>&token=<one-time-link-token> → confirmation page for one provider
+POST /.cratis/link/{scheme}  (form: token, returnUrl, antiforgery field)         → challenge for one provider
 GET /.cratis/link/complete                                                     → completion page
 ```
 
@@ -57,7 +58,7 @@ pages only**; sign-in and selection pages always refuse framing, and proxied app
 never touched.
 
 Opening `/.cratis/link/{scheme}` directly in a popup or top-level redirect — the pre-embedding shape —
-still works exactly as before.
+shows the confirmation page described below, whose button starts the provider challenge.
 
 ---
 
@@ -67,11 +68,23 @@ still works exactly as before.
    issues a short-lived, single-use token bound to that signed-in user, and opens the popup at
    `/.cratis/link/{scheme}?returnUrl=…&token=…`. The `scheme` is a configured provider scheme (the same value
    used by `/.cratis/login/{scheme}`, e.g. `github`).
-2. **AuthProxy challenges the provider.** The request must come from an authenticated session (an anonymous
-   request is rejected with `401`; an unknown scheme with `404`; a missing token with `400`). AuthProxy starts
-   an OAuth/OIDC challenge for the requested scheme, carrying a link-mode marker and the link token through the
-   authentication properties.
-3. **On the provider callback the identity is captured, not signed in.** Instead of writing the primary
+2. **The user confirms, then AuthProxy challenges the provider.** A `GET` to `/.cratis/link/{scheme}` never
+   reaches the provider: it answers with a confirmation page (`link-confirm.html`, never framed) whose form
+   posts the token and return URL back to the same path together with an antiforgery token. Only that `POST` —
+   which must carry a valid antiforgery cookie and form token, and read its values from the form, never the
+   query string — starts the challenge. The request must come from an authenticated session (an anonymous
+   request is rejected with `401`; an unknown scheme with `404`; a missing token or an invalid antiforgery
+   token with `400`; any method other than `GET` or `POST` with `405`). The challenge carries a link-mode marker,
+   the link token, the selected provider and a binding of the confirming session's account through the
+   protected authentication properties.
+3. **On the provider callback the identity is captured, not signed in.** First the callback is checked: the
+   provider must be the one selected, and the flow must carry the account binding. When the callback arrives
+   with the session cookie, that session must be the account that confirmed the link; any mismatch ends on the
+   generic failure page without contacting the application. Providers that answer with a cross-site form post
+   (the `FormPost` response mode) do not get the session cookie sent with the callback. When there is no
+   session cookie the comparison is skipped and the protected flow state is relied on instead: it was created
+   only by a `POST` with a valid antiforgery token, and it carries the account and the provider. Whenever the
+   session cookie is present, a mismatch is always refused. Then, instead of writing the primary
    authentication cookie, AuthProxy reads the freshly authenticated `subject` (and identity provider) and
    `POST`s them to the configured [`ExchangeUrl`](#configuration), authenticated with the link token as the
    bearer credential — exactly mirroring the [invite exchange](./lobby/invitation-to-organization.md). The

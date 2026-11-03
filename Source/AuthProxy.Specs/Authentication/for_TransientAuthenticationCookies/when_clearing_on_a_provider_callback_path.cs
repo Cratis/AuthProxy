@@ -26,8 +26,8 @@ public class when_clearing_on_a_provider_callback_path : Specification
     [Fact] void should_clear_the_nonce_cookie() => _setCookies.ShouldContain($"{Cookies.NoncePrefix}def=; expires");
 
     [Fact]
-    void should_also_clear_at_the_callback_path_where_legacy_cookies_were_scoped() =>
-        _setCookies.ShouldContain("path=/signin-microsoft");
+    void should_only_clear_at_the_root_path() =>
+        _setCookies.ShouldNotContain("path=/signin-microsoft");
 
     [Fact] void should_not_clear_unrelated_cookies() => _setCookies.ShouldNotContain("keep-me=;");
 }

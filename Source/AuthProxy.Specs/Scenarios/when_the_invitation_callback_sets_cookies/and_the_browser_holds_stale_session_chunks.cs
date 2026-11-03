@@ -1,0 +1,24 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Cratis.AuthProxy.Scenarios.when_invitation_completes_on_the_callback;
+
+namespace Cratis.AuthProxy.Scenarios.when_the_invitation_callback_sets_cookies;
+
+/// <summary>A browser holding the chunks of an older, larger session.</summary>
+/// <param name="factory">The shared application factory.</param>
+public class and_the_browser_holds_stale_session_chunks(CallbackCookiesAuthProxyFactory factory) : IClassFixture<CallbackCookiesAuthProxyFactory>, IAsyncLifetime
+{
+    readonly CallbackCookieScenario _scenario = new();
+
+    public async ValueTask InitializeAsync() => await _scenario.Run(factory, nameof(and_the_browser_holds_stale_session_chunks), 0, true);
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    [Fact] void should_redirect_to_the_lobby() => Assert.StartsWith(OidcCallbackAuthProxyFactory.LobbyUrl, _scenario.SignIn.Callback.Headers.Location?.ToString());
+    [Fact] void should_establish_the_session_in_one_unchunked_cookie() => Assert.DoesNotContain(_scenario.CallbackSetCookies, cookie => cookie.StartsWith($"{OidcCallbackAuthProxyFactory.SessionCookieName}C1=", StringComparison.Ordinal) && !cookie.StartsWith($"{OidcCallbackAuthProxyFactory.SessionCookieName}C1=;", StringComparison.Ordinal));
+    [Fact] void should_not_set_the_identity_or_tenant_cookies_on_the_callback() => Assert.DoesNotContain(_scenario.CallbackSetCookies, cookie => cookie.StartsWith(".cratis-", StringComparison.Ordinal) && !cookie.Contains("expires=", StringComparison.Ordinal));
+    [Fact] void should_delete_this_handshakes_correlation_and_nonce_cookies() => Assert.All(_scenario.CurrentHandshakeCookies, pair => Assert.Contains(_scenario.CallbackSetCookies, cookie => cookie.StartsWith($"{pair.Split('=', 2)[0]}=;", StringComparison.Ordinal)));
+    [Fact] void should_keep_the_set_cookie_headers_under_the_warning_threshold() => Assert.True(_scenario.Measurement.SetCookieTotal <= SetCookieSizeMiddleware.WarningThreshold, $"Set-Cookie total {_scenario.Measurement.SetCookieTotal}");
+    [Fact] void should_keep_the_response_header_under_a_4k_proxy_buffer() => Assert.True(_scenario.Measurement.HeaderBlock <= CallbackCookieMeasurement.HeaderBlockBudget, $"Header block {_scenario.Measurement.HeaderBlock}");
+}

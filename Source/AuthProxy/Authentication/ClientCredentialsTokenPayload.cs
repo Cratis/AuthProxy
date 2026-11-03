@@ -14,4 +14,11 @@ public record ClientCredentialsTokenPayload(
     string Service,
     string RoutePrefix,
     string ClientId,
-    string? Tenant = null);
+    string? Tenant = null)
+{
+    /// <summary>
+    /// Gets when the chain of refreshed tokens this token belongs to stops being accepted. Only set on refresh tokens.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? FamilyExpiresAt { get; init; }
+}

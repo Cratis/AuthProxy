@@ -5,6 +5,7 @@ using System.Net;
 using System.Text;
 using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
 
@@ -111,8 +112,15 @@ public class and_the_failure_mode_varies : Specification
     {
         var properties = new AuthenticationProperties { RedirectUri = ReturnUrl };
         properties.Items[LinkMiddleware.LinkModePropertyKey] = "true";
+        properties.Items[LinkMiddleware.LinkSchemePropertyKey] = "github";
+        LinkSessionBinding.TryCreate(SessionPrincipal, out var binding);
+        properties.Items[LinkMiddleware.LinkSessionBindingPropertyKey] = binding;
         return properties;
     }
+
+    static ClaimsPrincipal SessionPrincipal { get; } = new(new ClaimsIdentity(
+        [new Claim("sub", "account-1")],
+        CookieAuthenticationDefaults.AuthenticationScheme));
 
     static RecordingHttpMessageHandler Responds(HttpStatusCode statusCode) => new(statusCode);
 
@@ -172,7 +180,13 @@ public class and_the_failure_mode_varies : Specification
             Substitute.For<ILogger<LinkSubjectExchanger>>(),
             new CanonicalIdentityResolver(authentication));
 
+        var authenticationService = Substitute.For<IAuthenticationService>();
+        authenticationService
+            .AuthenticateAsync(Arg.Any<HttpContext>(), CookieAuthenticationDefaults.AuthenticationScheme)
+            .Returns(AuthenticateResult.Success(new AuthenticationTicket(SessionPrincipal, CookieAuthenticationDefaults.AuthenticationScheme)));
+
         var services = Substitute.For<IServiceProvider>();
+        services.GetService(typeof(IAuthenticationService)).Returns(authenticationService);
         services.GetService(typeof(ILoggerFactory)).Returns(loggerFactory);
         services.GetService(typeof(IErrorPageProvider)).Returns(errorPageProvider);
         services.GetService(typeof(ILinkSubjectExchanger)).Returns(exchanger);

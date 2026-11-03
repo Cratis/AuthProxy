@@ -23,4 +23,11 @@ public class ServiceClientCredentials
     /// </summary>
     [Required]
     public string VerificationPath { get; set; } = "/.cratis/client-credentials/verify";
+
+    /// <summary>
+    /// Gets or sets how long a chain of refreshed tokens can be used, counted from the original <c language="text">client_credentials</c> grant.
+    /// Refreshing a token never extends this deadline, and rotating the client secret at the service does not shorten it.
+    /// Use the <see cref="TimeSpan"/> format, for example <c language="text">30.00:00:00</c>. Defaults to 30 days.
+    /// </summary>
+    public TimeSpan RefreshTokenFamilyLifetime { get; set; } = Cratis.AuthProxy.Authentication.ClientCredentialsDefaults.DefaultRefreshTokenFamilyLifetime;
 }

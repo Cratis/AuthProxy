@@ -9,12 +9,14 @@ namespace Cratis.AuthProxy.Links;
 public static class LinksServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the <see cref="ILinkSubjectExchanger"/> used by the session-preserving link flow.
+    /// Registers the <see cref="ILinkSubjectExchanger"/> used by the session-preserving link flow and the
+    /// antiforgery services its confirmation form relies on.
     /// </summary>
     /// <param name="builder">The <see cref="WebApplicationBuilder"/> to configure.</param>
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddLinks(this WebApplicationBuilder builder)
     {
+        builder.AddProxyAntiforgery();
         builder.Services.AddSingleton<ILinkSubjectExchanger, LinkSubjectExchanger>();
 
         return builder;
