@@ -114,6 +114,21 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      # Only this existing trusted main push seeds the shared cache; all other runs restore only.
+      - name: Cache NuGet packages
+        uses: Cratis/Workflows/.github/actions/dotnet-cache@3f8a8a7ef75f72b6b089638b68ec2f9af8f593e3
+        with:
+          mode: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.repository.default_branch == 'main' && 'auto' || 'restore' }}
+          path: ~/.nuget/packages
+          key-files: |
+            **/*.csproj
+            **/*.props
+            **/*.targets
+            **/packages.lock.json
+            **/[Nn]u[Gg]et.[Cc]onfig
+            global.json
+            AuthProxy.slnx
+
       - name: Restore
         run: dotnet restore
 

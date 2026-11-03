@@ -52,6 +52,20 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Cache NuGet packages
+        uses: Cratis/Workflows/.github/actions/dotnet-cache@3f8a8a7ef75f72b6b089638b68ec2f9af8f593e3
+        with:
+          mode: restore
+          path: ~/.nuget/packages
+          key-files: |
+            **/*.csproj
+            **/*.props
+            **/*.targets
+            **/packages.lock.json
+            **/[Nn]u[Gg]et.[Cc]onfig
+            global.json
+            AuthProxy.slnx
+
       - name: Build
         run: dotnet build --configuration Release
 
