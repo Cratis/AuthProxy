@@ -31,6 +31,7 @@ public class when_the_provider_is_not_configured : Specification
         {
             User = new ClaimsPrincipal(new ClaimsIdentity("test")),
         };
+        _context.Request.Method = HttpMethods.Get;
         _context.Request.Path = $"{WellKnownPaths.Link}/unknown";
         _context.Request.QueryString = QueryString.Create("token", "the-link-token");
 

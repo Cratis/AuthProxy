@@ -46,6 +46,11 @@ public static class ClientCredentialsDefaults
     public const string TenantClaimType = "cratis/tenant";
 
     /// <summary>
+    /// The default lifetime of a chain of refreshed tokens, counted from the original client-credentials grant.
+    /// </summary>
+    public static readonly TimeSpan DefaultRefreshTokenFamilyLifetime = TimeSpan.FromDays(30);
+
+    /// <summary>
     /// The <see cref="HttpContext.Items"/> key under which the composite scheme selector stashes an
     /// already-validated <see cref="ClientCredentialsTokenPayload"/>, so the bearer authentication handler
     /// does not have to unprotect the same token a second time.

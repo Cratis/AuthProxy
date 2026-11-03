@@ -34,6 +34,7 @@ public class when_the_link_token_is_missing : Specification
         {
             User = new ClaimsPrincipal(new ClaimsIdentity("test")),
         };
+        _context.Request.Method = HttpMethods.Get;
         _context.Request.Path = $"{WellKnownPaths.Link}/github";
 
         _authenticationService = Substitute.For<IAuthenticationService>();

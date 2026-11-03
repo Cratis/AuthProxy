@@ -6,45 +6,16 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace Cratis.AuthProxy.for_LinkMiddleware;
 
-public class when_initiating_a_link : Specification
+public class when_initiating_a_link : given.a_link_page_context
 {
-    LinkMiddleware _middleware;
-    DefaultHttpContext _context;
-    IAuthenticationService _authenticationService;
-    bool _nextCalled;
-
     void Establish()
     {
-        var authConfig = Substitute.For<IOptionsMonitor<C.Authentication>>();
-        authConfig.CurrentValue.Returns(new C.Authentication
-        {
-            OAuthProviders = [new C.OAuthProvider { Name = "GitHub" }],
-        });
-
-        _middleware = new LinkMiddleware(
-            _ =>
-            {
-                _nextCalled = true;
-                return Task.CompletedTask;
-            },
-            authConfig,
-            Substitute.For<ILogger<LinkMiddleware>>());
-
-        _context = new DefaultHttpContext
-        {
-            User = new ClaimsPrincipal(new ClaimsIdentity("test")),
-        };
         _context.Request.Path = $"{WellKnownPaths.Link}/github";
-        _context.Request.QueryString = QueryString.Create(new Dictionary<string, string?>
+        PostForm(new Dictionary<string, string>
         {
             ["returnUrl"] = "/settings/link-complete",
             ["token"] = "the-link-token",
         });
-
-        _authenticationService = Substitute.For<IAuthenticationService>();
-        var serviceProvider = Substitute.For<IServiceProvider>();
-        serviceProvider.GetService(typeof(IAuthenticationService)).Returns(_authenticationService);
-        _context.RequestServices = serviceProvider;
     }
 
     async Task Because() => await _middleware.InvokeAsync(_context);
@@ -69,6 +40,21 @@ public class when_initiating_a_link : Specification
             _context,
             "github",
             Arg.Is<AuthenticationProperties>(properties => properties.RedirectUri == "/settings/link-complete"));
+
+    [Fact] void should_record_the_session_binding()
+    {
+        LinkSessionBinding.TryCreate(SessionPrincipal, out var expected).ShouldBeTrue();
+        _authenticationService.Received(1).ChallengeAsync(
+            _context,
+            "github",
+            Arg.Is<AuthenticationProperties>(properties => properties.Items[LinkMiddleware.LinkSessionBindingPropertyKey] == expected));
+    }
+
+    [Fact] void should_record_the_selected_provider() =>
+        _authenticationService.Received(1).ChallengeAsync(
+            _context,
+            "github",
+            Arg.Is<AuthenticationProperties>(properties => properties.Items[LinkMiddleware.LinkSchemePropertyKey] == "github"));
 
     [Fact] void should_not_call_next() => _nextCalled.ShouldBeFalse();
 }

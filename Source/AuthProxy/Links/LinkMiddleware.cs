@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -49,6 +50,16 @@ public class LinkMiddleware(
     /// </summary>
     public const string LinkTokenPropertyKey = "Cratis.AuthProxy.LinkToken";
 
+    /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key carrying the binding of the account that started the link.
+    /// </summary>
+    public const string LinkSessionBindingPropertyKey = "Cratis.AuthProxy.LinkSessionBinding";
+
+    /// <summary>
+    /// The <see cref="AuthenticationProperties"/> item key carrying the provider the link was started for.
+    /// </summary>
+    public const string LinkSchemePropertyKey = "Cratis.AuthProxy.LinkScheme";
+
     const string CompleteSegment = "complete";
 
     static readonly HashSet<string> _framedDestinations = new(StringComparer.Ordinal) { "iframe", "frame", "embed", "object" };
@@ -73,23 +84,15 @@ public class LinkMiddleware(
             return;
         }
 
-        if (segment.Length > 0 && !SchemeExists(segment))
+        var rejection = Reject(context, segment);
+        if (rejection is { } status)
         {
-            logger.LinkProviderNotConfigured(segment);
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            context.Response.StatusCode = status;
             return;
         }
 
-        // Linking augments an existing account, so it requires a signed-in user. An anonymous request has
-        // no primary account to link to — reject it instead of starting a challenge.
-        if (context.User.Identity?.IsAuthenticated != true)
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return;
-        }
-
-        var token = context.Request.Query["token"].FirstOrDefault();
-        if (string.IsNullOrWhiteSpace(token))
+        var request = await LinkRequestReader.Read(context, segment);
+        if (request is null)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;
@@ -106,15 +109,14 @@ public class LinkMiddleware(
             return;
         }
 
-        var properties = new AuthenticationProperties
+        if (request.Confirmed)
         {
-            RedirectUri = ResolveReturnUrl(context.Request.Query["returnUrl"].FirstOrDefault()),
-        };
-        properties.Items[LinkModePropertyKey] = "true";
-        properties.Items[LinkTokenPropertyKey] = token;
-
-        logger.InitiatingLink(segment);
-        await context.ChallengeAsync(segment, properties);
+            await Challenge(context, request);
+        }
+        else
+        {
+            await LinkConfirmationPage.Write(context, request, ProviderName(request.Provider));
+        }
     }
 
     /// <summary>
@@ -147,6 +149,62 @@ public class LinkMiddleware(
     {
         var destination = request.Headers["Sec-Fetch-Dest"].FirstOrDefault();
         return destination is not null && _framedDestinations.Contains(destination);
+    }
+
+    int? Reject(HttpContext context, string segment)
+    {
+        if (segment.Length == 0)
+        {
+            return context.User.Identity?.IsAuthenticated == true ? null : StatusCodes.Status401Unauthorized;
+        }
+
+        if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsPost(context.Request.Method))
+        {
+            context.Response.Headers.Allow = "GET, POST";
+            return StatusCodes.Status405MethodNotAllowed;
+        }
+
+        if (!SchemeExists(segment))
+        {
+            logger.LinkProviderNotConfigured(segment);
+            return StatusCodes.Status404NotFound;
+        }
+
+        // Linking augments an existing account, so it requires a signed-in user. An anonymous request has
+        // no primary account to link to — reject it instead of starting a challenge.
+        return context.User.Identity?.IsAuthenticated == true ? null : StatusCodes.Status401Unauthorized;
+    }
+
+    async Task Challenge(HttpContext context, LinkRequest request)
+    {
+        // The account that confirmed is the account the link will be recorded for: the session the request
+        // arrived with is read here, and the callback must find the same account again.
+        var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        if (!LinkSessionBinding.TryCreate(session.Principal, out var binding))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = ResolveReturnUrl(request.ReturnUrl),
+        };
+        properties.Items[LinkModePropertyKey] = "true";
+        properties.Items[LinkTokenPropertyKey] = request.Token;
+        properties.Items[LinkSessionBindingPropertyKey] = binding;
+        properties.Items[LinkSchemePropertyKey] = request.Provider;
+
+        logger.InitiatingLink(request.Provider);
+        await context.ChallengeAsync(request.Provider, properties);
+    }
+
+    string ProviderName(string scheme)
+    {
+        var config = authConfig.CurrentValue;
+        return config.OidcProviders.Select(provider => provider.Name)
+            .Concat(config.OAuthProviders.Select(provider => provider.Name))
+            .FirstOrDefault(name => OidcProviderScheme.FromName(name) == scheme) ?? scheme;
     }
 
     bool SchemeExists(string scheme)

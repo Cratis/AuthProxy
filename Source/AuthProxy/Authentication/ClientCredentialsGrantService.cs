@@ -79,7 +79,7 @@ public class ClientCredentialsGrantService(
                 "The target service could not verify the supplied client credentials.");
         }
 
-        return IssueTokens(service, clientId, verificationResult.Tenant);
+        return IssueTokens(service, clientId, verificationResult.Tenant, tokenProtector.StartFamily(service));
     }
 
     ClientCredentialsGrantResult GrantFromRefreshToken(string? refreshToken)
@@ -108,12 +108,24 @@ public class ClientCredentialsGrantService(
                 errorDescription);
         }
 
-        return IssueTokens(service, payload.ClientId, payload.Tenant);
+        return IssueTokens(service, payload.ClientId, payload.Tenant, payload.FamilyExpiresAt!.Value);
     }
 
-    ClientCredentialsGrantResult IssueTokens(ConfiguredClientCredentialsService service, string clientId, string? tenant) =>
-        ClientCredentialsGrantResult.Success(
-            tokenProtector.CreateToken(service, clientId, tenant),
-            tokenProtector.ExpiresInSeconds,
-            tokenProtector.CreateRefreshToken(service, clientId, tenant));
+    ClientCredentialsGrantResult IssueTokens(
+        ConfiguredClientCredentialsService service,
+        string clientId,
+        string? tenant,
+        DateTimeOffset familyExpiresAt)
+    {
+        var issued = tokenProtector.Issue(service, clientId, tenant, familyExpiresAt);
+        if (issued.ExpiresInSeconds <= 0)
+        {
+            return ClientCredentialsGrantResult.CreateError(
+                StatusCodes.Status401Unauthorized,
+                "invalid_grant",
+                "The refresh token is invalid or has expired.");
+        }
+
+        return ClientCredentialsGrantResult.Success(issued.AccessToken, issued.ExpiresInSeconds, issued.RefreshToken);
+    }
 }

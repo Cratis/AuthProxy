@@ -35,6 +35,7 @@ public class when_the_user_is_not_authenticated : Specification
         {
             User = new ClaimsPrincipal(new ClaimsIdentity()),
         };
+        _context.Request.Method = HttpMethods.Get;
         _context.Request.Path = $"{WellKnownPaths.Link}/github";
         _context.Request.QueryString = QueryString.Create("token", "the-link-token");
 

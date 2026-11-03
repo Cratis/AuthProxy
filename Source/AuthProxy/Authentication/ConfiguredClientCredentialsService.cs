@@ -12,4 +12,10 @@ namespace Cratis.AuthProxy.Authentication;
 public record ConfiguredClientCredentialsService(
     string Name,
     string RoutePrefix,
-    Uri VerificationUri);
+    Uri VerificationUri)
+{
+    /// <summary>
+    /// Gets how long a chain of refreshed tokens can be used, counted from the original grant.
+    /// </summary>
+    public TimeSpan RefreshTokenFamilyLifetime { get; init; } = ClientCredentialsDefaults.DefaultRefreshTokenFamilyLifetime;
+}
