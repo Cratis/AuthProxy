@@ -21,5 +21,11 @@ public class and_the_browser_holds_stale_handshake_cookies(CallbackCookiesAuthPr
     [Fact] void should_delete_this_handshakes_correlation_and_nonce_cookies() => Assert.All(_scenario.CurrentHandshakeCookies, pair => Assert.Contains(_scenario.CallbackSetCookies, cookie => cookie.StartsWith($"{pair.Split('=', 2)[0]}=;", StringComparison.Ordinal)));
     [Fact] void should_keep_the_set_cookie_headers_under_the_warning_threshold() => Assert.True(_scenario.Measurement.SetCookieTotal <= SetCookieSizeMiddleware.WarningThreshold, $"Set-Cookie total {_scenario.Measurement.SetCookieTotal}");
     [Fact] void should_keep_the_response_header_under_a_4k_proxy_buffer() => Assert.True(_scenario.Measurement.HeaderBlock <= CallbackCookieMeasurement.HeaderBlockBudget, $"Header block {_scenario.Measurement.HeaderBlock}");
+    [Fact] void should_have_written_handshake_cookies_on_each_challenge() => Assert.NotEmpty(_scenario.StaleHandshakeSetCookies);
+    [Fact] void should_let_handshake_cookies_expire_within_an_hour() => Assert.All(_scenario.StaleHandshakeSetCookies, cookie => Assert.True(ExpiresAt(cookie) <= _scenario.StartedAt.AddMinutes(61), cookie.Split('=', 2)[0]));
+
+    static DateTimeOffset ExpiresAt(string setCookie) =>
+        Microsoft.Net.Http.Headers.SetCookieHeaderValue.Parse(setCookie).Expires ?? DateTimeOffset.MaxValue;
+
     [Fact] void should_still_clear_some_stale_handshake_cookies() => Assert.Contains(_scenario.CallbackSetCookies, cookie => _scenario.StaleHandshakeNames.Any(name => cookie.StartsWith($"{name}=;", StringComparison.Ordinal)));
 }

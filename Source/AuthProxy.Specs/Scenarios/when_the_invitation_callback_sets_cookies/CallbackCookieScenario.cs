@@ -16,6 +16,12 @@ public sealed class CallbackCookieScenario
     /// <summary>Gets the names of the correlation and nonce cookies the stale handshakes left behind.</summary>
     public IReadOnlyList<string> StaleHandshakeNames { get; private set; } = [];
 
+    /// <summary>Gets the Set-Cookie headers the stale handshakes' challenges wrote for correlation and nonce cookies.</summary>
+    public IReadOnlyList<string> StaleHandshakeSetCookies { get; private set; } = [];
+
+    /// <summary>Gets when the scenario started, to compare cookie expiries against.</summary>
+    public DateTimeOffset StartedAt { get; private set; }
+
     /// <summary>Gets the sign-in round trip.</summary>
     public OidcCallbackAuthProxyFactory.ProviderSignIn SignIn { get; private set; } = null!;
 
@@ -39,15 +45,22 @@ public sealed class CallbackCookieScenario
     public async Task Run(CallbackCookiesAuthProxyFactory factory, string title, int staleHandshakes, bool staleSession)
     {
         factory.Reset();
+        StartedAt = DateTimeOffset.UtcNow;
         using var browser = factory.CreateBrowser(factory.BrowserBase);
 
         var stale = new List<string>();
+        var staleSetCookies = new List<string>();
         for (var attempt = 0; attempt < staleHandshakes; attempt++)
         {
             var challenge = await browser.GetAsync($"/invite/{NewToken(factory)}");
             stale.AddRange(OidcCallbackAuthProxyFactory.CookiesFrom(challenge).Where(IsHandshakeCookie));
+            if (challenge.Headers.TryGetValues("Set-Cookie", out var written))
+            {
+                staleSetCookies.AddRange(written.Where(IsHandshakeCookie));
+            }
         }
 
+        StaleHandshakeSetCookies = staleSetCookies;
         StaleHandshakeNames = [.. stale.Select(pair => pair.Split('=', 2)[0])];
         if (staleSession)
         {
