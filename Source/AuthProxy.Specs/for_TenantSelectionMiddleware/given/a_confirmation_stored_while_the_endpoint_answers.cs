@@ -18,6 +18,9 @@ public class a_confirmation_stored_while_the_endpoint_answers : a_tenant_selecti
     protected DefaultHttpContext _first;
     protected DefaultHttpContext _second;
     protected DefaultHttpContext _third;
+    protected DefaultHttpContext _probe;
+    protected int _callsBeforeProbe;
+    protected int _callsAfterProbe;
     protected int _callsBeforeThird;
     protected bool _nextCalledForThird;
     TaskCompletionSource _firstEntered;
@@ -48,6 +51,11 @@ public class a_confirmation_stored_while_the_endpoint_answers : a_tenant_selecti
 
         _second = NewRequest();
         await _middleware.InvokeAsync(_second);
+
+        _callsBeforeProbe = _endpointCalls;
+        _probe = NewRequest();
+        await _middleware.InvokeAsync(_probe);
+        _callsAfterProbe = _endpointCalls;
 
         _endpointStatus = _lateStatus;
         _endpointBody = _lateBody;
