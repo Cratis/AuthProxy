@@ -212,6 +212,15 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
         CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
 
     /// <summary>
+    /// Creates a non-redirecting, cookie-less <see cref="HttpClient"/> whose requests target <paramref name="baseAddress"/>,
+    /// so a spec can play a browser on a host inside a configured session cookie domain.
+    /// </summary>
+    /// <param name="baseAddress">The origin the browser addresses.</param>
+    /// <returns>A configured <see cref="HttpClient"/>.</returns>
+    public HttpClient CreateBrowser(Uri baseAddress) =>
+        CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false, BaseAddress = baseAddress });
+
+    /// <summary>
     /// Starts the OIDC challenge at <paramref name="path"/> and answers it on the callback with a fake
     /// identity provider round trip, exactly as the browser and a real OIDC provider would between them.
     /// </summary>
@@ -423,8 +432,8 @@ public class OidcCallbackAuthProxyFactory : WebApplicationFactory<Program>
                             use = "sig",
                             kid = factory._idpKeyId,
                             alg = SecurityAlgorithms.RsaSha256,
-                            n = Base64UrlEncode(parameters.Modulus!),
-                            e = Base64UrlEncode(parameters.Exponent!),
+                            n = Base64UrlEncode(parameters.Modulus),
+                            e = Base64UrlEncode(parameters.Exponent),
                         },
                     },
                 });
