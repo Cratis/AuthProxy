@@ -56,6 +56,7 @@ public class ServiceRoutingConfigurationValidator : IValidateOptions<C.AuthProxy
         }
 
         failures.AddRange(Conflicts(declared));
+        failures.AddRange(DefaultServiceFailures(options));
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
@@ -109,6 +110,20 @@ public class ServiceRoutingConfigurationValidator : IValidateOptions<C.AuthProxy
                     yield return conflict;
                 }
             }
+        }
+    }
+
+    static IEnumerable<string> DefaultServiceFailures(C.AuthProxy options)
+    {
+        var defaults = options.Services.Where(_ => _.Value.Default).Select(_ => _.Key).ToArray();
+        if (defaults.Length > 1)
+        {
+            yield return $"Services {string.Join(", ", defaults.Select(_ => $"'{_}'"))} all set Default; only one service can be reached through the catch-all routes.";
+        }
+
+        foreach (var serviceName in defaults.Where(_ => options.Services[_].Hosts.Count > 0 || !string.IsNullOrWhiteSpace(options.Services[_].PathPrefix)))
+        {
+            yield return $"Service '{serviceName}' sets Default but declares Hosts or a PathPrefix; the default service is the one reached where no host or prefix matches, so it declares neither.";
         }
     }
 }

@@ -5,6 +5,7 @@ using Cratis.AuthProxy;
 using Cratis.AuthProxy.ApplicationContract;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.Grpc;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
@@ -38,6 +39,7 @@ builder.AddLinks();
 builder.AddSignIns();
 builder.SetupReverseProxy();
 builder.AddManagement();
+builder.AddGrpcListener();
 
 var app = builder.Build();
 
@@ -48,6 +50,7 @@ app.UseSearchIndexingHeaders();
 // reverse proxy can see it — and so a request for a management path on the public listener is refused
 // before anything else can serve it.
 app.UseManagement();
+app.UseGrpcListener();
 app.UseIngress();
 
 await app.RunAsync();

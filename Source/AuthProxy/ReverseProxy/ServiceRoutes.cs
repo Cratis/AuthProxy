@@ -171,15 +171,23 @@ public static class ServiceRoutes
         || new PathString(second).StartsWithSegments(first, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Gets whether a service is reached through the plain catch-all routes of a single-service deployment.
+    /// Gets the service reached through the plain catch-all routes: the one service of a single-service deployment that
+    /// declares neither hosts nor a path prefix, or the service that sets <see cref="C.Service.Default"/>.
     /// </summary>
     /// <param name="config">The configuration.</param>
-    /// <returns><see langword="true"/> when there is exactly one service and it declares neither hosts nor a path prefix.</returns>
-    public static bool UsesSingleServiceDefaults(C.AuthProxy config) =>
-        config.Services.Count == 1
-        && config.Services.Values.First() is var service
-        && service.Hosts.Count == 0
-        && string.IsNullOrWhiteSpace(service.PathPrefix);
+    /// <returns>The service's configured name, or <see langword="null"/> when no service gets the catch-all routes.</returns>
+    public static string? CatchAllService(C.AuthProxy config)
+    {
+        var declared = config.Services.Where(_ => _.Value.Default).ToArray();
+        if (declared.Length == 1 && IsUnrouted(declared[0].Value))
+        {
+            return declared[0].Key;
+        }
+
+        return declared.Length == 0 && config.Services.Count == 1 && IsUnrouted(config.Services.Values.First())
+            ? config.Services.Keys.First()
+            : null;
+    }
 
     /// <summary>
     /// Resolves the selected proxy route's service, falling back to routing declarations without a proxy endpoint.
@@ -207,6 +215,8 @@ public static class ServiceRoutes
             return new(name, service);
         }
 
+        var catchAll = CatchAllService(config);
+
         var services = config.Services
             .Where(_ => _.Value.Backend is not null || _.Value.Frontend is not null)
             .Select(_ => new RoutedService(_.Key, _.Value))
@@ -219,8 +229,11 @@ public static class ServiceRoutes
         return ByPathPrefix(services, path, _ => HostsOf(_).Any(host => Matches(host, request)))
             ?? ByPathPrefix(services, path, _ => _.Hosts.Count == 0)
             ?? ByName(services, path, [header, request.Query[CanonicalServiceQueryParameter], request.Query[ServiceQueryParameter]])
-            ?? services.FirstOrDefault(_ => PathPrefixOf(_.Service) is null && HostsOf(_.Service).Any(host => Matches(host, request)));
+            ?? services.FirstOrDefault(_ => PathPrefixOf(_.Service) is null && HostsOf(_.Service).Any(host => Matches(host, request)))
+            ?? services.FirstOrDefault(_ => string.Equals(_.Name, catchAll, StringComparison.Ordinal));
     }
+
+    static bool IsUnrouted(C.Service service) => service.Hosts.Count == 0 && string.IsNullOrWhiteSpace(service.PathPrefix);
 
     static RoutedService? ByPathPrefix(IEnumerable<RoutedService> services, PathString path, Func<C.Service, bool> hostMatches) =>
         services
