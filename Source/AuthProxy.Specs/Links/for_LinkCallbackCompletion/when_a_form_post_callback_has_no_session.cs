@@ -11,9 +11,13 @@ namespace Cratis.AuthProxy.Links.for_LinkCallbackCompletion;
 /// The protected flow state, created only by a confirmed request from a signed-in session, carries the account
 /// and the provider, so the comparison with the session is skipped when there is no session to compare with.
 /// </summary>
-public class when_the_session_cookie_is_absent : a_link_callback_context
+public class when_a_form_post_callback_has_no_session : a_link_callback_context
 {
     protected override bool HasSession => false;
+
+    protected override string CallbackMethod => HttpMethods.Post;
+
+    protected override C.OidcResponseMode ProviderResponseMode => C.OidcResponseMode.FormPost;
 
     async Task Because() => await LinkCallbackCompletion.Complete(_ticketContext, _properties);
 

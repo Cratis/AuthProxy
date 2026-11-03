@@ -5,6 +5,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Options;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Links;
 
@@ -75,7 +77,7 @@ public static class LinkCallbackCompletion
     /// The protected flow state is created only by a confirmed request from a signed-in session, and carries the
     /// provider and the binding of that session's account. A provider that answers with a cross-site form post does
     /// not get the session cookie sent along, so when there is no session on the callback the flow state alone is
-    /// relied on. Whenever a session is present it must be the account that started the link.
+    /// relied on, and only when the provider is configured for a form post and the callback is a POST. Whenever a session is present it must be the account that started the link.
     /// </remarks>
     /// <param name="context">The ticket-received context raised by the remote authentication handler.</param>
     /// <param name="properties">The round-tripped challenge properties carrying the flow state.</param>
@@ -101,11 +103,30 @@ public static class LinkCallbackCompletion
 
         if (!session.Succeeded)
         {
-            return true;
+            // Only a provider configured for a cross-site form post is expected to arrive without the
+            // (SameSite=Lax) session cookie; a redirect callback always carries it, so its absence there
+            // means the session ended and the link must not complete.
+            return IsFormPostCallback(context);
         }
 
         return LinkSessionBinding.TryCreate(session.Principal, out var current)
             && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(current), Encoding.UTF8.GetBytes(bound));
+    }
+
+    static bool IsFormPostCallback(TicketReceivedContext context)
+    {
+        if (!HttpMethods.IsPost(context.Request.Method))
+        {
+            return false;
+        }
+
+        var authentication = context.HttpContext.RequestServices
+            .GetRequiredService<IOptionsMonitor<C.AuthProxy>>()
+            .CurrentValue.Authentication;
+
+        return authentication.OidcProviders.Any(_ =>
+            _.ResponseMode == C.OidcResponseMode.FormPost
+            && string.Equals(OidcProviderScheme.FromName(_.Name), context.Scheme.Name, StringComparison.Ordinal));
     }
 
     static ILogger GetLogger(HttpContext context) =>

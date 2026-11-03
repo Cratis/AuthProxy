@@ -47,6 +47,16 @@ public class a_link_callback_context : Specification
     /// </summary>
     protected virtual string? RecordedScheme => "github";
 
+    /// <summary>
+    /// Gets the HTTP method of the callback request.
+    /// </summary>
+    protected virtual string CallbackMethod => HttpMethods.Get;
+
+    /// <summary>
+    /// Gets the response mode the selected provider is configured with.
+    /// </summary>
+    protected virtual C.OidcResponseMode ProviderResponseMode => C.OidcResponseMode.Query;
+
     protected static ClaimsPrincipal Principal(string subject) =>
         new(new ClaimsIdentity(
             [new Claim("sub", subject), new Claim(SessionClaims.ProviderScheme, "microsoft")],
@@ -59,6 +69,7 @@ public class a_link_callback_context : Specification
         _context = new DefaultHttpContext();
         _context.Request.Scheme = "https";
         _context.Request.Host = new HostString("cratis.studio");
+        _context.Request.Method = CallbackMethod;
         _context.Request.Path = "/signin-github";
         _context.Response.Body = new MemoryStream();
 
@@ -77,7 +88,13 @@ public class a_link_callback_context : Specification
         var errorPageProvider = CreateErrorPageProvider();
 
         var proxyConfig = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
-        proxyConfig.CurrentValue.Returns(new C.AuthProxy());
+        proxyConfig.CurrentValue.Returns(new C.AuthProxy
+        {
+            Authentication = new C.Authentication
+            {
+                OidcProviders = [new C.OidcProvider { Name = "GitHub", ResponseMode = ProviderResponseMode }],
+            },
+        });
 
         var authenticationService = Substitute.For<IAuthenticationService>();
         authenticationService
