@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.SignInCallbacks;
 using Cratis.AuthProxy.SignIns;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OAuth;
@@ -22,6 +23,7 @@ public class configured_canonical_provider_callbacks : Specification
     protected OAuthOptions _oauthOptions;
     protected IServiceProvider _services;
     protected C.AuthProxy _rootConfiguration;
+    protected ISignInCallbackDispatcher _callbackDispatcher;
 
     void Establish()
     {
@@ -88,6 +90,8 @@ public class configured_canonical_provider_callbacks : Specification
         rootOptions.CurrentValue.Returns(_ => _rootConfiguration);
         builder.Services.AddSingleton(rootOptions);
         builder.Services.AddSingleton<ISignInNotifier>(Substitute.For<ISignInNotifier>());
+        _callbackDispatcher = Substitute.For<ISignInCallbackDispatcher>();
+        builder.Services.AddSingleton(_callbackDispatcher);
         builder.AddIngressConfiguration();
         builder.AddIngressAuthentication();
         _services = builder.Services.BuildServiceProvider();

@@ -287,4 +287,11 @@ public class Service
     /// browser-session model.
     /// </remarks>
     public IList<BearerRoute> BearerRoutes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets the optional sign-in callback for this service.
+    /// When set, AuthProxy notifies the service server-to-server when a user signs in and when a returning user's
+    /// session makes its first request. Leave unset — the default — and the service is never called.
+    /// </summary>
+    public SignInCallback? SignInCallback { get; set; }
 }

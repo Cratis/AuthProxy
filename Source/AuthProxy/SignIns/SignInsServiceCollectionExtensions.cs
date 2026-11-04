@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.SignInCallbacks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
@@ -24,6 +25,7 @@ public static class SignInsServiceCollectionExtensions
         builder.Services.AddSingleton<IClientLocationResolver, ClientLocationResolver>();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<ISignInNotificationSigner, SignInNotificationSigner>();
+        builder.Services.AddSignInCallbacks();
         builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, SignInAttestationConfigurationValidator>();
 
         // Constructed explicitly rather than by convention. The notifier's optional collaborators are

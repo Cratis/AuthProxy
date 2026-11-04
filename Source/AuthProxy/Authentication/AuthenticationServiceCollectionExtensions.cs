@@ -6,6 +6,7 @@ using System.Security.Claims;
 using Cratis.AuthProxy.AccessTokens;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
+using Cratis.AuthProxy.SignInCallbacks;
 using Cratis.AuthProxy.SignIns;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -606,6 +607,10 @@ public static class AuthenticationServiceCollectionExtensions
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);
+
+        // A service that declares a sign-in callback is told too, in the background and without ever failing the sign-in.
+        context.HttpContext.RequestServices.GetRequiredService<ISignInCallbackDispatcher>()
+            .SignedIn(context.HttpContext, context.Principal!, context.Scheme.Name, context.Properties);
 
         // A callback answering a pending invitation's own challenge completes the invitation here, on the
         // callback itself, so no follow-up request — and no cookie round-trip — stands between the sign-in
