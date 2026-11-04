@@ -382,7 +382,7 @@ If several AuthProxy replicas run without a shared Data Protection key ring, one
 
 ### Discovery, fallback and refresh
 
-AuthProxy resolves `ReplicaHost` and publishes each address as its own destination. It resolves again every `RefreshInterval`, so rollouts are followed. When the pinned replica disappears or fails, the request goes to another replica and the user is re-pinned.
+AuthProxy resolves `ReplicaHost` and publishes each address as its own destination. It resolves again every `RefreshInterval`, so rollouts are followed. After a pinned replica leaves discovery and the snapshot refreshes, a request carrying its old affinity cookie goes to a remaining replica and receives a replacement cookie. A transport failure can still fail the current request; it is not immediately retried on another replica. Passive health checks use observed transport failures to take unhealthy replicas out of normal rotation when healthy alternatives exist.
 
 - If DNS fails, the last known replicas are kept, as long as the service configuration is unchanged.
 - If DNS answers with no usable address, or fails and nothing is known, AuthProxy falls back to `BaseUrl`.
