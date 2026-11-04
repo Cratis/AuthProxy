@@ -62,8 +62,10 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, IForwa
         request.Headers.Add(Headers.LegacyTenantId, tenant);
 
         // A request that has to be signed and cannot be is not sent: the service never hears from it, which is
-        // a fact like any other unreachable service and is reported the same way.
-        if (signer.Sign(request, signer.AudienceFor(serviceName)) == ForwardedIdentitySigningStatus.Failed)
+        // a fact like any other unreachable service and is reported the same way. Only the two outcomes known to be
+        // safe let the call through, so an outcome added later fails closed.
+        var signing = signer.Sign(request, signer.AudienceFor(serviceName));
+        if (signing is not (ForwardedIdentitySigningStatus.Attested or ForwardedIdentitySigningStatus.NotConfigured))
         {
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
         }
