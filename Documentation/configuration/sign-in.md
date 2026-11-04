@@ -13,6 +13,9 @@ The notification is a service-to-service back-channel, mirroring the [invite exc
 and the [credential link callback](./link.md): AuthProxy `POST`s a small JSON payload to a configured
 application endpoint.
 
+To tell one service about its users instead — including when a returning user's session makes its first request —
+use the per-service [sign-in callback](./sign-in-callback.md).
+
 ---
 
 ## When it fires
