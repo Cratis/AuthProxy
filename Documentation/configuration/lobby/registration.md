@@ -8,18 +8,9 @@ description: "Let a user start self-serve registration at the AuthProxy register
 Use registration when a user should create a new organization without receiving an invite first.
 Users who are joining an existing organization should use an invitation flow instead.
 
-## Flow
-
-1. The user opens `https://your-authproxy/register`.
-2. AuthProxy stores a short-lived HTTP-only registration cookie.
-3. AuthProxy starts authentication.
-   - With one configured identity provider, AuthProxy challenges that provider directly.
-   - With multiple providers, AuthProxy redirects to the standard login page so the user can choose
-     a provider.
-4. After a successful login, AuthProxy deletes the registration cookie.
-5. AuthProxy redirects the user to `Invite.Lobby.Registration.BaseUrl`.
-
+Configure the destination of the registration experience before directing users to AuthProxy.
 The `/register` path is only active when `Invite.Lobby.Registration.BaseUrl` is configured.
+AuthProxy handles sign-in and the redirect; the registration experience creates the organization.
 
 ## Configuration
 
@@ -54,3 +45,14 @@ authproxy.WithLobbyRegistration("https://lobby.example.com/register");
 ```
 
 This sets `Cratis:AuthProxy:Invite:Lobby:Registration:BaseUrl`.
+
+## Flow
+
+1. The user opens `https://your-authproxy/register`.
+2. AuthProxy stores a short-lived HTTP-only registration cookie.
+3. AuthProxy starts authentication.
+   - With one configured identity provider, AuthProxy challenges that provider directly.
+   - With multiple providers, AuthProxy redirects to the standard login page so the user can choose
+     a provider.
+4. After a successful login, AuthProxy deletes the registration cookie.
+5. AuthProxy redirects the user to `Invite.Lobby.Registration.BaseUrl`.

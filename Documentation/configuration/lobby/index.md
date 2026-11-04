@@ -8,16 +8,33 @@ description: "The AuthProxy lobby finishes onboarding for users who cannot enter
 AuthProxy uses the lobby to finish onboarding when a user cannot enter the application directly
 after authentication.
 
-Use the lobby documentation based on the onboarding outcome you need:
+Choose the route based on what the user needs to do after signing in:
 
+- [Registration](registration.md) — let a user create an organization without receiving an invitation.
+- [Invitation to Organization](invitation-to-organization.md) — invite a user directly into an
+  existing organization. Use an invitation, not registration, when the user should join an organization.
 - [Invitation for Creating Organization](invitation-for-creating-organization.md) — invite a user
   who should create a new organization after they sign in.
-- [Invitation to Organization](invitation-to-organization.md) — invite a user directly into an
-  existing organization.
-- [Registration](registration.md) — let a user start a self-serve registration flow that ends in
-  organization creation. If the user should join an existing organization, invite them instead.
+
+Registration needs a destination for the registration experience. The two invitation routes share
+additional setup: AuthProxy must verify the incoming invitation, authenticate its recipient, and complete
+it with the Lobby invitation authority before choosing the destination.
+
+For incoming invitation verification, a pinned public key and metadata-based keys are alternatives.
+[Invitation token keys](invitation-token-keys.md) explains the metadata option, including its version,
+issuer, audience, and retrieval requirements. These verification keys are separate from the private keys
+under `Invite.Attestation`, which AuthProxy uses to sign outgoing staging and completion calls. The same
+Lobby invitation authority must own both endpoints and validate those attestations.
+
+Before configuring either invitation route, also configure the recipient mode and eligible identity
+providers. The shared [Signed protocol](invitation-to-organization.md#signed-protocol) reference gives
+those prerequisites, the authority's responsibilities, and the exact protocol. The individual guides
+show the settings for the destination you chose.
 
 ## Shared invitation routing
+
+After successful invitation completion, a matching tenant can continue to the application or go to Lobby;
+nonmatching or unresolved tenants go to the configured Lobby frontend, or otherwise to the return URL.
 
 AuthProxy compares the validated invitation's configured `TenantClaim` value with the tenant resolved for the
 request. That equality is observational routing evidence, not issuer identity: it proves only that both observed
@@ -36,7 +53,11 @@ binding, attestations, transaction consumption, cookies, or sessions.
 
 ## Shared configuration
 
-All lobby-related settings live under `Cratis:AuthProxy:Invite:Lobby`:
+`Lobby` provides destination settings, not all settings available to a proxy [`Service`](../services.md).
+Proxy clusters come from `Services`, not `Lobby`. AuthProxy rejects `ActivityTimeout` on Lobby or its
+`Backend`, `Frontend`, and `Registration` endpoints.
+
+Configure the Lobby destinations under `Cratis:AuthProxy:Invite:Lobby`:
 
 ```json
 {
@@ -53,8 +74,6 @@ All lobby-related settings live under `Cratis:AuthProxy:Invite:Lobby`:
   }
 }
 ```
-
-The `Lobby` object uses the standard [`Service`](../services.md) shape.
 
 | Property | Type | Description |
 |----------|------|-------------|

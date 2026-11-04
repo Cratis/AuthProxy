@@ -9,28 +9,33 @@ Use this flow when you invite a user into an organization that already exists. A
 the standard `/invite/<token>` bootstrap, but a matching invitation tenant claim and the `ReturnUrl`
 destination let the user continue directly into the application instead of being sent to Lobby.
 
-## Flow
+## Requirements
 
-1. The user opens `https://your-authproxy/invite/<token>`.
-2. AuthProxy validates the token, creates an independent 256-bit transaction and challenge, and calls
-   `Invite.StageUrl`. The signed `invite-stage` attestation binds those values to the exact capability hash,
-   invitation ID, and tenant before provider authentication starts.
-3. AuthProxy protects the pending state in an HTTP-only cookie and binds it into the provider's protected
-   challenge state. A browser can carry the values but cannot author or substitute them.
-4. After login, AuthProxy **re-validates the token** (signature, issuer, audience, and lifetime), the protected
-   pending state, and the provider challenge binding.
-5. AuthProxy requires one canonical provider identity, one provider-derived email with an exact verified value
-   of `true`, one provider-derived assurance value, and the authentication-ticket issue time.
-6. AuthProxy calls `Invite.ExchangeUrl` with a signed `invite-complete` attestation. The JSON body contains only
-   the opaque transaction ID; the browser and request body never supply identity authority.
-7. AuthProxy compares the configured `Invite.TenantClaim` from the token with the tenant resolved for the request.
-   Equality is observational routing evidence, not issuer identity: it does not prove which tenant issued the
-   invitation.
-8. If the tenant values match, `Invite.MatchingTenantInvitationDestination` selects `ReturnUrl` or `Lobby`.
-   `ReturnUrl` is the default and continues to the target service.
+- The invite token must include the claim configured in `Invite.TenantClaim`.
+- The request must resolve to the same tenant value after authentication.
+- The invitation link should use the same host and route shape that the organization's normal
+  traffic uses so tenant resolution produces the expected value.
 
-If the tenant values differ, or AuthProxy cannot observe both values, the invitation selects Lobby when its frontend
-is configured. The matching-tenant enum does not change those rows of the shared routing matrix.
+These conditions let a successful invitation continue into the existing organization. They do not
+establish who issued the invitation or replace the shared invitation setup.
+
+Configure incoming invitation-token verification before using this flow. A pinned public key and
+metadata-based verification are alternatives; see [Invitation token keys](invitation-token-keys.md)
+for the metadata requirements. Separately, configure `Invite.Attestation` so AuthProxy can sign its
+outgoing calls to `StageUrl` and `ExchangeUrl`. The same Lobby invitation authority must own both endpoints.
+
+Configure [canonical federated identity](../authentication.md#canonical-federated-identity) and the
+provider opt-ins required by the invitation's recipient mode before enabling signed completion.
+The protocol reference below gives the exact recipient, provider-evidence, and authority requirements,
+including the Microsoft Entra limitations. Check these before enabling a provider for signed completion.
+The example below shows the attestation and routing settings; it does not include incoming-token
+verification settings.
+
+> **Compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange for existing
+> deployments. That legacy mode is not sufficient authority for creating or linking an account. Enable the signed
+> protocol before an application treats invitation completion as identity proof. Independently,
+> `Invite.MatchingTenantInvitationDestination` defaults to `ReturnUrl`, preserving the released matching-tenant
+> redirect behavior.
 
 ## Configuration
 
@@ -71,7 +76,7 @@ is configured. The matching-tenant enum does not change those rows of the shared
 | `ExchangeUrl` | `string` | Absolute URL of the same Lobby invitation authority's completion endpoint. |
 | `TenantClaim` | `string` | Claim in the invite token that contains the tenant ID observed for routing. Equality with the resolved tenant does not identify the invitation issuer. |
 | `MatchingTenantInvitationDestination` | `InvitationCompletionDestination` | Destination for matching tenant values. `ReturnUrl` is the default; use `Lobby` to select `Lobby.Frontend.BaseUrl`. |
-| `EmailClaim` | `string` | Claim in the invite token that contains the invited email. Required by the signed protocol. |
+| `EmailClaim` | `string` | Claim in the invite token that contains the invited email. Required for signed email-targeted completion. |
 | `Attestation.Issuer` | `string` | Exact issuer the invitation authority validates. |
 | `Attestation.Audience` | `string` | Exact invitation-authority audience. |
 | `Attestation.ActiveKeyId` | `string` | Key ID used for newly signed attestations. |
@@ -79,7 +84,35 @@ is configured. The matching-tenant enum does not change those rows of the shared
 | `Attestation.Lifetime` | `TimeSpan` | Short-lived token lifetime from 10 through 60 seconds. Defaults to 60 seconds. |
 | `Lobby.Frontend.BaseUrl` | `string` | Fallback redirect if the invite cannot continue directly into the organization. |
 
+## Flow
+
+1. The user opens `https://your-authproxy/invite/<token>`.
+2. AuthProxy validates the token, creates an independent 256-bit transaction and challenge, and calls
+   `Invite.StageUrl`. The signed `invite-stage` attestation binds those values to the exact capability hash,
+   invitation ID, and tenant before provider authentication starts.
+3. AuthProxy protects the pending state in an HTTP-only cookie and binds it into the provider's protected
+   challenge state. A browser can carry the values but cannot author or substitute them.
+4. After login, AuthProxy **re-validates the token** (signature, issuer, audience, and lifetime), the protected
+   pending state, and the provider challenge binding.
+5. AuthProxy requires one canonical provider identity, one provider-derived assurance value, and the
+   authentication-ticket issue time. Email-targeted completion also requires one provider-derived email matching
+   the invitation with an exact verified value of `true`. Identity-bound completion supplies no email and must
+   satisfy the recipient binding requirements below.
+6. AuthProxy calls `Invite.ExchangeUrl` with a signed `invite-complete` attestation. The JSON body contains only
+   the opaque transaction ID; the browser and request body never supply identity authority.
+7. AuthProxy compares the configured `Invite.TenantClaim` from the token with the tenant resolved for the request.
+   Equality is observational routing evidence, not issuer identity: it does not prove which tenant issued the
+   invitation.
+8. If the tenant values match, `Invite.MatchingTenantInvitationDestination` selects `ReturnUrl` or `Lobby`.
+   `ReturnUrl` is the default and continues to the target service.
+
+If the tenant values differ, or AuthProxy cannot observe both values, the invitation selects Lobby when its frontend
+is configured. The matching-tenant enum does not change those rows of the shared routing matrix.
+
 ## Signed protocol
+
+Both invitation routes use this protocol. Configure the recipient mode and provider evidence described
+here before using either route; the exact requests and validation responsibilities apply to both.
 
 The staging call uses `Authorization: Bearer <stage-attestation>` and this bounded body:
 
@@ -110,11 +143,11 @@ hash to `capability_hash`, persist no raw capability, and atomically consume the
 invitation, transaction, challenge, or capability hash.
 
 Configure [canonical federated identity](../authentication.md#canonical-federated-identity) for every provider.
-The selected email, verification, and assurance claim types must name provider-derived claims. Missing, duplicate,
-empty, unverified, or ambiguous evidence fails closed before the completion endpoint is called.
-Set `CanonicalIdentity.InvitationCompletionEnabled=true` only for providers that can supply that evidence. Signed
-invitation provider selection hides every other provider while leaving it available for ordinary sign-in. Microsoft
-Entra commonly omits `email_verified`; do not enable it unless the tenant maps an equivalent trustworthy custom
+For email-targeted completion, the selected email, verification, and assurance claim types must name provider-derived
+claims. Missing, duplicate, empty, unverified, or ambiguous evidence fails closed before the completion endpoint is called.
+Set `CanonicalIdentity.InvitationCompletionEnabled=true` only for providers that can supply that evidence. For this
+recipient mode, invitation provider selection hides every other provider while leaving it available for ordinary sign-in.
+Microsoft Entra commonly omits `email_verified`; do not enable it unless the tenant maps an equivalent trustworthy custom
 claim and configures its exact claim type. AuthProxy never promotes `email` or `preferred_username` to verified
 evidence implicitly.
 
@@ -137,12 +170,6 @@ For Microsoft Entra identity-bound invitations, configure a tenant-specific auth
 `CanonicalIdentity.SubjectClaimType=oid`. The framework-validated tenant issuer plus immutable object ID is the
 identity tuple; `email` and `preferred_username` are not substitutes.
 
-> **Compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange for existing
-> deployments. That legacy mode is not sufficient authority for creating or linking an account. Enable the signed
-> protocol before an application treats invitation completion as identity proof. Independently,
-> `Invite.MatchingTenantInvitationDestination` defaults to `ReturnUrl`, preserving the released matching-tenant
-> redirect behavior.
-
 ## Rotate signing keys
 
 1. Add the new public key to the invitation authority's pinned verification set.
@@ -152,13 +179,6 @@ identity tuple; `email` and `preferred_username` are not substitutes.
 
 AuthProxy selects exactly one active key and always writes its `kid`. It never logs private key material or
 attestation payloads.
-
-## Requirements
-
-- The invite token must include the claim configured in `Invite.TenantClaim`.
-- The request must resolve to the same tenant value after authentication.
-- The invitation link should use the same host and route shape that the organization's normal
-  traffic uses so tenant resolution produces the expected value.
 
 ## When to use another flow
 

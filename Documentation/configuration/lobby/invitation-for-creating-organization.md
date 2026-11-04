@@ -9,26 +9,30 @@ Use this flow when you invite a user who should create a new organization after 
 AuthProxy validates and stages the invite with the Lobby invitation authority, authenticates the recipient,
 completes the staged transaction with a signed attestation, and then sends the user to the Lobby frontend.
 
-## Flow
-
-1. The user opens `https://your-authproxy/invite/<token>`.
-2. AuthProxy validates the signed JWT invite token.
-3. AuthProxy generates an independent transaction and challenge, signs an `invite-stage` attestation, and calls
-   `Invite.StageUrl`. The Lobby invitation authority validates the exact capability, persists only its hash and
-   bounded transaction state, and discards the raw token.
-4. AuthProxy protects the staged state and invite token in short-lived HTTP-only cookies.
-   - With one configured identity provider, AuthProxy challenges that provider immediately.
-   - With multiple providers, AuthProxy serves `invitation-select-provider.html` so the user can
-     choose how to sign in.
-5. After successful provider authentication, AuthProxy re-validates the token and protected transaction bindings,
-   derives canonical provider identity from the authenticated ticket, and calls `Invite.ExchangeUrl` with a signed
-   `invite-complete` attestation. The JSON body contains only the opaque transaction ID.
-6. The same Lobby invitation authority verifies and atomically consumes the transaction and attestation ID. If it
-   succeeds, AuthProxy redirects the user to `Invite.Lobby.Frontend.BaseUrl`.
-
-This flow is the right fit when the invited user must create an organization. Configure
+The Lobby frontend must provide the organization-creation experience: completing the invitation gets
+the user to that experience, rather than creating the organization itself. Configure
 `MatchingTenantInvitationDestination` as `Lobby` so the creating-organization journey still selects Lobby when the
 invitation tenant claim happens to match the tenant resolved for the request.
+
+Before configuring this route, choose how AuthProxy will verify incoming invitations. The example below
+uses a pinned public key; [Invitation token keys](invitation-token-keys.md) describes metadata-based
+verification as an alternative, including its version, issuer, audience, and retrieval requirements.
+Neither option replaces `Invite.Attestation`, whose private keys sign AuthProxy's outgoing calls to
+the Lobby invitation authority.
+
+Both invitation routes also need the same staging and completion endpoints, recipient mode, and eligible
+identity providers. Configure those prerequisites using the shared
+[Signed protocol](invitation-to-organization.md#signed-protocol) reference before applying the destination
+settings below. The same Lobby invitation authority must own both endpoints and validate the attestations.
+
+For signed invitations, email-targeted completion requires
+`CanonicalIdentity.InvitationCompletionEnabled=true`. Identity-bound completion requires
+`CanonicalIdentity.InvitationIdentityBindingCompletionEnabled=true` and restricts the chooser and callback
+to the exact provider key in the invitation. Ordinary sign-in availability does not make a provider
+eligible for signed invitation completion.
+
+> **Legacy compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange. That mode is
+> not sufficient authority for creating or linking an account and must not be used for production onboarding.
 
 ## Configuration
 
@@ -92,6 +96,25 @@ invitation tenant claim happens to match the tenant resolved for the request.
 | `ClaimsToForward` | `InviteClaimForwarding[]` | Claim mappings forwarded from the invite token into the identity details request. |
 | `Lobby.Frontend.BaseUrl` | `string` | Lobby URL used after a successful invite exchange. |
 
+## Flow
+
+1. The user opens `https://your-authproxy/invite/<token>`.
+2. AuthProxy validates the signed JWT invite token.
+3. AuthProxy generates an independent transaction and challenge, signs an `invite-stage` attestation, and calls
+   `Invite.StageUrl`. The Lobby invitation authority validates the exact capability, persists only its hash and
+   bounded transaction state, and discards the raw token.
+4. AuthProxy protects the staged state and invite token in short-lived HTTP-only cookies.
+   - If the user is not already authenticated and one identity provider is eligible, AuthProxy challenges
+     that provider immediately.
+   - With multiple eligible providers, AuthProxy serves `invitation-select-provider.html` so the user can
+     choose how to sign in.
+   - An already authenticated user sees the chooser even when only one provider is eligible.
+5. After successful provider authentication, AuthProxy re-validates the token and protected transaction bindings,
+   derives canonical provider identity from the authenticated ticket, and calls `Invite.ExchangeUrl` with a signed
+   `invite-complete` attestation. The JSON body contains only the opaque transaction ID.
+6. The same Lobby invitation authority verifies and atomically consumes the transaction and attestation ID. If it
+   succeeds, AuthProxy redirects the user to `Invite.Lobby.Frontend.BaseUrl`.
+
 ## Signed protocol
 
 Creating-organization and existing-organization invitations use the same signed two-stage Lobby protocol. See
@@ -100,9 +123,6 @@ attestation claims, exclusive recipient modes, verification rules, key rotation,
 
 The browser never authors provider identity. Both internal calls are authenticated by short-lived AuthProxy
 attestations, and the completion body contains no email, provider, issuer, or subject fields.
-
-> **Legacy compatibility.** Omitting `Invite.Attestation` retains the released unsigned JSON exchange. That mode is
-> not sufficient authority for creating or linking an account and must not be used for production onboarding.
 
 ## Invite claim forwarding
 
@@ -140,10 +160,10 @@ AuthProxy serves dedicated pages for each invitation error:
 | ----------- | ----------- | ------------- |
 | `invitation-expired.html` | The token signature is valid, but the `exp` claim is in the past. | 401 |
 | `invitation-invalid.html` | The token is malformed or has an invalid signature. | 401 |
-| `invitation-select-provider.html` | The token is valid and multiple identity providers are configured. | 200 |
+| `invitation-select-provider.html` | The token is valid and multiple providers are eligible, or an already authenticated user needs the chooser even with one eligible provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated subject is already associated with an existing account. | 409 |
-| `invitation-email-unavailable.html` | Legacy unsigned mode only: email binding is enabled, but the provider supplied no authenticated-session address. | 403 |
-| `invitation-email-mismatch.html` | Legacy unsigned mode only: email binding is enabled, and the provider supplied another address or explicitly reported `email_verified=false`. | 403 |
+| `invitation-email-unavailable.html` | Signed email-targeted completion or email binding in unsigned mode: the provider supplied no authenticated-session address. | 403 |
+| `invitation-email-mismatch.html` | Signed email-targeted completion or email binding in unsigned mode: the provider supplied another address or explicitly reported `email_verified=false`. Signed email-targeted completion also rejects missing, ambiguous, or non-`true` verification evidence. | 403 |
 
 See [Error pages](../error-pages.md) for customization details and
 [Custom Invitation Provider-Selection Page](../invitation-provider-selection.md) for a full branded
