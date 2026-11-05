@@ -35,6 +35,7 @@ public class and_a_signing_key_is_given : given.an_auth_proxy_being_published
         _manifest = document.RootElement.Clone();
     }
 
+    [Fact] void should_not_publish_a_development_profile() => _proxy.ContainsKey("Cratis__AuthProxy__Profile").ShouldBeFalse();
     [Fact] void should_use_the_supplied_signer_parameter() => ReferenceEquals(_proxy[$"{SignerPrefix}__SecretBase64"], _key).ShouldBeTrue();
     [Fact] void should_use_the_supplied_verifier_parameter() => ReferenceEquals(_backend[$"{VerifierPrefix}__Keys__0__SecretBase64"], _key).ShouldBeTrue();
     [Fact] void should_accept_the_secret_parameter() => _key.Secret.ShouldBeTrue();

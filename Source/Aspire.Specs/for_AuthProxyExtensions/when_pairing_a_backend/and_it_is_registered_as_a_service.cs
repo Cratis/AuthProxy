@@ -17,6 +17,7 @@ public class and_it_is_registered_as_a_service : given.an_auth_proxy_and_a_backe
         _parameter = _builder.Resources.OfType<ParameterResource>().Single();
     }
 
+    [Fact] void should_select_the_local_development_profile() => _proxy["Cratis__AuthProxy__Profile"].ShouldEqual("LocalDevelopment");
     [Fact] void should_use_the_backend_name_as_audience() => _proxy[$"{SignerPrefix}__Audience"].ShouldEqual("api");
     [Fact] void should_use_the_proxy_name_as_key_id() => _proxy[$"{SignerPrefix}__KeyId"].ShouldEqual("auth-proxy");
     [Fact] void should_generate_exactly_32_bytes() => Convert.FromBase64String(_proxy[$"{SignerPrefix}__SecretBase64"]).Length.ShouldEqual(32);
