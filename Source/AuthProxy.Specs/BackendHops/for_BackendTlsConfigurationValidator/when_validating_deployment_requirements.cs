@@ -27,6 +27,57 @@ public class when_validating_deployment_requirements
         new BackendTlsConfigurationValidator(TimeProvider.System).Validate(null, options).Succeeded.ShouldEqual(succeeds);
     }
 
+    [Theory]
+    [InlineData(false, false, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, true, true, true)]
+    public void should_cover_frontends_whether_or_not_the_service_has_a_backend(bool backend, bool https, bool client, bool succeeds)
+    {
+        using var certificates = new given.TestCertificates();
+        var options = new C.AuthProxy
+        {
+            BackendTls = client ? certificates.Settings : new(),
+            Services = new Dictionary<string, C.Service>
+            {
+                ["app"] = new()
+                {
+                    Backend = backend ? new() { BaseUrl = "https://backend.example" } : null,
+                    Frontend = new() { BaseUrl = https ? "https://frontend.example" : "http://frontend.example" },
+                    ForwardedIdentity = new()
+                }
+            }
+        };
+        var result = new BackendTlsConfigurationValidator(TimeProvider.System).Validate(null, options);
+        result.Succeeded.ShouldEqual(succeeds);
+        if (!succeeds) string.Join(';', result.Failures).ShouldContain("Services:app:Frontend:BaseUrl");
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void should_allow_http_frontends_without_client_authentication_when_unsigned_or_local(bool backend, bool local)
+    {
+        var options = new C.AuthProxy
+        {
+            Profile = local ? C.DeploymentProfile.LocalDevelopment : C.DeploymentProfile.Default,
+            Services = new Dictionary<string, C.Service>
+            {
+                ["app"] = new()
+                {
+                    Backend = backend ? new() { BaseUrl = "https://backend.example" } : null,
+                    Frontend = new() { BaseUrl = "http://frontend.example" },
+                    ForwardedIdentity = local ? new() : null
+                }
+            }
+        };
+        new BackendTlsConfigurationValidator(TimeProvider.System).Validate(null, options).Succeeded.ShouldBeTrue();
+    }
+
     [Fact]
     public void should_refuse_a_signed_http_tenant_list_even_without_signed_services()
     {

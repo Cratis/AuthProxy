@@ -17,4 +17,18 @@ public class when_validating_a_backend_peer : given.a_tls_policy
     [Fact] void should_select_the_client_identity_for_the_backend() => policy.SelectClientCertificate("localhost")!.HasPrivateKey.ShouldBeTrue();
     [Fact] void should_not_offer_the_client_identity_to_a_frontend() => policy.SelectClientCertificate("frontend.example").ShouldBeNull();
     [Fact] void should_not_offer_the_client_identity_to_an_identity_provider() => policy.SelectClientCertificate("identity.example").ShouldBeNull();
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void should_apply_backend_tls_to_frontends_only_when_signed(bool backend, bool signingEnabled)
+    {
+        configuration.Services["app"].Backend = backend ? new() { BaseUrl = "https://localhost" } : null;
+        configuration.Services["app"].ForwardedIdentity = signingEnabled ? new() : null;
+        using var server = certificates.Issue(host: "frontend.example");
+        policy.ValidateServerCertificate("frontend.example", server, null, SslPolicyErrors.RemoteCertificateChainErrors).ShouldEqual(signingEnabled);
+        (policy.SelectClientCertificate("frontend.example") is not null).ShouldEqual(signingEnabled);
+    }
 }

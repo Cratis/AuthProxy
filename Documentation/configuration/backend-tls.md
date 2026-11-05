@@ -34,13 +34,13 @@ The client certificate and unencrypted private key must be matching PEM files. T
 
 The trust bundle is optional. An empty path uses system trust. A configured PEM bundle replaces system roots for backend hosts; it does not add a fallback to public roots. Backend certificates still need a valid chain, validity period, server-authentication usage and matching hostname. AuthProxy does not fetch missing intermediates or perform online revocation checks for a custom bundle, so origins must present their intermediate chain. OIDC providers and other non-backend hosts keep system trust and are not offered the backend client certificate.
 
-The policy covers YARP proxy requests, bearer routes, identity-details calls and selectable-tenant-list calls. Backend hosts come from service backend URLs, the lobby backend and selection `TenantsEndpoint` URLs. Host matching is case-insensitive and does not distinguish ports: do not share a backend hostname with unrelated endpoints if those endpoints must not receive the client identity. Frontend-only hosts, invitation-registration URLs and identity providers do not extend this host set.
+The policy covers YARP proxy requests, bearer routes, identity-details calls and selectable-tenant-list calls. Covered hosts come from service backend URLs, signed service frontend URLs, the lobby backend and selection `TenantsEndpoint` URLs. Host matching is case-insensitive and does not distinguish ports: do not share a backend hostname with unrelated endpoints if those endpoints must not receive the client identity. Unsigned frontend hosts, invitation-registration URLs and identity providers do not extend this host set.
 
 Sticky replica routing keeps the configured DNS authority as the TLS target even when connecting to a discovered IP address. Issue server certificates for that DNS name, not for the replica's incidental IP address.
 
 ## Signed-hop requirements
 
-The default deployment profile requires **HTTPS and a configured client certificate** for signed service backends and signed tenant-list endpoints. Validation identifies the configuration key and refuses startup before identity is sent. Unsigned deployments keep their existing transport behavior; this requirement is not a global HTTPS enforcement rule.
+The default deployment profile requires **HTTPS and a configured client certificate** for every signed hop: service backends, service frontends (including frontend-only services) and tenant-list endpoints. Validation identifies the configuration key and refuses startup before identity is sent. Unsigned deployments keep their existing transport behavior; this requirement is not a global HTTPS enforcement rule.
 
 For a developer machine only, explicitly select:
 
@@ -62,7 +62,7 @@ Aspire's [`WithSignedForwardingTo`](../aspire/index.md#signed-forwarded-identity
 
 Replace the mounted client certificate and key together, preferably by atomically replacing a secret volume or symlink. AuthProxy polls their contents, including the CA bundle, every `ReloadInterval` (one minute by default; at least five seconds). A valid changed snapshot becomes visible atomically to new TLS handshakes. Invalid or partial replacements produce a redacted warning and leave the last valid snapshot in use. If that client certificate expires, AuthProxy logs an error on the next poll; receivers must reject it rather than relying on the previous successful handshake.
 
-Existing TLS connections do not renegotiate when files change. When TLS material is configured, pooled connections have a lifetime equal to the reload interval, so a later request opens a new connection. Long-running streams can continue on an existing connection. Allow for both the polling interval and connection turnover during rotation.
+Existing TLS connections do not renegotiate when files change. When TLS material is configured, pooled connections have a lifetime equal to the reload interval, so a request after that connection lifetime expires opens a new connection and presents the current client certificate. Long-running streams can continue on an existing connection. Allow for both the polling interval and connection turnover during rotation.
 
 For a CA migration, mount an overlap bundle containing both old and new roots, wait for reload, change the backend's server certificate, then remove the old root after connection turnover. AuthProxy never installs roots into the machine's global trust store.
 
