@@ -66,7 +66,7 @@ Use the canonical provider helpers when every downstream identity path must use 
 provider subject:
 
 ```csharp
-authProxy.WithCanonicalOidcProvider(
+authproxy.WithCanonicalOidcProvider(
     "Microsoft Entra",
     OidcProviderType.Microsoft,
     "https://login.microsoftonline.com/<tenant-id>/v2.0",
