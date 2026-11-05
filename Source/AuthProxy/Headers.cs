@@ -127,4 +127,21 @@ public static class Headers
     /// deprecated and will be removed in a future major release.
     /// </summary>
     public const string LegacyServiceId = "Service-ID";
+
+    /// <summary>
+    /// The prefix of every header that marks a call as AuthProxy's own sign-in callback. A caller must never be able
+    /// to send one, so everything under this prefix is stripped from an inbound request.
+    /// </summary>
+    public const string SignInCallbackPrefix = "x-cratis-sign-in-callback";
+
+    /// <summary>
+    /// The header that marks a call as AuthProxy's sign-in callback. Its value is the kind of the callback,
+    /// <c language="text">SignedIn</c> or <c language="text">Returned</c>.
+    /// </summary>
+    public const string SignInCallback = "x-cratis-sign-in-callback";
+
+    /// <summary>
+    /// The header that carries the sign-in callback's shared secret, when one is configured.
+    /// </summary>
+    public const string SignInCallbackSecret = "x-cratis-sign-in-callback-secret";
 }

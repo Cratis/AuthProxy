@@ -4,6 +4,7 @@
 using Cratis.AuthProxy.AccessTokens;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.OnBehalfSessions;
+using Cratis.AuthProxy.SignInCallbacks;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
@@ -25,6 +26,7 @@ public static class ReverseProxyExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder SetupReverseProxy(this WebApplicationBuilder builder)
     {
+        builder.Services.AddSignInCallbacks();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ActivityTimeoutConfigurationValidator>();
         builder.Services.TryAddSingleton<IReplicaDiscovery, DnsReplicaDiscovery>();
         builder.Services.AddSingleton<IDestinationResolver, ReplicaDestinationResolver>();
@@ -76,6 +78,7 @@ public static class ReverseProxyExtensions
         {
             proxy.UseMiddleware<ForwardingPathMiddleware>();
             proxy.UseMiddleware<AccessTokenForwardingMiddleware>();
+            proxy.UseMiddleware<SignInCallbackMiddleware>();
 
             // The stages MapReverseProxy() runs when it is given no pipeline of its own.
             proxy.UseSessionAffinity();

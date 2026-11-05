@@ -22,6 +22,8 @@
   href: link.md
 - name: Sign-in Notifications
   href: sign-in.md
+- name: Sign-in Callback
+  href: sign-in-callback.md
 - name: On-behalf Sessions
   href: on-behalf-sessions.md
 - name: Data Protection Keys

@@ -54,6 +54,7 @@ static class SpoofableHeaders
     static bool IsSpoofable(string name) =>
         name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
         || name.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith(Headers.SignInCallbackPrefix, StringComparison.OrdinalIgnoreCase)
         || string.Equals(name, Headers.TenantId, StringComparison.OrdinalIgnoreCase)
         || string.Equals(name, Headers.LegacyTenantId, StringComparison.OrdinalIgnoreCase);
 }
