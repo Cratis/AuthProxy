@@ -5,10 +5,11 @@ description: "Deploy AuthProxy on Azure with Microsoft Entra ID sign-in and keep
 
 # Deploying on Azure
 
-This guide takes AuthProxy from nothing to a working deployment on Azure, signing users in with Microsoft
-Entra ID, and keeping your backends reachable **only** through the proxy. The platform-specific steps are in
-[App Service](app-service.md) and [Container Apps](container-apps.md); everything that is the same on both is
-here.
+Prepare the shared identity, service addresses and key storage here, then follow one Azure hosting recipe.
+Choose [App Service](app-service.md) for a deployment built around separate web apps, or
+[Container Apps](container-apps.md) for AuthProxy and its services in a container app environment. Both
+recipes use Microsoft Entra ID for sign-in, but their ingress and backend-isolation settings differ; use
+the settings for the host you choose rather than combining the two recipes.
 
 ```mermaid
 flowchart LR
@@ -23,7 +24,8 @@ flowchart LR
 
 ## Backends trust AuthProxy, so only AuthProxy may reach them
 
-This is the one decision in the whole deployment that cannot be fixed afterwards.
+Plan backend isolation before deploying the apps. The identity headers described below are not signed,
+so a backend that accepts them must not also accept direct requests from untrusted callers.
 
 AuthProxy strips the identity headers a caller sends, authenticates the caller, and writes
 `x-ms-client-principal`, `x-ms-client-principal-id` and `x-ms-client-principal-name` itself. Your backend
@@ -37,6 +39,23 @@ easy because the failure is silent: the application works perfectly, for everybo
 forging the header. Each platform page ends with an isolation recipe. The [direct-access
 test](#test-that-a-backend-cannot-be-reached-directly) below checks the routes you probe; it does not prove
 that no other route to the backend exists.
+
+---
+
+## Order of work
+
+Keep this sequence in view while preparing the shared settings:
+
+1. Register the Entra application and create the secret used by these recipes.
+2. Create the network, the storage account and container, and the Key Vault with its key.
+3. Deploy the backends and frontends **private** first.
+4. Deploy AuthProxy with the shared settings and the managed identity's role assignments.
+5. Run the [isolation test](#test-that-a-backend-cannot-be-reached-directly), then sign in.
+
+Read the shared preparation below, then follow either [App Service](app-service.md) or
+[Container Apps](container-apps.md) for the platform-specific deployment steps. Return to the isolation
+test with the backend addresses from that deployment. A successful sign-in confirms the proxy path works;
+it does not establish that direct access to the backend is blocked.
 
 ---
 
@@ -60,10 +79,11 @@ that no other route to the backend exists.
 
 ### The credential
 
-Microsoft recommends certificate or federated (managed identity) credentials for confidential clients, and
-advises against secrets in production. AuthProxy's OIDC provider takes **a client secret only**
-(`ClientSecret`); certificate and federated credentials are not supported yet and are tracked in
-[Cratis/AuthProxy#149](https://github.com/Cratis/AuthProxy/issues/149). Until then:
+Microsoft recommends certificate or federated credentials for confidential clients and advises against
+secrets in production. AuthProxy supports these through `ClientCredential`; see
+[Client credentials](../configuration/authentication.md#client-credentials-certificates-and-federated-credentials)
+for the required provider configuration. Leave `ClientSecret` empty when selecting an assertion credential.
+The Azure commands in this chapter use `ClientSecret`, so follow the precautions below for that recipe:
 
 - Keep the secret out of source control and out of plain app settings. Hold it in Key Vault and reference it
   from the platform (the platform pages show how).
@@ -146,6 +166,28 @@ Cratis__AuthProxy__Authorization__RequiredClaims__0__AnyOf__0=AuthProxy.User
 ---
 
 ## Point AuthProxy at your services
+
+Before applying either hosting recipe, configure how AuthProxy resolves an application tenant and how your
+backend decides whether a signed-in user may enter. A service with a `Backend` participates in identity
+resolution by default, and its `IdentityVerification` defaults to `Required`. With no `TenantResolutions`,
+AuthProxy refuses to start; with Required verification, a successful Entra sign-in alone does not admit
+the caller. See [Required needs a tenant resolution](../configuration/services.md#required-needs-a-tenant-resolution).
+
+Choose the [tenant resolution strategy](../configuration/tenancy.md) for your application; the Entra
+directory tenant ID is not automatically that application tenant. For an application that deliberately
+uses one fixed tenant, `Specified` is an option: set
+`Cratis__AuthProxy__TenantResolutions__0__Strategy=Specified` and
+`Cratis__AuthProxy__TenantResolutions__0__Options__TenantId` to the application-owned tenant ID.
+Other applications need their own strategy configuration rather than copying that choice.
+
+Keep verification Required, making the choice explicit with
+`Cratis__AuthProxy__Services__portal__IdentityVerification=Required`. The backend must implement
+`GET /.cratis/me` for the resolved user and tenant, returning a successful JSON response with boolean
+`isAuthorized: true` for a caller it admits, without a contradictory `isAuthenticated: false`.
+The application owns that admission decision; returning identity details alone is not enough. See
+[Identity enrichment](../configuration/services.md#identity-enrichment) for the request and response contract.
+Apply the chosen tenant settings and the explicit verification setting alongside each host recipe's
+settings below; the command blocks are not a complete application configuration on their own.
 
 Name each backend and frontend by the address AuthProxy reaches it on from inside your network, following
 the isolation recipe for [App Service](app-service.md#isolating-backends) or
@@ -321,13 +363,3 @@ Run it from two places:
 
 Finally, prove the positive path too: sign in through AuthProxy and confirm the application sees you. A
 backend that nothing can reach passes the test above trivially.
-
----
-
-## Order of work
-
-1. Register the Entra application and create the secret.
-2. Create the network, the storage account and container, and the Key Vault with its key.
-3. Deploy the backends and frontends **private** first.
-4. Deploy AuthProxy with the settings above and the managed identity's role assignments.
-5. Run the [isolation test](#test-that-a-backend-cannot-be-reached-directly), then sign in.

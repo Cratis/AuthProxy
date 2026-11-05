@@ -5,13 +5,29 @@ description: "Run AuthProxy on Azure App Service as a Linux custom container and
 
 # AuthProxy on Azure App Service
 
-AuthProxy runs on App Service as a Linux custom container, with your backends and frontends as separate App
-Service apps (or any other private workload) that only AuthProxy can reach. Read the
-[overview](index.md) first: it covers the Entra registration and the settings both platforms share.
+Use this recipe when AuthProxy runs as a Linux custom container on App Service. Your backends and
+frontends can be separate App Service apps or other private workloads; their network rules must restrict
+who can reach them. Complete the Entra registration and shared configuration in the [overview](index.md)
+first, then use the steps below to create the proxy app and apply the App Service-specific settings.
 
 ---
 
 ## Create the AuthProxy app
+
+Before running the commands, use an Azure CLI session signed in to the intended subscription and gather
+the resources and shell values they refer to:
+
+- An existing resource group (`$rg`), a plan name (`$plan`) and an AuthProxy app name (`$authproxy`).
+- The Entra directory and application IDs (`$directoryTenantId`, `$clientId`) and the Key Vault secret
+  URI (`$secretUri`) from the [shared preparation](index.md#register-the-application-in-microsoft-entra-id).
+- The storage account and vault names (`$account`, `$vault`), with the blob container and RSA key
+  already created as described under [Data Protection keys](index.md#data-protection-keys).
+- The backend/frontend app names (`$backend`, `$frontend`) and virtual network (`$vnet`) for your
+  chosen [backend-isolation recipe](#isolating-backends). Establish that boundary before exposing the apps;
+  virtual network integration alone only gives AuthProxy an outbound route.
+
+The examples do not provision the whole network or shared key storage. Keep these values available as you
+move from app creation to settings and backend isolation.
 
 Create a Linux App Service plan (Basic or higher; a private endpoint, used below, needs one) and a web app
 that runs the `cratis/authproxy` image from Docker Hub. Pin a version tag rather than `latest`.
@@ -41,7 +57,12 @@ az webapp config set --resource-group $rg --name $authproxy --web-sockets-enable
 
 Everything below is an app setting, which App Service passes to the container as an environment variable.
 `__` in a name is the configuration separator. Keep the client secret out of plain settings by
-referencing a Key Vault secret, which the app's managed identity must be allowed to read:
+referencing a Key Vault secret, which the app's managed identity must be allowed to read.
+
+Before applying these settings, complete the [tenant-resolution and backend-admission prerequisites](index.md#point-authproxy-at-your-services).
+Include your application's chosen tenant-resolution settings and explicit Required verification setting
+in the app settings you apply. The block below supplies neither a tenant strategy nor a backend admission
+implementation, so it is not sufficient on its own:
 
 ```bash
 az webapp config appsettings set --resource-group $rg --name $authproxy --settings \
@@ -90,9 +111,11 @@ Two consequences:
   access restriction on the `AzureFrontDoor.Backend` service tag and your `X-Azure-FDID` header value;
   otherwise anyone can bypass it and talk to the app's public name.
 
-After the first sign-in, check what AuthProxy recorded. The `ipAddress` your
-[sign-in notification](../configuration/sign-in.md) receives should be the user's, not an address inside
-Azure. [Trusted proxies](../configuration/trusted-proxies.md#checking-your-work) shows how to read it.
+After the first sign-in, inspect the `ipAddress` received by your
+[sign-in notification](../configuration/sign-in.md) endpoint. It should identify the user's address rather
+than an address inside Azure. If it does not, use
+[Checking your work](../configuration/trusted-proxies.md#checking-your-work) to revisit the forwarded hops
+and trusted peers; a completed sign-in alone does not show that those settings are correct.
 
 ### Health check
 

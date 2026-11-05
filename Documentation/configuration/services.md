@@ -916,7 +916,7 @@ stays a relying party: it validates the token and forwards the request, and it n
               "Issuers": [ { "Issuer": "https://auth.example/" } ],
               "Audiences": [ "direct-api" ],
               "RequiredScopes": [ "direct:read" ],
-              "ResourceMetadataUrl": "https://cratis.direct/.well-known/oauth-protected-resource/mcp",
+              "ResourceMetadataUrl": "https://app.cratis.direct/.well-known/oauth-protected-resource/mcp",
               "IdentityProvider": "github",
               "ClaimMappings": {
                 "sub": "github_id",
@@ -929,7 +929,7 @@ stays a relying party: it validates the token and forwards the request, and it n
               "PathPrefix": "/v1",
               "Issuers": [ { "Issuer": "https://auth.example/" } ],
               "Audiences": [ "direct-api" ],
-              "ResourceMetadataUrl": "https://cratis.direct/.well-known/oauth-protected-resource/v1",
+              "ResourceMetadataUrl": "https://app.cratis.direct/.well-known/oauth-protected-resource/v1",
               "IdentityProvider": "github",
               "ClaimMappings": {
                 "sub": "github_id",
@@ -946,8 +946,8 @@ stays a relying party: it validates the token and forwards the request, and it n
 }
 ```
 
-This is Direct's shape: Cratis Identity issues tokens with `aud=direct-api` for both `https://cratis.direct/mcp`
-and `https://cratis.direct/v1`. The claim mappings make a token-authenticated request carry the same
+This is Direct's shape: Cratis Identity issues tokens with `aud=direct-api` for both `https://app.cratis.direct/mcp`
+and `https://app.cratis.direct/v1`. The claim mappings make a token-authenticated request carry the same
 `x-ms-client-principal-id` (the numeric GitHub id) and `x-ms-client-principal-name` (the GitHub login) as a
 browser session signed in through Direct's GitHub provider, so Direct resolves the same user either way. The
 Cratis account id from the token's `sub` is still forwarded, as the `urn:cratis:bearer:subject` claim.
