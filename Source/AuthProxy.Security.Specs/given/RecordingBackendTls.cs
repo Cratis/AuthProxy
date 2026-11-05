@@ -9,8 +9,7 @@ namespace Cratis.AuthProxy.Security.given;
 
 /// <summary>A real TLS origin that requests client authentication during the handshake.</summary>
 /// <param name="ServerCertificate">The server certificate including its private key.</param>
-/// <param name="CloseConnections">Whether every response closes the connection for deterministic rotation checks.</param>
-public sealed record RecordingBackendTls(X509Certificate2 ServerCertificate, bool CloseConnections = true)
+public sealed record RecordingBackendTls(X509Certificate2 ServerCertificate)
 {
     /// <summary>Configures the loopback HTTPS listener.</summary>
     /// <param name="builder">The origin's web host.</param>

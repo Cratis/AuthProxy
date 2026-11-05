@@ -143,7 +143,6 @@ public sealed class RecordingBackend : IAsyncDisposable
                 context.Request.Path = path;
             }
 
-            if (tls?.CloseConnections == true) context.Response.Headers.Connection = "close";
             state.Record(context);
             await next();
         });

@@ -44,7 +44,7 @@ public class when_connecting_through_the_registered_transports
         await using var origin = originBuilder.Build();
         origin.Run(context =>
         {
-            context.Response.Headers.Connection = "close";
+            context.Response.Headers["X-Spec-Connection"] = context.Connection.Id;
             return context.Response.WriteAsync(context.Connection.ClientCertificate?.GetCertHashString(HashAlgorithmName.SHA256) ?? "missing client certificate");
         });
         await origin.StartAsync(TestContext.Current.CancellationToken);
@@ -57,6 +57,7 @@ public class when_connecting_through_the_registered_transports
         builder.Services.Configure<C.AuthProxy>(options =>
         {
             options.BackendTls = certificates.Settings;
+            options.BackendTls.ReloadInterval = C.BackendTls.MinimumReloadInterval;
             options.Services["app"] = new() { Backend = new() { BaseUrl = uri.ToString() }, IdentityVerification = C.IdentityVerificationMode.BestEffort };
         });
         await using var services = builder.Services.BuildServiceProvider();
@@ -80,14 +81,7 @@ public class when_connecting_through_the_registered_transports
                 response.EnsureSuccessStatusCode();
                 using var leaf = X509Certificate2.CreateFromPemFile(certificates.CertificatePath, certificates.KeyPath);
                 (await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldEqual(leaf.GetCertHashString(HashAlgorithmName.SHA256));
-                using var replacement = certificates.Issue(client: true);
-                certificates.WriteClient(replacement);
-                services.GetRequiredService<IBackendTlsMaterialSource>().TryReload().ShouldBeTrue();
-                using var rotated = new HttpRequestMessage(HttpMethod.Get, request.RequestUri);
-                rotated.Headers.Host = request.Headers.Host;
-                using var rotatedResponse = await client.SendAsync(rotated, TestContext.Current.CancellationToken);
-                rotatedResponse.EnsureSuccessStatusCode();
-                (await rotatedResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldEqual(replacement.GetCertHashString(HashAlgorithmName.SHA256));
+                await AssertNewConnectionUsesRotatedCertificate(client, response, certificates, services);
             }
             else
             {
@@ -95,5 +89,20 @@ public class when_connecting_through_the_registered_transports
             }
         }
         await origin.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    static async Task AssertNewConnectionUsesRotatedCertificate(HttpMessageInvoker client, HttpResponseMessage response, given.TestCertificates certificates, IServiceProvider services)
+    {
+        using var replacement = certificates.Issue(client: true);
+        certificates.WriteClient(replacement);
+        services.GetRequiredService<IBackendTlsMaterialSource>().TryReload().ShouldBeTrue();
+        await Task.Delay(C.BackendTls.MinimumReloadInterval + TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        Assert.NotNull(response.RequestMessage);
+        using var rotated = new HttpRequestMessage(HttpMethod.Get, response.RequestMessage.RequestUri);
+        rotated.Headers.Host = response.RequestMessage.Headers.Host;
+        using var rotatedResponse = await client.SendAsync(rotated, TestContext.Current.CancellationToken);
+        rotatedResponse.EnsureSuccessStatusCode();
+        rotatedResponse.Headers.GetValues("X-Spec-Connection").Single().ShouldNotEqual(response.Headers.GetValues("X-Spec-Connection").Single());
+        (await rotatedResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)).ShouldEqual(replacement.GetCertHashString(HashAlgorithmName.SHA256));
     }
 }

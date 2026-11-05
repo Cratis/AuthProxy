@@ -70,8 +70,12 @@ public sealed class ForwardedIdentityOrigin : IAsyncDisposable
                 context.Request.Headers.ToDictionary(header => header.Key, header => header.Value.Select(value => value!).ToArray(), StringComparer.OrdinalIgnoreCase),
                 false);
             var verified = ForwardedIdentityVerifier.Verify(observation, audience, keyId, origin.Secret.ToArray());
-            if (tls?.CloseConnections == true) context.Response.Headers.Connection = "close";
-            origin.Received.Enqueue(observation with { Verified = verified, ClientCertificateThumbprint = context.Connection.ClientCertificate?.GetCertHashString(HashAlgorithmName.SHA256) });
+            origin.Received.Enqueue(observation with
+            {
+                Verified = verified,
+                ConnectionId = context.Connection.Id,
+                ClientCertificateThumbprint = context.Connection.ClientCertificate?.GetCertHashString(HashAlgorithmName.SHA256)
+            });
             var hasIdentity = observation.Headers.Keys.Any(name => name.StartsWith("x-ms-client-principal", StringComparison.OrdinalIgnoreCase));
             if (hasIdentity && !verified)
             {

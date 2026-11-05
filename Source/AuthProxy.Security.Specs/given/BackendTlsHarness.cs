@@ -19,6 +19,7 @@ public class BackendTlsHarness(HopCertificates certificates, RecordingBackendTls
         const string root = C.AuthProxy.SectionKey;
         settings[$"{root}:Profile"] = local ? nameof(C.DeploymentProfile.LocalDevelopment) : nameof(C.DeploymentProfile.Default);
         settings[$"{root}:BackendTls:TrustedCertificateAuthoritiesPath"] = certificates.BundlePath;
+        settings[$"{root}:BackendTls:ReloadInterval"] = C.BackendTls.MinimumReloadInterval.ToString();
         if (client)
         {
             settings[$"{root}:BackendTls:ClientCertificate:CertificatePath"] = certificates.CertificatePath;

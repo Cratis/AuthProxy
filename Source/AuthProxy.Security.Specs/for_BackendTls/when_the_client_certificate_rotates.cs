@@ -19,12 +19,19 @@ public class when_the_client_certificate_rotates
         using var firstResponse = await client.SendAsync(first, TestContext.Current.CancellationToken);
         Assert.True(firstResponse.IsSuccessStatusCode);
         var original = certificates.ClientThumbprint;
+        var firstConnection = proxy.ApplicationOrigin.Received.Last(request => request.RawTarget.EndsWith("/private", StringComparison.Ordinal));
+        Assert.Equal(original, firstConnection.ClientCertificateThumbprint);
         certificates.RotateClient();
         Assert.True(proxy.Services.GetRequiredService<IBackendTlsMaterialSource>().TryReload());
+
+        // Reload changes handshake material, not existing connections. Let the production pool
+        // lifetime elapse so the same client must establish a new TLS connection.
+        await Task.Delay(C.BackendTls.MinimumReloadInterval + TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
         using var second = ForwardedIdentityHarness.Session(ForwardedIdentityHarness.SignedHost, "/private?rotated=1");
         using var secondResponse = await client.SendAsync(second, TestContext.Current.CancellationToken);
         Assert.True(secondResponse.IsSuccessStatusCode);
         var observed = proxy.ApplicationOrigin.Received.Last(request => request.RawTarget.Contains("rotated=1", StringComparison.Ordinal));
+        Assert.NotEqual(firstConnection.ConnectionId, observed.ConnectionId);
         Assert.Equal(certificates.ClientThumbprint, observed.ClientCertificateThumbprint);
         Assert.NotEqual(original, observed.ClientCertificateThumbprint);
     }
