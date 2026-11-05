@@ -61,6 +61,35 @@ public static class ClientPrincipalExtensions
                 .AuthenticateResult?.Ticket?.AuthenticationScheme
             ?? user.Identity.AuthenticationType;
 
+        return context.BuildClientPrincipal(
+            user,
+            authenticationScheme,
+            context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties);
+    }
+
+    /// <summary>
+    /// Builds the client principal for an authenticated <paramref name="user"/> that is not necessarily the one on the request.
+    /// </summary>
+    /// <param name="context">The current <see cref="HttpContext"/>.</param>
+    /// <param name="user">The authenticated user to describe.</param>
+    /// <param name="authenticationScheme">The scheme the user's identity is resolved against.</param>
+    /// <param name="properties">The authentication properties of the session the user belongs to, when there are any.</param>
+    /// <returns>The <see cref="ClientPrincipal"/>, or <see langword="null"/> when the user is not authenticated or the identity does not resolve.</returns>
+    /// <remarks>
+    /// Used where the principal is known before it is on the request, such as the provider callback that is about to
+    /// establish the session.
+    /// </remarks>
+    public static ClientPrincipal? BuildClientPrincipal(
+        this HttpContext context,
+        ClaimsPrincipal user,
+        string? authenticationScheme,
+        AuthenticationProperties? properties)
+    {
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
         var canonicalResolution = context.RequestServices is { } requestServices
             ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)
             : null;
@@ -111,7 +140,7 @@ public static class ClientPrincipalExtensions
             UserDetails = userDetails,
             UserRoles = roles,
             Claims = claims,
-            AccountProvider = GetAccountProvider(user, context, authenticationScheme, isCanonical),
+            AccountProvider = GetAccountProvider(user, properties, authenticationScheme, isCanonical),
         };
     }
 
@@ -175,18 +204,18 @@ public static class ClientPrincipalExtensions
     /// Only a browser session records the provider that names its account; every other principal binds by its identity provider.
     /// </summary>
     /// <param name="user">The principal to bind.</param>
-    /// <param name="context">The request carrying the authentication result.</param>
+    /// <param name="properties">The authentication properties of the session, when there are any.</param>
     /// <param name="authenticationScheme">The scheme that authenticated the principal.</param>
     /// <param name="isCanonical">Whether the principal already carries a canonical identity.</param>
     /// <returns>The recorded session provider, an empty string when unrecorded, or null for other principals.</returns>
-    static string? GetAccountProvider(ClaimsPrincipal user, HttpContext context, string? authenticationScheme, bool isCanonical)
+    static string? GetAccountProvider(ClaimsPrincipal user, AuthenticationProperties? properties, string? authenticationScheme, bool isCanonical)
     {
         if (isCanonical || !string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal))
         {
             return null;
         }
 
-        return SessionProvider.TryRead(user, context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Properties, out var sessionScheme) ? sessionScheme : string.Empty;
+        return SessionProvider.TryRead(user, properties, out var sessionScheme) ? sessionScheme : string.Empty;
     }
 
     static bool IsRoleClaim(string claimType, bool isCanonical) =>

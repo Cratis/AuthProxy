@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.IdentityModel.Tokens.Jwt;
+using Cratis.AuthProxy.SignInCallbacks;
 using Cratis.AuthProxy.SignIns;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -85,6 +86,7 @@ public class canonical_cookie_registration : Specification
         builder.AddIngressConfiguration();
         builder.Services.AddSingleton(authenticationMonitor);
         builder.Services.AddSingleton(Substitute.For<ISignInNotifier>());
+        builder.Services.AddSingleton(Substitute.For<ISignInCallbackDispatcher>());
         builder.AddIngressAuthentication();
         _authenticationService = Substitute.For<IAuthenticationService>();
         _authenticationService
