@@ -44,4 +44,13 @@ sealed class AuthProxyConfigAnnotation : IResourceAnnotation
     /// rather than overwrite the indices an earlier call already wrote.
     /// </summary>
     public Dictionary<string, int> ServiceRequiredClaimCounts { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets the backend resource registered for each service.</summary>
+    public Dictionary<string, IResource> ServiceBackends { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>Gets the resource hosting each selectable-tenant endpoint.</summary>
+    public Dictionary<int, IResource> TenantListResources { get; } = [];
+
+    /// <summary>Gets the signed-forwarding pairing for each backend resource.</summary>
+    public Dictionary<IResource, ForwardedIdentityPairing> ForwardedIdentityPairings { get; } = new(ReferenceEqualityComparer.Instance);
 }

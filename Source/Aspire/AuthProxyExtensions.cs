@@ -6,7 +6,7 @@ namespace Cratis.AuthProxy.Aspire;
 /// <summary>
 /// Extension methods for adding and configuring <see cref="AuthProxyResource"/> in an Aspire application model.
 /// </summary>
-public static class AuthProxyExtensions
+public static partial class AuthProxyExtensions
 {
     const string ConfigPrefix = "Cratis__AuthProxy";
 
@@ -63,6 +63,7 @@ public static class AuthProxyExtensions
         bool? resolveIdentityDetails = null)
         where T : IResourceWithEnvironment
     {
+        GetOrCreateAnnotation(builder.Resource).ServiceBackends[serviceName] = serviceResource.Resource;
         var endpoint = serviceResource.GetEndpoint(endpointName);
         builder.WithEnvironment(context =>
             context.EnvironmentVariables[$"{ConfigPrefix}__Services__{serviceName}__Backend__BaseUrl"] =
@@ -1095,6 +1096,7 @@ public static class AuthProxyExtensions
         var annotation = GetOrCreateAnnotation(builder.Resource);
         var idx = annotation.TenantResolutionCount++;
         var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
+        annotation.TenantListResources[idx] = serviceResource.Resource;
         var endpoint = serviceResource.GetEndpoint(endpointName);
 
         builder.WithEnvironment($"{prefix}__Strategy", "Selection");
