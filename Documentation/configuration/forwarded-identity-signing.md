@@ -78,7 +78,7 @@ Keep clocks synchronized. Arc accepts timestamps up to 30 seconds in the future 
 
 ## Wire bindings and limits
 
-AuthProxy strips caller-supplied `x-cratis-forwarded-identity-signature` values. After identity injection, path rewrites and destination construction, it emits exactly one:
+AuthProxy strips caller-supplied `x-cratis-forwarded-identity-signature` values and known forwarded-identity context headers, including older draft names, treating underscore spellings of protected names as their hyphenated equivalents. After identity injection, path rewrites and destination construction, it emits exactly one:
 
 ```text
 v1.<key-id>.<unix-seconds>.<base64url-nonce>.<base64url-hmac>

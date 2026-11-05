@@ -24,9 +24,23 @@ namespace Cratis.AuthProxy;
 /// Every on-behalf header is matched by <see cref="Headers.OnBehalfPrefix"/> for the same reason: a caller must never
 /// be able to name an actor, or present an assertion, that AuthProxy did not issue for this request.
 /// </para>
+/// <para>
+/// Forwarded-identity context headers, including older draft names, are removed by exact name. Underscore
+/// spellings are treated as hyphenated names because some backends map both spellings to the same variable.
+/// Routing headers remain available for service selection.
+/// </para>
 /// </remarks>
 static class SpoofableHeaders
 {
+    static readonly HashSet<string> _identityHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        Headers.ForwardedIdentitySignature, Headers.TenantId, Headers.LegacyTenantId, Headers.TokenClientId, Headers.TokenScope,
+        "x-cratis-credential-kind", "x-cratis-credential-id", "x-cratis-issuer", "x-cratis-subject",
+        "x-cratis-idp", "x-cratis-auth-time", "x-cratis-acr", "x-cratis-amr", "x-cratis-act",
+        "x-cratis-grant-id", "x-cratis-policy-epoch", "x-cratis-sender-binding", "x-cratis-forwarded-token-sha256",
+        "x-cratis-assurance", "x-cratis-actor", "x-cratis-dpop-result"
+    };
+
     /// <summary>
     /// Removes every spoofable header from an inbound request.
     /// </summary>
@@ -51,11 +65,12 @@ static class SpoofableHeaders
         }
     }
 
-    static bool IsSpoofable(string name) =>
-        name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
-        || name.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
-        || name.StartsWith(Headers.SignInCallbackPrefix, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(name, Headers.ForwardedIdentitySignature, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(name, Headers.TenantId, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(name, Headers.LegacyTenantId, StringComparison.OrdinalIgnoreCase);
+    static bool IsSpoofable(string name)
+    {
+        var candidate = name.Replace('_', '-');
+        return candidate.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(Headers.SignInCallbackPrefix, StringComparison.OrdinalIgnoreCase)
+            || _identityHeaders.Contains(candidate);
+    }
 }
