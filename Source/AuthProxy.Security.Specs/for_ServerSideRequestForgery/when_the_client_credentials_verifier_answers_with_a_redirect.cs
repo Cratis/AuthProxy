@@ -53,6 +53,10 @@ public class when_the_client_credentials_verifier_answers_with_a_redirect : IAsy
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"{C.AuthProxy.SectionKey}:Services:app:Backend:BaseUrl"] = "https://backend.example.test",
+
+            // Backend TLS now reads the validated configuration when the client's handler is built, so the
+            // configuration has to be one AuthProxy would start with.
+            [$"{C.AuthProxy.SectionKey}:Services:app:IdentityVerification"] = nameof(C.IdentityVerificationMode.BestEffort),
         });
         builder.AddIngressConfiguration();
         builder.AddIngressAuthentication();

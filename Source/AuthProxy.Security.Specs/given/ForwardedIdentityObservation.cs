@@ -10,6 +10,12 @@ namespace Cratis.AuthProxy.Security.given;
 /// <param name="Verified">Whether the independent verifier accepted the proof.</param>
 public sealed record ForwardedIdentityObservation(string Method, string RawTarget, IReadOnlyDictionary<string, string[]> Headers, bool Verified)
 {
+    /// <summary>Gets the origin's transport connection identifier.</summary>
+    public string ConnectionId { get; init; } = string.Empty;
+
+    /// <summary>Gets the handshake client certificate's SHA-256 fingerprint.</summary>
+    public string? ClientCertificateThumbprint { get; init; }
+
     /// <summary>Gets the singular proof, or an empty string when absent.</summary>
     public string Proof => Headers.TryGetValue("x-cratis-forwarded-identity-signature", out var values) ? values.Single() : string.Empty;
 }

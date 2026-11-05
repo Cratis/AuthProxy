@@ -28,7 +28,8 @@ public static partial class AuthProxyExtensions
     /// Run mode generates a fresh in-memory key per backend, without a persisted default. Publish mode
     /// requires a provisioned secret parameter and emits only its reference. This method never logs the key.
     /// Pairing covers registered backend services and resource-based selectable-tenant endpoints, regardless
-    /// of registration order. It configures Arc's verifier, not a local-development trust profile.
+    /// of registration order. Run mode selects AuthProxy's LocalDevelopment transport profile; publishing
+    /// requires backend TLS configuration. It configures Arc's verifier, not Arc's local-development trust profile.
     /// </remarks>
     public static IResourceBuilder<T> WithSignedForwardingTo<T, TBackend>(
         this IResourceBuilder<T> builder,
@@ -60,6 +61,10 @@ public static partial class AuthProxyExtensions
         verifier.KeyIds.Add(keyId);
         var keyIndex = verifier.KeyIds.Count - 1;
 
+        if (builder.ApplicationBuilder.ExecutionContext.IsRunMode)
+        {
+            builder.WithEnvironment($"{ConfigPrefix}__Profile", "LocalDevelopment");
+        }
         builder.WithEnvironment(context => WriteForwardedIdentitySigners(context, annotation, backend.Resource, pairing));
         backend.WithEnvironment(context => WriteVerifier(context, verifier, keyIndex, pairing));
         return builder;

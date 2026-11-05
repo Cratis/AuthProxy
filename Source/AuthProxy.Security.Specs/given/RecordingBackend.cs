@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -112,12 +113,14 @@ public sealed class RecordingBackend : IAsyncDisposable
     /// Starts a new recording origin.
     /// </summary>
     /// <param name="normalizeRepeatedSeparators">Whether to collapse repeated path separators like a slash-normalizing backend.</param>
+    /// <param name="tls">Optional real TLS listener settings.</param>
     /// <returns>The started origin.</returns>
-    public static async Task<RecordingBackend> Start(bool normalizeRepeatedSeparators = false)
+    public static async Task<RecordingBackend> Start(bool normalizeRepeatedSeparators = false, RecordingBackendTls? tls = null)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        if (tls is null) builder.WebHost.UseUrls("http://127.0.0.1:0");
+        else tls.Configure(builder.WebHost);
         builder.Services.AddSingleton<RecordingState>();
         builder.Services.AddSingleton<IdentityResponder>();
         builder.Services.AddSingleton<TenantsResponder>();
@@ -182,6 +185,7 @@ public sealed class RecordingBackend : IAsyncDisposable
             .Addresses
             .First();
 
+        if (tls is not null) address = address.Replace("127.0.0.1", "localhost", StringComparison.Ordinal);
         var backend = new RecordingBackend(app, address, identityResponder, tenantsResponder);
         state.Attach(backend.Received, backend.SignInNotifications);
 
@@ -276,6 +280,7 @@ public sealed class RecordingBackend : IAsyncDisposable
                 context.Request.Headers.ToDictionary(
                     header => header.Key,
                     header => header.Value.ToString(),
-                    StringComparer.OrdinalIgnoreCase)));
+                    StringComparer.OrdinalIgnoreCase),
+                context.Connection.ClientCertificate?.GetCertHashString(HashAlgorithmName.SHA256)));
     }
 }
