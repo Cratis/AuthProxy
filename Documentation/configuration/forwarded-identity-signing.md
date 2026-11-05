@@ -28,7 +28,7 @@ Supply the third property, `SecretBase64`, through your secret provider, for exa
 | `KeyId` | Case-sensitive `[A-Za-z0-9_-]{1,64}`; must identify a key provisioned at the receiver. |
 | `SecretBase64` | Strict standard base64 encoding exactly 32 random bytes, with no whitespace. |
 
-A partial or invalid block stops startup and identifies the configuration path, without printing the secret. There is no global signing key or fallback key. Use a separate key per trust boundary; do not reuse OIDC, Data Protection or on-behalf assertion keys.
+A partial or invalid block stops startup and identifies the configuration path, without printing the secret. There is no global signing key or fallback key. Each configured service must have distinct key material, even if services use the same audience or backend URL. Startup rejects shared material and identifies only the two configuration paths. Do not reuse OIDC, Data Protection or on-behalf assertion keys.
 
 The service block covers:
 
@@ -56,6 +56,8 @@ A service block does **not** sign `TenantsEndpoint` calls. Configure `ForwardedI
 ```
 
 Supply `Cratis__AuthProxy__TenantResolutions__0__Options__ForwardedIdentity__SecretBase64` from the secret provider, adjusting the array index to the selection resolver's position. If this block is absent, the tenant flow remains unsigned even when service flows are signed. This matters when a tenant endpoint also requires signed identity.
+
+The tenant flow may reuse its own service's key only with an identical audience and a `TenantsEndpoint` inside that service's configured backend origin and base-path boundary. Scheme, host and port must match; path comparison is case-sensitive and segment-boundary aware. A frontend URL does not establish backend ownership. Selection options have no explicit service reference, so deployments that cannot establish this relationship from their URLs must use a separate tenant-endpoint key.
 
 ## Receiver configuration and rollout
 

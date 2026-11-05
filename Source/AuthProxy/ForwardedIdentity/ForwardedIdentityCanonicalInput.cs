@@ -62,15 +62,16 @@ internal static class ForwardedIdentityCanonicalInput
         if (!TryHeaders(request, out var headers, out refusal)) return false;
 
         var input = new StringBuilder("Cratis.AuthProxy.ForwardedIdentity.v1\n");
+        var byteCount = Encoding.UTF8.GetByteCount("Cratis.AuthProxy.ForwardedIdentity.v1\n");
         foreach (var value in new[] { audience, keyId, timestamp, nonce, method, path, headers.Count.ToString(CultureInfo.InvariantCulture) })
         {
-            Frame(input, value);
+            byteCount += Frame(input, value);
         }
         foreach (var (name, value) in headers.OrderBy(header => header.Key, StringComparer.Ordinal))
         {
-            Frame(input, name);
-            Frame(input, value);
-            if (Encoding.UTF8.GetByteCount(input.ToString()) > 32768)
+            byteCount += Frame(input, name);
+            byteCount += Frame(input, value);
+            if (byteCount > 32768)
             {
                 refusal = ForwardedIdentityRefusal.CanonicalTooLarge;
                 return false;
@@ -145,5 +146,11 @@ internal static class ForwardedIdentityCanonicalInput
 
     static bool IsToken(char character) => character is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') || "!#$%&'*+-.^_`|~".Contains(character);
 
-    static void Frame(StringBuilder input, string value) => input.Append(Encoding.UTF8.GetByteCount(value).ToString(CultureInfo.InvariantCulture)).Append(':').Append(value).Append('\n');
+    static int Frame(StringBuilder input, string value)
+    {
+        var byteCount = Encoding.UTF8.GetByteCount(value);
+        var length = byteCount.ToString(CultureInfo.InvariantCulture);
+        input.Append(length).Append(':').Append(value).Append('\n');
+        return length.Length + byteCount + 2;
+    }
 }
