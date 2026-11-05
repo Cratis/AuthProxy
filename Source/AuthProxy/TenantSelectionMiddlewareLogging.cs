@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy;
 
 internal static partial class TenantSelectionMiddlewareLogging
 {
+    [LoggerMessage(LogLevel.Warning, "Tenant endpoint was not called because forwarded identity signing was refused")]
+    internal static partial void TenantIdentityNotSigned(this ILogger logger);
+
     [LoggerMessage(LogLevel.Warning, "Tenant endpoint could not be reached ({ExceptionType})")]
     internal static partial void TenantEndpointUnavailable(this ILogger logger, string exceptionType);
 

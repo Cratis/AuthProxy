@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.Json;
 using Microsoft.Extensions.Caching.Memory;
@@ -25,6 +26,7 @@ namespace Cratis.AuthProxy.Identity;
 /// <param name="memoryCache">The memory cache used to deduplicate concurrent identity resolutions.</param>
 /// <param name="authorizationCache">The tamper-proof record of a previously resolved authorization.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="signer">The per-flow forwarded-identity signer.</param>
 /// <remarks>
 /// What each service's answer is worth is a per-service setting — see
 /// <see cref="C.IdentityVerificationMode"/>. Under <see cref="C.IdentityVerificationMode.BestEffort"/> only
@@ -38,7 +40,8 @@ public class IdentityDetailsResolver(
     IEnumerable<IIdentityDetailsPrincipalEnricher> principalEnrichers,
     IMemoryCache memoryCache,
     IIdentityAuthorizationCache authorizationCache,
-    ILogger<IdentityDetailsResolver> logger) : IIdentityDetailsResolver
+    ILogger<IdentityDetailsResolver> logger,
+    IForwardedIdentitySigner signer) : IIdentityDetailsResolver
 {
     /// <summary>
     /// The longest encoded value the readable identity cookie is allowed to carry. Browsers refuse a cookie
@@ -63,7 +66,7 @@ public class IdentityDetailsResolver(
     };
 
     readonly ConcurrentDictionary<IdentityAccountTenantKey, SemaphoreSlim> _resolverLocks = new();
-    readonly IdentityEndpointCaller _endpointCaller = new(httpClientFactory, logger);
+    readonly IdentityEndpointCaller _endpointCaller = new(httpClientFactory, logger, signer);
 
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
@@ -245,9 +248,10 @@ public class IdentityDetailsResolver(
     /// <see cref="C.IdentityVerificationMode.Required"/> is where a body-level verdict becomes a decision.
     /// </remarks>
     static bool Admits(IdentityVerificationOutcome outcome, C.IdentityVerificationMode mode) =>
-        mode == C.IdentityVerificationMode.Required
+        outcome.Reason != IdentityVerificationReason.ForwardedIdentityNotSigned &&
+        (mode == C.IdentityVerificationMode.Required
             ? outcome.Status == IdentityVerificationStatus.Positive
-            : outcome.Reason != IdentityVerificationReason.Forbidden;
+            : outcome.Reason != IdentityVerificationReason.Forbidden);
 
     /// <summary>
     /// Computes how long a request may wait for its turn at the identity endpoints.

@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
@@ -32,7 +33,11 @@ public sealed class BearerRouteForwarder(
     IOptionsMonitor<C.AuthProxy> config,
     ILogger<BearerRouteForwarder> logger) : IBearerRouteForwarder, IDisposable
 {
-    readonly HttpTransformer _transformer = transformBuilder.Create(context => context.RequestTransforms.Add(new BearerRouteHeadersTransform()));
+    readonly HttpTransformer _transformer = transformBuilder.Create(context =>
+    {
+        context.RequestTransforms.Add(new BearerRouteHeadersTransform());
+        context.RequestTransforms.Add(new ForwardedIdentitySigningTargetTransform(ForwardedIdentityFlow.BearerRoute));
+    });
 
     readonly HttpMessageInvoker _invoker = clientFactory.CreateClient(new ForwarderHttpClientContext
     {
@@ -64,6 +69,8 @@ public sealed class BearerRouteForwarder(
         {
             context.Items[BearerRouteDefaults.ForwardedIdentityItemKey] = identity;
         }
+
+        context.Items[BearerRouteDefaults.ServiceItemKey] = route.ServiceName;
 
         var requestConfig = new ForwarderRequestConfig
         {

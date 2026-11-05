@@ -30,7 +30,7 @@ public class a_resolver_with_issued_identity_cookies : when_identity_verificatio
         _authorizationCache = new IdentityAuthorizationCache(new EphemeralDataProtectionProvider(), configuration, Substitute.For<ILogger<IdentityAuthorizationCache>>());
         var clients = Substitute.For<IHttpClientFactory>();
         clients.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(_handler, disposeHandler: false));
-        _resolver = new IdentityDetailsResolver(configuration, clients, [], _memoryCache, _authorizationCache, _logger);
+        _resolver = new IdentityDetailsResolver(configuration, clients, [], _memoryCache, _authorizationCache, _logger, Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
         _alice = new ClientPrincipal { UserId = "user-a", UserDetails = "Alice" };
         _bob = new ClientPrincipal { UserId = "user-b", UserDetails = "Bob" };
     }

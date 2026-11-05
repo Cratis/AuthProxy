@@ -56,7 +56,8 @@ public class when_selected_tenant_is_revalidated_and_still_available : Specifica
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
             given.signed_selected_tenant_cookies.Instance,
-            Substitute.For<ILogger<TenantSelectionMiddleware>>());
+            Substitute.For<ILogger<TenantSelectionMiddleware>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     async Task Because()

@@ -38,7 +38,8 @@ public class when_resolving_concurrent_canonical_identity_details : Specificatio
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            Substitute.For<ILogger<IdentityDetailsResolver>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     async Task Because()

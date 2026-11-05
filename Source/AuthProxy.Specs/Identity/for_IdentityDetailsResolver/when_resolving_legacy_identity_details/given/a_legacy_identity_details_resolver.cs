@@ -41,7 +41,8 @@ public class a_legacy_identity_details_resolver : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            Substitute.For<ILogger<IdentityDetailsResolver>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     /// <summary>

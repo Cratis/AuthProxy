@@ -73,5 +73,8 @@ public enum IdentityVerificationReason
     /// <summary>
     /// The call was to be made during an on-behalf session and its assertion could not be issued, so it was not made.
     /// </summary>
-    OnBehalfAssertionUnavailable = 11
+    OnBehalfAssertionUnavailable = 11,
+
+    /// <summary>The opted-in identity call could not be signed, so it was not sent.</summary>
+    ForwardedIdentityNotSigned = 12
 }

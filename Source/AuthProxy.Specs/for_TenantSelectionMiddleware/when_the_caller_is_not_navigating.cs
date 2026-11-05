@@ -68,7 +68,8 @@ public class when_the_caller_is_not_navigating : Specification
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
             given.signed_selected_tenant_cookies.Instance,
-            Substitute.For<ILogger<TenantSelectionMiddleware>>());
+            Substitute.For<ILogger<TenantSelectionMiddleware>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/api/orders";

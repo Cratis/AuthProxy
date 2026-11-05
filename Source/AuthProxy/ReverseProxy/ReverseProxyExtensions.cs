@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.AccessTokens;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.AuthProxy.SignInCallbacks;
@@ -42,13 +43,6 @@ public static class ReverseProxyExtensions
 
         builder.Services
             .AddReverseProxy()
-            .ConfigureHttpClient((_, handler) =>
-            {
-                handler.KeepAlivePingPolicy = HttpKeepAlivePingPolicy.Always;
-                handler.KeepAlivePingDelay = TimeSpan.FromMinutes(1);
-                handler.KeepAlivePingTimeout = TimeSpan.FromMinutes(2);
-                handler.ConnectTimeout = TimeSpan.FromMinutes(3);
-            })
             .AddTransforms(ctx =>
             {
                 ctx.RequestTransforms.Add(new InjectIdentityHeadersTransform());
@@ -58,7 +52,10 @@ public static class ReverseProxyExtensions
 
                 // Last, so the assertion signs the path the backend receives.
                 ctx.RequestTransforms.Add(new OnBehalfForwardTransform());
+                ctx.RequestTransforms.Add(new ForwardedIdentitySigningTargetTransform(ForwardedIdentityFlow.ProxiedRequest));
             });
+        builder.AddForwardedIdentitySigning();
+        builder.Services.AddSingleton<Yarp.ReverseProxy.Forwarder.IForwarderHttpClientFactory, SigningForwarderHttpClientFactory>();
 
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ServiceRoutingConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, StickyRoutingConfigurationValidator>();

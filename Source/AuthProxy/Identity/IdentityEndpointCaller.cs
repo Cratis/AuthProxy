@@ -3,6 +3,7 @@
 
 using System.Net;
 using System.Text.Json.Nodes;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.OnBehalfSessions;
 
 namespace Cratis.AuthProxy.Identity;
@@ -15,13 +16,14 @@ namespace Cratis.AuthProxy.Identity;
 /// The logger to write to. This is the resolver's own logger rather than one of this type's category, so
 /// everything an operator needs to explain a single identity resolution stays on one category.
 /// </param>
+/// <param name="signer">The per-flow forwarded-identity signer.</param>
 /// <remarks>
 /// Separated from <see cref="IdentityDetailsResolver"/> because the two answer different questions. This
 /// one turns an HTTP exchange into a fact — reached or not, refused or not, verdict or not — and holds no
 /// opinion about what should happen next. The resolver decides what the fact is worth, which is where the
 /// per-service mode belongs.
 /// </remarks>
-public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogger logger)
+public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogger logger, IForwardedIdentitySigner signer)
 {
     /// <summary>
     /// Calls a service's identity endpoint and reports the outcome.
@@ -55,7 +57,6 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
         var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
         logger.CallingIdentityEndpoint(url, serviceName);
 
-        using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.SetMicrosoftIdentityHeaders(principal);
         var tenant = HeaderValue.ToTransportValue(tenantId);
@@ -85,6 +86,12 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
 
         try
         {
+            var signing = signer.Sign(request, new(ForwardedIdentityFlow.IdentityDetails, serviceName));
+            if (signing == ForwardedIdentitySigningOutcome.Refused)
+            {
+                return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
+            }
+            using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
             using var httpResponse = await client.SendAsync(request, token);
 
             if (httpResponse.StatusCode == HttpStatusCode.Forbidden)

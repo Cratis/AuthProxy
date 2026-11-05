@@ -115,6 +115,7 @@ public static class IngressExtensions
         // The same holds for the bearer-route gate: UseIngress always places it, and it hands every request on
         // untouched for a deployment that declares no bearer route.
         builder.AddBearerRoutes();
+        builder.AddForwardedIdentitySigning();
 
         // The on-behalf gate is placed by UseIngress too, and is inert until the OnBehalf section is configured.
         builder.AddActingOnBehalf();

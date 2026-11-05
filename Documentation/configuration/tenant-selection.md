@@ -78,6 +78,10 @@ tenant is auto-selected), so no switcher is shown for single-tenant users.
 
 ---
 
+## Signed identity at the tenant endpoint
+
+To call a tenant endpoint that requires Arc v1 signed identity, configure `ForwardedIdentity` with `Audience`, `KeyId` and secret-provider `SecretBase64` on the selection resolver's `Options`. Service-level signing does not cover this separate flow. Without this block, tenant calls retain unsigned legacy behavior. Signed calls do not follow redirects; signing refusal uses the existing unavailable response without confirming a tenant. See [Forwarded identity signing](forwarded-identity-signing.md#configure-the-tenant-list-flow-separately) for configuration and rollout order.
+
 ## Endpoint response shape
 
 `TenantsEndpoint` must return JSON with one object per selectable tenant:

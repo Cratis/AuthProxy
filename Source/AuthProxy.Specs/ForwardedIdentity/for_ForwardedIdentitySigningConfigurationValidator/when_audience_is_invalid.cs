@@ -17,7 +17,8 @@ public class when_audience_is_invalid : given.a_signing_configuration
         Validate();
         result.Failed.ShouldBeTrue();
     }
-    [Fact] void should_reject_an_oversized_audience()
+    [Fact]
+    void should_reject_an_oversized_audience()
     {
         settings.Audience = new string('a', 129);
         Validate();

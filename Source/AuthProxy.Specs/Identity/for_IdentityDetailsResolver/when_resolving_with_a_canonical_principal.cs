@@ -73,7 +73,8 @@ public class when_resolving_with_a_canonical_principal : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            Substitute.For<ILogger<IdentityDetailsResolver>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     async Task Because() => await _detailsResolver.Resolve(_context, _principal, "tenant");

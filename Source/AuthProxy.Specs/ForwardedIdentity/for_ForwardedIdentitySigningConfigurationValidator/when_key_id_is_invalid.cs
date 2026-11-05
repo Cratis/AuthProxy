@@ -17,7 +17,8 @@ public class when_key_id_is_invalid : given.a_signing_configuration
         Validate();
         result.Failed.ShouldBeTrue();
     }
-    [Fact] void should_reject_an_oversized_key_id()
+    [Fact]
+    void should_reject_an_oversized_key_id()
     {
         settings.KeyId = new string('a', 65);
         Validate();

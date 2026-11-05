@@ -17,14 +17,16 @@ public class when_a_covered_header_is_invalid : given.the_published_vector
         accepted.ShouldBeFalse();
         refusal.ShouldEqual(ForwardedIdentityRefusal.InvalidHeaderValue);
     }
-    [Fact] void should_refuse_65_headers()
+    [Fact]
+    void should_refuse_65_headers()
     {
         for (var index = 0; index < 62; index++) request.Headers.Add($"x-ms-client-principal-extra-{index}", "v");
         Canonicalize();
         accepted.ShouldBeFalse();
         refusal.ShouldEqual(ForwardedIdentityRefusal.TooManyHeaders);
     }
-    [Fact] void should_refuse_an_oversized_canonical_input()
+    [Fact]
+    void should_refuse_an_oversized_canonical_input()
     {
         request.Headers.Add("x-ms-client-principal-extra", new string('x', 32768));
         Canonicalize();
@@ -42,7 +44,8 @@ public class when_a_covered_header_is_invalid : given.the_published_vector
         accepted.ShouldBeFalse();
         refusal.ShouldEqual(ForwardedIdentityRefusal.IncompleteIdentity);
     }
-    [Fact] void should_refuse_lowercase_methods()
+    [Fact]
+    void should_refuse_lowercase_methods()
     {
         request.Method = new("post");
         Canonicalize();

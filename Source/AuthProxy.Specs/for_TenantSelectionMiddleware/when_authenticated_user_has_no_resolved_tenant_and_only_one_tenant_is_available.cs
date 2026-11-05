@@ -56,7 +56,8 @@ public class when_authenticated_user_has_no_resolved_tenant_and_only_one_tenant_
             _errorPageProvider,
             new MemoryCache(new MemoryCacheOptions()),
             given.signed_selected_tenant_cookies.Instance,
-            Substitute.For<ILogger<TenantSelectionMiddleware>>());
+            Substitute.For<ILogger<TenantSelectionMiddleware>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";

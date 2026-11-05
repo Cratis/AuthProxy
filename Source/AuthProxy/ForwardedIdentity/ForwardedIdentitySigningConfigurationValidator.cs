@@ -17,13 +17,11 @@ public sealed class ForwardedIdentitySigningConfigurationValidator : IValidateOp
         {
             Validate(service.ForwardedIdentity, $"{C.AuthProxy.SectionKey}:Services:{serviceName}", failures);
         }
-        for (var index = 0; index < options.TenantResolutions.Count; index++)
+        if (TenantSelectionMiddleware.TryGetSelectionOptions(options, out var selection))
         {
-            var resolution = options.TenantResolutions[index];
-            if (resolution.Strategy == C.TenantSourceIdentifierResolverType.Selection && resolution.Options is Tenancy.SelectionOptions selection)
-            {
-                Validate(selection.ForwardedIdentity, $"{C.AuthProxy.SectionKey}:TenantResolutions:{index}:Options", failures);
-            }
+            var resolution = options.TenantResolutions.First(resolution => resolution.Strategy == C.TenantSourceIdentifierResolverType.Selection);
+            var index = options.TenantResolutions.IndexOf(resolution);
+            Validate(selection.ForwardedIdentity, $"{C.AuthProxy.SectionKey}:TenantResolutions:{index}:Options", failures);
         }
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
