@@ -6,6 +6,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
@@ -69,6 +70,7 @@ public static class IngressExtensions
 
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardedIdentitySigningConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SignInCallbackHostConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ClientCredentialsConfigurationValidator>();
