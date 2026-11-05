@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -17,6 +18,7 @@ namespace Cratis.AuthProxy.Security.given;
 public sealed class ForwardedIdentityOrigin : IAsyncDisposable
 {
     readonly WebApplication _app;
+    bool _tls;
 
     ForwardedIdentityOrigin(WebApplication app, string audience, string keyId, byte[] secret)
     {
@@ -36,7 +38,9 @@ public sealed class ForwardedIdentityOrigin : IAsyncDisposable
     public ReadOnlyMemory<byte> Secret { get; }
 
     /// <summary>Gets the loopback URL.</summary>
-    public string BaseUrl => _app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+    public string BaseUrl => _tls
+        ? _app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single().Replace("127.0.0.1", "localhost", StringComparison.Ordinal)
+        : _app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
 
     /// <summary>Gets the wire observations.</summary>
     public ConcurrentQueue<ForwardedIdentityObservation> Received { get; } = new();
@@ -48,14 +52,16 @@ public sealed class ForwardedIdentityOrigin : IAsyncDisposable
     /// <param name="audience">The receiver audience.</param>
     /// <param name="keyId">The receiver key identifier.</param>
     /// <param name="keyByte">The repeated public test-only key byte.</param>
+    /// <param name="tls">Optional real TLS listener settings.</param>
     /// <returns>The running origin.</returns>
-    public static async Task<ForwardedIdentityOrigin> Start(string audience, string keyId, byte keyByte)
+    public static async Task<ForwardedIdentityOrigin> Start(string audience, string keyId, byte keyByte, RecordingBackendTls? tls = null)
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        if (tls is null) builder.WebHost.UseUrls("http://127.0.0.1:0");
+        else tls.Configure(builder.WebHost);
         var app = builder.Build();
-        var origin = new ForwardedIdentityOrigin(app, audience, keyId, Enumerable.Repeat(keyByte, 32).ToArray());
+        var origin = new ForwardedIdentityOrigin(app, audience, keyId, Enumerable.Repeat(keyByte, 32).ToArray()) { _tls = tls is not null };
         app.Run(async context =>
         {
             var observation = new ForwardedIdentityObservation(
@@ -64,7 +70,8 @@ public sealed class ForwardedIdentityOrigin : IAsyncDisposable
                 context.Request.Headers.ToDictionary(header => header.Key, header => header.Value.Select(value => value!).ToArray(), StringComparer.OrdinalIgnoreCase),
                 false);
             var verified = ForwardedIdentityVerifier.Verify(observation, audience, keyId, origin.Secret.ToArray());
-            origin.Received.Enqueue(observation with { Verified = verified });
+            if (tls?.CloseConnections == true) context.Response.Headers.Connection = "close";
+            origin.Received.Enqueue(observation with { Verified = verified, ClientCertificateThumbprint = context.Connection.ClientCertificate?.GetCertHashString(HashAlgorithmName.SHA256) });
             var hasIdentity = observation.Headers.Keys.Any(name => name.StartsWith("x-ms-client-principal", StringComparison.OrdinalIgnoreCase));
             if (hasIdentity && !verified)
             {

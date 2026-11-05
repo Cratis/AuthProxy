@@ -20,6 +20,16 @@ public class AuthProxy
     public static readonly TimeSpan DefaultActivityTimeout = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Gets or sets authenticated TLS settings for backend connections.
+    /// </summary>
+    public BackendTls BackendTls { get; set; } = new();
+
+    /// <summary>
+    /// Gets or sets the deployment profile. LocalDevelopment is only for developer machines.
+    /// </summary>
+    public DeploymentProfile Profile { get; set; }
+
+    /// <summary>
     /// Gets or sets the authentication configuration.
     /// </summary>
     public Authentication Authentication { get; set; } = new();

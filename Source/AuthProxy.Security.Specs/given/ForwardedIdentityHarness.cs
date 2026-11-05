@@ -30,11 +30,17 @@ public class ForwardedIdentityHarness : BearerRouteHarness
     public const string RefusedPath = "/api/unsignable";
 
     /// <summary>Initializes a new instance of the <see cref="ForwardedIdentityHarness"/> class.</summary>
-    public ForwardedIdentityHarness()
+    public ForwardedIdentityHarness() : this(null)
     {
-        ApplicationOrigin = ForwardedIdentityOrigin.Start("signed-backend", "active-1", 42).GetAwaiter().GetResult();
-        Other = ForwardedIdentityOrigin.Start("other-backend", "other-1", 43).GetAwaiter().GetResult();
-        Tenants = ForwardedIdentityOrigin.Start("tenant-backend", "tenants-1", 44).GetAwaiter().GetResult();
+    }
+
+    /// <summary>Initializes independently verifying origins with optional TLS.</summary>
+    /// <param name="tls">The origins' TLS listener settings.</param>
+    protected ForwardedIdentityHarness(RecordingBackendTls? tls)
+    {
+        ApplicationOrigin = ForwardedIdentityOrigin.Start("signed-backend", "active-1", 42, tls).GetAwaiter().GetResult();
+        Other = ForwardedIdentityOrigin.Start("other-backend", "other-1", 43, tls).GetAwaiter().GetResult();
+        Tenants = ForwardedIdentityOrigin.Start("tenant-backend", "tenants-1", 44, tls).GetAwaiter().GetResult();
     }
 
     /// <summary>Gets the signed application's independently verifying origin.</summary>
@@ -69,6 +75,7 @@ public class ForwardedIdentityHarness : BearerRouteHarness
         settings[$"{root}:Services:app:Hosts:0"] = SignedHost;
         settings[$"{root}:Services:app:Backend:BaseUrl"] = ApplicationOrigin.BaseUrl + "/base";
         settings[$"{root}:Services:app:Frontend:BaseUrl"] = ApplicationOrigin.BaseUrl + "/base";
+        settings[$"{root}:Profile"] = nameof(C.DeploymentProfile.LocalDevelopment);
         settings[$"{root}:Services:app:IdentityVerification"] = nameof(C.IdentityVerificationMode.Required);
         for (var index = 0; index < 3; index++) settings[$"{root}:Services:app:BearerRoutes:{index}:AcceptWithoutIdentityVerification"] = "true";
         settings[$"{root}:Services:app:AnonymousPaths:0"] = AnonymousPath;

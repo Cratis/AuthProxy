@@ -10,11 +10,13 @@ namespace Cratis.AuthProxy.Security.given;
 /// <param name="Path">The request path.</param>
 /// <param name="QueryString">The query string, including the leading <c language="text">?</c> when present.</param>
 /// <param name="Headers">Every header the origin received, keyed case-insensitively.</param>
+/// <param name="ClientCertificateThumbprint">The handshake client certificate's SHA-256 fingerprint.</param>
 public sealed record ForwardedRequest(
     string Method,
     string Path,
     string QueryString,
-    IReadOnlyDictionary<string, string> Headers)
+    IReadOnlyDictionary<string, string> Headers,
+    string? ClientCertificateThumbprint = null)
 {
     /// <summary>
     /// Gets whether the origin received the named header.

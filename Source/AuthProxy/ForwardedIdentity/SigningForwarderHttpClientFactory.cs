@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.BackendHops;
 using Yarp.ReverseProxy.Forwarder;
 
 namespace Cratis.AuthProxy.ForwardedIdentity;
@@ -8,7 +9,8 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <summary>Preserves YARP's transport configuration while signing at the final send boundary.</summary>
 /// <param name="logger">The YARP client-factory logger.</param>
 /// <param name="signer">The v1 signer.</param>
-internal sealed class SigningForwarderHttpClientFactory(ILogger<ForwarderHttpClientFactory> logger, IForwardedIdentitySigner signer) : ForwarderHttpClientFactory(logger)
+/// <param name="tlsPolicy">The backend TLS policy.</param>
+internal sealed class SigningForwarderHttpClientFactory(ILogger<ForwarderHttpClientFactory> logger, IForwardedIdentitySigner signer, BackendTlsHttpClientPolicy tlsPolicy) : ForwarderHttpClientFactory(logger)
 {
     readonly ILogger _logger = logger;
 
@@ -20,6 +22,7 @@ internal sealed class SigningForwarderHttpClientFactory(ILogger<ForwarderHttpCli
         handler.KeepAlivePingDelay = TimeSpan.FromMinutes(1);
         handler.KeepAlivePingTimeout = TimeSpan.FromMinutes(2);
         handler.ConnectTimeout = TimeSpan.FromMinutes(3);
+        tlsPolicy.Apply(handler);
     }
 
     /// <inheritdoc/>

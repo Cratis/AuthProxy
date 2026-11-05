@@ -4,6 +4,7 @@
 using Cratis.AuthProxy.Admission;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BackendHops;
 using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.ForwardedIdentity;
@@ -68,6 +69,7 @@ public static class IngressExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        builder.Services.AddBackendTls();
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardedIdentitySigningConfigurationValidator>();
@@ -92,7 +94,7 @@ public static class IngressExtensions
         // it, to any host reachable from inside. Declared here, ahead of every AddHttpClient in the pipeline,
         // so a client that genuinely needs to follow a redirect can still say so with a primary handler of
         // its own and be the only one that does.
-        builder.Services.ConfigureHttpClientDefaults(defaults => defaults.ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false }));
+        builder.Services.ConfigureHttpClientDefaults(defaults => defaults.ConfigurePrimaryHttpMessageHandler(services => services.GetRequiredService<BackendTlsHttpClientPolicy>().CreateHandler()));
 
         builder.Services.AddHttpClient();
         builder.Services.AddSingleton<ITenantVerifier, TenantVerifier>();

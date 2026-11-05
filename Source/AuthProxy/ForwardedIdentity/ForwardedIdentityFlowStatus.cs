@@ -9,4 +9,8 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <param name="IsSigned">Whether signing is configured.</param>
 /// <param name="KeyId">The public key identifier.</param>
 /// <param name="Audience">The receiving audience.</param>
-public sealed record ForwardedIdentityFlowStatus(ForwardedIdentityFlow Flow, string? ServiceName, bool IsSigned, string? KeyId, string? Audience);
+public sealed record ForwardedIdentityFlowStatus(ForwardedIdentityFlow Flow, string? ServiceName, bool IsSigned, string? KeyId, string? Audience)
+{
+    /// <summary>Gets the configured transport protection for this flow.</summary>
+    public BackendHops.BackendHopTransport Transport { get; init; }
+}
