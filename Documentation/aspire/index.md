@@ -5,26 +5,6 @@ description: "Host AuthProxy in a .NET Aspire app model as a container or projec
 
 # Aspire Hosting Integration
 
-## Canonical provider identity
-
-Use the canonical provider helpers when every downstream identity path must use one explicitly selected
-provider subject:
-
-```csharp
-authProxy.WithCanonicalOidcProvider(
-    "Microsoft Entra",
-    OidcProviderType.Microsoft,
-    "https://login.microsoftonline.com/<tenant-id>/v2.0",
-    clientId,
-    clientSecret,
-    "entra-workforce",
-    "oid");
-```
-
-For OAuth providers, `WithCanonicalOAuthProvider` additionally requires the explicit issuer assigned to the
-authenticated user-information flow. The `WithOidcProvider` and `WithOAuthProvider` helpers retain legacy
-identity behavior.
-
 The `Cratis.AuthProxy.Aspire` NuGet package adds first-class .NET Aspire support for AuthProxy.
 Instead of configuring environment variables by hand, you wire up authentication, tenancy, and
 service routing with a concise fluent API in your `AppHost`.
@@ -43,14 +23,7 @@ This is the typical path for external consumers who run AuthProxy from Docker Hu
 var authproxy = builder.AddAuthProxy("authproxy", tag: "latest")
     .WithHttpEndpoint(port: 8080)
     .WithBackend("main", apiResource)
-    .WithFrontend("main", webResource)
-    .WithOidcProvider(
-        "Microsoft",
-        OidcProviderType.Microsoft,
-        authority: "https://login.microsoftonline.com/<tenant-id>/v2.0",
-        clientId: "<client-id>",
-        clientSecret: "<client-secret>")
-    .WithHostTenantResolution();
+    .WithFrontend("main", webResource);
 ```
 
 `AddAuthProxy` creates an `AuthProxyResource` backed by the `cratis/authproxy` Docker Hub image.
@@ -70,6 +43,42 @@ var authproxy = builder.AddProject<Projects.AuthProxy>("authproxy")
 
 All `With*` methods work on any `IResourceBuilder<T> where T : IResourceWithEnvironment`,
 so you can mix container and project resources freely.
+
+## Provider choices
+
+Once the proxy resource is registered, configure its authentication provider and tenant resolution. For
+example, this uses the OIDC helper with host-based tenant resolution:
+
+```csharp
+authproxy
+    .WithOidcProvider(
+        "Microsoft",
+        OidcProviderType.Microsoft,
+        authority: "https://login.microsoftonline.com/<tenant-id>/v2.0",
+        clientId: "<client-id>",
+        clientSecret: "<client-secret>")
+    .WithHostTenantResolution();
+```
+
+## Canonical provider identity
+
+Use the canonical provider helpers when every downstream identity path must use one explicitly selected
+provider subject:
+
+```csharp
+authProxy.WithCanonicalOidcProvider(
+    "Microsoft Entra",
+    OidcProviderType.Microsoft,
+    "https://login.microsoftonline.com/<tenant-id>/v2.0",
+    clientId,
+    clientSecret,
+    "entra-workforce",
+    "oid");
+```
+
+For OAuth providers, `WithCanonicalOAuthProvider` additionally requires the explicit issuer assigned to the
+authenticated user-information flow. The `WithOidcProvider` and `WithOAuthProvider` helpers retain legacy
+identity behavior.
 
 ---
 
