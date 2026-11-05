@@ -5,9 +5,10 @@ description: "Run AuthProxy on Azure Container Apps with external ingress in fro
 
 # AuthProxy on Azure Container Apps
 
-AuthProxy runs on Container Apps as one container app with **external** ingress, in front of backends and
-frontends that are container apps with **internal** ingress. Read the [overview](index.md) first: it covers
-the Entra registration and the settings both platforms share.
+Use this recipe for AuthProxy with **external** ingress and backend/frontend container apps with
+**internal** ingress. Complete the Entra registration and shared configuration in the [overview](index.md)
+first. Before creating the apps, choose which workloads belong in the environment: that choice determines
+who can call the backends directly, not just where the containers run.
 
 The decision that matters here is how much you trust the other apps in the environment. Internal ingress does
 not mean "reachable only by AuthProxy". See [Isolating backends](#isolating-backends).
@@ -15,6 +16,20 @@ not mean "reachable only by AuthProxy". See [Isolating backends](#isolating-back
 ---
 
 ## Create the apps
+
+Use an Azure CLI session signed in to the intended subscription. The commands assume an existing resource
+group (`$rg`) and Container Apps environment (`$env`), the Entra directory/application IDs
+(`$directoryTenantId`, `$clientId`), and the client-secret URI (`$secretUri`). Have the storage account and
+vault names (`$account`, `$vault`) ready, with the blob container and RSA key from the shared
+[Data Protection setup](index.md#data-protection-keys). Deploy the internal backend and frontend before
+creating AuthProxy, and obtain their addresses (`$backendFqdn`, `$frontendFqdn`) as shown under
+[Service addresses](#service-addresses). Keep untrusted workloads in a different environment, following
+[Isolating backends](#isolating-backends).
+
+The command below uses `Mode=TrustAny` and `ForwardLimit=1`. Use that combination only when the platform
+ingress is the only peer that can connect to the replica; read [Trusted proxies](#trusted-proxies) before
+applying it. If you add an upstream proxy, keep the limit at one until the boundary and
+[direct-origin spoofed-header check](#adding-an-upstream-proxy) described below are in place.
 
 Use a **user-assigned managed identity** for AuthProxy. Its Key Vault secret reference and its storage and
 vault role assignments all have to exist before the app starts, and a system-assigned identity does not exist
@@ -27,7 +42,11 @@ identityClientId=$(az identity show --resource-group $rg --name id-authproxy --q
 ```
 
 Give the identity the `Key Vault Secrets User` role on the client secret, the `Key Vault Crypto User` role on
-the Data Protection key, and `Storage Blob Data Contributor` on the blob container. Then create AuthProxy:
+the Data Protection key, and `Storage Blob Data Contributor` on the blob container. Before creating
+AuthProxy, complete the [tenant-resolution and backend-admission prerequisites](index.md#point-authproxy-at-your-services).
+Include your application's chosen tenant-resolution settings and explicit Required verification setting
+in the environment variables supplied at creation. The block below supplies neither a tenant strategy
+nor a backend admission implementation, so it is not sufficient on its own:
 
 ```bash
 az containerapp create --resource-group $rg --name authproxy --environment $env \
@@ -139,9 +158,10 @@ containers:
           port: 9110
 ```
 
-Apply it by updating the app with a YAML definition that carries this `probes` list. Readiness runs the Data
-Protection round trip, so a replica that cannot load the key ring from storage is kept out of rotation.
-Probe port 9110 matches `Management__Port` above.
+Apply the `probes` list through the app's YAML definition. Port 9110 matches `Management__Port` above.
+Readiness performs a Data Protection round trip; it can report a key-ring problem, but it does not call
+your backends or try an Entra sign-in. Keep the direct-access and signed-in checks at the end of this
+recipe even when readiness succeeds.
 
 `Management__BindAddress=0.0.0.0` is needed because the default is loopback, which a probe sent to the
 replica from outside the container cannot reach. The management port is not the ingress target port, so

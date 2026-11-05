@@ -1,25 +1,23 @@
 ---
-title: "Sign-in Callback"
-description: "Have AuthProxy tell an application, server to server, when a user signs in and when a returning user's session makes its first request."
+title: "AuthProxy sign-in callbacks for service activity"
+description: "Configure per-service AuthProxy callbacks for sign-ins and returning users, with best-effort delivery, identity headers, and receiver trust checks."
 ---
 
-# Sign-in Callback
+<a id="sign-in-callback"></a>
 
-A service can ask AuthProxy to call it back when a user signs in, and again when a user comes back with a session
-that already exists. The application learns who is active ("last seen") and can run first-request work without
-detecting a first request itself.
+Cratis AuthProxy can notify a service's backend when a user signs in or returns with an existing browser session.
+Configure a per-service `SignInCallback` to update activity records or start per-user work without detecting
+returning users in every application. Delivery runs in the background, so the browser request does not wait for it.
 
-It is **off by default**. A service that declares no `SignInCallback` is never called.
-
-This is not the same as the [sign-in notification](./sign-in.md). The notification is one proxy-wide endpoint that
-reports a sign-in together with the client's location and browser. The sign-in callback is declared **per service**,
-presents the user the way every proxied request does, and also reports returns.
+A service without a `SignInCallback` section receives no callbacks. If you need one application endpoint to record
+completed sign-ins with the client's location and browser, use the proxy-wide [sign-in notification](./sign-in.md).
+That notification is awaited during sign-in; service callbacks run independently in the background.
 
 ---
 
 ## Configuration
 
-Declare the callback on the service it is for:
+Add `SignInCallback` to a service that declares a `Backend`. AuthProxy appends `Path` to that backend's `BaseUrl`:
 
 ```json
 {
@@ -48,9 +46,10 @@ Declare the callback on the service it is for:
 | `Timeout` | `00:00:05` | How long AuthProxy waits for the service to answer. Must be above zero and at most one minute. |
 | `Secret` | empty | A shared secret sent in a header, so the service can tell AuthProxy from any other caller on its network. Supply it from a secret store or the environment, never from a committed file. |
 
-The service must declare a `Backend`: the call goes to the same internal address AuthProxy proxies requests to.
-A configuration that cannot work — a missing path, a relative path, a non-positive interval or timeout, or no
-backend — stops AuthProxy at startup with a message that names the setting.
+A frontend-only service cannot receive a callback. `Path` must start with a single `/` and cannot contain a host,
+query, fragment, backslash, whitespace, or control character. It selects a path on the declared backend, not an
+independent destination. `Interval` must be greater than zero, and `Secret` cannot contain control characters.
+Invalid callback configuration stops AuthProxy at startup with a message that names the setting.
 
 ---
 
@@ -58,16 +57,21 @@ backend — stops AuthProxy at startup with a message that names the setting.
 
 | Kind | When |
 |---|---|
-| `SignedIn` | Right after an identity-provider callback succeeds and a fresh session is established. Always sent, however recently the user signed in before. |
+| `SignedIn` | Queued when a primary identity-provider sign-in completes for the service, however recently the user signed in before. |
 | `Returned` | On the first request a user's existing session makes to the service, and then at most once per `Interval` for that user and service. |
 
-A `Returned` callback is not sent for a request that is not a browser session (a bearer token, a machine
-client), for an on-behalf session, for an unauthenticated request, or for a request AuthProxy refuses. A sign-in
+Only a browser cookie session produces a `Returned` callback. Bearer-token and machine-to-machine requests,
+on-behalf sessions, unauthenticated requests, and requests AuthProxy refuses do not count as returns. A sign-in
 resets the interval, so the request that follows a `SignedIn` is not also reported as `Returned`.
 
-The sign-in is attributed to the service the provider callback request resolves to (by host, then by the single or
-default service). When the callback runs on a shared [callback host](./sign-in.md#running-the-handshake-on-one-host) that does not resolve to a
-service, no `SignedIn` is sent; the user's first proxied request reports `Returned` instead.
+The interval starts at the last `SignedIn` or `Returned` notification attempt. Requests within that interval do
+not restart it. AuthProxy tracks each user separately for each service, so visiting one service does not suppress
+callbacks to another.
+
+AuthProxy attributes the sign-in to the service matched by the provider callback request under the normal
+[service-routing rules](./services.md). If a shared [callback host](./sign-in.md#running-the-handshake-on-one-host)
+does not resolve to a service, no `SignedIn` is queued; the user's first proxied request to a service with a
+callback reports `Returned` instead.
 
 ---
 
@@ -79,7 +83,7 @@ AuthProxy sends one `POST` to `{Backend.BaseUrl}{Path}`.
 
 | Header | Value |
 |---|---|
-| `x-cratis-sign-in-callback` | The kind: `SignedIn` or `Returned`. Marks the call as AuthProxy's own. |
+| `x-cratis-sign-in-callback` | The kind: `SignedIn` or `Returned`. Identifies a callback but is not a credential. |
 | `x-cratis-sign-in-callback-secret` | The configured `Secret`. Sent only when one is configured. |
 | `x-ms-client-principal`, `x-ms-client-principal-id`, `x-ms-client-principal-name` | The user, exactly as on a proxied request. |
 | `x-cratis-tenant-id`, `Tenant-ID` | The resolved tenant. Sent only when a tenant resolved. |
@@ -108,26 +112,35 @@ value as `x-ms-client-principal-id`. Any `2xx` answer counts as accepted; the re
 
 ## Trust
 
-The callback arrives from AuthProxy over the internal network, the same way proxied requests do. Two things let the
-receiver rely on it:
+The callback marker identifies the callback kind; it does not authenticate the sender. AuthProxy strips every
+inbound header that starts with `x-cratis-sign-in-callback`, including the secret header, before forwarding a
+client request. That prevents a caller from supplying those headers through the proxy, but it does not protect
+a backend that accepts direct requests.
 
-- **The marker headers cannot be forged through the proxy.** AuthProxy strips every inbound header that starts with
-  `x-cratis-sign-in-callback`, so a browser that posts to the callback path through the proxy cannot present the
-  marker or the secret.
-- **The secret covers the network.** Anything that can reach the service directly could still send the marker.
-  Configure a `Secret` and have the service reject a call whose `x-cratis-sign-in-callback-secret` does not match, compared
-  in constant time. Without a secret the service relies on network isolation alone.
+Restrict backend access to the proxy, as you would when trusting ordinary identity headers. If other callers can
+reach the backend directly, configure `Secret` through a secret store or environment variable. Have the receiver
+reject a missing or incorrect `x-cratis-sign-in-callback-secret` before acting, using a constant-time comparison.
+Without a secret, the receiver relies on network isolation alone. Keep the secret out of committed files and
+protect the connection that carries it.
 
 ---
 
 ## Delivery guarantees
 
-- **It never blocks or fails the user's request.** The callback is queued and sent from a background worker with the
-  configured timeout. A failure is logged — never with the secret or the user's identity — and the request carries on.
-- **It is at-least-once on a best-effort basis, and can be missed.** The queue is in memory and bounded. When a service
-  stops answering and the queue fills, new callbacks are dropped and logged. A restart loses what was queued.
-- **The receiver must be idempotent.** What AuthProxy remembers per user and service is held in memory, per replica,
-  and is lost on restart. With several replicas, or after a restart, a service can receive the same `Returned` more than
-  once within an interval.
+Delivery is best-effort, not at-least-once. AuthProxy queues callbacks in memory and sends them from background
+workers with the configured timeout. A failed, timed-out, or non-successful attempt is logged without retry.
+When the bounded queue is full, AuthProxy logs and drops the new callback. A restart loses queued callbacks.
+Callback failures do not block or fail the user's sign-in or proxied request.
 
-No new database is involved, and there are no metrics for it beyond the log.
+The receiver must also tolerate duplicates. AuthProxy remembers users in memory on each replica, and that state
+is lost on restart. With several replicas, or after a restart, a service can receive the same `Returned` more
+than once within an interval. Make the receiver idempotent: processing a duplicate must not repeat a side effect
+that should happen only once.
+
+A callback may arrive after the user's request reaches the backend, or never arrive at all. Do not make serving
+that request depend on callback delivery. A failed or dropped callback does not reset the interval, so the next
+request does not trigger an immediate retry.
+
+Use the callback logs to investigate delivery: they report failures, timeouts, refused responses, and full-queue
+drops without including the configured secret or identity payload. There is no persistent delivery store or
+callback-specific metrics surface.

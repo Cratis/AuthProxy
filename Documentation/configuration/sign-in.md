@@ -1,37 +1,33 @@
 ---
-title: "Sign-in Notifications"
-description: "Have AuthProxy notify your application over a service-to-service back channel each time a user actually signs in through an identity provider."
+title: "AuthProxy sign-in notifications and receiver verification"
+description: "Configure AuthProxy to report completed sign-ins to your application, including client metadata, delivery behavior, and signed-notification verification."
 ---
 
-# Sign-in Notifications
+<a id="sign-in-notifications"></a>
 
-AuthProxy can notify the application every time a user **actually signs in** — that is, when a signed-out
-user completes an interactive identity-provider login and a fresh session is established. The application can
-then record the sign-in, for example to alert the user of a new sign-in from an unfamiliar location or device.
+Cratis AuthProxy can post completed primary sign-ins to an application endpoint so your application can record
+sign-in activity or alert users to an unfamiliar location or device. Configure `SignIn.NotifyUrl` to receive
+identity details, the client's IP address, and browser metadata over a server-to-server connection.
 
-The notification is a service-to-service back-channel, mirroring the [invite exchange](./lobby/invitation-to-organization.md)
-and the [credential link callback](./link.md): AuthProxy `POST`s a small JSON payload to a configured
-application endpoint.
-
-To tell one service about its users instead — including when a returning user's session makes its first request —
-use the per-service [sign-in callback](./sign-in-callback.md).
+Like the [invite exchange](./lobby/invitation-to-organization.md) and [credential link callback](./link.md),
+this connection carries a JSON payload from AuthProxy to your application. The receiver decides what to record
+or act on. To notify individual services about sign-ins and returning users instead, use the per-service
+[sign-in callback](./sign-in-callback.md).
 
 ---
 
 ## When it fires
 
-The notification fires **only on a genuine logged-out → signed-in transition**:
+AuthProxy sends the notification when it accepts a new primary authentication ticket from an identity provider
+in `OnTicketReceived`. For example, a signed-out user follows a login redirect, authenticates, and returns with
+a fresh ticket. Ordinary proxied requests that reuse a session cookie do not send notifications.
 
-- ✅ A signed-out user is redirected to an identity provider, authenticates, and returns with a fresh ticket.
-- ❌ An already-authenticated user making ordinary proxied requests — the existing session cookie is reused,
-  no provider round-trip happens, and no notification is sent.
-- ❌ The [credential-linking](./link.md) flow — that authenticates a *second* provider without establishing a
-  new primary session, so it is never reported as a sign-in.
+The [credential-linking](./link.md) flow authenticates a second provider without establishing a new primary
+session, so it does not send a sign-in notification.
 
-Technically, AuthProxy hooks the provider **callback** (`OnTicketReceived`), which the framework raises only
-when a new authentication ticket is delivered from a provider — not when an existing session is validated.
-That is what scopes the event to real sign-ins rather than every request. A notification failure never breaks
-the sign-in: the call is best-effort and any error is logged and swallowed.
+AuthProxy awaits the notification request during sign-in. A slow receiver can therefore delay completion, unlike
+the background per-service callback. A failed request or non-success response is logged without preventing the
+sign-in, and AuthProxy does not retry it. Treat this as a best-effort activity signal, not a complete sign-in ledger.
 
 ---
 
@@ -69,20 +65,24 @@ subject and `identityProvider` becomes the same compatibility value as `provider
 }
 ```
 
-- **Identity fields** — legacy providers select `subject` and `identityProvider` from the freshly
-  authenticated principal. Canonical providers send the complete `(providerKey, issuer, subject)` tuple.
-  Consumers must bind all three tuple components; neither `subject` alone nor `identityProvider` is a stable
-  cross-provider account key.
-- **`ipAddress`** — the client IP, taken from the left-most `X-Forwarded-For` entry (falling back to the
-  connection's remote address).
-- **`location`** — a best-effort, coarse location. See [Approximate location](#approximate-location) below.
-- **`browser`** / **`operatingSystem`** — parsed from the `User-Agent` header with a lightweight built-in
-  heuristic (no third-party user-agent database). Unrecognized values are sent as empty strings rather than
-  guessed.
-- **`userAgent`** — the raw header, so the application can do its own richer parsing if it wants to.
+For legacy providers, AuthProxy reads `subject` from the freshly authenticated principal and uses the challenged
+provider's name for `identityProvider` when available, falling back to identity claims. Canonical providers send
+the complete `(providerKey, issuer, subject)` tuple. Bind all three components when identifying an account;
+neither `subject` alone nor `identityProvider` is a stable cross-provider account key.
 
-By default the notification carries **no credential** and relies on the endpoint being network-isolated (see
-[Security](#security)). Configure [the signed envelope](#the-signed-envelope) to authenticate it instead.
+The remaining fields describe the request:
+
+| Field | Meaning |
+|---|---|
+| `ipAddress` | The connection's remote IP after AuthProxy's trusted forwarded-header processing. AuthProxy does not read `X-Forwarded-For` directly for this field. |
+| `location` | A coarse location from trusted proxy headers. See [Approximate location](#approximate-location). |
+| `browser`, `operatingSystem` | Parsed from `User-Agent` by built-in heuristics, without a third-party database. Unrecognized values are empty strings. |
+| `userAgent` | The raw `User-Agent` header, available for application-side parsing. |
+
+These request details provide context, not proof of a person's location or device identity. By default the
+notification carries no credential and relies on endpoint isolation or separate authentication (see
+[Security](#security)). Configure [the signed envelope](#the-signed-envelope) to let the receiver verify AuthProxy
+as the sender and check the notification's integrity.
 
 Canonical identity is opt-in per provider, so an application migrating provider registrations must accept
 both body shapes. A notification says that a provider authenticated the tuple; it does not grant application
@@ -92,21 +92,17 @@ membership, roles, scopes, or authorization.
 
 ## Approximate location
 
-AuthProxy deliberately does **not** bundle a geo-IP database — that would be a heavy dependency and a data
-pipeline of its own. The `location` is instead derived from what is already on the request:
+AuthProxy does not perform geo-IP lookups. It reads location headers only when the request comes from a trusted
+proxy. Supported headers include Cloudflare's `CF-IPCity`, `CF-Region`, and `CF-IPCountry`, as well as
+`X-Geo-City` / `X-Geo-Region` / `X-Geo-Country` and `X-AppEngine-City` / `-Region` / `-Country`.
 
-- the resolved client IP (always sent); and
-- coarse geo headers that a fronting CDN or reverse proxy may add — Cloudflare's `CF-IPCountry`, and the
-  conventional `X-Geo-City` / `X-Geo-Region` / `X-Geo-Country` and `X-AppEngine-City` / `-Region` / `-Country`
-  headers.
+Available values are joined in city, region, country order. If no supported headers are present, or the request
+did not come from a trusted proxy, `location` is empty. The resolved IP still travels in `ipAddress`, and the
+application can use it for its own lookup if needed. Configure the fronting proxy to replace caller-supplied
+location headers before relying on them.
 
-When those headers are present, `location` is assembled as `City, Region, Country`. When they are **not**
-present, `location` is empty and only the IP travels — the application can resolve a fuller location from the
-IP itself if it needs one. This keeps AuthProxy dependency-light while still recording a genuine approximate
-location wherever the infrastructure provides one.
-
-> **Note.** The client IP and any derived location are personal data. Handle and retain them in the application
-> accordingly.
+The client IP and any derived location are personal data. Choose how the application stores them and how long
+it retains them.
 
 ---
 
@@ -137,9 +133,9 @@ posted).
 
 ### Running the handshake on one host
 
-The same `SignIn` section holds `CallbackHost`, which has nothing to do with notifications. It names the one
-host the identity-provider handshake runs on, so a deployment that serves several hosts registers a single
-callback and a single post-logout address with the provider:
+If your deployment serves several hosts, `SignIn.CallbackHost` lets their identity-provider login exchanges run
+on one host. You can then register a single callback and a single post-logout address with the provider.
+This setting controls the browser login flow, not the notification destination:
 
 ```json
 {
@@ -154,7 +150,7 @@ callback and a single post-logout address with the provider:
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `CallbackHost` | `""` | Host, with an optional port, that runs every OAuth or OIDC handshake. Empty keeps today's behavior: each host completes its own. It requires `Session:CookieDomain`, and the host has to lie inside it; AuthProxy refuses to start otherwise. |
+| `CallbackHost` | `""` | Host, with an optional port, for primary sign-in and sign-out handshakes. When empty, each host completes its own. It requires `Session:CookieDomain`, and the host must lie inside that domain; AuthProxy refuses to start otherwise. |
 
 A sign-in or sign-out that starts on another host is sent to the callback host and returns to the original
 address, which is only honored for hosts a service declares, frontends, the lobby and
@@ -166,18 +162,18 @@ Invitations, credential links and registration keep running on the host they sta
 
 ## The signed envelope
 
-Without further configuration the notification body is the *only* evidence the application has, so anything
-that can reach the endpoint chooses which user gets recorded as signed in — including the `subject`,
-`providerKey` and `issuer`. Set `Cratis:AuthProxy:SignIn:Attestation` and AuthProxy signs a short-lived RS256
-JWS over each notification and sends it as `Authorization: Bearer`.
+An unsigned body does not prove who sent it. Without endpoint isolation or separate authentication, anyone who
+can reach the receiver can choose the `subject`, `providerKey`, and `issuer` it records. Configure
+`Cratis:AuthProxy:SignIn:Attestation` to have AuthProxy send a signed envelope with each notification.
 
-**The body is unchanged.** The envelope travels in a header, so an application already consuming
-notifications keeps parsing exactly the same JSON.
+The envelope is a short-lived JSON Web Signature (JWS), signed with RSA and SHA-256 using the RS256 algorithm.
+It travels in `Authorization: Bearer`; the JSON body stays unchanged. The receiver must verify the envelope
+before acting on the body.
 
 ### What the envelope binds
 
-The envelope is a profile of [RFC 9449 (DPoP)](https://www.rfc-editor.org/rfc/rfc9449) rather than a scheme of
-its own. Six facts are bound:
+The envelope uses the method and URI claims defined by [RFC 9449 (DPoP)](https://www.rfc-editor.org/rfc/rfc9449),
+which binds a proof to an HTTP request. AuthProxy adds a body digest. The receiver checks the following bindings:
 
 | Fact | Carried by | Meaning |
 |---|---|---|
@@ -186,35 +182,36 @@ its own. Six facts are bound:
 | Route | `htm`, `htu` | the method and target URI of the request it accompanies |
 | Body | `body_hash` | base64url SHA-256 of the exact bytes posted |
 | Time | `iat`, `nbf`, `exp` | the window it is valid in |
-| Replay | `jti` | a random 256-bit identifier, unique per notification |
+| Replay | `jti` | a random 256-bit identifier the receiver uses to detect reuse |
 
-A `purpose` claim of `sign-in-notification` separates the envelope from every other assertion AuthProxy signs,
-so an invitation attestation can never be presented in its place.
+Require `purpose` to be `sign-in-notification` so the receiver rejects other assertions, such as invitation
+attestations, even if they use the same signing keys.
 
-Two details a verifier must implement exactly:
+The `htu` claim follows RFC 9449: it contains the target URI without query or fragment. Compare it against the
+request URI with those parts removed. With `Attestation` configured, AuthProxy rejects a `NotifyUrl` containing
+a query because that query would not be covered by the signature.
 
-- **`htu` follows RFC 9449** — the target URI *without* query and fragment. Compare it against the
-  query-stripped request URI, not the raw target. Because the query is deliberately outside the binding, a
-  `NotifyUrl` that carries one would be signed without it — so AuthProxy refuses to start with a query on
-  `NotifyUrl` once `Attestation` is configured. Put anything the application needs in the body instead.
-- **`body_hash` is an AuthProxy extension** — RFC 9449 defines no body digest. It uses the identical
-  construction to that specification's `ath` claim: unpadded base64url of the SHA-256 of the raw request body.
+The `body_hash` claim is an AuthProxy extension because RFC 9449 defines no body digest. It uses the same
+construction as that specification's `ath` claim: unpadded base64url of the SHA-256 of the raw request body.
 
 ### Verifying a notification
 
 1. Reject the request outright if the `Authorization: Bearer` header is missing.
 2. Select the public key by the JWS `kid` header from your pinned key set, and require RS256.
-3. Validate `iss`, `aud`, `exp` and `nbf` with no clock skew allowance beyond your own tolerance.
+3. Require the configured `iss` and `aud`, and validate `iat`, `nbf`, and `exp` against your accepted validity window and clock-skew tolerance.
 4. Require `purpose` to be `sign-in-notification`.
 5. Compare `htm` to the request method and `htu` to the request URI with query and fragment removed.
-6. Read the raw request body **before** deserializing it, and compare `body_hash` to its SHA-256 digest.
-7. Reject a `jti` already seen inside the envelope lifetime.
+6. Read the raw request body before deserializing it. Compute its SHA-256 digest, encode it as unpadded base64url, and compare it to `body_hash`.
+7. Require `jti` and atomically record it before processing the notification. Reject a value already seen, and retain it through the accepted validity window. Receivers with multiple replicas need shared replay tracking.
 
-> **AuthProxy publishes no JWKS document.** The verifying application pins the public keys by its own
-> configuration and selects one by `kid` — the same way the invitation authority consumes invitation
-> attestations. Key rotation is therefore a coordinated configuration change on both sides.
+AuthProxy publishes no JSON Web Key Set (JWKS) document for key discovery. Configure the receiver's trusted
+public keys explicitly and select one by `kid`, as for invitation attestations. Key rotation requires coordinated
+configuration changes on both sides.
 
 ### Configuring it
+
+Configure the signing identity, audience, and active key. The PEM value below is a placeholder, not usable key
+material.
 
 ```json
 {
@@ -251,32 +248,33 @@ Two details a verifier must implement exactly:
 Supply `PrivateKeyPem` through a secret provider. AuthProxy never returns or logs it — publish only the
 matching public key to the application.
 
-**Key rotation.** Add the new key to `SigningKeys`, publish its public half to the application, then move
-`ActiveKeyId` to it. Keep the previous key configured until every envelope it signed has expired.
+To rotate keys, add the new key to `SigningKeys` and configure its public half in the application before moving
+`ActiveKeyId` to it. Keep the previous public key available to the receiver until every envelope it signed is
+outside the receiver's accepted validity window.
 
 ### Compatibility and failure behavior
 
-- **Leaving the section unset changes nothing.** No `Authorization` header is added and the body is byte-for-byte
-  what it has always been.
-- **Once configured, AuthProxy never downgrades.** If an envelope cannot be signed — unusable key material,
-  an `ActiveKeyId` naming no key — the notification is *not posted at all* and the failure is logged. A
-  sign-in is never recorded on unauthenticated evidence.
-- **Configuration is validated at startup**, so an unusable key fails the process rather than silently
-  suppressing every sign-in notification. When attestation is configured, `NotifyUrl` must also be an absolute
-  HTTPS URL (HTTP is accepted only for loopback development).
+Without an `Attestation` section, AuthProxy adds no `Authorization` header and sends the same JSON body. Once
+signing is configured, an unusable key or missing active key causes AuthProxy to log the failure and skip the
+notification. It does not fall back to an unsigned request. The user's sign-in still proceeds.
+
+AuthProxy validates signing configuration at startup, including key material and the active key identifier.
+When attestation is configured, `NotifyUrl` must be an absolute HTTPS URL without credentials, a query, or a
+fragment. HTTP is accepted only for loopback development.
 
 ---
 
 ## Security
 
-**Unsigned by default.** With no [`Attestation`](#the-signed-envelope) section the notification JSON is not
-signed and carries no credential. Point `NotifyUrl` at an internal application address that is
-**network-isolated** from public traffic, or authenticate AuthProxy separately at the application endpoint.
+With no [`Attestation`](#the-signed-envelope) section, the notification carries no credential. Point `NotifyUrl`
+at an internal endpoint isolated from public traffic, or authenticate AuthProxy separately at the receiver.
+Do not treat a request body as trusted merely because it names a provider and subject.
 
-**Signed when configured.** The envelope establishes that AuthProxy produced this exact notification, for this
-application, over this exact body, recently, and only once. Network isolation and an authenticated envelope
-are complementary — enabling one is not a reason to relax the other.
+A verified envelope establishes the notification's origin and integrity for the configured application and
+validity window. Preventing replay also requires the receiver to reject reused `jti` values; a valid signature
+alone does not make a notification single-use. Keep network isolation in place when enabling signatures.
 
-Either way, treat the identity tuple as authenticated provider metadata, then apply the application's own
-authorization policy before changing any access or membership. A verified envelope proves the notification's
-origin and integrity; it grants no membership, role, or scope.
+After authenticating the notification, apply the application's authorization policy before changing access or
+membership. The identity tuple describes the provider-authenticated account; it grants no membership, role,
+or scope. If your next task is tracking activity when an existing session returns to a service, configure the
+[per-service sign-in callback](./sign-in-callback.md) rather than adding that work to this receiver.
