@@ -6,7 +6,8 @@ namespace Cratis.AuthProxy.ForwardedIdentity.for_ForwardedIdentitySigningConfigu
 public class when_services_reuse_signing_material : given.a_signing_configuration
 {
     [Theory]
-    [InlineData("spec-backend", "active-1")]
+    [InlineData("other-audience", "active-1")]
+    [InlineData("spec-backend", "different-key-id")]
     [InlineData("other-audience", "different-key-id")]
     public void should_refuse_shared_material_and_name_only_the_two_paths(string audience, string keyId)
     {
@@ -20,7 +21,7 @@ public class when_services_reuse_signing_material : given.a_signing_configuratio
     }
 
     [Fact]
-    void should_not_treat_two_service_entries_at_the_same_url_as_one_application()
+    void should_accept_aliases_with_the_same_audience_key_id_and_material()
     {
         configuration.Services["main"].Backend = new() { BaseUrl = "https://backend.test/app" };
         configuration.Services["other"] = new()
@@ -29,6 +30,6 @@ public class when_services_reuse_signing_material : given.a_signing_configuratio
             ForwardedIdentity = settings
         };
         Validate();
-        result.Failed.ShouldBeTrue();
+        result.Succeeded.ShouldBeTrue();
     }
 }

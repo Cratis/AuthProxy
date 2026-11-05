@@ -29,7 +29,12 @@ public sealed class ForwardedIdentitySigningConfigurationValidator : IValidateOp
             if (key is null) continue;
             foreach (var existing in services)
             {
-                if (SameSecret(existing.Key, key)) failures.Add($"{existing.Path}:ForwardedIdentity; {path}:ForwardedIdentity");
+                if (SameSecret(existing.Key, key) &&
+                    (!string.Equals(existing.Key.Audience, key.Audience, StringComparison.Ordinal) ||
+                     !string.Equals(existing.Key.KeyId, key.KeyId, StringComparison.Ordinal)))
+                {
+                    failures.Add($"{existing.Path}:ForwardedIdentity; {path}:ForwardedIdentity");
+                }
             }
             services.Add((key, path, service));
         }
