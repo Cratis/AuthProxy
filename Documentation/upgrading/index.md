@@ -1,6 +1,6 @@
 ---
 title: Upgrading
-description: Changes between AuthProxy releases, compatibility transitions, and how to keep the previous behavior.
+description: Review AuthProxy upgrade changes to identity verification, tenant and service headers, session providers and upstream forwarding before deploying.
 ---
 
 Notes on releases that change what an unchanged configuration does.

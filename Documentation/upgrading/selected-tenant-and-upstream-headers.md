@@ -1,6 +1,6 @@
 ---
 title: Selected tenant and upstream headers
-description: A selected tenant is confirmed for the signed-in account before it is forwarded, services stop receiving AuthProxy's own cookies, and the caller's Authorization header is removed on session requests by default.
+description: Check AuthProxy upgrade behavior for selected tenants, proxy cookies and caller Authorization headers, including explicit forwarding configuration.
 ---
 
 ## The caller's Authorization header

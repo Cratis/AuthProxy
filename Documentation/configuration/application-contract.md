@@ -1,6 +1,6 @@
 ---
 title: "Application configuration contract"
-description: "Start AuthProxy from a Screenplay model's provider list and the values of a Cratis environment: the provider kinds, the environment keys, how secrets are read, and the invitation settings for an application's Ante."
+description: "Configure AuthProxy from Screenplay providers and Cratis environment values, including provider kinds, secret references and Ante invitation settings."
 ---
 
 # Application configuration contract
