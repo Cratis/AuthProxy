@@ -20,16 +20,47 @@ public class when_services_reuse_signing_material : given.a_signing_configuratio
         result.Failures.Single().ShouldEqual($"{C.AuthProxy.SectionKey}:Services:main:ForwardedIdentity; {C.AuthProxy.SectionKey}:Services:other:ForwardedIdentity");
     }
 
-    [Fact]
-    void should_accept_aliases_with_the_same_audience_key_id_and_material()
+    [Theory]
+    [InlineData("https://backend.test/app", "https://backend.test/app", true)]
+    [InlineData("https://BACKEND.test:443/app", "https://backend.test/app", true)]
+    [InlineData("https://backend.test", "https://backend.test/", true)]
+    [InlineData("https://backend.test/app", "https://other.test/app", false)]
+    [InlineData("https://backend.test/app", "http://backend.test/app", false)]
+    [InlineData("https://backend.test/app", "https://backend.test:444/app", false)]
+    [InlineData("https://backend.test/app", "https://backend.test/other", false)]
+    [InlineData("https://backend.test/app", "https://backend.test/APP", false)]
+    [InlineData("https://backend.test/app", "https://backend.test/app/", false)]
+    [InlineData("https://backend.test/app/", "https://backend.test/app//", false)]
+    [InlineData("", "", false)]
+    [InlineData("https://backend.test/app", "", false)]
+    [InlineData("", "https://backend.test/app", false)]
+    [InlineData("relative", "relative", false)]
+    [InlineData("ftp://backend.test/app", "ftp://backend.test/app", false)]
+    [InlineData("https://backend.test/app?target=one", "https://backend.test/app?target=one", false)]
+    [InlineData("https://backend.test/app#fragment", "https://backend.test/app#fragment", false)]
+    public void should_share_material_only_for_an_unambiguous_backend_alias(string first, string second, bool allowed)
     {
-        configuration.Services["main"].Backend = new() { BaseUrl = "https://backend.test/app" };
+        configuration.Services["main"].Backend = first.Length == 0 ? null : new() { BaseUrl = first };
         configuration.Services["other"] = new()
         {
-            Backend = new() { BaseUrl = "https://backend.test/app" },
+            Backend = second.Length == 0 ? null : new() { BaseUrl = second },
             ForwardedIdentity = settings
         };
         Validate();
-        result.Succeeded.ShouldBeTrue();
+        result.Succeeded.ShouldEqual(allowed);
+        if (!allowed)
+        {
+            result.Failures.Single().ShouldEqual($"{C.AuthProxy.SectionKey}:Services:main:ForwardedIdentity; {C.AuthProxy.SectionKey}:Services:other:ForwardedIdentity");
+        }
+    }
+
+    [Fact]
+    void should_not_infer_aliases_from_dns_discovered_replicas()
+    {
+        var backend = new C.ServiceEndpoint { BaseUrl = "https://backend.test/app", StickyRouting = new() { Enabled = true } };
+        configuration.Services["main"].Backend = backend;
+        configuration.Services["other"] = new() { Backend = backend, ForwardedIdentity = settings };
+        Validate();
+        result.Failed.ShouldBeTrue();
     }
 }

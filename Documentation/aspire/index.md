@@ -214,11 +214,11 @@ authproxy
     .WithSignedForwardingTo(apiResource);
 ```
 
-This is the recommended default setup, not an implicit effect of `WithBackend`. Use **Cratis.Arc 22.154.0 or later**, which includes the v1 verifier. An older Arc ignores the verifier settings and can trust unsigned headers instead. Deploy an AuthProxy version that supports v1 signing before enabling pairing.
+This is the recommended default setup, not an implicit effect of `WithBackend`. Use **Cratis.Arc 22.168.0 or a compatible newer version** with the v1 verifier. An older Arc ignores the verifier settings and can trust unsigned headers instead. Deploy an AuthProxy version that supports v1 signing before enabling pairing.
 
 In run mode, pairing generates a fresh random 32-byte HMAC key in a secret Aspire parameter. The dashboard masks the key; it is shared by reference between AuthProxy and the backend, never logged or persisted, and changes on each AppHost run. Each backend gets its own key, so two backends cannot sign for each other. AuthProxy sends the audience, key ID and proof; the backend accepts only verified forwarded identity, with no unsigned fallback.
 
-One call pairs a backend resource, not a service name. All `WithBackend` aliases targeting that resource share the pairing and one verifier key. Resource-based selectable-tenant endpoints on it use the same pairing, while endpoints on unpaired resources stay unsigned. Registration order does not matter: pairing can come before or after `WithBackend` and `WithSelectionTenantResolution`.
+One call pairs a backend resource, not a service name. All `WithBackend` aliases targeting that resource share the pairing and one verifier key. At startup, aliases must also have the same normalized backend destination, audience and key ID; missing or ambiguous destinations cannot share key material. Resource-based selectable-tenant endpoints on it use the same pairing, while endpoints on unpaired resources stay unsigned. Registration order does not matter: pairing can come before or after `WithBackend` and `WithSelectionTenantResolution`.
 
 ### Publish with a provisioned key
 
@@ -232,7 +232,7 @@ authproxy
     .WithSignedForwardingTo(apiResource, signingKey: apiSigningKey);
 ```
 
-Provision that parameter through your deployment's secret store with a standard-base64-encoded, freshly generated 32-byte key. The manifest contains only the parameter reference, not a generated default or key value. Provision a distinct key for each backend audience; do not reuse OIDC, Data Protection or on-behalf keys.
+The supplied parameter must be marked `secret: true`; a plain parameter is refused before pairing is configured. Provision that parameter through your deployment's secret store with a standard-base64-encoded, freshly generated 32-byte key. The manifest contains only the parameter reference, not a generated default or key value. Provision a distinct key for each backend audience; do not reuse OIDC, Data Protection or on-behalf keys.
 
 ### Override names and pair multiple proxies
 

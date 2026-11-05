@@ -29,9 +29,7 @@ public sealed class ForwardedIdentitySigningConfigurationValidator : IValidateOp
             if (key is null) continue;
             foreach (var existing in services)
             {
-                if (SameSecret(existing.Key, key) &&
-                    (!string.Equals(existing.Key.Audience, key.Audience, StringComparison.Ordinal) ||
-                     !string.Equals(existing.Key.KeyId, key.KeyId, StringComparison.Ordinal)))
+                if (SameSecret(existing.Key, key) && !IsAlias(existing.Key, key, existing.Service.Backend, service.Backend))
                 {
                     failures.Add($"{existing.Path}:ForwardedIdentity; {path}:ForwardedIdentity");
                 }
@@ -69,10 +67,33 @@ public sealed class ForwardedIdentitySigningConfigurationValidator : IValidateOp
     static bool SameSecret(ForwardedIdentitySigningKey first, ForwardedIdentitySigningKey second) =>
         CryptographicOperations.FixedTimeEquals(first.Secret.Span, second.Secret.Span);
 
+    static bool IsAlias(ForwardedIdentitySigningKey first, ForwardedIdentitySigningKey second, C.ServiceEndpoint? firstBackend, C.ServiceEndpoint? secondBackend) =>
+        string.Equals(first.Audience, second.Audience, StringComparison.Ordinal) &&
+        string.Equals(first.KeyId, second.KeyId, StringComparison.Ordinal) &&
+        SameBackend(firstBackend, secondBackend);
+
+    static bool SameBackend(C.ServiceEndpoint? first, C.ServiceEndpoint? second)
+    {
+        if (!TryGetBackendAddress(first, out var firstUri) || !TryGetBackendAddress(second, out var secondUri)) return false;
+        return SameOrigin(firstUri, secondUri) && string.Equals(firstUri.AbsolutePath, secondUri.AbsolutePath, StringComparison.Ordinal);
+    }
+
+    static bool TryGetBackendAddress(C.ServiceEndpoint? backend, out Uri address)
+    {
+        address = null!;
+
+        // DNS-discovered replicas do not identify a single destination that can establish alias ownership.
+        if (backend?.StickyRouting?.Enabled == true || !Uri.TryCreate(backend?.BaseUrl, UriKind.Absolute, out var parsed)) return false;
+        if (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps) return false;
+        if (!parsed.IsWellFormedOriginalString() || parsed.Query.Length != 0 || parsed.Fragment.Length != 0) return false;
+        address = parsed;
+        return true;
+    }
+
     static bool IsOwnBackend(ForwardedIdentitySigningKey service, ForwardedIdentitySigningKey tenant, C.ServiceEndpoint? backend, string endpoint)
     {
         if (!string.Equals(service.Audience, tenant.Audience, StringComparison.Ordinal) ||
-            !Uri.TryCreate(backend?.BaseUrl, UriKind.Absolute, out var backendUri) ||
+            !TryGetBackendAddress(backend, out var backendUri) ||
             !Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
         {
             return false;

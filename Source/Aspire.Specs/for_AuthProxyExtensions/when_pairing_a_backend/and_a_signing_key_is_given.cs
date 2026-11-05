@@ -18,6 +18,7 @@ public class and_a_signing_key_is_given : given.an_auth_proxy_and_a_backend
         _backend = await RawEnvironmentOf(_api.Resource);
     }
 
+    [Fact] void should_accept_the_secret_parameter() => _key.Secret.ShouldBeTrue();
     [Fact] void should_use_the_supplied_signer_parameter() => ReferenceEquals(_proxy[$"{SignerPrefix}__SecretBase64"], _key).ShouldBeTrue();
     [Fact] void should_use_the_supplied_verifier_parameter() => ReferenceEquals(_backend[$"{VerifierPrefix}__Keys__0__SecretBase64"], _key).ShouldBeTrue();
     [Fact] void should_not_generate_another_parameter() => _builder.Resources.OfType<ParameterResource>().Single().ShouldEqual(_key);

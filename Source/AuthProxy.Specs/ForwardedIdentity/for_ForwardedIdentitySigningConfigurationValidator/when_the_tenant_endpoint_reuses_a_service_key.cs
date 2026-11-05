@@ -42,6 +42,22 @@ public class when_the_tenant_endpoint_reuses_a_service_key : given.a_signing_con
     }
 
     [Fact]
+    void should_refuse_the_same_audience_key_id_and_material_on_another_tenant_host()
+    {
+        configuration.Services["main"].Backend = new() { BaseUrl = "https://backend.test/app" };
+        configuration.TenantResolutions =
+        [
+            new()
+            {
+                Strategy = C.TenantSourceIdentifierResolverType.Selection,
+                Options = new SelectionOptions { TenantsEndpoint = "https://other.test/app/tenants", ForwardedIdentity = settings }
+            }
+        ];
+        Validate();
+        result.Failures.Single().ShouldEqual($"{C.AuthProxy.SectionKey}:Services:main:ForwardedIdentity; {C.AuthProxy.SectionKey}:TenantResolutions:0:Options:ForwardedIdentity");
+    }
+
+    [Fact]
     void should_not_infer_backend_ownership_from_a_frontend_url()
     {
         configuration.Services["main"].Backend = new() { BaseUrl = "https://backend.test/app" };

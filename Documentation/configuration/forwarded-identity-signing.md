@@ -32,7 +32,7 @@ Supply the third property, `SecretBase64`, through your secret provider, for exa
 | `KeyId` | Case-sensitive `[A-Za-z0-9_-]{1,64}`; must identify a key provisioned at the receiver. |
 | `SecretBase64` | Strict standard base64 encoding exactly 32 random bytes, with no whitespace. |
 
-A partial or invalid block stops startup and identifies the configuration path, without printing the secret. There is no global signing key or fallback key. Each backend audience must have distinct key material. Service aliases may share material only with identical audience and key ID; sharing material across audiences or under different key IDs is refused. Startup identifies only the two configuration paths. Do not reuse OIDC, Data Protection or on-behalf assertion keys.
+A partial or invalid block stops startup and identifies the configuration path, without printing the secret. There is no global signing key or fallback key. Each backend audience must have distinct key material. Service aliases may share material only with identical audience, key ID and normalized backend destination (scheme, host, port, credentials and exact path). Missing or ambiguous destinations, including query/fragment-bearing base URLs and DNS-discovered replica routing, cannot establish alias ownership. Sharing material across audiences, under different key IDs or across destinations is refused. Startup identifies only the two configuration paths. Do not reuse OIDC, Data Protection or on-behalf assertion keys.
 
 The service block covers:
 

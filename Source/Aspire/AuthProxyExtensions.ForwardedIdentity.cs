@@ -23,6 +23,7 @@ public static partial class AuthProxyExtensions
     /// <exception cref="ForwardedIdentityAlreadyPaired">This AuthProxy has already paired this backend.</exception>
     /// <exception cref="ConflictingForwardedIdentityAudience">Another pairing uses a different audience on this backend.</exception>
     /// <exception cref="ForwardedIdentitySigningKeyNotProvisioned">No signing key was supplied outside run mode.</exception>
+    /// <exception cref="ArgumentException">The supplied signing key parameter is not marked secret.</exception>
     /// <remarks>
     /// Run mode generates a fresh in-memory key per backend, without a persisted default. Publish mode
     /// requires a provisioned secret parameter and emits only its reference. This method never logs the key.
@@ -41,6 +42,7 @@ public static partial class AuthProxyExtensions
         audience ??= backend.Resource.Name;
         keyId ??= builder.Resource.Name;
         ValidateForwardedIdentityNames(audience, keyId);
+        ValidateForwardedIdentitySigningKey(signingKey?.Resource);
 
         var annotation = builder.Resource.Annotations.OfType<AuthProxyConfigAnnotation>().SingleOrDefault();
         if (annotation?.ForwardedIdentityPairings.ContainsKey(backend.Resource) == true)
@@ -72,6 +74,14 @@ public static partial class AuthProxyExtensions
         if (keyId.Length is < 1 or > 64 || keyId.Any(character => !(character is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '_' or '-')))
         {
             throw new InvalidForwardedIdentityKeyId(keyId);
+        }
+    }
+
+    static void ValidateForwardedIdentitySigningKey(ParameterResource? signingKey)
+    {
+        if (signingKey is { Secret: false })
+        {
+            throw new ArgumentException($"Signing key parameter '{signingKey.Name}' must be secret. Declare it with secret: true.", nameof(signingKey));
         }
     }
 
