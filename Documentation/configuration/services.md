@@ -8,6 +8,8 @@ description: "Configure the services AuthProxy routes to with YARP, each with a 
 AuthProxy routes requests to one or more **services** using [YARP](https://microsoft.github.io/reverse-proxy/).
 Each service may expose a **backend** (API), a **frontend** (SPA / static assets), or both.
 
+See [Backend TLS](backend-tls.md) to configure backend client certificates, private CA trust and live rotation. Signed service backends require HTTPS and a client certificate outside the explicit local-development profile; unsigned services retain their existing transport behavior.
+
 ---
 
 ## Configuration

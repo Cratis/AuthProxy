@@ -7,6 +7,8 @@ description: Configure AuthProxy to sign outbound forwarded identity for Arc v1 
 
 AuthProxy can attach an HMAC-SHA256 proof to the identity headers it sends to a backend. Signing is **opt-in per flow**. An installation with no `ForwardedIdentity` blocks keeps its existing unsigned forwarding behavior.
 
+Signed service backends and signed tenant-list endpoints require HTTPS and a configured client certificate outside AuthProxy's explicit `LocalDevelopment` profile. Configure [Backend TLS](backend-tls.md) before enabling signing in a deployed environment. Signing protects the forwarded identity proof; it does not replace transport authentication or backend ingress restrictions. Installations that do not configure signing retain their existing transport behavior.
+
 Use an Arc receiver with the v1 contract (Arc 22.168.0 or a compatible newer version). Deploy AuthProxy signing before requiring proofs at the receiver. AuthProxy does not require an Arc package upgrade to produce this wire format.
 
 ## From Aspire

@@ -36,6 +36,8 @@
   href: services.md
 - name: Forwarded Identity Signing
   href: forwarded-identity-signing.md
+- name: Backend TLS
+  href: backend-tls.md
 - name: One Proxy, Several Hosts
   href: one-proxy-several-hosts.md
 - name: Public Application Surfaces

@@ -249,6 +249,8 @@ Both proxies must use the same audience for that backend and distinct key IDs. E
 
 Lens identity switching sends unsigned headers, so a paired backend does not accept that switched identity. Browse through AuthProxy to use the signed-in identity, or use an unpaired backend with Arc's local-development profile for identity switching. Pairing does not enable that profile. The Cratis CLI talks to Chronicle and is unaffected.
 
+In run mode, `WithSignedForwardingTo` explicitly selects AuthProxy's `LocalDevelopment` transport profile so local HTTP backends can receive signed requests without client certificates. This is separate from Arc's identity trust profile. Publishing emits no development-profile override: configure HTTPS backend URLs and [Backend TLS](../configuration/backend-tls.md) client credentials for deployed signed hops. HTTPS certificate validation remains enabled in both modes.
+
 For configuration, rotation and protocol limits, see [Forwarded Identity Signing](../configuration/forwarded-identity-signing.md) and Arc's [Signed forwarded identity](https://www.cratis.io/arc/authentication/signed-forwarded-identity/) reference. Keep TLS and backend ingress restrictions in place: anyone holding an HMAC verification key can also forge proofs.
 
 ---
