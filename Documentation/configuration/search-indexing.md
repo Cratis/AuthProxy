@@ -1,6 +1,6 @@
 ---
 title: "Search-Index Exclusion"
-description: "Opt out of search indexing for every host served by an AuthProxy deployment."
+description: "Exclude AuthProxy hosts from search indexes with SearchIndexing options, robots.txt and response headers, then verify the deployment's behavior."
 ---
 
 # Search-Index Exclusion
