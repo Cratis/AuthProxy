@@ -31,7 +31,7 @@ public class when_the_backend_certificate_is_not_authenticated
         using var server = other.Issue();
         await using var proxy = new BackendTlsHarness(certificates, new(server));
         using var client = proxy.CreateSecurityClient();
-        using var request = ForwardedIdentityHarness.Session(ForwardedIdentityHarness.SignedHost, WellKnownPaths.SelectTenant);
+        using var request = ForwardedIdentityHarness.Session(ForwardedIdentityHarness.SignedHost, WellKnownPaths.SelectTenant + "?tenantId=11111111-1111-1111-1111-111111111111");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Empty(proxy.Tenants.Received);
