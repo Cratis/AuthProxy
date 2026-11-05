@@ -9,6 +9,10 @@ AuthProxy can attach an HMAC-SHA256 proof to the identity headers it sends to a 
 
 Use an Arc receiver with the v1 contract (Arc 22.168.0 or a compatible newer version). Deploy AuthProxy signing before requiring proofs at the receiver. AuthProxy does not require an Arc package upgrade to produce this wire format.
 
+## From Aspire
+
+Use [`WithSignedForwardingTo(backend)`](../aspire/index.md#signed-forwarded-identity) to pair the AuthProxy signer and Arc verifier without hand-writing environment configuration. Run mode generates a fresh secret per backend; publishing requires an explicitly provisioned secret parameter. The pairing also configures resource-based selectable-tenant endpoints on that backend.
+
 ## Configure a service
 
 Set `Cratis:AuthProxy:Services:<name>:ForwardedIdentity`:
@@ -28,7 +32,7 @@ Supply the third property, `SecretBase64`, through your secret provider, for exa
 | `KeyId` | Case-sensitive `[A-Za-z0-9_-]{1,64}`; must identify a key provisioned at the receiver. |
 | `SecretBase64` | Strict standard base64 encoding exactly 32 random bytes, with no whitespace. |
 
-A partial or invalid block stops startup and identifies the configuration path, without printing the secret. There is no global signing key or fallback key. Each configured service must have distinct key material, even if services use the same audience or backend URL. Startup rejects shared material and identifies only the two configuration paths. Do not reuse OIDC, Data Protection or on-behalf assertion keys.
+A partial or invalid block stops startup and identifies the configuration path, without printing the secret. There is no global signing key or fallback key. Each backend audience must have distinct key material. Service aliases may share material only with identical audience and key ID; sharing material across audiences or under different key IDs is refused. Startup identifies only the two configuration paths. Do not reuse OIDC, Data Protection or on-behalf assertion keys.
 
 The service block covers:
 

@@ -89,6 +89,7 @@ Use `WithBackend` and `WithFrontend` to register the resources that AuthProxy sh
 ```csharp
 authproxy
     .WithBackend("main", apiResource)
+    .WithSignedForwardingTo(apiResource)
     .WithFrontend("main", webResource);
 ```
 
@@ -200,6 +201,55 @@ is neither is refused when the app host builds. `WithForwardLimit` is the number
 legitimately passes through, and it decides which address ends up reported as the client — see
 [Trusted Proxies](../configuration/trusted-proxies.md) for how to choose it and what an untrusted
 caller can do while it is unset.
+
+---
+
+## Signed forwarded identity
+
+Pair each Arc backend explicitly so it can verify that identity headers were set by AuthProxy:
+
+```csharp
+authproxy
+    .WithBackend("main", apiResource)
+    .WithSignedForwardingTo(apiResource);
+```
+
+This is the recommended default setup, not an implicit effect of `WithBackend`. Use **Cratis.Arc 22.154.0 or later**, which includes the v1 verifier. An older Arc ignores the verifier settings and can trust unsigned headers instead. Deploy an AuthProxy version that supports v1 signing before enabling pairing.
+
+In run mode, pairing generates a fresh random 32-byte HMAC key in a secret Aspire parameter. The dashboard masks the key; it is shared by reference between AuthProxy and the backend, never logged or persisted, and changes on each AppHost run. Each backend gets its own key, so two backends cannot sign for each other. AuthProxy sends the audience, key ID and proof; the backend accepts only verified forwarded identity, with no unsigned fallback.
+
+One call pairs a backend resource, not a service name. All `WithBackend` aliases targeting that resource share the pairing and one verifier key. Resource-based selectable-tenant endpoints on it use the same pairing, while endpoints on unpaired resources stay unsigned. Registration order does not matter: pairing can come before or after `WithBackend` and `WithSelectionTenantResolution`.
+
+### Publish with a provisioned key
+
+Publish mode never generates key material. Supply a secret parameter explicitly; without one, `WithSignedForwardingTo` throws `ForwardedIdentitySigningKeyNotProvisioned` while building the AppHost:
+
+```csharp
+var apiSigningKey = builder.AddParameter("api-signing-key", secret: true);
+
+authproxy
+    .WithBackend("main", apiResource)
+    .WithSignedForwardingTo(apiResource, signingKey: apiSigningKey);
+```
+
+Provision that parameter through your deployment's secret store with a standard-base64-encoded, freshly generated 32-byte key. The manifest contains only the parameter reference, not a generated default or key value. Provision a distinct key for each backend audience; do not reuse OIDC, Data Protection or on-behalf keys.
+
+### Override names and pair multiple proxies
+
+The audience defaults to the backend resource name; the key ID defaults to the AuthProxy resource name. Override either when provisioning names must remain stable across deployments:
+
+```csharp
+authproxy.WithSignedForwardingTo(apiResource, audience: "orders-api", keyId: "primary-proxy");
+edgeProxy.WithSignedForwardingTo(apiResource, audience: "orders-api", keyId: "edge-proxy");
+```
+
+Both proxies must use the same audience for that backend and distinct key IDs. Each call adds a separate verifier key slot without overwriting another proxy's key. In publish mode, pass each proxy's provisioned `signingKey` parameter too. A second pairing of the same proxy and backend is refused. Audiences must be nonblank, 1–128 printable ASCII characters; key IDs must match `[A-Za-z0-9_-]{1,64}`.
+
+### Lens and local development
+
+Lens identity switching sends unsigned headers, so a paired backend does not accept that switched identity. Browse through AuthProxy to use the signed-in identity, or use an unpaired backend with Arc's local-development profile for identity switching. Pairing does not enable that profile. The Cratis CLI talks to Chronicle and is unaffected.
+
+For configuration, rotation and protocol limits, see [Forwarded Identity Signing](../configuration/forwarded-identity-signing.md) and Arc's [Signed forwarded identity](https://www.cratis.io/arc/authentication/signed-forwarded-identity/) reference. Keep TLS and backend ingress restrictions in place: anyone holding an HMAC verification key can also forge proofs.
 
 ---
 
@@ -381,6 +431,8 @@ authproxy.WithSelectionTenantResolution(
 // Aspire resource reference — endpoint is resolved automatically
 authproxy.WithSelectionTenantResolution(platformApi, "/api/tenants/selectable");
 ```
+
+The resource overload is signed automatically when its resource is paired with `WithSignedForwardingTo`; the URL overload is not, so configure its `ForwardedIdentity` options explicitly.
 
 AuthProxy calls the endpoint after login and, if more than one tenant is returned, serves the
 built-in `select-tenant.html` page.  If only one tenant is returned the selection page is

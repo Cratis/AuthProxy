@@ -14,6 +14,7 @@ var web = builder.AddNpmApp("web", "../Web")
 builder.AddProject<Projects.AuthProxy>("authproxy")
     .WithHttpEndpoint(port: 8080)
     .WithBackend("main", testApp)
+    .WithSignedForwardingTo(testApp)
     .WithFrontend("main", web)
     .WithIdentityVerification("main", IdentityVerificationMode.BestEffort)
     .WaitFor(testApp);
