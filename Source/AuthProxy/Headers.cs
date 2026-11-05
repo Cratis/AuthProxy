@@ -8,6 +8,9 @@ namespace Cratis.AuthProxy;
 /// </summary>
 public static class Headers
 {
+    /// <summary>The Arc v1 signature header.</summary>
+    public const string ForwardedIdentitySignature = "x-cratis-forwarded-identity-signature";
+
     /// <summary>
     /// Microsoft Identity Platform client principal (base64 encoded JSON).
     /// </summary>
