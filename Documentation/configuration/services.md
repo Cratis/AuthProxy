@@ -42,6 +42,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `Backend` | `ServiceEndpointConfig` | `null` | API backend endpoint. |
+| `ForwardedIdentity` | `ForwardedIdentitySigning` | `null` | Opt-in Arc v1 signing for this service's proxy, bearer-route and identity-details flows. Requires `Audience`, `KeyId` and a secret-provider `SecretBase64`. Does not sign tenant-list calls. See [Forwarded identity signing](forwarded-identity-signing.md). |
 | `Frontend` | `ServiceEndpointConfig` | `null` | SPA / static-asset frontend endpoint. |
 | `Hosts` | `string[]` | `[]` | Host names (with an optional port) that route to this service. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |
 | `PathPrefix` | `string` | `""` | Path prefix that routes to this service, for example `/reporting`. See [Routing by host or path prefix](#routing-by-host-or-path-prefix). |

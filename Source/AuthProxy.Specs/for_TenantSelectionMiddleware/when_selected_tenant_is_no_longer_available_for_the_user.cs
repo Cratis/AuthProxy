@@ -55,7 +55,8 @@ public class when_selected_tenant_is_no_longer_available_for_the_user : Specific
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
             given.signed_selected_tenant_cookies.Instance,
-            Substitute.For<ILogger<TenantSelectionMiddleware>>());
+            Substitute.For<ILogger<TenantSelectionMiddleware>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = "/products";

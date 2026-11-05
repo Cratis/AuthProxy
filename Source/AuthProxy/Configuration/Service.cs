@@ -19,6 +19,11 @@ public class Service
     public static readonly TimeSpan DefaultIdentityVerificationTimeout = TimeSpan.FromSeconds(10);
 
     /// <summary>
+    /// Gets or sets optional Arc v1 signing for proxied requests, bearer routes and identity-details calls to this service.
+    /// </summary>
+    public ForwardedIdentitySigning? ForwardedIdentity { get; set; }
+
+    /// <summary>
     /// Gets or sets the backend (API) endpoint for this service.
     /// </summary>
     public ServiceEndpoint? Backend { get; set; }

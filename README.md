@@ -69,6 +69,7 @@ The `Cratis.AuthProxy.Aspire` NuGet package wires AuthProxy into a .NET Aspire A
 var authproxy = builder.AddAuthProxy("authproxy", tag: "latest")
     .WithHttpEndpoint(port: 8080)
     .WithBackend("main", apiResource)
+    .WithSignedForwardingTo(apiResource)
     .WithFrontend("main", webResource)
     .WithOidcProvider(
         "Microsoft",

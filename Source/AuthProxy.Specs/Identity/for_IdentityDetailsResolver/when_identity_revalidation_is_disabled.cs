@@ -33,7 +33,7 @@ public class when_identity_revalidation_is_disabled : Specification
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, /*lang=json,strict*/ "{\"displayName\":\"John Doe\"}")));
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>(), Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
         _context = new DefaultHttpContext();
     }
 

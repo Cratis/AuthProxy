@@ -6,6 +6,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
@@ -69,6 +70,7 @@ public static class IngressExtensions
 
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardedIdentitySigningConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SignInCallbackHostConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ClientCredentialsConfigurationValidator>();
@@ -113,6 +115,7 @@ public static class IngressExtensions
         // The same holds for the bearer-route gate: UseIngress always places it, and it hands every request on
         // untouched for a deployment that declares no bearer route.
         builder.AddBearerRoutes();
+        builder.AddForwardedIdentitySigning();
 
         // The on-behalf gate is placed by UseIngress too, and is inert until the OnBehalf section is configured.
         builder.AddActingOnBehalf();

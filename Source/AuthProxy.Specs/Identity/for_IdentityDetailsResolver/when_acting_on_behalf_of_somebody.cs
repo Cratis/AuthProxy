@@ -42,7 +42,8 @@ public class when_acting_on_behalf_of_somebody : Specification
             [],
             _memoryCache,
             Substitute.For<IIdentityAuthorizationCache>(),
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            Substitute.For<ILogger<IdentityDetailsResolver>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext { User = Sessions.ActorPrincipal() };
         _context.SetOnBehalf(new OnBehalfContext(Sessions.At(DateTimeOffset.UtcNow), Sessions.Represented(), "actor", new OnBehalfAttestations(_configuration.Monitor, TimeProvider.System)));

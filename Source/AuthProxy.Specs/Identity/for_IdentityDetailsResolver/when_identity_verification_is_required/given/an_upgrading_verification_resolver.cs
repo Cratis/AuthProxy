@@ -20,7 +20,7 @@ public class an_upgrading_verification_resolver : a_required_verification_resolv
         _authorizationCache = new IdentityAuthorizationCache(keys, configuration, Substitute.For<ILogger<IdentityAuthorizationCache>>());
         var clients = Substitute.For<IHttpClientFactory>();
         clients.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(_handler, disposeHandler: false));
-        _resolver = new IdentityDetailsResolver(configuration, clients, [], _memoryCache, _authorizationCache, _logger);
+        _resolver = new IdentityDetailsResolver(configuration, clients, [], _memoryCache, _authorizationCache, _logger, Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     protected async Task IssueCookieAndUpgrade(C.IdentityVerificationMode issuedUnder)

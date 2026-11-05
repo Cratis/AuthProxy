@@ -54,7 +54,7 @@ public class when_identity_cookie_is_already_present : Specification
         _authorizationCache = Substitute.For<IIdentityAuthorizationCache>();
         _authorizationCache.IsAuthorized(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>()).Returns(false);
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, _httpClientFactory, [], Substitute.For<IMemoryCache>(), _authorizationCache, Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, _httpClientFactory, [], Substitute.For<IMemoryCache>(), _authorizationCache, Substitute.For<ILogger<IdentityDetailsResolver>>(), Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext();
         _context.Request.Headers.Cookie = $"{Cookies.Identity}=forged-value";

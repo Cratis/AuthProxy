@@ -32,7 +32,7 @@ public class when_microservice_returns_non_success_status_code : Specification
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.BadRequest, "bad request")));
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>(), Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
         _context = new DefaultHttpContext();
     }
 

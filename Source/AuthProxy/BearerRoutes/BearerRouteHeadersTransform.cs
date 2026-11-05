@@ -24,6 +24,8 @@ public class BearerRouteHeadersTransform : RequestTransform
     {
         var headers = context.ProxyRequest.Headers;
         SpoofableHeaders.Strip(headers);
+        headers.Remove(Headers.ServiceId);
+        headers.Remove(Headers.LegacyServiceId);
         headers.Remove(Headers.TokenClientId);
         headers.Remove(Headers.TokenScope);
         headers.Remove(HeaderNames.Cookie);
@@ -54,6 +56,13 @@ public class BearerRouteHeadersTransform : RequestTransform
         if (!string.IsNullOrWhiteSpace(identity.ClientId))
         {
             headers.TryAddWithoutValidation(Headers.TokenClientId, HeaderValue.ToTransportValue(identity.ClientId));
+        }
+
+        if (context.HttpContext.Items[BearerRouteDefaults.ServiceItemKey] is string service)
+        {
+            var value = HeaderValue.ToTransportValue(service);
+            context.ProxyRequest.Headers.TryAddWithoutValidation(Headers.ServiceId, value);
+            context.ProxyRequest.Headers.TryAddWithoutValidation(Headers.LegacyServiceId, value);
         }
 
         return ValueTask.CompletedTask;

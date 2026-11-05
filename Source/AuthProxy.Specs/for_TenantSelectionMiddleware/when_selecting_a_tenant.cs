@@ -49,7 +49,8 @@ public class when_selecting_a_tenant : Specification
             Substitute.For<IErrorPageProvider>(),
             new MemoryCache(new MemoryCacheOptions()),
             given.signed_selected_tenant_cookies.Instance,
-            Substitute.For<ILogger<TenantSelectionMiddleware>>());
+            Substitute.For<ILogger<TenantSelectionMiddleware>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext();
         _context.Request.Path = WellKnownPaths.SelectTenant;

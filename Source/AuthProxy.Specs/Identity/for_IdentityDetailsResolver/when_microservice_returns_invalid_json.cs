@@ -32,7 +32,7 @@ public class when_microservice_returns_invalid_json : Specification
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, "{not-json")));
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>(), Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
         _context = new DefaultHttpContext();
     }
 

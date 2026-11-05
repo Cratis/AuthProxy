@@ -71,7 +71,8 @@ public class a_best_effort_verification_resolver : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             _authorizationCache,
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            Substitute.For<ILogger<IdentityDetailsResolver>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
         _context = new DefaultHttpContext();
     }
 

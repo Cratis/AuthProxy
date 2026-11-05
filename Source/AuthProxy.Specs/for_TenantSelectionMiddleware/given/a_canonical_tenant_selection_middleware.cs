@@ -56,7 +56,8 @@ public class a_canonical_tenant_selection_middleware : Specification
             Substitute.For<IErrorPageProvider>(),
             memoryCache,
             signed_selected_tenant_cookies.Instance,
-            Substitute.For<ILogger<TenantSelectionMiddleware>>());
+            Substitute.For<ILogger<TenantSelectionMiddleware>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     protected static ITenantResolver ResolverReflectingConfirmation()

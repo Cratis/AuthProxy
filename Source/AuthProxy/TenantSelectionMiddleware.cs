@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.Extensions.Caching.Memory;
@@ -27,6 +28,7 @@ namespace Cratis.AuthProxy;
 /// <param name="memoryCache">The memory cache used to bound how often the selected tenant is re-validated.</param>
 /// <param name="selectedTenantCookie">The selected-tenant cookie, bound to the signed-in account.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="signer">The per-flow forwarded-identity signer.</param>
 public class TenantSelectionMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
@@ -35,7 +37,8 @@ public class TenantSelectionMiddleware(
     IErrorPageProvider errorPageProvider,
     IMemoryCache memoryCache,
     Tenancy.SelectedTenantCookie selectedTenantCookie,
-    ILogger<TenantSelectionMiddleware> logger)
+    ILogger<TenantSelectionMiddleware> logger,
+    IForwardedIdentitySigner signer)
 {
     const string RevalidationCacheKeyPrefix = "TenantSelectionRevalidation";
 
@@ -155,6 +158,30 @@ public class TenantSelectionMiddleware(
             context,
             WellKnownPageNames.SelectTenant,
             StatusCodes.Status200OK);
+    }
+
+    /// <summary>Resolves the configured selection endpoint and its per-flow signing settings.</summary>
+    /// <param name="authProxyConfig">The current gateway configuration.</param>
+    /// <param name="selectionOptions">The configured selection options.</param>
+    /// <returns>Whether a usable selection endpoint exists.</returns>
+    internal static bool TryGetSelectionOptions(C.AuthProxy authProxyConfig, out Tenancy.SelectionOptions selectionOptions)
+    {
+        selectionOptions = new();
+        var selectionResolution = authProxyConfig.TenantResolutions
+            .FirstOrDefault(_ => _.Strategy == C.TenantSourceIdentifierResolverType.Selection);
+        if (selectionResolution?.Options is not Tenancy.SelectionOptions typedSelectionOptions)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(typedSelectionOptions.TenantsEndpoint)
+            || !Uri.IsWellFormedUriString(typedSelectionOptions.TenantsEndpoint, UriKind.Absolute))
+        {
+            return false;
+        }
+
+        selectionOptions = typedSelectionOptions;
+        return true;
     }
 
     static IdentityAccountTenantKey RevalidationCacheKey(IdentityAccountBinding account, string tenantId) =>
@@ -384,26 +411,6 @@ public class TenantSelectionMiddleware(
 
     bool IsSafeRelativeUrl(string? url) => RelativeRedirect.IsSameSiteRelative(url);
 
-    bool TryGetSelectionOptions(C.AuthProxy authProxyConfig, out Tenancy.SelectionOptions selectionOptions)
-    {
-        selectionOptions = new();
-        var selectionResolution = authProxyConfig.TenantResolutions
-            .FirstOrDefault(_ => _.Strategy == C.TenantSourceIdentifierResolverType.Selection);
-        if (selectionResolution?.Options is not Tenancy.SelectionOptions typedSelectionOptions)
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(typedSelectionOptions.TenantsEndpoint)
-            || !Uri.IsWellFormedUriString(typedSelectionOptions.TenantsEndpoint, UriKind.Absolute))
-        {
-            return false;
-        }
-
-        selectionOptions = typedSelectionOptions;
-        return true;
-    }
-
     /// <summary>
     /// Fetches an authoritative tenant list, distinguishing no tenant access from an unavailable endpoint.
     /// Unavailability is surfaced as HTTP 503 both during selection and when confirming a selected tenant.
@@ -420,13 +427,19 @@ public class TenantSelectionMiddleware(
             return TenantOptionsResult.NoIdentity;
         }
 
-        using var client = httpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, selectionOptions.TenantsEndpoint);
         request.SetMicrosoftIdentityHeaders(principal);
 
         HttpResponseMessage response;
         try
         {
+            var signing = signer.Sign(request, new(ForwardedIdentityFlow.TenantList, null));
+            if (signing == ForwardedIdentitySigningOutcome.Refused)
+            {
+                logger.TenantIdentityNotSigned();
+                return TenantOptionsResult.Unavailable;
+            }
+            using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
             response = await client.SendAsync(request);
         }
         catch (Exception exception)

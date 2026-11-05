@@ -12,4 +12,7 @@ public record SelectionOptions
     /// Gets the endpoint URL that returns the selectable tenant list for the authenticated user.
     /// </summary>
     public string TenantsEndpoint { get; init; } = string.Empty;
+
+    /// <summary>Gets optional Arc v1 signing for calls to the tenant-list endpoint.</summary>
+    public Configuration.ForwardedIdentitySigning? ForwardedIdentity { get; init; }
 }

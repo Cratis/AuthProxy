@@ -34,7 +34,7 @@ public class when_the_identity_details_are_too_large_for_a_cookie : Specificatio
         httpClientFactory.CreateClient(Arg.Any<string>()).Returns(
             new HttpClient(new FakeHttpMessageHandler(HttpStatusCode.OK, "{\"projectAccess\":[" + grants + "]}")));
 
-        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>());
+        _resolver = new IdentityDetailsResolver(optionsMonitor, httpClientFactory, [], Substitute.For<IMemoryCache>(), Substitute.For<IIdentityAuthorizationCache>(), Substitute.For<ILogger<IdentityDetailsResolver>>(), Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
         _context = new DefaultHttpContext();
     }
 

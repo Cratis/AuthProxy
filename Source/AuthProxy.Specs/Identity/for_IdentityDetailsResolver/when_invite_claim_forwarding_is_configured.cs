@@ -70,7 +70,8 @@ public class when_invite_claim_forwarding_is_configured : Specification
             enrichers,
             Substitute.For<IMemoryCache>(),
             Substitute.For<IIdentityAuthorizationCache>(),
-            Substitute.For<ILogger<IdentityDetailsResolver>>());
+            Substitute.For<ILogger<IdentityDetailsResolver>>(),
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
         _context = new DefaultHttpContext();
         _context.Request.Headers.Cookie = $"{Cookies.InviteToken}=invite-token";

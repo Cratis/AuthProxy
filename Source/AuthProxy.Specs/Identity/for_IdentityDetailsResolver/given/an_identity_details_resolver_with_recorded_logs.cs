@@ -46,7 +46,8 @@ public class an_identity_details_resolver_with_recorded_logs : Specification
             [],
             new MemoryCache(new MemoryCacheOptions()),
             Substitute.For<IIdentityAuthorizationCache>(),
-            _logger);
+            _logger,
+            Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
     }
 
     protected static ClientPrincipal CanonicalPrincipal(IEnumerable<ClientPrincipalClaim>? claims = null) =>
