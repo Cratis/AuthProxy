@@ -40,6 +40,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
                 var route = service.BearerRoutes[index];
                 var at = $"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.Services)}:{serviceName}:{nameof(C.Service.BearerRoutes)}:{index}";
                 ValidateRoute(at, serviceName, service, route, prefixes, metadataPaths, anonymousPaths, failures);
+                ValidateEnvironment(at, route, options.CredentialBinding, failures);
 
                 if (service.StripPathPrefix)
                 {
@@ -85,6 +86,19 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
+    }
+
+    static void ValidateEnvironment(string at, C.BearerRoute route, C.CredentialBinding binding, List<string> failures)
+    {
+        if (route.EnvironmentClaimType.Length == 0) return;
+        if (string.IsNullOrWhiteSpace(route.EnvironmentClaimType) || route.EnvironmentClaimType != route.EnvironmentClaimType.Trim())
+        {
+            failures.Add($"{at}:{nameof(C.BearerRoute.EnvironmentClaimType)} must be non-whitespace and have no surrounding whitespace.");
+        }
+        if (binding.Environment.Length == 0)
+        {
+            failures.Add($"{at}:{nameof(C.BearerRoute.EnvironmentClaimType)} requires {C.AuthProxy.SectionKey}:CredentialBinding:Environment.");
+        }
     }
 
     static void ValidateRoute(

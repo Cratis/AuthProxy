@@ -284,11 +284,44 @@ See [Error pages](error-pages.md) to override this page.
 
 ---
 
+## Credential binding
+
+A credential bound to tenant A cannot authorize a request addressing tenant B, even when the person belongs
+to both tenants. AuthProxy compares tenant identifiers exactly: it does not lowercase, trim or repair them.
+`Tenant-A` and `tenant-a` are different constraints.
+
+For browser sessions, the protected selected-tenant cookie and tenants resolved from `Claim` are credential
+constraints. An on-behalf session uses only its represented tenant, not the actor's own claims or selection.
+AuthProxy client-credentials tokens use their verified `cratis/tenant` claim; the same claim from another
+authentication scheme does not create a client-credentials binding. `Host`, `SubHost`, `Route` and `Specified`
+address the target tenant. `Default` does not: it supplies a fallback, not another credential constraint.
+
+AuthProxy refuses a mismatch with `403` and `Cache-Control: no-store` before membership lookup, tenant
+verification, namespace selection or forwarding. Its warning identifies the credential kind and redacted
+request path without logging tenant values. An unbound session can still use an addressed tenant, subject to
+the usual membership checks. Legacy unsigned selection cookies do not establish a binding; the tenant-selection
+flow confirms them as before. Switch tenants through `/.cratis/select-tenant`, rather than replaying a selection
+on another tenant's host. Invitation, registration, authentication-bootstrap and declared anonymous paths remain
+reachable before tenant selection.
+
+To isolate AuthProxy-issued credentials by resource or environment, set `Cratis:AuthProxy:CredentialBinding:Resource`
+and/or `Cratis:AuthProxy:CredentialBinding:Environment` to trusted deployment identifiers. Each defaults to an
+empty string (no declared binding). A declared value accepts letters, digits, `-`, `.`, `_` and `~`, up to 256
+characters, with no surrounding whitespace; invalid configuration prevents startup. Never derive these settings
+from caller input. Enabling or changing them signs everyone out once; restart every replica with identical
+settings. See [data-protection binding](data-protection.md#multi-replica-checklist).
+
 ## Bearer routes
 
 On a [bearer route](services.md#bearer-routes) the tenant comes from the access token alone: the claim named by
-`TenantClaimType` (`tid` by default). None of the resolution strategies above run, the tenant-selection cookie is
-never read and the tenant-selection page is never served.
+`TenantClaimType` (`tid` by default). `Host`, `SubHost` and `Route` resolutions constrain the addressed target:
+a token naming another tenant is refused with `403`. `Specified` and `Default` do not override or constrain the
+token tenant on bearer routes. The tenant-selection cookie is never read and the tenant-selection page is never served.
+
+A route can also set `EnvironmentClaimType`, for example `env`. This requires a declared
+`CredentialBinding:Environment` at startup and exactly one non-empty claim value on each token, matching that
+environment exactly. Missing or mismatched values produce `403`; case and whitespace variants are not repaired.
+The route's `Audiences` continue to enforce the resource constraint through the token's `aud` claim.
 
 - A token that does not carry exactly one tenant, or carries one that is not made of letters, digits, `-`, `.`,
   `_` or `~` (at most 256 characters), is refused with `403`. There is no fallback to a default tenant.

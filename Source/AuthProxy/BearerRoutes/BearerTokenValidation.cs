@@ -19,6 +19,11 @@ public sealed record BearerTokenValidation(
     string? Reason = null)
 {
     /// <summary>
+    /// Gets the environment constraint, when the route requires one.
+    /// </summary>
+    public string? Environment { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the token was accepted.
     /// </summary>
     public bool Succeeded => Status == BearerTokenValidationStatus.Succeeded;
@@ -31,6 +36,16 @@ public sealed record BearerTokenValidation(
     /// <returns>The result.</returns>
     public static BearerTokenValidation Success(ClaimsPrincipal principal, string tenantId) =>
         new(BearerTokenValidationStatus.Succeeded, principal, tenantId);
+
+    /// <summary>
+    /// Creates a successful result with an environment constraint.
+    /// </summary>
+    /// <param name="principal">The principal to forward.</param>
+    /// <param name="tenantId">The tenant from the token.</param>
+    /// <param name="environment">The environment constraint, when the route requires one.</param>
+    /// <returns>The result.</returns>
+    public static BearerTokenValidation Success(ClaimsPrincipal principal, string tenantId, string? environment) =>
+        Success(principal, tenantId) with { Environment = environment };
 
     /// <summary>
     /// Creates a refusal.

@@ -67,7 +67,7 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        var exempt = IsExemptFromTenantSelection(context);
+        var exempt = Tenancy.TenantSelectionExemptions.IsExemptFromTenantSelection(context, config.CurrentValue);
         if (!exempt && context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant))
         {
             await HandleTenantSelection(context, selectionOptions);
@@ -257,23 +257,6 @@ public class TenantSelectionMiddleware(
 
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
     }
-
-    /// <summary>
-    /// Determines whether the request is served without tenant selection: invitations, registrations,
-    /// authentication bootstrap, declared anonymous paths and pending invitation or registration sessions.
-    /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <returns><see langword="true"/> when no tenant is chosen for the request; otherwise <see langword="false"/>.</returns>
-    bool IsExemptFromTenantSelection(HttpContext context) =>
-        context.IsInvitation()
-        || context.IsRegistration()
-        || context.IsAuthenticationBootstrap()
-
-        // A path the deployment declares anonymous is served without regard to who is asking, so it
-        // stays reachable for a caller who happens to be signed in without having chosen a tenant.
-        || context.IsAnonymousPath(config.CurrentValue)
-        || context.HasPendingInvitation()
-        || context.HasPendingRegistration();
 
     /// <summary>
     /// Confirms the tenant named by the selected-tenant cookie for the signed-in account and records it on the request.

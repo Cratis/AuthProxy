@@ -47,6 +47,7 @@ public static class BearerChallenge
                 break;
 
             case BearerTokenValidationStatus.MissingTenant:
+            case BearerTokenValidationStatus.UnboundCredential:
                 Forbidden(context);
                 break;
 
