@@ -47,6 +47,14 @@ internal sealed class BackendTlsConfigurationValidator(TimeProvider timeProvider
             }
         }
 
+        failures.AddRange(IdentityBackChannelFailures(options));
+
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
+
+    static IEnumerable<string> IdentityBackChannelFailures(C.AuthProxy options) => BackendHopHosts.RequiresHttps(options)
+        ? BackendHopHosts.IdentityBackChannels(options)
+            .Where(channel => !BackendHopHosts.IsHttps(channel.Address))
+            .Select(channel => $"{channel.Key} must use HTTPS while forwarded-identity signing is configured.")
+        : [];
 }

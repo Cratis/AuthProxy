@@ -2,7 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using Cratis.AuthProxy.BackendHops;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
+using Microsoft.Extensions.Options;
 
 namespace Cratis.AuthProxy.SignInCallbacks;
 
@@ -10,8 +13,10 @@ namespace Cratis.AuthProxy.SignInCallbacks;
 /// Posts a sign-in callback to a service, the way AuthProxy would present the user on a proxied request.
 /// </summary>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
+/// <param name="signer">The forwarded-identity signer.</param>
+/// <param name="config">The gateway configuration.</param>
 /// <param name="logger">The logger.</param>
-public class SignInCallbackSender(IHttpClientFactory httpClientFactory, ILogger<SignInCallbackSender> logger) : ISignInCallbackSender
+public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForwardedIdentitySigner signer, IOptionsMonitor<Configuration.AuthProxy> config, ILogger<SignInCallbackSender> logger) : ISignInCallbackSender
 {
     static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -21,7 +26,13 @@ public class SignInCallbackSender(IHttpClientFactory httpClientFactory, ILogger<
         try
         {
             using var message = Build(request);
-            using var client = httpClientFactory.CreateClient();
+            if (!TrySign(message, request, out var signing))
+            {
+                return false;
+            }
+            using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated
+                ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName)
+                : httpClientFactory.CreateClient();
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (request.Timeout > TimeSpan.Zero)
             {
@@ -102,4 +113,21 @@ public class SignInCallbackSender(IHttpClientFactory httpClientFactory, ILogger<
             .Where(_ => types.Contains(_.Type, StringComparer.Ordinal) && !string.IsNullOrWhiteSpace(_.Value))
             .Select(_ => _.Value)
             .FirstOrDefault();
+
+    bool TrySign(HttpRequestMessage message, SignInCallbackRequest request, out ForwardedIdentitySigningOutcome signing)
+    {
+        signing = ForwardedIdentitySigningOutcome.Refused;
+        if (!BackendHopHosts.AllowsIdentityBackChannel(config.CurrentValue, request.Url))
+        {
+            logger.SignInCallbackRequiresHttps(request.Kind, request.ServiceName);
+            return false;
+        }
+        signing = signer.Sign(message, new(ForwardedIdentityFlow.SignInCallback, request.ServiceName));
+        if (signing is ForwardedIdentitySigningOutcome.Refused or ForwardedIdentitySigningOutcome.NotIdentityBearing)
+        {
+            logger.SignInCallbackCouldNotBeSigned(request.Kind, request.ServiceName);
+            return false;
+        }
+        return true;
+    }
 }

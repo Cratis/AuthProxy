@@ -13,6 +13,9 @@ namespace Cratis.AuthProxy.Admission;
 /// </remarks>
 internal static partial class CapabilityVerifierLogging
 {
+    [LoggerMessage(LogLevel.Warning, "Capability verification requires HTTPS while forwarded-identity signing is configured.")]
+    internal static partial void CapabilityVerifierRequiresHttps(this ILogger<CapabilityVerifier> logger);
+
     [LoggerMessage(LogLevel.Debug, "A presented capability was refused by the verifier.")]
     internal static partial void CapabilityRefused(this ILogger<CapabilityVerifier> logger);
 

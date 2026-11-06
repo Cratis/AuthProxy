@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
+using Cratis.AuthProxy.BackendHops;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -41,6 +42,11 @@ public class TenantVerifier(
         }
 
         var url = urlTemplate.Replace("{tenantId}", Uri.EscapeDataString(tenantId), StringComparison.Ordinal);
+        if (!BackendHopHosts.AllowsIdentityBackChannel(config.CurrentValue, url))
+        {
+            logger.TenantVerificationRequiresHttps();
+            return false;
+        }
         using var client = httpClientFactory.CreateClient();
 
         try

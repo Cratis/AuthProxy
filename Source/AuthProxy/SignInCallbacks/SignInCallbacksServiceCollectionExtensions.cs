@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
@@ -20,6 +21,7 @@ public static class SignInCallbacksServiceCollectionExtensions
     public static IServiceCollection AddSignInCallbacks(this IServiceCollection services)
     {
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IForwardedIdentitySigner, ForwardedIdentitySigner>();
         services.TryAddSingleton<ISignInCallbackQueue, SignInCallbackQueue>();
         services.TryAddSingleton<ISignInCallbackSender, SignInCallbackSender>();
         services.TryAddSingleton<ISignInCallbackDispatcher, SignInCallbackDispatcher>();

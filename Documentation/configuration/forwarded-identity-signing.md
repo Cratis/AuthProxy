@@ -1,6 +1,6 @@
 ---
 title: Forwarded Identity Signing
-description: Configure AuthProxy to sign outbound forwarded identity for Arc v1 receivers, including proxy, bearer, identity-details and tenant-list flows.
+description: Configure AuthProxy to sign outbound forwarded identity for Arc v1 receivers, including proxy, bearer, identity-details, tenant-list and sign-in callback flows.
 ---
 
 # Forwarded Identity Signing
@@ -41,8 +41,21 @@ The service block covers:
 - Normal proxied identity-bearing requests to that service's backend and frontend.
 - Its bearer-route forwards, using the service selected by the bearer route, not a caller-supplied service marker.
 - AuthProxy's direct `/.cratis/me` identity-details calls to that service.
+- Sign-in callbacks to that service. Each delivery attempt gets a fresh proof; a configured callback that cannot be signed is not sent. Unsigned services keep their existing callback behavior in mixed deployments.
 
 A service whose frontend and backend verify proofs must provision the matching audience and key at both receivers, or be split into separately configured services. Anonymous requests without principal or on-behalf identity material remain unsigned; tenant or service selectors alone do not create an identity.
+
+## Other identity back channels
+
+On-behalf grant checks and session notifications retain their per-call attestations, bound to purpose, method, target and body. They do not carry the v1 header envelope and are reported as attested, not envelope-signed. Their signed service's backend requires HTTPS outside `LocalDevelopment`, and their backend hosts receive the configured client certificate.
+
+Invitation staging/exchange, link exchange, and sign-in notifications are reported for transport only. Their body identity is not covered by the v1 envelope; invitation and sign-in notifications retain their flow-specific attestations.
+
+When any forwarded-identity signing is configured, callback backend URLs, resolved client-credential verification endpoints, invitation staging/exchange, link exchange, sign-in notification, capability verification, and tenant verification URLs must use HTTPS outside `LocalDevelopment`. A client-credential `VerificationPath` may be an absolute HTTP/HTTPS URL or backend-relative; validation checks the same resolved endpoint the verifier calls, not just the backend URL. Leading-slash paths, including the default `/.cratis/client-credentials/verify`, retain the backend's scheme and authority and resolve at its origin root. An empty or relative backend URL produces a validation failure when the endpoint needs a backend, rather than a URI parsing exception.
+
+Client-credential and capability verifier destinations, queued callback destinations, resolved tenant-verification URLs, and discovered OIDC token endpoints are checked against the current configuration before a client is created. Queued callbacks also use the current signing settings on every attempt. `LocalDevelopment` retains the existing HTTP allowance. Unsigned deployments retain their existing transport behavior.
+
+Capability/tenant verifiers and identity providers do not extend the backend client-certificate host set. They receive the backend client identity only if their host is independently configured as a backend hop; see [Backend TLS](backend-tls.md).
 
 ## Configure the tenant-list flow separately
 
@@ -94,6 +107,6 @@ Arc also covers a custom `Tenancy.HttpHeader` when configured. AuthProxy signs o
 
 A configured identity-bearing request that cannot be signed is not sent unsigned. Proxy and bearer flows use their existing generic forwarding-failure response. Identity-details signing refusal is an indeterminate verification result and is refused even under `BestEffort`. Tenant signing refusal uses the existing unavailable result; it does not create an empty tenant list or confirm a tenant. Signed back-channel HTTP clients do not follow redirects, so proofs cannot be replayed automatically to another destination. Legacy unsigned clients retain their previous behavior.
 
-Startup diagnostics list each proxied, bearer, identity-details and tenant-list flow as signed or not signed, with only service, audience and key ID. Check these rows when rolling out: signing a normal request does not prove that the tenant-list flow is signed. Runtime refusals log bounded reason codes, never principal JSON, header values, secrets, canonical input, nonces or MACs.
+Startup diagnostics list each proxied, bearer, identity-details, tenant-list and sign-in callback flow as signed or not signed, with only service, audience and key ID. On-behalf calls are listed as attested, not envelope-signed. Invitation staging/exchange, link exchange and sign-in notifications have transport-only rows. Check these rows when rolling out: signing a normal request does not prove that the tenant-list flow is signed. Runtime refusals log bounded reason codes, never principal JSON, header values, secrets, canonical input, nonces or MACs.
 
 Signing is not tenant membership, authorization, a replacement for on-behalf assertions, or body integrity. Preserve TLS, backend ingress restrictions and existing authorization checks. Anyone able to verify a shared-key proof can also forge one; constrain access to each service's signing material.
