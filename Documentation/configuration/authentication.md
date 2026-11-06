@@ -608,7 +608,9 @@ What is stripped is wider than what is written. Every inbound header whose name 
 might read — `x-ms-client-principal-idp`, say — cannot be used to smuggle a claim. The tenant is removed
 under both `x-cratis-tenant-id` and the legacy `Tenant-ID`, before and again after the proxy resolves its
 own, so the only tenant a backend can receive is the one AuthProxy resolved. A request with no resolved
-tenant reaches the backend with no tenant header at all.
+tenant reaches the backend with no tenant header at all. AuthProxy also strips known forwarded-identity
+context headers, including `x-cratis-credential-kind`, `x-cratis-issuer` and `x-cratis-forwarded-token-sha256`
+and older draft names, and treats underscore spellings of protected names as their hyphenated equivalents.
 
 | Header | Carries | Encoding |
 | -------- | --------- | ---------- |

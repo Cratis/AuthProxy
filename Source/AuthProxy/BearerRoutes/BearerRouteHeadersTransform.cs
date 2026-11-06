@@ -26,8 +26,6 @@ public class BearerRouteHeadersTransform : RequestTransform
         SpoofableHeaders.Strip(headers);
         headers.Remove(Headers.ServiceId);
         headers.Remove(Headers.LegacyServiceId);
-        headers.Remove(Headers.TokenClientId);
-        headers.Remove(Headers.TokenScope);
         headers.Remove(HeaderNames.Cookie);
 
         var identity = context.HttpContext.Items.TryGetValue(BearerRouteDefaults.ForwardedIdentityItemKey, out var item)
