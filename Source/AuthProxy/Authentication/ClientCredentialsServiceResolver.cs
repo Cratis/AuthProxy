@@ -112,15 +112,20 @@ public class ClientCredentialsServiceResolver(
     /// <returns>The endpoint used by the verifier, or null when it cannot be resolved.</returns>
     internal static Uri? CreateVerificationUri(string baseUrl, string verificationPath)
     {
-        if (Uri.TryCreate(verificationPath, UriKind.Absolute, out var absoluteUri))
+        if (Uri.TryCreate(verificationPath, UriKind.Absolute, out var absoluteUri) && IsHttp(absoluteUri))
         {
             return absoluteUri;
         }
-
-        return Uri.TryCreate(new Uri(baseUrl), verificationPath, out var relativeUri)
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var backendUri) || !IsHttp(backendUri))
+        {
+            return null;
+        }
+        return Uri.TryCreate(backendUri, verificationPath, out var relativeUri) && IsHttp(relativeUri)
             ? relativeUri
             : null;
     }
+
+    static bool IsHttp(Uri uri) => uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
 
     static string NormalizeRoutePrefix(string routePrefix)
     {
