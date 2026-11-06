@@ -2,14 +2,19 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net;
+using Cratis.AuthProxy.BackendHops;
+using Microsoft.Extensions.Options;
+
 namespace Cratis.AuthProxy.Authentication;
 
 /// <summary>
 /// Calls the configured downstream verification endpoint for the client-credentials flow.
 /// </summary>
 /// <param name="httpClientFactory">Creates outbound HTTP clients for verification requests.</param>
+/// <param name="config">The gateway configuration.</param>
 public class ClientCredentialsVerifier(
-    IHttpClientFactory httpClientFactory)
+    IHttpClientFactory httpClientFactory,
+    IOptionsMonitor<Configuration.AuthProxy> config)
 {
     static readonly JsonSerializerOptions _responseSerializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -27,6 +32,11 @@ public class ClientCredentialsVerifier(
         string clientSecret,
         CancellationToken cancellationToken)
     {
+        if (!BackendHopHosts.AllowsIdentityBackChannel(config.CurrentValue, service.VerificationUri.AbsoluteUri))
+        {
+            return new(ClientCredentialsVerificationStatus.Failed, HttpStatusCode.BadGateway);
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Post, service.VerificationUri)
         {
             Content = JsonContent.Create(new ClientCredentialsVerificationRequest(

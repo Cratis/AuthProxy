@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy.AccessTokens;
 
 internal static partial class UserAccessTokensLogging
 {
+    [LoggerMessage(LogLevel.Warning, "The token endpoint for OIDC provider {Scheme} requires HTTPS while forwarded-identity signing is configured")]
+    internal static partial void TokenEndpointRequiresHttps(this ILogger logger, string scheme);
+
     [LoggerMessage(LogLevel.Warning, "The OIDC provider {Scheme} a session signed in with is no longer configured; no access token can be obtained for it")]
     internal static partial void ProviderNoLongerConfigured(this ILogger logger, string scheme);
 

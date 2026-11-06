@@ -8,6 +8,11 @@ namespace Cratis.AuthProxy.Tenancy;
 /// </summary>
 internal static partial class TenantVerifierLogging
 {
+    /// <summary>Logs a tenant verification transport that does not meet the deployment policy.</summary>
+    /// <param name="logger">The logger to write to.</param>
+    [LoggerMessage(LogLevel.Warning, "Tenant verification requires HTTPS while forwarded-identity signing is configured.")]
+    internal static partial void TenantVerificationRequiresHttps(this ILogger<TenantVerifier> logger);
+
     /// <summary>
     /// Logs that a tenant was not found by the verification service.
     /// </summary>

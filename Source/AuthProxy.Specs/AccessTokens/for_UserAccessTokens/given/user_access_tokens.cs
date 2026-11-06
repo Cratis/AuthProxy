@@ -3,8 +3,8 @@
 
 using Cratis.AuthProxy.AccessTokens.given;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.given;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Cratis.AuthProxy.AccessTokens.for_UserAccessTokens.given;
@@ -22,6 +22,9 @@ public class user_access_tokens : a_user_token_store
     protected C.OidcProvider _provider;
     protected OpenIdConnectOptions _options;
     protected IOidcClientAssertions _assertions;
+    protected RecordingLogger<UserAccessTokens> _logger;
+    protected IOptionsMonitor<C.AuthProxy> _configuration;
+    protected IHttpClientFactory _httpClientFactory;
     protected UserAccessTokens _tokens;
     protected C.ServiceAccessToken _accessToken;
     protected string _sessionId;
@@ -42,10 +45,13 @@ public class user_access_tokens : a_user_token_store
         var authentication = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authentication.CurrentValue.Returns(_ => new C.Authentication { OidcProviders = [_provider] });
         _assertions = Substitute.For<IOidcClientAssertions>();
-        var httpClientFactory = Substitute.For<IHttpClientFactory>();
-        httpClientFactory.CreateClient(UserAccessTokens.HttpClientName).Returns(_ => new HttpClient(_endpoint, disposeHandler: false));
+        _httpClientFactory = Substitute.For<IHttpClientFactory>();
+        _httpClientFactory.CreateClient(UserAccessTokens.HttpClientName).Returns(_ => new HttpClient(_endpoint, disposeHandler: false));
+        _configuration = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        _configuration.CurrentValue.Returns(new C.AuthProxy());
 
-        _tokens = new(_store, oidcOptions, authentication, _assertions, httpClientFactory, _time, NullLogger<UserAccessTokens>.Instance);
+        _logger = new RecordingLogger<UserAccessTokens>();
+        _tokens = new(_store, oidcOptions, authentication, _configuration, _assertions, _httpClientFactory, _time, _logger);
         _accessToken = new() { Scopes = ["api://reporting/access_as_user"] };
         _sessionId = await _store.Create(new(Scheme, "refresh-token"), CancellationToken.None);
     }

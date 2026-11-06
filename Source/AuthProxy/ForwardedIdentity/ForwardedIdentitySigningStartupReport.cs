@@ -16,7 +16,8 @@ internal sealed class ForwardedIdentitySigningStartupReport(IOptionsMonitor<C.Au
     {
         foreach (var row in ForwardedIdentitySigningReport.For(config.CurrentValue))
         {
-            if (row.IsSigned) logger.FlowSigned(row.Flow, row.ServiceName, row.KeyId!, row.Audience!);
+            if (row.IsAttested) logger.FlowAttested(row.Flow, row.ServiceName);
+            else if (row.IsSigned) logger.FlowSigned(row.Flow, row.ServiceName, row.KeyId!, row.Audience!);
             else logger.FlowUnsigned(row.Flow, row.ServiceName);
             logger.FlowTransport(row.Flow, row.ServiceName, row.Transport);
         }
