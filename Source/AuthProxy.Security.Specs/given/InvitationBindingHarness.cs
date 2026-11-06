@@ -59,7 +59,7 @@ public class InvitationBindingHarness : SessionCookieHarness
         using var client = CreateSecurityClient();
         var login = await client.SendAsync(Request(
             ConsoleHost,
-            $"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl=%2F",
+            $"{WellKnownPaths.LoginPrefix}/{scheme}?returnUrl={Uri.EscapeDataString($"{WellKnownPaths.InvitePathPrefix}/{invitationCapability}")}",
             $"{Cookies.InviteToken}={invitationCapability}"));
         var location = login.Headers.Location;
         if (location?.IsAbsoluteUri != true)

@@ -49,6 +49,13 @@ public class SelectProviderMiddleware(
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
+        if (context.Request.Path == WellKnownPaths.LoginPage
+            && !BootstrapReturnUrl.IsAllowed(context, context.Request.Query["returnUrl"].FirstOrDefault()))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
         if (context.User.Identity?.IsAuthenticated == true
             || context.IsInvitation()
             || context.IsRegistration()

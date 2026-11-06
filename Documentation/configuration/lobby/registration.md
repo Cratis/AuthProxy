@@ -15,11 +15,15 @@ Users who are joining an existing organization should use an invitation flow ins
 3. AuthProxy starts authentication.
    - With one configured identity provider, AuthProxy challenges that provider directly.
    - With multiple providers, AuthProxy redirects to the standard login page so the user can choose
-     a provider.
-4. After a successful login, AuthProxy deletes the registration cookie.
+     a provider, preserving `/register` as the return destination.
+4. After a successful login, authentication returns to `/register`, where AuthProxy deletes the registration cookie.
 5. AuthProxy redirects the user to `Invite.Lobby.Registration.BaseUrl`.
 
 The `/register` path is only active when `Invite.Lobby.Registration.BaseUrl` is configured.
+Registration returns to this proxy-owned path before tenant membership is required, so a new user can complete
+registration with Host addressing and Selection configured. Pending registration sign-ins accept only a local
+`/register` return path; off-site URLs and other paths are rejected. Like pending invitations, registration keeps
+the handshake on its starting host because the flow cookie is host-only.
 
 ## Configuration
 

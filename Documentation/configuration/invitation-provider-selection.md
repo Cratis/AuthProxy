@@ -49,6 +49,11 @@ identity provider:
 | `type` | `string` | Provider brand — `Microsoft`, `Google`, `GitHub`, `Apple`, or `Custom`. Use this to pick logos or apply brand-specific styling. |
 | `loginUrl` | `string` | AuthProxy-relative URL that initiates the OIDC/OAuth challenge for this provider. Navigating to this URL starts the login flow and, after a successful login, redirects the user back to the original destination. |
 
+For invitations, each `loginUrl` includes a `returnUrl` pointing to the pending `/invite/{token}` path.
+Keep that query parameter when rendering provider links: sign-in must return to the invitation's proxy-owned
+path before tenant membership is required. While an invitation is pending, AuthProxy rejects off-site return URLs
+and paths that do not match that invitation.
+
 The cookie expires after 15 minutes and is deleted automatically by the browser after that time.
 
 ---

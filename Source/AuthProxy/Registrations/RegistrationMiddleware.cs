@@ -4,6 +4,7 @@
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Invites;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -77,7 +78,7 @@ public class RegistrationMiddleware(
         var providers = GetAllProviders(authConfig.CurrentValue).ToList();
         if (providers.Count > 1)
         {
-            context.Response.Redirect(WellKnownPaths.LoginPage);
+            context.Response.Redirect(QueryHelpers.AddQueryString(WellKnownPaths.LoginPage, "returnUrl", WellKnownPaths.Registration));
             return;
         }
 

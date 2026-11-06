@@ -68,8 +68,8 @@ public static class SignInCallbackHost
     /// here — no callback host, already on it, already bounced once, or answering an invitation.
     /// </returns>
     /// <remarks>
-    /// A pending invitation keeps the handshake on the host it started on: the invitation's own cookies are host-only
-    /// and would not travel. Such a sign-in needs a callback registered for that host.
+    /// A pending invitation or registration keeps the handshake on the host it started on: its flow cookies are
+    /// host-only and would not travel. Such a sign-in needs a callback registered for that host.
     /// </remarks>
     public static bool TryBuildLoginBounce(HttpContext context, C.AuthProxy config, string scheme, string? returnUrl, out string location)
     {
@@ -78,6 +78,7 @@ public static class SignInCallbackHost
             || IsCallbackHost(context, host)
             || context.Request.Query.ContainsKey(BouncedQueryKey)
             || context.HasPendingInvitation()
+            || context.HasPendingRegistration()
             || context.Request.Cookies.ContainsKey(Cookies.InvitationEntryState))
         {
             return false;
