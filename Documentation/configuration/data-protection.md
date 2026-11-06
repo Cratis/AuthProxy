@@ -27,6 +27,12 @@ store. AuthProxy supports three.
 
 Any of them can be combined with [Azure Key Vault key protection](#protecting-the-key-ring-with-azure-key-vault).
 
+Deployments sharing a key ring need [CredentialBinding](tenancy.md#credential-binding) settings: a shared key
+only proves that a deployment can decrypt an artifact, not that the artifact belongs to its resource or environment.
+AuthProxy logs a startup warning when `DataProtection` or `DataProtectionKeysPath` is configured without
+`CredentialBinding.Resource`. Set a trusted resource identifier and, when environments share keys, an environment
+identifier. Resource and environment scoping remains opt-in; the warning alone does not reject requests.
+
 ---
 
 ## File system (default)

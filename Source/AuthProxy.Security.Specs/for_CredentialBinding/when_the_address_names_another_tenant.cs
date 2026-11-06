@@ -10,7 +10,7 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
 {
     [Theory]
     [InlineData("tenant-a", "staging", "b.direct.example.test", HttpStatusCode.Forbidden)]
-    [InlineData("Tenant-A", "staging", "a.direct.example.test", HttpStatusCode.Forbidden)]
+    [InlineData("Tenant-A", "staging", "a.direct.example.test", HttpStatusCode.OK)]
     [InlineData("tenant-a ", "staging", "a.direct.example.test", HttpStatusCode.Forbidden)]
     [InlineData("tenant-a", "production", "a.direct.example.test", HttpStatusCode.Forbidden)]
     [InlineData("tenant-a", null, "a.direct.example.test", HttpStatusCode.Forbidden)]

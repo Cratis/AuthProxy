@@ -16,13 +16,15 @@ namespace Cratis.AuthProxy.Tenancy;
 /// <param name="selectedTenantCookie">The account-bound tenant selection.</param>
 /// <param name="errorPageProvider">The forbidden response writer.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="checkEffectiveTenant">Whether selection has completed and the effective tenant must also be checked.</param>
 public class CredentialBindingMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
     ITenantResolver tenantResolver,
     SelectedTenantCookie selectedTenantCookie,
     IErrorPageProvider errorPageProvider,
-    ILogger<CredentialBindingMiddleware> logger)
+    ILogger<CredentialBindingMiddleware> logger,
+    bool checkEffectiveTenant = false)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -37,8 +39,14 @@ public class CredentialBindingMiddleware(
 
         var resolutions = tenantResolver.ResolveEach(context).ToArray();
         var credentials = CredentialTenants(context, onBehalf, resolutions).ToArray();
-        var conflicts = resolutions.Any(target => CredentialTarget.IsAddressedByRequest(target.Strategy, bearerRoute: false)
-            && credentials.Any(tenant => !CredentialTarget.Matches(tenant, target.TenantId)));
+        var targets = resolutions.Where(target => CredentialTarget.IsAddressedByRequest(target.Strategy, bearerRoute: false));
+        var effectiveTenantApplies = checkEffectiveTenant && onBehalf is null;
+        if (effectiveTenantApplies && tenantResolver.TryResolve(context, out TenantResolutionResult effective))
+        {
+            targets = targets.Append(effective);
+        }
+
+        var conflicts = targets.Any(target => credentials.Any(tenant => !CredentialTarget.MatchesTenant(tenant, target.TenantId)));
         if (conflicts)
         {
             var kind = onBehalf is not null ? "on-behalf" : HasClientCredentialsIdentity(context) ? "client-credentials" : "session";
@@ -56,7 +64,7 @@ public class CredentialBindingMiddleware(
         if (current.TenantResolutions.Count == 0) return false;
         if (context.User.Identity?.IsAuthenticated != true && onBehalf is null) return false;
         return !context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant)
-            && !TenantSelectionExemptions.IsExemptFromTenantSelection(context, current);
+            && !TenantSelectionExemptions.IsExemptPath(context, current);
     }
 
     static bool HasClientCredentialsIdentity(HttpContext context) =>

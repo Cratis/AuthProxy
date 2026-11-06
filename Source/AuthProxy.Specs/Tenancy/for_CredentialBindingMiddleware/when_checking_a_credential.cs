@@ -12,7 +12,7 @@ public class when_checking_a_credential : Specification
     [Theory]
     [InlineData("tenant-a", "tenant-b", false)]
     [InlineData("tenant-a", "tenant-a", true)]
-    [InlineData("Tenant-A", "tenant-a", false)]
+    [InlineData("Tenant-A", "tenant-a", true)]
     [InlineData("tenant-a", "tenant-a ", false)]
     [InlineData(null, "tenant-b", true)]
     public async Task should_compare_a_protected_selection_before_selecting_a_namespace(string? selected, string addressed, bool allowed)
@@ -68,6 +68,26 @@ public class when_checking_a_credential : Specification
         await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], true);
     }
 
+    [Theory]
+    [InlineData(Cookies.Registration)]
+    [InlineData(Cookies.InviteToken)]
+    public async Task should_not_exempt_a_pending_cookie(string name)
+    {
+        var context = Context();
+        context.Request.Headers.Cookie = $"{name}=x";
+        await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], false);
+    }
+
+    [Theory]
+    [InlineData("tenant-b", false)]
+    [InlineData("Tenant-A", true)]
+    public async Task should_check_the_effective_default_against_a_token_binding(string target, bool allowed)
+    {
+        var context = Context();
+        context.User = new(new ClaimsIdentity([new Claim(ClientCredentialsDefaults.TenantClaimType, "tenant-a")], ClientCredentialsDefaults.AuthenticationScheme));
+        await Check(context, new(new EphemeralDataProtectionProvider()), [new(target, C.TenantSourceIdentifierResolverType.Default)], allowed, checkEffectiveTenant: true);
+    }
+
     [Fact]
     public async Task should_ignore_anonymous_and_legacy_selections()
     {
@@ -83,12 +103,17 @@ public class when_checking_a_credential : Specification
         User = new(new ClaimsIdentity([new Claim("sub", "alice"), new Claim("identity_provider", "oidc")], "test")),
     };
 
-    static async Task Check(DefaultHttpContext context, SelectedTenantCookie cookie, TenantResolutionResult[] resolutions, bool allowed)
+    static async Task Check(DefaultHttpContext context, SelectedTenantCookie cookie, TenantResolutionResult[] resolutions, bool allowed, bool checkEffectiveTenant = false)
     {
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         options.CurrentValue.Returns(new C.AuthProxy { TenantResolutions = [new() { Strategy = C.TenantSourceIdentifierResolverType.Host }] });
         var resolver = Substitute.For<ITenantResolver>();
         resolver.ResolveEach(context).Returns(resolutions);
+        resolver.TryResolve(context, out Arg.Any<TenantResolutionResult>()).Returns(call =>
+        {
+            call[1] = resolutions[0];
+            return true;
+        });
         var errors = Substitute.For<IErrorPageProvider>();
         var called = false;
         var middleware = new CredentialBindingMiddleware(
@@ -101,7 +126,8 @@ public class when_checking_a_credential : Specification
             resolver,
             cookie,
             errors,
-            Substitute.For<ILogger<CredentialBindingMiddleware>>());
+            Substitute.For<ILogger<CredentialBindingMiddleware>>(),
+            checkEffectiveTenant);
         await middleware.InvokeAsync(context);
         called.ShouldEqual(allowed);
         context.Items.ContainsKey(TenancyMiddleware.TenantIdItemKey).ShouldBeFalse();

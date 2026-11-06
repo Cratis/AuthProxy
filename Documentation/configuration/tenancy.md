@@ -289,20 +289,28 @@ See [Error pages](error-pages.md) to override this page.
 ## Credential binding
 
 A credential bound to tenant A cannot authorize a request addressing tenant B, even when the person belongs
-to both tenants. AuthProxy compares tenant identifiers exactly: it does not lowercase, trim or repair them.
-`Tenant-A` and `tenant-a` are different constraints. This tenant mismatch refusal is always enabled, including
+to both tenants. AuthProxy compares tenant identifiers with `OrdinalIgnoreCase`: `Tenant-A` and `tenant-a`
+name the same tenant. It does not trim or otherwise repair identifiers. This tenant mismatch refusal is always enabled, including
 unsigned deployments and deployments without resource or environment scoping.
 
 For browser sessions, the protected selected-tenant cookie and tenants resolved from `Claim` are credential
 constraints. An on-behalf session uses only its represented tenant, not the actor's own claims or selection.
 AuthProxy client-credentials tokens use their verified `cratis/tenant` claim; the same claim from another
 authentication scheme does not create a client-credentials binding. `Host`, `SubHost`, `Route` and `Specified`
-address the target tenant. `Default` does not: it supplies a fallback, not another credential constraint.
+address the target tenant. `Default` supplies a fallback, not another credential constraint; when that fallback
+wins resolution, the effective tenant is still checked against the credential before namespace selection or forwarding.
+Tenant comparisons use `OrdinalIgnoreCase`, consistently with on-behalf tenancy checks. Resource and environment
+comparisons remain ordinal and case-sensitive.
 
-AuthProxy refuses a mismatch with `403` and `Cache-Control: no-store` before membership lookup, tenant
-verification, namespace selection or forwarding. Its warning identifies the credential kind and redacted
+AuthProxy refuses an addressed mismatch with `403` and `Cache-Control: no-store` before membership lookup, tenant
+verification, namespace selection or forwarding. Pending invitation and registration cookies do not bypass binding checks. Its warning identifies the credential kind and redacted
 request path without logging tenant values. An unbound session can still use an addressed tenant, subject to
-the usual membership checks. Legacy unsigned selection cookies do not establish a binding; the tenant-selection
+the usual membership checks. When Selection is configured, an authenticated browser addressing a tenant through
+Host, SubHost or Route must confirm membership through the configured tenants endpoint, even without a selection
+cookie or with a legacy plain cookie. Successful confirmation issues a bound selection cookie so subsequent
+requests use the normal revalidation interval. A pending invitation or registration cookie may defer selection,
+but cannot authorize forwarding to an unconfirmed tenant. Deployments without Selection keep their existing
+addressing behavior. Legacy unsigned selection cookies do not establish a binding; the tenant-selection
 flow confirms them as before. Switch tenants through `/.cratis/select-tenant`, rather than replaying a selection
 on another tenant's host. Invitation, registration, authentication-bootstrap and declared anonymous paths remain
 reachable before tenant selection.

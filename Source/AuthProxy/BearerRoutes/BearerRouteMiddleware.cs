@@ -147,7 +147,7 @@ public class BearerRouteMiddleware(
             && !CredentialTarget.Matches(validation.Environment, current.CredentialBinding.Environment);
         var tenantConflict = tenantResolver.ResolveEach(context)
             .Any(target => CredentialTarget.IsAddressedByRequest(target.Strategy, bearerRoute: true)
-                && !CredentialTarget.Matches(validation.TenantId, target.TenantId));
+                && !CredentialTarget.MatchesTenant(validation.TenantId, target.TenantId));
         if (!environmentConflict && !tenantConflict) return false;
         logger.BearerCredentialBoundElsewhere(route.Prefix, route.ServiceName, environmentConflict ? "environment" : "tenant", RequestPathRedaction.Redact(context.Request.Path));
         return true;

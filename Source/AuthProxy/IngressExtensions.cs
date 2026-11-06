@@ -159,6 +159,8 @@ public static class IngressExtensions
             app.Logger.SessionConfigurationWarning(warning);
         }
 
+        app.WarnAboutUnscopedKeyRing();
+
         if (bool.TryParse(Environment.GetEnvironmentVariable(ForwardedHeadersEnvironmentVariable), out var hostHandlesForwardedHeaders)
             && hostHandlesForwardedHeaders)
         {
@@ -234,6 +236,7 @@ public static class IngressExtensions
         // Refuse bound-credential conflicts before membership lookup and namespace selection.
         app.UseMiddleware<CredentialBindingMiddleware>();
         app.UseMiddleware<TenantSelectionMiddleware>();
+        app.UseMiddleware<CredentialBindingMiddleware>(true);
         app.UseMiddleware<TenancyMiddleware>();
         app.UseInviteMiddleware();
         app.UseMiddleware<RegistrationMiddleware>();
@@ -245,6 +248,16 @@ public static class IngressExtensions
         app.UseReverseProxy();
 
         return app;
+    }
+
+    static void WarnAboutUnscopedKeyRing(this WebApplication app)
+    {
+        var authProxy = app.Services.GetRequiredService<IOptions<C.AuthProxy>>().Value;
+        if (!string.IsNullOrWhiteSpace(authProxy.CredentialBinding.Resource)) return;
+
+        var configuredKeyRing = app.Configuration.GetSection(C.DataProtection.SectionKey).Exists()
+            || !string.IsNullOrWhiteSpace(authProxy.DataProtectionKeysPath);
+        if (configuredKeyRing) app.Logger.SharedKeyRingWithoutCredentialBinding();
     }
 
     static void MapIngressEndpoints(this WebApplication app)

@@ -15,6 +15,15 @@ public class when_comparing_constraints : Specification
         CredentialTarget.Matches(credential, target).ShouldEqual(matches);
 
     [Theory]
+    [InlineData("tenant-a", "tenant-a", true)]
+    [InlineData("Tenant-A", "tenant-a", true)]
+    [InlineData("tenant-a ", "tenant-a", false)]
+    [InlineData(" tenant-a", "tenant-a", false)]
+    [InlineData("tenant-a", "tenant-b", false)]
+    public void should_compare_tenants_ignoring_only_case(string credential, string target, bool matches) =>
+        CredentialTarget.MatchesTenant(credential, target).ShouldEqual(matches);
+
+    [Theory]
     [InlineData(C.TenantSourceIdentifierResolverType.Host, true, true)]
     [InlineData(C.TenantSourceIdentifierResolverType.SubHost, true, true)]
     [InlineData(C.TenantSourceIdentifierResolverType.Route, true, true)]

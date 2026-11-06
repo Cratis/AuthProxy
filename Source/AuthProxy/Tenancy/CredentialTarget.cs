@@ -14,6 +14,14 @@ public static class CredentialTarget
     /// <returns>Whether the two values are identical.</returns>
     public static bool Matches(string? credential, string? target) => string.Equals(credential, target, StringComparison.Ordinal);
 
+    /// <summary>
+    /// Compares tenant identifiers consistently with tenancy resolution.
+    /// </summary>
+    /// <param name="credential">The verified credential tenant.</param>
+    /// <param name="target">The requested tenant.</param>
+    /// <returns>Whether the tenant identifiers match, ignoring case.</returns>
+    public static bool MatchesTenant(string? credential, string? target) => string.Equals(credential, target, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Determines whether a resolution strategy addresses a tenant rather than supplies a fallback or credential.</summary>
     /// <param name="strategy">The resolution strategy.</param>
     /// <param name="bearerRoute">Whether the request uses a bearer route, which ignores Specified deployment tenants.</param>
