@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using Cratis.AuthProxy.BackendHops;
 using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
+using Microsoft.Extensions.Options;
 
 namespace Cratis.AuthProxy.SignInCallbacks;
 
@@ -12,8 +14,9 @@ namespace Cratis.AuthProxy.SignInCallbacks;
 /// </summary>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
 /// <param name="signer">The forwarded-identity signer.</param>
+/// <param name="config">The gateway configuration.</param>
 /// <param name="logger">The logger.</param>
-public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForwardedIdentitySigner signer, ILogger<SignInCallbackSender> logger) : ISignInCallbackSender
+public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForwardedIdentitySigner signer, IOptionsMonitor<Configuration.AuthProxy> config, ILogger<SignInCallbackSender> logger) : ISignInCallbackSender
 {
     static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -23,10 +26,8 @@ public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForward
         try
         {
             using var message = Build(request);
-            var signing = signer.Sign(message, new(ForwardedIdentityFlow.SignInCallback, request.ServiceName));
-            if (signing is ForwardedIdentitySigningOutcome.Refused or ForwardedIdentitySigningOutcome.NotIdentityBearing)
+            if (!TrySign(message, request, out var signing))
             {
-                logger.SignInCallbackCouldNotBeSigned(request.Kind, request.ServiceName);
                 return false;
             }
             using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated
@@ -112,4 +113,21 @@ public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForward
             .Where(_ => types.Contains(_.Type, StringComparer.Ordinal) && !string.IsNullOrWhiteSpace(_.Value))
             .Select(_ => _.Value)
             .FirstOrDefault();
+
+    bool TrySign(HttpRequestMessage message, SignInCallbackRequest request, out ForwardedIdentitySigningOutcome signing)
+    {
+        signing = ForwardedIdentitySigningOutcome.Refused;
+        if (!BackendHopHosts.AllowsIdentityBackChannel(config.CurrentValue, request.Url))
+        {
+            logger.SignInCallbackRequiresHttps(request.Kind, request.ServiceName);
+            return false;
+        }
+        signing = signer.Sign(message, new(ForwardedIdentityFlow.SignInCallback, request.ServiceName));
+        if (signing is ForwardedIdentitySigningOutcome.Refused or ForwardedIdentitySigningOutcome.NotIdentityBearing)
+        {
+            logger.SignInCallbackCouldNotBeSigned(request.Kind, request.ServiceName);
+            return false;
+        }
+        return true;
+    }
 }

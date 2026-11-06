@@ -25,7 +25,7 @@ public class when_a_failure_is_logged : given.a_sender
         var factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(Arg.Any<string>()).Returns(_ => new HttpClient(new Failing(), false));
         _logger = new RecordingLogger<SignInCallbackSender>();
-        await new SignInCallbackSender(factory, _signer, _logger).Send(CreateRequest(), CancellationToken.None);
+        await new SignInCallbackSender(factory, _signer, _configuration, _logger).Send(CreateRequest(), CancellationToken.None);
     }
 
     [Fact] void should_log_the_failure() => _logger.Messages.Count.ShouldEqual(1);

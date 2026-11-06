@@ -106,7 +106,11 @@ public class ClientCredentialsServiceResolver(
         return service is not null;
     }
 
-    static Uri? CreateVerificationUri(string baseUrl, string verificationPath)
+    /// <summary>Resolves the configured verification endpoint against the service backend.</summary>
+    /// <param name="baseUrl">The backend base URL.</param>
+    /// <param name="verificationPath">The absolute verification URL or backend-relative path.</param>
+    /// <returns>The endpoint used by the verifier, or null when it cannot be resolved.</returns>
+    internal static Uri? CreateVerificationUri(string baseUrl, string verificationPath)
     {
         if (Uri.TryCreate(verificationPath, UriKind.Absolute, out var absoluteUri))
         {

@@ -19,6 +19,7 @@ public class a_sender : Specification
     protected SignInCallbackSender _sender;
     protected IHttpClientFactory _factory;
     protected IForwardedIdentitySigner _signer;
+    protected IOptionsMonitor<C.AuthProxy> _configuration;
     protected RecordingLogger<SignInCallbackSender> _deliveryLogger;
 
     protected virtual ForwardedIdentitySigningOutcome SigningOutcome => ForwardedIdentitySigningOutcome.NotConfigured;
@@ -64,6 +65,8 @@ public class a_sender : Specification
         _signer = Substitute.For<IForwardedIdentitySigner>();
         _signer.Sign(Arg.Any<HttpRequestMessage>(), Arg.Any<ForwardedIdentitySigningTarget>()).Returns(_ => SigningOutcome);
         _deliveryLogger = new RecordingLogger<SignInCallbackSender>();
-        _sender = new SignInCallbackSender(_factory, _signer, _deliveryLogger);
+        _configuration = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
+        _configuration.CurrentValue.Returns(new C.AuthProxy());
+        _sender = new SignInCallbackSender(_factory, _signer, _configuration, _deliveryLogger);
     }
 }

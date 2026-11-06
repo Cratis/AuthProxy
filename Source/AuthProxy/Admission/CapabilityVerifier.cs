@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using Cratis.AuthProxy.BackendHops;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -35,10 +36,17 @@ public class CapabilityVerifier(
     /// <inheritdoc/>
     public async Task<CapabilityVerification> Verify(CapabilityPresentation presentation, CancellationToken cancellationToken)
     {
-        var capability = config.CurrentValue.Admission.Capability;
+        var current = config.CurrentValue;
+        var capability = current.Admission.Capability;
         if (capability is null || string.IsNullOrWhiteSpace(capability.VerifierUrl))
         {
             logger.CapabilityVerifierNotConfigured();
+            return CapabilityVerification.Denied;
+        }
+
+        if (!BackendHopHosts.AllowsIdentityBackChannel(current, capability.VerifierUrl))
+        {
+            logger.CapabilityVerifierRequiresHttps();
             return CapabilityVerification.Denied;
         }
 

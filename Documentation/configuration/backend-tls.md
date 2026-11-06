@@ -44,7 +44,9 @@ Sticky replica routing keeps the configured DNS authority as the TLS target even
 
 The default deployment profile requires **HTTPS and a configured client certificate** for every signed hop: service backends, service frontends (including frontend-only services) and tenant-list endpoints. Validation identifies the configuration key and refuses startup before identity is sent. Unsigned deployments keep their existing transport behavior; this requirement is not a global HTTPS enforcement rule.
 
-When signing is configured, startup validation also requires HTTPS outside `LocalDevelopment` for callback and client-credential backend URLs, invitation staging/exchange, link exchange, sign-in notification, capability verification and tenant verification. Resolved tenant-verification URLs and discovered OIDC token endpoints are checked before a client is created. A refused verifier URL returns false; a refused token endpoint returns provider unavailable, without sending a request.
+When signing is configured, startup validation also requires HTTPS outside `LocalDevelopment` for callback backend URLs, resolved client-credential verification endpoints, invitation staging/exchange, link exchange, sign-in notification, capability verification and tenant verification. Client-credential validation resolves `VerificationPath` exactly as the verifier does, including absolute URLs that differ from the backend.
+
+Client-credential and capability verifier destinations, queued callback destinations, resolved tenant-verification URLs, and discovered OIDC token endpoints are checked against the current configuration before a client is created. A refused verifier URL returns its existing failure result; a refused token endpoint returns provider unavailable, without sending a request.
 
 On-behalf calls retain their existing per-call attestations, not the v1 header envelope. Their signed service's backend requires HTTPS outside `LocalDevelopment`, and the configured client certificate applies to its hosts. Body-carrying invitation, link and sign-in notification flows are transport-only in the signing inventory; their body identity is not covered by v1.
 

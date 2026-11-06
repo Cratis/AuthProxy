@@ -51,7 +51,9 @@ On-behalf grant checks and session notifications retain their per-call attestati
 
 Invitation staging/exchange, link exchange, and sign-in notifications are reported for transport only. Their body identity is not covered by the v1 envelope; invitation and sign-in notifications retain their flow-specific attestations.
 
-When any forwarded-identity signing is configured, callback and client-credential backend URLs, invitation staging/exchange, link exchange, sign-in notification, capability verification, and tenant verification URLs must use HTTPS outside `LocalDevelopment`. Resolved tenant-verification URLs and discovered OIDC token endpoints are checked before a client is created. `LocalDevelopment` retains the existing HTTP allowance. Unsigned deployments retain their existing transport behavior.
+When any forwarded-identity signing is configured, callback backend URLs, resolved client-credential verification endpoints, invitation staging/exchange, link exchange, sign-in notification, capability verification, and tenant verification URLs must use HTTPS outside `LocalDevelopment`. A client-credential `VerificationPath` may be absolute or backend-relative; validation checks the same resolved endpoint the verifier calls, not just the backend URL.
+
+Client-credential and capability verifier destinations, queued callback destinations, resolved tenant-verification URLs, and discovered OIDC token endpoints are checked against the current configuration before a client is created. Queued callbacks also use the current signing settings on every attempt. `LocalDevelopment` retains the existing HTTP allowance. Unsigned deployments retain their existing transport behavior.
 
 Capability/tenant verifiers and identity providers do not extend the backend client-certificate host set. They receive the backend client identity only if their host is independently configured as a backend hop; see [Backend TLS](backend-tls.md).
 

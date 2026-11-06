@@ -38,7 +38,7 @@ public class when_a_sign_in_callback_is_retried : Specification
         _receiver = new(_key);
         var factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName).Returns(_ => new HttpClient(_receiver, false));
-        _sender = new(factory, signer, NullLogger<SignInCallbackSender>.Instance);
+        _sender = new(factory, signer, config, NullLogger<SignInCallbackSender>.Instance);
         _request = new("app", "https://app.example/base/.cratis/auth/sign-in", TimeSpan.FromSeconds(2), string.Empty, SignInCallbackKind.SignedIn, new ClientPrincipal { IdentityProvider = "spec", UserId = "spec-user", UserDetails = "Spec User" }, "spec-tenant", DateTimeOffset.UtcNow);
     }
 

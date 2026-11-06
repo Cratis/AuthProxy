@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy.SignInCallbacks;
 
 internal static partial class SignInCallbackLogging
 {
+    [LoggerMessage(LogLevel.Warning, "The sign-in callback {Kind} for service {Service} requires HTTPS while forwarded-identity signing is configured")]
+    internal static partial void SignInCallbackRequiresHttps(this ILogger logger, SignInCallbackKind kind, string service);
+
     [LoggerMessage(LogLevel.Warning, "The sign-in callback {Kind} for service {Service} could not be signed and was not sent")]
     internal static partial void SignInCallbackCouldNotBeSigned(this ILogger logger, SignInCallbackKind kind, string service);
 

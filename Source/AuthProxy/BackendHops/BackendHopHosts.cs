@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Tenancy;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -97,7 +98,11 @@ internal static class BackendHopHosts
         {
             if (service.Backend is null) continue;
             if (service.SignInCallback is not null) yield return ($"sign-in callback {name}", $"{C.AuthProxy.SectionKey}:Services:{name}:Backend:BaseUrl", service.Backend.BaseUrl);
-            if (service.ClientCredentials is not null) yield return ($"client credentials {name}", $"{C.AuthProxy.SectionKey}:Services:{name}:Backend:BaseUrl", service.Backend.BaseUrl);
+            if (service.ClientCredentials is { } credentials)
+            {
+                var endpoint = ClientCredentialsServiceResolver.CreateVerificationUri(service.Backend.BaseUrl, credentials.VerificationPath);
+                yield return ($"client credentials {name}", $"{C.AuthProxy.SectionKey}:Services:{name}:ClientCredentials:VerificationPath", endpoint?.AbsoluteUri ?? credentials.VerificationPath);
+            }
         }
     }
 
