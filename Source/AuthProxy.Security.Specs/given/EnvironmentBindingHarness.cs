@@ -37,6 +37,12 @@ public sealed class EnvironmentBindingHarness : IDisposable
     /// <returns>The selected-tenant cookie.</returns>
     public Task<string> Select(HttpClient client) => _deployment.SelectTenant(client, "alice", TenantSelectionHarness.TenantA);
 
+    /// <summary>
+    /// Changes the shared account's current memberships.
+    /// </summary>
+    /// <param name="tenants">The tenants the account belongs to.</param>
+    public void UserBelongsTo(params string[] tenants) => _deployment.UserBelongsTo(tenants);
+
     /// <inheritdoc/>
     public void Dispose()
     {

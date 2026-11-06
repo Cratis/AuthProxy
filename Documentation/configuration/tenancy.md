@@ -290,7 +290,8 @@ See [Error pages](error-pages.md) to override this page.
 
 A credential bound to tenant A cannot authorize a request addressing tenant B, even when the person belongs
 to both tenants. AuthProxy compares tenant identifiers exactly: it does not lowercase, trim or repair them.
-`Tenant-A` and `tenant-a` are different constraints.
+`Tenant-A` and `tenant-a` are different constraints. This tenant mismatch refusal is always enabled, including
+unsigned deployments and deployments without resource or environment scoping.
 
 For browser sessions, the protected selected-tenant cookie and tenants resolved from `Claim` are credential
 constraints. An on-behalf session uses only its represented tenant, not the actor's own claims or selection.
@@ -305,6 +306,12 @@ the usual membership checks. Legacy unsigned selection cookies do not establish 
 flow confirms them as before. Switch tenants through `/.cratis/select-tenant`, rather than replaying a selection
 on another tenant's host. Invitation, registration, authentication-bootstrap and declared anonymous paths remain
 reachable before tenant selection.
+
+A browser session without a tenant binding remains unbound and uses normal tenant selection and membership
+verification. A foreign resource/environment selection cookie is discarded. If the session is otherwise valid
+and authenticated, AuthProxy reconfirms membership through the tenants endpoint and redirects to the original
+path without forwarding that application request or using the foreign cookie's tenant. An encrypted session
+ticket from another resource/environment cannot authenticate the caller and does not reach a backend.
 
 To isolate AuthProxy-issued credentials by resource or environment, set `Cratis:AuthProxy:CredentialBinding:Resource`
 and/or `Cratis:AuthProxy:CredentialBinding:Environment` to trusted deployment identifiers. Each defaults to an

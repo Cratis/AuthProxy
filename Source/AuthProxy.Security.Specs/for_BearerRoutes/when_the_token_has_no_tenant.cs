@@ -14,7 +14,6 @@ public class when_the_token_has_no_tenant(BearerRouteHarness harness) : IAsyncLi
     const string Path = $"{BearerRouteHarness.RoutePrefix}/tools";
 
     HttpResponseMessage? _response;
-    bool _forwarded;
 
     public async ValueTask InitializeAsync()
     {
@@ -22,7 +21,6 @@ public class when_the_token_has_no_tenant(BearerRouteHarness harness) : IAsyncLi
         harness.Origin.Clear();
 
         _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(without: "tid")));
-        _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
     public ValueTask DisposeAsync()
@@ -32,5 +30,8 @@ public class when_the_token_has_no_tenant(BearerRouteHarness harness) : IAsyncLi
     }
 
     [Fact] public void should_refuse_it() => Assert.Equal(HttpStatusCode.Forbidden, _response!.StatusCode);
-    [Fact] public void should_not_forward_anything() => Assert.False(_forwarded);
+    [Fact] public void should_not_forward_anything() => Assert.Empty(harness.Origin.Received);
+    [Fact] public async Task should_not_return_a_body() => Assert.Empty(await _response!.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    [Fact] public void should_not_return_a_principal() => Assert.False(_response!.Headers.Contains(Headers.Principal));
+    [Fact] public void should_not_return_a_tenant() => Assert.False(_response!.Headers.Contains(Headers.TenantId));
 }

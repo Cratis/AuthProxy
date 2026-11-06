@@ -22,6 +22,7 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
     public async Task should_refuse_conflicts_without_forwarding(string tenant, string? environment, string host, HttpStatusCode expected)
     {
         using var client = harness.CreateBearerClient();
+        harness.Origin.Clear();
         var path = $"/mcp/binding-{Guid.NewGuid():N}";
         var claims = new Dictionary<string, object> { ["tid"] = tenant };
         if (environment is not null) claims["env"] = environment;
@@ -30,30 +31,48 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(expected, response.StatusCode);
         Assert.Equal(expected == HttpStatusCode.OK, harness.Origin.ReceivedAnythingFor(path));
-        if (expected == HttpStatusCode.OK) Assert.Equal(tenant, harness.Origin.LastRequestTo(path).Value(Headers.TenantId));
+        if (expected == HttpStatusCode.OK)
+        {
+            Assert.Equal(tenant, harness.Origin.LastRequestTo(path).Value(Headers.TenantId));
+        }
+        else
+        {
+            Assert.Empty(harness.Origin.Received);
+            Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            Assert.False(response.Headers.Contains(Headers.Principal));
+            Assert.False(response.Headers.Contains(Headers.TenantId));
+        }
     }
 
     [Fact]
     public async Task should_refuse_multiple_environment_values()
     {
         using var client = harness.CreateBearerClient();
+        harness.Origin.Clear();
         const string path = "/mcp/multiple-environments";
         using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(claims: new Dictionary<string, object> { ["tid"] = "tenant-a", ["env"] = new[] { "staging", "staging" } }));
         request.Headers.Host = "a.direct.example.test";
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.False(harness.Origin.ReceivedAnythingFor(path));
+        Assert.Empty(harness.Origin.Received);
+        Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.False(response.Headers.Contains(Headers.Principal));
+        Assert.False(response.Headers.Contains(Headers.TenantId));
     }
 
     [Fact]
     public async Task should_refuse_a_case_variant_audience()
     {
         using var client = harness.CreateBearerClient();
+        harness.Origin.Clear();
         const string path = "/mcp/case-variant-audience";
         using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(claims: new Dictionary<string, object> { ["tid"] = "tenant-a", ["env"] = "staging" }, audience: "DIRECT-API"));
         request.Headers.Host = "a.direct.example.test";
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.False(harness.Origin.ReceivedAnythingFor(path));
+        Assert.Empty(harness.Origin.Received);
+        Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.False(response.Headers.Contains(Headers.Principal));
+        Assert.False(response.Headers.Contains(Headers.TenantId));
     }
 }

@@ -26,6 +26,16 @@ public class when_a_person_in_both_tenants_addresses_a_host(TwoTenantPersonHarne
         {
             Assert.Empty(harness.Origin.Received);
             Assert.Empty(harness.RequestsForTenant(TenantSelectionHarness.TenantB));
+            var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            Assert.DoesNotContain(TenantSelectionHarness.TenantB, body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(host, body, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(response.Headers, header =>
+                header.Key.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase) ||
+                header.Key.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase));
+            Assert.False(response.Headers.Contains(Headers.TenantId));
+            Assert.False(response.Headers.Contains(Headers.LegacyTenantId));
+            Assert.False(response.Headers.Contains(Headers.TokenClientId));
+            Assert.False(response.Headers.Contains(Headers.TokenScope));
         }
         else
         {

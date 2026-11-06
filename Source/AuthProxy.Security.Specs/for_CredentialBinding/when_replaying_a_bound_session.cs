@@ -31,7 +31,10 @@ public class when_replaying_a_bound_session
             Assert.Equal(HttpStatusCode.OK, control.StatusCode);
             Assert.True(staging.Origin.ReceivedAnythingFor(path));
             using var refused = await targetClient.SendAsync(replay, TestContext.Current.CancellationToken);
-            Assert.False(refused.IsSuccessStatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+            Assert.Empty(await refused.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            Assert.False(refused.Headers.Contains(Headers.Principal));
+            Assert.False(refused.Headers.Contains(Headers.TenantId));
             Assert.Empty(target.Origin.Received);
         }
         finally
