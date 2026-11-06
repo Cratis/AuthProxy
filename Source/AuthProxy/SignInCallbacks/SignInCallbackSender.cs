@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Net.Http.Headers;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 
 namespace Cratis.AuthProxy.SignInCallbacks;
@@ -10,8 +11,9 @@ namespace Cratis.AuthProxy.SignInCallbacks;
 /// Posts a sign-in callback to a service, the way AuthProxy would present the user on a proxied request.
 /// </summary>
 /// <param name="httpClientFactory">The HTTP client factory.</param>
+/// <param name="signer">The forwarded-identity signer.</param>
 /// <param name="logger">The logger.</param>
-public class SignInCallbackSender(IHttpClientFactory httpClientFactory, ILogger<SignInCallbackSender> logger) : ISignInCallbackSender
+public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForwardedIdentitySigner signer, ILogger<SignInCallbackSender> logger) : ISignInCallbackSender
 {
     static readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
 
@@ -21,7 +23,15 @@ public class SignInCallbackSender(IHttpClientFactory httpClientFactory, ILogger<
         try
         {
             using var message = Build(request);
-            using var client = httpClientFactory.CreateClient();
+            var signing = signer.Sign(message, new(ForwardedIdentityFlow.SignInCallback, request.ServiceName));
+            if (signing is ForwardedIdentitySigningOutcome.Refused or ForwardedIdentitySigningOutcome.NotIdentityBearing)
+            {
+                logger.SignInCallbackCouldNotBeSigned(request.Kind, request.ServiceName);
+                return false;
+            }
+            using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated
+                ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName)
+                : httpClientFactory.CreateClient();
             using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             if (request.Timeout > TimeSpan.Zero)
             {

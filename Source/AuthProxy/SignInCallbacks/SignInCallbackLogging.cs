@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy.SignInCallbacks;
 
 internal static partial class SignInCallbackLogging
 {
+    [LoggerMessage(LogLevel.Warning, "The sign-in callback {Kind} for service {Service} could not be signed and was not sent")]
+    internal static partial void SignInCallbackCouldNotBeSigned(this ILogger logger, SignInCallbackKind kind, string service);
+
     [LoggerMessage(LogLevel.Debug, "Sign-in callback {Kind} delivered to service {Service}")]
     internal static partial void CallbackDelivered(this ILogger logger, string service, SignInCallbackKind kind);
 

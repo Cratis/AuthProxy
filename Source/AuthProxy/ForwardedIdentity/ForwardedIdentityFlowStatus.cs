@@ -11,6 +11,9 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <param name="Audience">The receiving audience.</param>
 public sealed record ForwardedIdentityFlowStatus(ForwardedIdentityFlow Flow, string? ServiceName, bool IsSigned, string? KeyId, string? Audience)
 {
+    /// <summary>Gets whether this flow uses a per-call attestation rather than the forwarded-identity envelope.</summary>
+    public bool IsAttested { get; init; }
+
     /// <summary>Gets the configured transport protection for this flow.</summary>
     public BackendHops.BackendHopTransport Transport { get; init; }
 }

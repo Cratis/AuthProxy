@@ -74,7 +74,7 @@ public class when_only_the_backend_address_reloads : IAsyncLifetime
                 });
                 var clients = Substitute.For<IHttpClientFactory>();
                 clients.CreateClient(UserAccessTokens.HttpClientName).Returns(_ => new HttpClient(Endpoint, disposeHandler: false));
-                return new UserAccessTokens(provider.GetRequiredService<IUserTokenStore>(), options, provider.GetRequiredService<IOptionsMonitor<C.Authentication>>(), Substitute.For<IOidcClientAssertions>(), clients, TimeProvider.System, provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<UserAccessTokens>>());
+                return new UserAccessTokens(provider.GetRequiredService<IUserTokenStore>(), options, provider.GetRequiredService<IOptionsMonitor<C.Authentication>>(), provider.GetRequiredService<IOptionsMonitor<C.AuthProxy>>(), Substitute.For<IOidcClientAssertions>(), clients, TimeProvider.System, provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<UserAccessTokens>>());
             }));
         }
     }

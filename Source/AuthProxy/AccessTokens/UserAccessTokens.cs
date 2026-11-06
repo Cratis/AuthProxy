@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.BackendHops;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ namespace Cratis.AuthProxy.AccessTokens;
 /// <param name="store">The <see cref="IUserTokenStore"/> holding refresh and access tokens.</param>
 /// <param name="oidcOptions">The OIDC handler options, for each provider's client and metadata.</param>
 /// <param name="authentication">The authentication configuration, for each provider's client credential.</param>
+/// <param name="config">The gateway configuration.</param>
 /// <param name="clientAssertions">The <see cref="IOidcClientAssertions"/> for providers authenticated by assertion.</param>
 /// <param name="httpClientFactory">The <see cref="IHttpClientFactory"/> for the token endpoint.</param>
 /// <param name="timeProvider">The <see cref="TimeProvider"/>.</param>
@@ -35,6 +37,7 @@ public sealed class UserAccessTokens(
     IUserTokenStore store,
     IOptionsMonitor<OpenIdConnectOptions> oidcOptions,
     IOptionsMonitor<C.Authentication> authentication,
+    IOptionsMonitor<C.AuthProxy> config,
     IOidcClientAssertions clientAssertions,
     IHttpClientFactory httpClientFactory,
     TimeProvider timeProvider,
@@ -171,6 +174,11 @@ public sealed class UserAccessTokens(
         {
             var options = oidcOptions.Get(session.Scheme);
             var tokenEndpoint = await OidcClientAuthentication.TokenEndpointOf(options, cancellationToken);
+            if (!BackendHopHosts.AllowsIdentityBackChannel(config.CurrentValue, tokenEndpoint))
+            {
+                logger.TokenEndpointRequiresHttps(session.Scheme);
+                return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
+            }
             using var request = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint)
             {
                 Content = new FormUrlEncodedContent(await Form(session, provider, options, accessToken, tokenEndpoint, cancellationToken))

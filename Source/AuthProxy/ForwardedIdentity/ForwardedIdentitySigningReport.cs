@@ -21,7 +21,41 @@ public static class ForwardedIdentitySigningReport
             if (service.ParticipatesInIdentityResolution) rows.Add(Row(ForwardedIdentityFlow.IdentityDetails, name, service.ForwardedIdentity, service.Backend?.BaseUrl, config));
         }
         if (TenantSelectionMiddleware.TryGetSelectionOptions(config, out var selection)) rows.Add(Row(ForwardedIdentityFlow.TenantList, null, selection.ForwardedIdentity, selection.TenantsEndpoint, config));
+        rows.AddRange(Callbacks(config));
+        rows.AddRange(OnBehalf(config));
+        rows.AddRange(BodyFlows(config));
         return rows;
+    }
+
+    static IEnumerable<ForwardedIdentityFlowStatus> Callbacks(C.AuthProxy config) => config.Services
+        .Where(pair => pair.Value.SignInCallback is not null && pair.Value.Backend is not null)
+        .Select(pair => Row(ForwardedIdentityFlow.SignInCallback, pair.Key, pair.Value.ForwardedIdentity, pair.Value.Backend!.BaseUrl, config));
+
+    static IEnumerable<ForwardedIdentityFlowStatus> OnBehalf(C.AuthProxy config)
+    {
+        if (config.OnBehalf is not { } onBehalf) yield break;
+        if (!config.Services.TryGetValue(onBehalf.Service, out var application)) yield break;
+        if (application.Backend is { } backend) yield return Row(ForwardedIdentityFlow.OnBehalf, onBehalf.Service, null, backend.BaseUrl, config) with { IsAttested = true };
+    }
+
+    static IEnumerable<ForwardedIdentityFlowStatus> BodyFlows(C.AuthProxy config)
+    {
+        var flows = new (ForwardedIdentityFlow Flow, string? Address)[]
+        {
+            (ForwardedIdentityFlow.InvitationStage, config.Invite?.StageUrl),
+            (ForwardedIdentityFlow.InvitationExchange, config.Invite?.ExchangeUrl),
+            (ForwardedIdentityFlow.LinkExchange, config.Link?.ExchangeUrl),
+            (ForwardedIdentityFlow.SignInNotification, config.SignIn?.NotifyUrl)
+        };
+        foreach (var (flow, address) in flows.Where(flow => !string.IsNullOrWhiteSpace(flow.Address)))
+        {
+            var row = Row(flow, null, null, address, config);
+            if (row.Transport == BackendHops.BackendHopTransport.MutualTls && !BackendHops.BackendHopHosts.For(config).Contains(new Uri(address!, UriKind.Absolute).IdnHost))
+            {
+                row = row with { Transport = BackendHops.BackendHopTransport.Tls };
+            }
+            yield return row;
+        }
     }
 
     static ForwardedIdentityFlowStatus Row(ForwardedIdentityFlow flow, string? service, C.ForwardedIdentitySigning? settings, string? address, C.AuthProxy config) =>
