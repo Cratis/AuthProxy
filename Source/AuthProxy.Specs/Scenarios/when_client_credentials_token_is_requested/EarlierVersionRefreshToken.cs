@@ -16,7 +16,7 @@ public static class EarlierVersionRefreshToken
     /// Creates an earlier-format refresh token with the given remaining lifetime.
     /// </summary>
     /// <param name="factory">The factory whose host protects the token.</param>
-    /// <param name="lifetime">How long the token stays valid.</param>
+    /// <param name="lifetime">How long the token stays valid, measured from the host's clock.</param>
     /// <returns>The protected token.</returns>
     public static string Create(AuthProxyFactory factory, TimeSpan lifetime)
     {
@@ -25,6 +25,7 @@ public static class EarlierVersionRefreshToken
             .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.Refresh.v1")
             .ToTimeLimitedDataProtector();
         var json = JsonSerializer.Serialize(new { service = "portal", routePrefix = "/api", clientId = "orders-api" });
-        return protector.Protect(json, lifetime);
+        var expiration = factory.Services.GetRequiredService<TimeProvider>().GetUtcNow() + lifetime;
+        return protector.Protect(json, expiration);
     }
 }

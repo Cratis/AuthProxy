@@ -11,6 +11,8 @@ Downstream services receive the resolved tenant ID under both `x-cratis-tenant-i
 needs no tenancy configuration. Legacy `Tenant-ID` forwarding is deprecated and will be removed in a
 future major release; move backends to `x-cratis-tenant-id`.
 
+In Cratis products, the tenant is what people see as a workspace. [Organization, workspace and namespace](/concepts/organization-workspace-namespace/) explains how a tenant relates to the customer's organization and to the Chronicle namespace that stores its data.
+
 A client cannot choose the tenant a backend sees. AuthProxy strips an inbound `x-cratis-tenant-id` and
 the legacy `Tenant-ID` header, and writes back only the tenant it resolved itself under both names. Earlier
 releases sent only `Tenant-ID`; see [Upgrading](../upgrading/tenant-and-service-headers.md).
