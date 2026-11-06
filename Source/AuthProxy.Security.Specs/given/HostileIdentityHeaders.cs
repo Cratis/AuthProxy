@@ -21,6 +21,7 @@ public static class HostileIdentityHeaders
     static readonly string[] _neverWritten =
     [
         "x-ms-client-principal-idp", "x-ms-client-principal-roles",
+        "x-cratis-forwarded-identity-version",
         "x-cratis-on-behalf-anything", "x-cratis-on-behalf-context",
         "x-cratis-sign-in-callback", "x-cratis-sign-in-callback-secret",
         "x-cratis-credential-kind", "x-cratis-credential-id", "x-cratis-issuer", "x-cratis-subject",
@@ -85,5 +86,6 @@ public static class HostileIdentityHeaders
     static bool Protected(string name) => All.Any(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
         || name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
         || name.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
-        || name.StartsWith(Headers.SignInCallbackPrefix, StringComparison.OrdinalIgnoreCase);
+        || name.StartsWith(Headers.SignInCallbackPrefix, StringComparison.OrdinalIgnoreCase)
+        || name.StartsWith("x-cratis-forwarded-identity", StringComparison.OrdinalIgnoreCase);
 }

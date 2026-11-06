@@ -25,7 +25,8 @@ namespace Cratis.AuthProxy;
 /// be able to name an actor, or present an assertion, that AuthProxy did not issue for this request.
 /// </para>
 /// <para>
-/// Forwarded-identity context headers, including older draft names, are removed by exact name. Underscore
+/// Every header beginning with x-cratis-forwarded-identity and known forwarded-identity context headers,
+/// including older draft names, are removed. Underscore
 /// spellings are treated as hyphenated names because some backends map both spellings to the same variable.
 /// Routing headers remain available for service selection.
 /// </para>
@@ -34,7 +35,7 @@ static class SpoofableHeaders
 {
     static readonly HashSet<string> _identityHeaders = new(StringComparer.OrdinalIgnoreCase)
     {
-        Headers.ForwardedIdentitySignature, Headers.TenantId, Headers.LegacyTenantId, Headers.TokenClientId, Headers.TokenScope,
+        Headers.TenantId, Headers.LegacyTenantId, Headers.TokenClientId, Headers.TokenScope,
         "x-cratis-credential-kind", "x-cratis-credential-id", "x-cratis-issuer", "x-cratis-subject",
         "x-cratis-idp", "x-cratis-auth-time", "x-cratis-acr", "x-cratis-amr", "x-cratis-act",
         "x-cratis-grant-id", "x-cratis-policy-epoch", "x-cratis-sender-binding", "x-cratis-forwarded-token-sha256",
@@ -71,6 +72,7 @@ static class SpoofableHeaders
         return candidate.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
             || candidate.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
             || candidate.StartsWith(Headers.SignInCallbackPrefix, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith("x-cratis-forwarded-identity", StringComparison.OrdinalIgnoreCase)
             || _identityHeaders.Contains(candidate);
     }
 }
