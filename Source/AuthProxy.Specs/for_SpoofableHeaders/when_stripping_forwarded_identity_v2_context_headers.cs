@@ -6,6 +6,7 @@ namespace Cratis.AuthProxy.for_SpoofableHeaders;
 public class when_stripping_forwarded_identity_v2_context_headers
 {
     [Theory]
+    [InlineData("x-cratis-forwarded-identity-version")]
     [InlineData("x-cratis-credential-kind")]
     [InlineData("x-cratis-credential-id")]
     [InlineData("x-cratis-issuer")]
@@ -24,11 +25,12 @@ public class when_stripping_forwarded_identity_v2_context_headers
     [InlineData("x-cratis-dpop-result")]
     public void should_strip_every_context_name_on_ingress_and_egress(string name)
     {
-        var headers = new HeaderDictionary { [name.ToUpperInvariant()] = "caller-context", ["Accept"] = "application/json", ["x-cratis-microservice"] = "app" };
+        var headers = new HeaderDictionary { [name.ToUpperInvariant()] = "caller-context", ["Accept"] = "application/json", ["x-cratis-microservice"] = "app", ["Service-ID"] = "app" };
         using var request = new HttpRequestMessage();
         request.Headers.Add(name, "caller-context");
         request.Headers.Add("Accept", "application/json");
         request.Headers.Add("x-cratis-microservice", "app");
+        request.Headers.Add("Service-ID", "app");
 
         SpoofableHeaders.Strip(headers);
         SpoofableHeaders.Strip(request.Headers);
@@ -39,5 +41,7 @@ public class when_stripping_forwarded_identity_v2_context_headers
         request.Headers.GetValues("Accept").Single().ShouldEqual("application/json");
         headers["x-cratis-microservice"].ToString().ShouldEqual("app");
         request.Headers.GetValues("x-cratis-microservice").Single().ShouldEqual("app");
+        headers["Service-ID"].ToString().ShouldEqual("app");
+        request.Headers.GetValues("Service-ID").Single().ShouldEqual("app");
     }
 }

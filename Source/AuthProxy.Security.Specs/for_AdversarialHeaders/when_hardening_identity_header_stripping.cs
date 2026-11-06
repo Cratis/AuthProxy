@@ -20,6 +20,7 @@ public class when_hardening_identity_header_stripping(SecurityHarness harness) :
             harness.Origin.Clear();
             using var request = SecurityHarness.Authenticated(HttpMethod.Get, SecurityHarness.ProtectedPath, SecurityHarness.UniqueUser("header-stripping"));
             request.Headers.Add(Headers.ServiceId, "app");
+            request.Headers.Add(Headers.LegacyServiceId, "app");
             HostileIdentityHeaders.ApplyTo(request, variant);
             using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
             _results[variant] = (response.StatusCode, harness.Origin.Received.ToArray());
@@ -39,9 +40,11 @@ public class when_hardening_identity_header_stripping(SecurityHarness harness) :
     public void should_not_forward_caller_supplied_identity_context(HostileHeaderVariant variant) => Assert.Empty(_results[variant].Received.SelectMany(request => HostileIdentityHeaders.Leaks(request.Headers)));
 
     [Theory]
-    [InlineData(HostileHeaderVariant.Exact)]
-    [InlineData(HostileHeaderVariant.Underscored)]
-    public void should_forward_the_routing_header(HostileHeaderVariant variant) => Assert.Equal("app", _results[variant].Received.Last(request => request.Path == SecurityHarness.ProtectedPath).Value(Headers.ServiceId));
+    [InlineData(HostileHeaderVariant.Exact, Headers.ServiceId)]
+    [InlineData(HostileHeaderVariant.Underscored, Headers.ServiceId)]
+    [InlineData(HostileHeaderVariant.Exact, Headers.LegacyServiceId)]
+    [InlineData(HostileHeaderVariant.Underscored, Headers.LegacyServiceId)]
+    public void should_forward_the_routing_header(HostileHeaderVariant variant, string name) => Assert.Equal("app", Assert.Single(_results[variant].Received, request => request.Path == SecurityHarness.ProtectedPath).Headers[name]);
 
     [Theory]
     [InlineData(HostileHeaderVariant.Exact)]

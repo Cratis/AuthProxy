@@ -15,6 +15,7 @@ public class when_stripping_underscore_aliases
     [InlineData("x_cratis_on_behalf_custom")]
     [InlineData("x_cratis_sign_in_callback_secret")]
     [InlineData("x_cratis_forwarded_identity_signature")]
+    [InlineData("X_CRATIS_FORWARDED_IDENTITY_VERSION")]
     [InlineData("x_cratis_credential_kind")]
     [InlineData("x_cratis_issuer")]
     [InlineData("x_cratis_token_client_id")]
