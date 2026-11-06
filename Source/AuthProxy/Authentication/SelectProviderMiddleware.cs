@@ -50,7 +50,7 @@ public class SelectProviderMiddleware(
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.Request.Path == WellKnownPaths.LoginPage
-            && !BootstrapReturnUrl.IsAllowed(context, context.Request.Query["returnUrl"].FirstOrDefault()))
+            && !BootstrapReturnUrl.PrepareLogin(context, context.Request.Query["returnUrl"].FirstOrDefault()))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;

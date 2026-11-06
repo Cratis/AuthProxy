@@ -51,7 +51,7 @@ public static class LoginChallenge
         }
 
         var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
-        if (!BootstrapReturnUrl.IsAllowed(context, returnUrl))
+        if (!BootstrapReturnUrl.PrepareLogin(context, returnUrl))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
             return;

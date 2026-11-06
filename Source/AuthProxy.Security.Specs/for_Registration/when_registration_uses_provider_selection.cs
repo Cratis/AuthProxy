@@ -73,9 +73,6 @@ public class when_registration_uses_provider_selection(SessionCookieHarness harn
     [InlineData("http://console.example.test/register")]
     [InlineData("//outside.example.test/register")]
     [InlineData("/\\outside.example.test/register")]
-    [InlineData("/api/private")]
-    [InlineData("/register/../api/private")]
-    [InlineData("/register%2f..%2fapi/private")]
     public async Task should_reject_a_foreign_registration_destination(string returnUrl)
     {
         using var client = harness.CreateSecurityClient();
@@ -93,6 +90,43 @@ public class when_registration_uses_provider_selection(SessionCookieHarness harn
         }
 
         Assert.Empty(harness.ConsoleOrigin.Received);
+    }
+
+    [Theory]
+    [InlineData(Cookies.Registration, null, true)]
+    [InlineData(Cookies.Registration, "/", false)]
+    [InlineData(Cookies.Registration, "/api/private", false)]
+    [InlineData(Cookies.InviteToken, null, true)]
+    [InlineData(Cookies.InviteToken, "/", false)]
+    public async Task should_resume_normal_sign_in_after_abandoning_the_pending_flow(string pendingCookie, string? returnUrl, bool useChooser)
+    {
+        await using var deployment = Configure(multipleProviders: true);
+        using var client = deployment.CreateClient(new() { AllowAutoRedirect = false, HandleCookies = false });
+        string[] pending = [$"{pendingCookie}=abandoned", $"{Cookies.InvitationEntryState}=abandoned-state"];
+        var chooserUrl = returnUrl is null ? WellKnownPaths.LoginPage : QueryHelpers.AddQueryString(WellKnownPaths.LoginPage, "returnUrl", returnUrl);
+        using var chooserRequest = SessionCookieHarness.Request(SessionCookieHarness.ConsoleHost, chooserUrl, pending);
+        chooserRequest.Headers.Add("Sec-Fetch-Dest", "document");
+        using var page = useChooser ? await client.SendAsync(chooserRequest, TestContext.Current.CancellationToken) : null;
+        if (page is not null) Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+
+        var login = $"{WellKnownPaths.LoginPrefix}/{SessionCookieHarness.ProviderScheme}";
+        if (returnUrl is not null) login = QueryHelpers.AddQueryString(login, "returnUrl", returnUrl);
+        using var challengeRequest = SessionCookieHarness.Request(SessionCookieHarness.ConsoleHost, login, useChooser ? [] : pending);
+        using var challenge = await client.SendAsync(challengeRequest, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        var abandoned = page ?? challenge;
+        Assert.Contains(SessionCookieHarness.SetCookies(abandoned), cookie => SessionCookieHarness.IsDeletionOf(cookie, pendingCookie));
+        Assert.Contains(SessionCookieHarness.SetCookies(abandoned), cookie => SessionCookieHarness.IsDeletionOf(cookie, Cookies.InvitationEntryState));
+        Assert.StartsWith(SessionCookieHarness.ProviderAuthorizationEndpoint, challenge.Headers.Location.ToString(), StringComparison.Ordinal);
+        var state = QueryHelpers.ParseQuery(challenge.Headers.Location.Query)["state"].ToString();
+        using var callbackRequest = SessionCookieHarness.Request(
+            SessionCookieHarness.ConsoleHost,
+            $"/signin-{SessionCookieHarness.ProviderScheme}?code=test-code&state={Uri.EscapeDataString(state)}",
+            SessionCookieHarness.SessionFrom(challenge));
+        using var callback = await client.SendAsync(callbackRequest, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Found, callback.StatusCode);
+        Assert.Equal(returnUrl ?? "/", callback.Headers.Location.ToString());
+        Assert.NotEmpty(SessionCookieHarness.SessionFrom(callback));
     }
 
     WebApplicationFactory<Program> Configure(bool multipleProviders) => harness.WithWebHostBuilder(builder =>

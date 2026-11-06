@@ -21,9 +21,10 @@ Users who are joining an existing organization should use an invitation flow ins
 
 The `/register` path is only active when `Invite.Lobby.Registration.BaseUrl` is configured.
 Registration returns to this proxy-owned path before tenant membership is required, so a new user can complete
-registration with Host addressing and Selection configured. Pending registration sign-ins accept only a local
-`/register` return path; off-site URLs and other paths are rejected. Like pending invitations, registration keeps
-the handshake on its starting host because the flow cookie is host-only.
+registration with Host addressing and Selection configured. A local `/register` return path continues the flow.
+Another local destination, including `/` or no return URL, abandons the flow: AuthProxy deletes the pending cookies
+and continues ordinary sign-in. Off-site URLs remain rejected. Like pending invitations, registration keeps
+the handshake on its starting host while its host-only flow cookie is pending.
 
 ## Configuration
 

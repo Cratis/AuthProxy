@@ -51,8 +51,9 @@ identity provider:
 
 For invitations, each `loginUrl` includes a `returnUrl` pointing to the pending `/invite/{token}` path.
 Keep that query parameter when rendering provider links: sign-in must return to the invitation's proxy-owned
-path before tenant membership is required. While an invitation is pending, AuthProxy rejects off-site return URLs
-and paths that do not match that invitation.
+path before tenant membership is required. While an invitation is pending, AuthProxy rejects off-site return URLs.
+Another local path, including `/` or no return URL, abandons the invitation: AuthProxy deletes the pending cookies
+and continues ordinary sign-in.
 
 The cookie expires after 15 minutes and is deleted automatically by the browser after that time.
 

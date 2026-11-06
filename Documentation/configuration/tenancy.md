@@ -307,8 +307,9 @@ verification, namespace selection or forwarding. Pending invitation and registra
 request path without logging tenant values. An unbound session can still use an addressed tenant, subject to
 the usual membership checks. When Selection is configured, an authenticated browser addressing a tenant through
 Host, SubHost or Route must confirm membership through the configured tenants endpoint, even without a selection
-cookie or with a legacy plain cookie. Successful confirmation issues a bound selection cookie so subsequent
-requests use the normal revalidation interval. A pending invitation or registration cookie may defer selection,
+cookie or with a legacy plain cookie. Host and SubHost confirmation issues a host-only bound selection cookie.
+Route confirmation does not bind the shared host to one tenant; it uses the per-account, per-tenant memory cache
+and the normal revalidation interval instead. Each newly addressed tenant still requires membership confirmation. A pending invitation or registration cookie may defer selection,
 but cannot authorize forwarding to an unconfirmed tenant. Deployments without Selection keep their existing
 addressing behavior. Legacy unsigned selection cookies do not establish a binding; the tenant-selection
 flow confirms them as before. Switch tenants through `/.cratis/select-tenant`, rather than replaying a selection

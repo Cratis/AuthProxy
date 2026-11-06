@@ -189,7 +189,10 @@ public class TenantSelectionMiddleware(
     static IdentityAccountTenantKey RevalidationCacheKey(IdentityAccountBinding account, string tenantId) =>
         IdentityAccountTenantKey.Create(RevalidationCacheKeyPrefix, account, tenantId);
 
-    string? TenantToConfirm(HttpContext context, C.AuthProxy current, bool exempt)
+    static bool CanWriteSelectionCookie(TenantResolutionResult? resolved) =>
+        resolved is null || resolved.Strategy is C.TenantSourceIdentifierResolverType.Host or C.TenantSourceIdentifierResolverType.SubHost;
+
+    TenantResolutionResult? TenantToConfirm(HttpContext context, C.AuthProxy current, bool exempt)
     {
         if (TenantSelectionExemptions.IsExemptPath(context, current)) return null;
         if (context.User.Identities.Any(identity => identity.IsAuthenticated && identity.AuthenticationType == ClientCredentialsDefaults.AuthenticationScheme)) return null;
@@ -199,7 +202,7 @@ public class TenantSelectionMiddleware(
         var addressed = resolved.Strategy is C.TenantSourceIdentifierResolverType.Host
             or C.TenantSourceIdentifierResolverType.SubHost
             or C.TenantSourceIdentifierResolverType.Route;
-        return exempt || addressed ? resolved.TenantId : null;
+        return exempt || addressed ? resolved : null;
     }
 
     async Task HandleTenantSelection(HttpContext context, Tenancy.SelectionOptions selectionOptions)
@@ -281,7 +284,7 @@ public class TenantSelectionMiddleware(
     /// <param name="exempt">Whether the request is served without tenant selection.</param>
     /// <param name="resolvedTenant">The effective addressed tenant requiring membership confirmation, if any.</param>
     /// <returns><see langword="true"/> when a response was written and the request ends here; otherwise <see langword="false"/>.</returns>
-    async Task<bool> ConfirmSelectedTenant(HttpContext context, Tenancy.SelectionOptions selectionOptions, bool exempt, string? resolvedTenant = null)
+    async Task<bool> ConfirmSelectedTenant(HttpContext context, Tenancy.SelectionOptions selectionOptions, bool exempt, TenantResolutionResult? resolvedTenant = null)
     {
         var cookie = selectedTenantCookie.Read(context);
         if (cookie.State == Tenancy.SelectedTenantCookieState.None && resolvedTenant is null)
@@ -296,17 +299,18 @@ public class TenantSelectionMiddleware(
             if (resolvedTenant is null) return false;
         }
 
-        var tenantId = resolvedTenant ?? cookie.TenantId;
+        var tenantId = resolvedTenant?.TenantId ?? cookie.TenantId;
         var principal = context.BuildClientPrincipal();
         var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), config.CurrentValue.Authentication.TotalProviderCount, out var account);
         var cached = hasBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, tenantId), out _);
         var legacy = cookie.State != Tenancy.SelectedTenantCookieState.Bound
             || !CredentialTarget.MatchesTenant(cookie.TenantId, tenantId);
         var interval = config.CurrentValue.Session.TenantRevalidationInterval;
+        var reissue = legacy && CanWriteSelectionCookie(resolvedTenant);
 
         if (cached || (!legacy && interval <= TimeSpan.Zero))
         {
-            Confirm(context, tenantId, legacy);
+            Confirm(context, tenantId, reissue);
             return false;
         }
 
@@ -355,7 +359,7 @@ public class TenantSelectionMiddleware(
         }
 
         MarkTenantAsRevalidated(context, tenantId);
-        Confirm(context, tenantId, legacy);
+        Confirm(context, tenantId, reissue);
         return false;
     }
 
