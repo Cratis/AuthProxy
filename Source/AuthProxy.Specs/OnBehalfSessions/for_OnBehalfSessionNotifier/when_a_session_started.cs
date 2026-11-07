@@ -22,6 +22,11 @@ public class when_a_session_started : a_session_notifier
     [Fact] void should_carry_when_it_expires() => Body["expiresAt"]!.GetValue<DateTimeOffset>().ShouldEqual(_session.ExpiresAt);
     [Fact] void should_carry_the_grants_validity() => Body["grantValidUntil"]!.GetValue<DateTimeOffset>().ShouldEqual(_now.AddHours(2));
     [Fact] void should_send_the_tenant_header() => _handler.LastHeaders[Headers.TenantId].ShouldEqual(Sessions.Tenant);
+    [Fact] void should_send_the_legacy_tenant_header() => _handler.LastHeaders[Headers.LegacyTenantId].ShouldEqual(Sessions.Tenant);
+    [Fact] void should_send_the_actor_header() => _handler.LastHeaders[Headers.OnBehalfActor].ShouldEqual(OnBehalfApplication.Describe(_session.Actor).ToBase64());
+    [Fact] void should_send_the_attestation_as_a_bearer_token() => _handler.LastRequest!.Headers.Authorization!.Scheme.ShouldEqual("Bearer");
+    [Fact] void should_sign_the_method() => Token.GetClaim(OnBehalfAttestationClaims.HttpMethod).Value.ShouldEqual(_handler.LastRequest!.Method.Method);
+    [Fact] void should_sign_the_target() => Token.GetClaim(OnBehalfAttestationClaims.HttpUri).Value.ShouldEqual(_handler.LastRequest!.RequestUri!.GetLeftPart(UriPartial.Path));
     [Fact] void should_sign_it_as_a_start() => Token.GetClaim(OnBehalfAttestationClaims.Purpose).Value.ShouldEqual(OnBehalfAttestationClaims.SessionStartedPurpose);
     [Fact] void should_sign_the_exact_body() => Token.GetClaim(OnBehalfAttestationClaims.BodyHash).Value.ShouldEqual(BodyDigest);
 }
