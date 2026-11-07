@@ -27,6 +27,12 @@ store. AuthProxy supports three.
 
 Any of them can be combined with [Azure Key Vault key protection](#protecting-the-key-ring-with-azure-key-vault).
 
+Deployments sharing a key ring need [CredentialBinding](tenancy.md#credential-binding) settings: a shared key
+only proves that a deployment can decrypt an artifact, not that the artifact belongs to its resource or environment.
+AuthProxy logs a startup warning when `DataProtection` or `DataProtectionKeysPath` is configured without
+`CredentialBinding.Resource`. Set a trusted resource identifier and, when environments share keys, an environment
+identifier. Resource and environment scoping remains opt-in; the warning alone does not reject requests.
+
 ---
 
 ## File system (default)
@@ -210,7 +216,13 @@ startup**, naming the setting, rather than resolved by picking one:
    Protection keeps the loaded key ring in memory and re-reads the store periodically, so an outage that
    begins after a replica is running does not sign its callers out; it surfaces when the ring is next
    refreshed or a new key has to be written.
-4. Keep the application name `Cratis.AuthProxy`. AuthProxy sets it itself; it is part of what makes replicas
-   share keys, and it cannot be changed through configuration.
+4. Use identical `Cratis:AuthProxy:CredentialBinding:Resource` and `:Environment` settings on every replica.
+   Both default to empty, preserving the application name `Cratis.AuthProxy` and existing protected credentials.
+   Setting either opts into a binding-derived name: `Cratis.AuthProxy;resource=<resource>;environment=<environment>`,
+   omitting unset parts. Identifiers accept letters, digits, `-`, `.`, `_` and `~` (at most 256 characters),
+   never `;` or `=`, so bindings cannot share a name accidentally. Enabling or changing the binding signs everyone
+   out once: session and selected-tenant cookies, client-credentials and refresh tokens, and on-behalf sessions
+   protected under the previous name no longer unprotect, even when deployments share keys. Restart all replicas
+   together with the same trusted identifiers. See [credential binding](tenancy.md#credential-binding).
 5. Expect a new key ring, and a sign-out for everyone, when you move from one store to another. Keys are not
    copied between stores.

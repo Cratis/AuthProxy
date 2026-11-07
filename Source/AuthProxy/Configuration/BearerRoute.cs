@@ -71,6 +71,12 @@ public class BearerRoute
     public string TenantClaimType { get; set; } = DefaultTenantClaimType;
 
     /// <summary>
+    /// Gets or sets the environment claim required on the token. When set, exactly one non-empty value must
+    /// equal the deployment's CredentialBinding.Environment. Empty leaves environment validation disabled.
+    /// </summary>
+    public string EnvironmentClaimType { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets or sets the claims to rewrite before the principal is forwarded: forwarded claim type to the token claim
     /// it is read from, replacing all case variants of the target. A missing source refuses the token, as do
     /// multiple usable source values for mapped sub, preferred_username or name. Targets may not differ only

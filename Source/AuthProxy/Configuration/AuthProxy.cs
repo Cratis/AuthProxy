@@ -139,6 +139,11 @@ public class AuthProxy
     public DataProtection DataProtection { get; set; } = new();
 
     /// <summary>
+    /// Gets or sets the trusted resource and environment identifiers used to bind credentials to this deployment.
+    /// </summary>
+    public CredentialBinding CredentialBinding { get; set; } = new();
+
+    /// <summary>
     /// Gets or sets the <see cref="Tenants"/>.
     /// Tenants are keyed by tenant ID string.
     /// </summary>

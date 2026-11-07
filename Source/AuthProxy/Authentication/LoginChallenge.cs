@@ -51,6 +51,12 @@ public static class LoginChallenge
         }
 
         var returnUrl = context.Request.Query["returnUrl"].FirstOrDefault() ?? "/";
+        if (!BootstrapReturnUrl.PrepareLogin(context, returnUrl))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
         if (SignInCallbackHost.TryBuildLoginBounce(context, proxyConfig, scheme, returnUrl, out var bounce))
         {
             context.Response.Redirect(bounce);

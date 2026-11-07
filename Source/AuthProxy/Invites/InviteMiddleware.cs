@@ -614,7 +614,12 @@ public class InviteMiddleware(
     async Task ServeProviderSelection(HttpContext context, string token, List<OidcProviderInfo> providers)
     {
         // Multiple providers: inject the providers cookie and serve the selection page.
-        var providersJson = JsonSerializer.Serialize(providers, _providerSerializerOptions);
+        var returnUrl = context.GetPathAndQuery();
+        var continuations = providers.Select(provider => provider with
+        {
+            LoginUrl = QueryHelpers.AddQueryString(provider.LoginUrl, "returnUrl", returnUrl)
+        });
+        var providersJson = JsonSerializer.Serialize(continuations, _providerSerializerOptions);
         context.Response.Cookies.Append(Cookies.Providers, providersJson, new CookieOptions
         {
             HttpOnly = false,

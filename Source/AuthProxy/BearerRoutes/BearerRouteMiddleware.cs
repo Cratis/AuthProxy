@@ -18,6 +18,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="validator">The access-token validator.</param>
 /// <param name="accessPolicy">The deployment's claim requirements, applied to the token's principal.</param>
 /// <param name="tenantVerifier">The tenant existence verifier, applied when tenant verification is configured.</param>
+/// <param name="tenantResolver">The request's addressed tenants.</param>
 /// <param name="forwarder">The forwarder to the service backend.</param>
 /// <param name="logger">The logger.</param>
 /// <remarks>
@@ -47,6 +48,7 @@ public class BearerRouteMiddleware(
     IBearerTokenValidator validator,
     IAccessPolicy accessPolicy,
     ITenantVerifier tenantVerifier,
+    ITenantResolver tenantResolver,
     IBearerRouteForwarder forwarder,
     ILogger<BearerRouteMiddleware> logger)
 {
@@ -114,6 +116,12 @@ public class BearerRouteMiddleware(
             return;
         }
 
+        if (BindingConflicts(context, current, route, validation))
+        {
+            BearerChallenge.Forbidden(context);
+            return;
+        }
+
         var decision = accessPolicy.Evaluate(validation.Principal!, current, route.ServiceName, route.Route);
         if (!decision.IsGranted)
         {
@@ -131,5 +139,17 @@ public class BearerRouteMiddleware(
 
         context.User = validation.Principal!;
         await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
+    }
+
+    bool BindingConflicts(HttpContext context, C.AuthProxy current, ResolvedBearerRoute route, BearerTokenValidation validation)
+    {
+        var environmentConflict = route.Route.EnvironmentClaimType.Length > 0
+            && !CredentialTarget.Matches(validation.Environment, current.CredentialBinding.Environment);
+        var tenantConflict = tenantResolver.ResolveEach(context)
+            .Any(target => CredentialTarget.IsAddressedByRequest(target.Strategy, bearerRoute: true)
+                && !CredentialTarget.MatchesTenant(validation.TenantId, target.TenantId));
+        if (!environmentConflict && !tenantConflict) return false;
+        logger.BearerCredentialBoundElsewhere(route.Prefix, route.ServiceName, environmentConflict ? "environment" : "tenant", RequestPathRedaction.Redact(context.Request.Path));
+        return true;
     }
 }

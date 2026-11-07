@@ -1,6 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text.Json;
+using Microsoft.AspNetCore.WebUtilities;
+
 namespace Cratis.AuthProxy.Invites.for_InviteMiddleware;
 
 public class when_valid_invite_token_is_presented_with_multiple_providers : Specification
@@ -61,6 +64,19 @@ public class when_valid_invite_token_is_presented_with_multiple_providers : Spec
     [Fact]
     void should_include_provider_names_in_providers_cookie() =>
         _context.Response.Headers.SetCookie.ToString().ShouldContain("Microsoft");
+    [Fact]
+    void should_return_each_provider_to_the_pending_invitation()
+    {
+        var cookie = _context.Response.Headers.SetCookie.Single(value => value.StartsWith($"{Cookies.Providers}=", StringComparison.Ordinal));
+        var value = Uri.UnescapeDataString(cookie.Split(';')[0].Split('=', 2)[1]);
+        using var providers = JsonDocument.Parse(value);
+        foreach (var provider in providers.RootElement.EnumerateArray())
+        {
+            var login = new Uri(new Uri("https://local.test"), provider.GetProperty("loginUrl").GetString());
+            QueryHelpers.ParseQuery(login.Query)["returnUrl"].ToString().ShouldEqual("/invite/some-token");
+        }
+    }
+
     [Fact]
     void should_serve_invitation_select_provider_page() =>
         _errorPageProvider.Received(1).WriteErrorPageAsync(

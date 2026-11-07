@@ -25,4 +25,7 @@ public enum BearerTokenValidationStatus
 
     /// <summary>The issuer's metadata or signing keys could not be retrieved, so the token could not be checked.</summary>
     IssuerUnavailable = 5,
+
+    /// <summary>The token lacks a constraint the route requires.</summary>
+    UnboundCredential = 6,
 }

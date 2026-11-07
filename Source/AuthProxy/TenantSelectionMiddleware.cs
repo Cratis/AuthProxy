@@ -6,6 +6,7 @@ using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.OnBehalfSessions;
+using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -67,7 +68,7 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        var exempt = IsExemptFromTenantSelection(context);
+        var exempt = Tenancy.TenantSelectionExemptions.IsExemptFromTenantSelection(context, config.CurrentValue);
         if (!exempt && context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant))
         {
             await HandleTenantSelection(context, selectionOptions);
@@ -76,7 +77,8 @@ public class TenantSelectionMiddleware(
 
         // A selected tenant is confirmed for the signed-in account on every request, including the paths that
         // are otherwise served without tenant selection.
-        if (await ConfirmSelectedTenant(context, selectionOptions, exempt))
+        var resolvedTenant = TenantToConfirm(context, config.CurrentValue, exempt);
+        if (await ConfirmSelectedTenant(context, selectionOptions, exempt && resolvedTenant is null, resolvedTenant))
         {
             return;
         }
@@ -187,6 +189,22 @@ public class TenantSelectionMiddleware(
     static IdentityAccountTenantKey RevalidationCacheKey(IdentityAccountBinding account, string tenantId) =>
         IdentityAccountTenantKey.Create(RevalidationCacheKeyPrefix, account, tenantId);
 
+    static bool CanWriteSelectionCookie(TenantResolutionResult? resolved) =>
+        resolved is null || resolved.Strategy is C.TenantSourceIdentifierResolverType.Host or C.TenantSourceIdentifierResolverType.SubHost;
+
+    TenantResolutionResult? TenantToConfirm(HttpContext context, C.AuthProxy current, bool exempt)
+    {
+        if (TenantSelectionExemptions.IsExemptPath(context, current)) return null;
+        if (context.User.Identities.Any(identity => identity.IsAuthenticated && identity.AuthenticationType == ClientCredentialsDefaults.AuthenticationScheme)) return null;
+        if (!tenantResolver.TryResolve(context, out TenantResolutionResult resolved)) return null;
+        if (resolved.Strategy == C.TenantSourceIdentifierResolverType.Selection) return null;
+
+        var addressed = resolved.Strategy is C.TenantSourceIdentifierResolverType.Host
+            or C.TenantSourceIdentifierResolverType.SubHost
+            or C.TenantSourceIdentifierResolverType.Route;
+        return exempt || addressed ? resolved : null;
+    }
+
     async Task HandleTenantSelection(HttpContext context, Tenancy.SelectionOptions selectionOptions)
     {
         var tenantId = context.Request.Query["tenantId"].FirstOrDefault();
@@ -259,33 +277,17 @@ public class TenantSelectionMiddleware(
     }
 
     /// <summary>
-    /// Determines whether the request is served without tenant selection: invitations, registrations,
-    /// authentication bootstrap, declared anonymous paths and pending invitation or registration sessions.
-    /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <returns><see langword="true"/> when no tenant is chosen for the request; otherwise <see langword="false"/>.</returns>
-    bool IsExemptFromTenantSelection(HttpContext context) =>
-        context.IsInvitation()
-        || context.IsRegistration()
-        || context.IsAuthenticationBootstrap()
-
-        // A path the deployment declares anonymous is served without regard to who is asking, so it
-        // stays reachable for a caller who happens to be signed in without having chosen a tenant.
-        || context.IsAnonymousPath(config.CurrentValue)
-        || context.HasPendingInvitation()
-        || context.HasPendingRegistration();
-
-    /// <summary>
     /// Confirms the tenant named by the selected-tenant cookie for the signed-in account and records it on the request.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="selectionOptions">The selection strategy options carrying the tenant endpoint.</param>
     /// <param name="exempt">Whether the request is served without tenant selection.</param>
+    /// <param name="resolvedTenant">The effective addressed tenant requiring membership confirmation, if any.</param>
     /// <returns><see langword="true"/> when a response was written and the request ends here; otherwise <see langword="false"/>.</returns>
-    async Task<bool> ConfirmSelectedTenant(HttpContext context, Tenancy.SelectionOptions selectionOptions, bool exempt)
+    async Task<bool> ConfirmSelectedTenant(HttpContext context, Tenancy.SelectionOptions selectionOptions, bool exempt, TenantResolutionResult? resolvedTenant = null)
     {
         var cookie = selectedTenantCookie.Read(context);
-        if (cookie.State == Tenancy.SelectedTenantCookieState.None)
+        if (cookie.State == Tenancy.SelectedTenantCookieState.None && resolvedTenant is null)
         {
             return false;
         }
@@ -294,19 +296,21 @@ public class TenantSelectionMiddleware(
         {
             logger.SelectedTenantCookieRejected();
             Tenancy.SelectedTenantCookie.Delete(context);
-            return false;
+            if (resolvedTenant is null) return false;
         }
 
-        var tenantId = cookie.TenantId;
+        var tenantId = resolvedTenant?.TenantId ?? cookie.TenantId;
         var principal = context.BuildClientPrincipal();
         var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), config.CurrentValue.Authentication.TotalProviderCount, out var account);
         var cached = hasBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, tenantId), out _);
-        var legacy = cookie.State == Tenancy.SelectedTenantCookieState.Legacy;
+        var legacy = cookie.State != Tenancy.SelectedTenantCookieState.Bound
+            || !CredentialTarget.MatchesTenant(cookie.TenantId, tenantId);
         var interval = config.CurrentValue.Session.TenantRevalidationInterval;
+        var reissue = legacy && CanWriteSelectionCookie(resolvedTenant);
 
         if (cached || (!legacy && interval <= TimeSpan.Zero))
         {
-            Confirm(context, tenantId, legacy);
+            Confirm(context, tenantId, reissue);
             return false;
         }
 
@@ -343,13 +347,19 @@ public class TenantSelectionMiddleware(
                 return false;
             }
 
+            if (resolvedTenant is not null)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return true;
+            }
+
             context.Response.StatusCode = StatusCodes.Status302Found;
             context.Response.Headers.Location = context.GetPathAndQuery();
             return true;
         }
 
         MarkTenantAsRevalidated(context, tenantId);
-        Confirm(context, tenantId, legacy);
+        Confirm(context, tenantId, reissue);
         return false;
     }
 

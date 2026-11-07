@@ -286,11 +286,60 @@ See [Error pages](error-pages.md) to override this page.
 
 ---
 
+## Credential binding
+
+A credential bound to tenant A cannot authorize a request addressing tenant B, even when the person belongs
+to both tenants. AuthProxy compares tenant identifiers with `OrdinalIgnoreCase`: `Tenant-A` and `tenant-a`
+name the same tenant. It does not trim or otherwise repair identifiers. This tenant mismatch refusal is always enabled, including
+unsigned deployments and deployments without resource or environment scoping.
+
+For browser sessions, the protected selected-tenant cookie and tenants resolved from `Claim` are credential
+constraints. An on-behalf session uses only its represented tenant, not the actor's own claims or selection.
+AuthProxy client-credentials tokens use their verified `cratis/tenant` claim; the same claim from another
+authentication scheme does not create a client-credentials binding. `Host`, `SubHost`, `Route` and `Specified`
+address the target tenant. `Default` supplies a fallback, not another credential constraint; when that fallback
+wins resolution, the effective tenant is still checked against the credential before namespace selection or forwarding.
+Tenant comparisons use `OrdinalIgnoreCase`, consistently with on-behalf tenancy checks. Resource and environment
+comparisons remain ordinal and case-sensitive.
+
+AuthProxy refuses an addressed mismatch with `403` and `Cache-Control: no-store` before membership lookup, tenant
+verification, namespace selection or forwarding. Pending invitation and registration cookies do not bypass binding checks. Its warning identifies the credential kind and redacted
+request path without logging tenant values. An unbound session can still use an addressed tenant, subject to
+the usual membership checks. When Selection is configured, an authenticated browser addressing a tenant through
+Host, SubHost or Route must confirm membership through the configured tenants endpoint, even without a selection
+cookie or with a legacy plain cookie. Host and SubHost confirmation issues a host-only bound selection cookie.
+Route confirmation does not bind the shared host to one tenant; it uses the per-account, per-tenant memory cache
+and the normal revalidation interval instead. Each newly addressed tenant still requires membership confirmation. A pending invitation or registration cookie may defer selection,
+but cannot authorize forwarding to an unconfirmed tenant. Deployments without Selection keep their existing
+addressing behavior. Legacy unsigned selection cookies do not establish a binding; the tenant-selection
+flow confirms them as before. Switch tenants through `/.cratis/select-tenant`, rather than replaying a selection
+on another tenant's host. Invitation, registration, authentication-bootstrap and declared anonymous paths remain
+reachable before tenant selection.
+
+A browser session without a tenant binding remains unbound and uses normal tenant selection and membership
+verification. A foreign resource/environment selection cookie is discarded. If the session is otherwise valid
+and authenticated, AuthProxy reconfirms membership through the tenants endpoint and redirects to the original
+path without forwarding that application request or using the foreign cookie's tenant. An encrypted session
+ticket from another resource/environment cannot authenticate the caller and does not reach a backend.
+
+To isolate AuthProxy-issued credentials by resource or environment, set `Cratis:AuthProxy:CredentialBinding:Resource`
+and/or `Cratis:AuthProxy:CredentialBinding:Environment` to trusted deployment identifiers. Each defaults to an
+empty string (no declared binding). A declared value accepts letters, digits, `-`, `.`, `_` and `~`, up to 256
+characters, with no surrounding whitespace; invalid configuration prevents startup. Never derive these settings
+from caller input. Enabling or changing them signs everyone out once; restart every replica with identical
+settings. See [data-protection binding](data-protection.md#multi-replica-checklist).
+
 ## Bearer routes
 
 On a [bearer route](services.md#bearer-routes) the tenant comes from the access token alone: the claim named by
-`TenantClaimType` (`tid` by default). None of the resolution strategies above run, the tenant-selection cookie is
-never read and the tenant-selection page is never served.
+`TenantClaimType` (`tid` by default). `Host`, `SubHost` and `Route` resolutions constrain the addressed target:
+a token naming another tenant is refused with `403`. `Specified` and `Default` do not override or constrain the
+token tenant on bearer routes. The tenant-selection cookie is never read and the tenant-selection page is never served.
+
+A route can also set `EnvironmentClaimType`, for example `env`. This requires a declared
+`CredentialBinding:Environment` at startup and exactly one non-empty claim value on each token, matching that
+environment exactly. Missing or mismatched values produce `403`; case and whitespace variants are not repaired.
+The route's `Audiences` continue to enforce the resource constraint through the token's `aud` claim.
 
 - A token that does not carry exactly one tenant, or carries one that is not made of letters, digits, `-`, `.`,
   `_` or `~` (at most 256 characters), is refused with `403`. There is no fallback to a default tenant.

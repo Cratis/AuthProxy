@@ -123,10 +123,12 @@ public static class IngressExtensions
         builder.AddActingOnBehalf();
 
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, KeyRingConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, CredentialBindingConfigurationValidator>();
         builder.Services
             .AddDataProtection()
-            .SetApplicationName("Cratis.AuthProxy")
             .ApplyConfiguredKeyRing(builder.Configuration);
+        builder.Services.AddOptions<DataProtectionOptions>().Configure<IConfiguration>((options, configuration) =>
+            options.ApplicationDiscriminator = CredentialBindingProtection.ApplicationName(configuration));
 
         return builder;
     }
@@ -156,6 +158,8 @@ public static class IngressExtensions
         {
             app.Logger.SessionConfigurationWarning(warning);
         }
+
+        app.WarnAboutUnscopedKeyRing();
 
         if (bool.TryParse(Environment.GetEnvironmentVariable(ForwardedHeadersEnvironmentVariable), out var hostHandlesForwardedHeaders)
             && hostHandlesForwardedHeaders)
@@ -228,7 +232,11 @@ public static class IngressExtensions
         // After the deployment's gates, so an actor must be allowed in as themselves before acting as anybody, and
         // before tenant selection, tenancy and identity resolution, so all three see the represented user.
         app.UseMiddleware<OnBehalfMiddleware>();
+
+        // Refuse bound-credential conflicts before membership lookup and namespace selection.
+        app.UseMiddleware<CredentialBindingMiddleware>();
         app.UseMiddleware<TenantSelectionMiddleware>();
+        app.UseMiddleware<CredentialBindingMiddleware>(true);
         app.UseMiddleware<TenancyMiddleware>();
         app.UseInviteMiddleware();
         app.UseMiddleware<RegistrationMiddleware>();
@@ -240,6 +248,16 @@ public static class IngressExtensions
         app.UseReverseProxy();
 
         return app;
+    }
+
+    static void WarnAboutUnscopedKeyRing(this WebApplication app)
+    {
+        var authProxy = app.Services.GetRequiredService<IOptions<C.AuthProxy>>().Value;
+        if (!string.IsNullOrWhiteSpace(authProxy.CredentialBinding.Resource)) return;
+
+        var configuredKeyRing = app.Configuration.GetSection(C.DataProtection.SectionKey).Exists()
+            || !string.IsNullOrWhiteSpace(authProxy.DataProtectionKeysPath);
+        if (configuredKeyRing) app.Logger.SharedKeyRingWithoutCredentialBinding();
     }
 
     static void MapIngressEndpoints(this WebApplication app)

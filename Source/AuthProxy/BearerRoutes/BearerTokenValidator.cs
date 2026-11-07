@@ -166,11 +166,18 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
                 $"The token lacks the required scope(s) {string.Join(' ', missingScopes)}.");
         }
 
-        if (!TryGetSingleValue(claims, route.TenantClaimType, out var tenantId) || !IsUsableTenantId(tenantId))
+        if (!TryGetSingleValue(claims, route.TenantClaimType, out var tenantId, trim: false) || !IsUsableTenantId(tenantId))
         {
             return BearerTokenValidation.Refused(
                 BearerTokenValidationStatus.MissingTenant,
                 $"The token carries no single usable '{route.TenantClaimType}' claim.");
+        }
+
+        string? environment = null;
+        if (route.Route.EnvironmentClaimType.Length > 0
+            && !TryGetSingleValue(claims, route.Route.EnvironmentClaimType, out environment, trim: false))
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.UnboundCredential, "The token carries no single usable environment constraint.");
         }
 
         if (!TryGetSingleValue(claims, SubjectClaimType, out var subject))
@@ -200,7 +207,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         forwarded.AddRange(scopes.Select(_ => new Claim(BearerRouteClaims.Scope, _)));
 
         var identity = new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role);
-        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId);
+        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment);
     }
 
     static TokenValidationParameters CreateParameters(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, IReadOnlyCollection<SecurityKey> keys) => new()
@@ -291,10 +298,11 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         }
     }
 
-    static bool TryGetSingleValue(IEnumerable<Claim> claims, string claimType, out string value)
+    static bool TryGetSingleValue(IEnumerable<Claim> claims, string claimType, out string value, bool trim = true)
     {
         var values = claims.Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal)).Take(2).ToArray();
-        value = values.Length == 1 ? values[0].Value.Trim() : string.Empty;
+        value = values.Length == 1 ? values[0].Value : string.Empty;
+        if (trim) value = value.Trim();
         return value.Length > 0;
     }
 
