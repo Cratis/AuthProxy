@@ -40,7 +40,7 @@ public static class BearerRouteServiceCollectionExtensions
         })
 
             // An issuer's response cannot choose a second address for AuthProxy to fetch.
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
         builder.Services.AddSingleton<IBearerIssuerMetadata, BearerIssuerMetadata>();
         builder.Services.AddSingleton<IBearerTokenValidator, BearerTokenValidator>();
         builder.Services.AddSingleton<IBearerRouteForwarder, BearerRouteForwarder>();

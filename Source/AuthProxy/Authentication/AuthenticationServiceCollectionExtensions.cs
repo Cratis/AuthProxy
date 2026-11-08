@@ -105,7 +105,7 @@ public static class AuthenticationServiceCollectionExtensions
 
         if (jwtSection.Exists())
         {
-            authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, jwtSection.Bind);
+            authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => ConfigureJwtBearerOptions(options, jwtSection));
             builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
             {
                 var existing = options.Events.OnTokenValidated;
@@ -154,6 +154,12 @@ public static class AuthenticationServiceCollectionExtensions
         }
 
         return CookieAuthenticationDefaults.AuthenticationScheme;
+    }
+
+    static void ConfigureJwtBearerOptions(JwtBearerOptions options, IConfigurationSection section)
+    {
+        section.Bind(options);
+        options.BackchannelHttpHandler = new HttpClientHandler { UseCookies = false };
     }
 
     static void ConfigureCookieOptions(CookieAuthenticationOptions options, C.Session session)
@@ -289,6 +295,7 @@ public static class AuthenticationServiceCollectionExtensions
 
     static void ConfigureOidcOptions(OpenIdConnectOptions options, C.OidcProvider provider, string scheme)
     {
+        options.BackchannelHttpHandler = new HttpClientHandler { UseCookies = false };
         options.Authority = provider.Authority;
         options.ClientId = provider.ClientId;
         options.ClientSecret = provider.UsesClientAssertion ? null : provider.ClientSecret;
@@ -408,6 +415,7 @@ public static class AuthenticationServiceCollectionExtensions
 
     static void ConfigureOAuthOptions(OAuthOptions options, C.OAuthProvider provider, string scheme)
     {
+        options.BackchannelHttpHandler = new HttpClientHandler { UseCookies = false };
         options.AuthorizationEndpoint = provider.AuthorizationEndpoint;
         options.TokenEndpoint = provider.TokenEndpoint;
         options.UserInformationEndpoint = provider.UserInformationEndpoint;

@@ -29,7 +29,7 @@ public static class InvitesServiceCollectionExtensions
         })
 
             // A metadata response cannot choose another address for AuthProxy to fetch.
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
         builder.Services.AddSingleton<IInvitationAttestationIssuer, InvitationAttestationIssuer>();
         builder.Services.AddSingleton<IInvitationEntryStateProtector, InvitationEntryStateProtector>();
         builder.Services.AddSingleton<IValidateOptions<Configuration.AuthProxy>, InvitationAttestationConfigurationValidator>();
