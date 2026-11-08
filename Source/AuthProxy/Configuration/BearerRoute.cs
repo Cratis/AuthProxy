@@ -146,4 +146,12 @@ public class BearerRoute
     /// </para>
     /// </remarks>
     public bool AcceptWithoutIdentityVerification { get; set; }
+
+    /// <summary>
+    /// Gets or sets the personal access tokens the route accepts, when it does. A route with both this and
+    /// <see cref="Issuers"/> accepts either kind of credential and never retries one as the other; a route with
+    /// this and no issuers accepts personal access tokens alone, advertises no OAuth metadata, and takes no
+    /// <see cref="ResourceMetadataUrl"/>.
+    /// </summary>
+    public BearerRoutePersonalAccessTokens? PersonalAccessTokens { get; set; }
 }

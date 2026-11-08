@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -113,6 +114,33 @@ public class BearerRouteMiddleware(
 
     async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
+        // The credential's kind is decided once, here. The branch it lands in is the only one that sees it: a
+        // refusal is never retried as the other kind.
+        var (dispatch, reason) = CredentialDispatcher.Dispatch(context.Request, route);
+        switch (dispatch)
+        {
+            case CredentialDispatch.Ambiguous:
+                logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
+                BearerChallenge.MultipleCredentials(context);
+                return;
+
+            case CredentialDispatch.Refused:
+                logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason), route);
+                return;
+
+            case CredentialDispatch.Missing:
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Missing, "No bearer token was presented."), route);
+                return;
+
+            case CredentialDispatch.PersonalAccessToken:
+                // The service behind the route verifies the token; this gate only recognized it and checked it names
+                // this route's resource.
+                context.Items[BearerRouteDefaults.PassThroughAuthorizationItemKey] = true;
+                await forwarder.Forward(context, route, identity: null);
+                return;
+        }
+
         var validation = await validator.Validate(context.Request, route, context.RequestAborted);
         if (!validation.Succeeded)
         {

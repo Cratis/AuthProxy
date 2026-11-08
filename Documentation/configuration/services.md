@@ -979,8 +979,9 @@ every token-authenticated request instead.
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `PathPrefix` | `string` | — | The prefix this route covers, for example `/mcp`. Matched case-insensitively on segment boundaries, with the same rules as [anonymous paths](#what-a-valid-entry-looks-like). The longest matching prefix wins. |
-| `Issuers` | `BearerIssuerConfig[]` | — | The authorization servers whose tokens are accepted. At least one. |
-| `Audiences` | `string[]` | — | The token's `aud` must exactly match at least one of these, including any trailing slash. At least one. |
+| `Issuers` | `BearerIssuerConfig[]` | `[]` | The authorization servers whose tokens are accepted. At least one, unless `PersonalAccessTokens` is declared. |
+| `Audiences` | `string[]` | — | The token's `aud` must exactly match at least one of these, including any trailing slash. At least one, unless the route accepts personal access tokens only. |
+| `PersonalAccessTokens` | `{ ResourceKey }` | `null` | Accept personal access tokens of one resource on this route: `ResourceKey` is `direct`, `studio` or `stage-<app-key>`. With `Issuers` the route accepts either kind of credential; without, personal access tokens alone, and it takes no `ResourceMetadataUrl` (its well-known metadata path answers `404`). A token is recognized by its `<resource-key>_pat_` prefix, checked for shape and checksum and for its resource, and handed to the service unchanged; the service verifies it. A value is handled as one kind only and never retried as the other. |
 | `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
 | `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication and must be outside every bearer-route prefix. |
 | `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |

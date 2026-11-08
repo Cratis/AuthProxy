@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Runtime.CompilerServices;
+using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.BearerRoutes;
@@ -22,6 +23,11 @@ public static class BearerRouteTable
     /// The path segment RFC 8414 inserts between an issuer's host and path to locate its metadata document.
     /// </summary>
     public const string AuthorizationServerMetadataPath = "/.well-known/oauth-authorization-server";
+
+    /// <summary>
+    /// The RFC 9728 well-known path a protected resource's metadata document lives under.
+    /// </summary>
+    public const string ProtectedResourceMetadataPath = "/.well-known/oauth-protected-resource";
 
     static readonly ConditionalWeakTable<C.AuthProxy, Resolution> _resolved = [];
 
@@ -236,9 +242,11 @@ public static class BearerRouteTable
     {
         resolved = default!;
 
+        var tokens = route.PersonalAccessTokens;
         if (AnonymousPathPolicy.Evaluate(route.PathPrefix, out var prefix) != AnonymousPathRejection.None
-            || route.Issuers.Count == 0
-            || route.Audiences.All(string.IsNullOrWhiteSpace))
+            || (route.Issuers.Count == 0 && tokens is null)
+            || (route.Issuers.Count > 0 && route.Audiences.All(string.IsNullOrWhiteSpace))
+            || (tokens is not null && !PersonalAccessTokenClassifier.IsValidResourceKey(tokens.ResourceKey)))
         {
             return false;
         }
@@ -256,7 +264,18 @@ public static class BearerRouteTable
 
         Uri? metadataUrl = null;
         string? metadataPath = null;
-        if (!string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
+        if (issuers.Count == 0)
+        {
+            // No OAuth metadata to serve: the well-known path of the resource is answered with a not-found by the
+            // gate, so it is not proxied to the backend as an unauthenticated browser path.
+            if (!string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
+            {
+                return false;
+            }
+
+            metadataPath = ProtectedResourceMetadataPath + prefix;
+        }
+        else if (!string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
         {
             if (!TryParseAuthorityUri(route.ResourceMetadataUrl, out metadataUrl, out _)
                 || AnonymousPathPolicy.Evaluate(metadataUrl.AbsolutePath, out var normalizedMetadataPath) != AnonymousPathRejection.None)
@@ -267,7 +286,14 @@ public static class BearerRouteTable
             metadataPath = normalizedMetadataPath;
         }
 
-        resolved = new ResolvedBearerRoute(serviceName, backendBaseUrl, prefix, issuers, route, metadataUrl, metadataPath);
+        var profile = (issuers.Count, tokens) switch
+        {
+            (0, not null) => BearerProfile.PatOnly,
+            (_, not null) => BearerProfile.Combined,
+            _ => BearerProfile.OAuthOnly,
+        };
+
+        resolved = new ResolvedBearerRoute(serviceName, backendBaseUrl, prefix, issuers, route, metadataUrl, metadataPath, profile, tokens?.ResourceKey);
         return true;
     }
 

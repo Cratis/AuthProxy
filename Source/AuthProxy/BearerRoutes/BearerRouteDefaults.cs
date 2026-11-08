@@ -25,6 +25,12 @@ public static class BearerRouteDefaults
     /// </summary>
     internal const string ForwardedIdentityItemKey = "Cratis.AuthProxy.BearerRoutes.ForwardedIdentity";
 
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key marking a request whose credential is handed on to the service as
+    /// presented, because the service is the one that verifies it.
+    /// </summary>
+    internal const string PassThroughAuthorizationItemKey = "Cratis.AuthProxy.BearerRoutes.PassThroughAuthorization";
+
     /// <summary>The service selected by the bearer route.</summary>
     internal const string ServiceItemKey = "Cratis.AuthProxy.BearerRoutes.Service";
 }

@@ -27,6 +27,11 @@ public static class BearerChallenge
     public const int IssuerUnavailableRetryAfterSeconds = 30;
 
     /// <summary>
+    /// The status of a request that presents more than one credential (RFC 6750 §3.1: <c language="text">invalid_request</c>).
+    /// </summary>
+    public const int MultipleCredentialsStatusCode = StatusCodes.Status400BadRequest;
+
+    /// <summary>
     /// Writes the refusal matching a failed validation.
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
@@ -87,6 +92,13 @@ public static class BearerChallenge
         NoStore(context);
         MachineResponse.Write(context, StatusCodes.Status403Forbidden, "forbidden");
     }
+
+    /// <summary>
+    /// Refuses a request that presented more than one credential, without choosing between them.
+    /// </summary>
+    /// <param name="context">The request context.</param>
+    public static void MultipleCredentials(HttpContext context) =>
+        Refuse(context, MultipleCredentialsStatusCode, "invalid_request", ChallengeValue(resourceMetadataUrl: null, "invalid_request", scope: null));
 
     /// <summary>
     /// Writes a bare <c language="text">400</c>: the request path is not one AuthProxy will vouch for a principal on.

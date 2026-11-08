@@ -3,6 +3,7 @@
 
 using System.Buffers;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -135,9 +136,11 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             }
         }
 
-        if (route.Issuers.Count == 0)
+        ValidatePersonalAccessTokens(at, route, failures);
+
+        if (route.Issuers.Count == 0 && route.PersonalAccessTokens is null)
         {
-            failures.Add($"{at}:{nameof(C.BearerRoute.Issuers)} is empty. A bearer route must name the authorization server whose tokens it accepts.");
+            failures.Add($"{at}:{nameof(C.BearerRoute.Issuers)} is empty. A bearer route must name the authorization server whose tokens it accepts, or declare {nameof(C.BearerRoute.PersonalAccessTokens)}.");
         }
 
         for (var i = 0; i < route.Issuers.Count; i++)
@@ -150,7 +153,8 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             }
         }
 
-        if (route.Audiences.All(string.IsNullOrWhiteSpace))
+        var acceptsTokensOnly = route.Issuers.Count == 0 && route.PersonalAccessTokens is not null;
+        if (!acceptsTokensOnly && route.Audiences.All(string.IsNullOrWhiteSpace))
         {
             failures.Add($"{at}:{nameof(C.BearerRoute.Audiences)} is empty. A bearer route must name the audience its tokens are issued for.");
         }
@@ -208,6 +212,26 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             {
                 failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} has conflicting targets differing only by case: '{target}'.");
             }
+        }
+    }
+
+    static void ValidatePersonalAccessTokens(string at, C.BearerRoute route, List<string> failures)
+    {
+        if (route.PersonalAccessTokens is not { } tokens)
+        {
+            return;
+        }
+
+        if (!PersonalAccessTokenClassifier.IsValidResourceKey(tokens.ResourceKey))
+        {
+            failures.Add(
+                $"{at}:{nameof(C.BearerRoute.PersonalAccessTokens)}:{nameof(C.BearerRoutePersonalAccessTokens.ResourceKey)} must be 'direct', 'studio' or 'stage-<app-key>' " +
+                "with a lowercase letter, digit or hyphen app key.");
+        }
+
+        if (route.Issuers.Count == 0 && !string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
+        {
+            failures.Add($"{at}:{nameof(C.BearerRoute.ResourceMetadataUrl)} is set on a route that accepts personal access tokens only, which has no OAuth metadata to advertise.");
         }
     }
 
