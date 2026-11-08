@@ -41,6 +41,8 @@ Host matching is case-insensitive and does not distinguish ports: do not share a
 
 Sticky replica routing keeps the configured DNS authority as the TLS target even when connecting to a discovered IP address. Issue server certificates for that DNS name, not for the replica's incidental IP address.
 
+AuthProxy's factory-managed back-channel clients do not store or replay response cookies, including verifier, callback and metadata clients. A backend cannot establish a cookie session that subsequent calls inherit through a pooled handler. Each call carries only its explicitly constructed identity and credentials; documented callback identity headers remain unchanged. OAuth, OIDC and JWT bearer provider back channels also do not store or replay response cookies.
+
 ## Identity-hop requirements
 
 Set `Cratis:AuthProxy:BackendTls:RequireTlsOnIdentityHops` to `true` to require **HTTPS on every identity-bearing hop**, even without forwarded-identity signing. This is an operator-controlled server setting, not a caller header or request option. It defaults to `false` in this minor release; a future major release will make it the default. With it off, existing transport behavior is unchanged, including the signing requirements and LocalDevelopment exemptions.

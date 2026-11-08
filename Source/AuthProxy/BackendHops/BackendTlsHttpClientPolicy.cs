@@ -17,12 +17,12 @@ namespace Cratis.AuthProxy.BackendHops;
 internal sealed class BackendTlsHttpClientPolicy(IOptionsMonitor<C.AuthProxy> config, IBackendTlsMaterialSource material, ILogger<BackendTlsHttpClientPolicy> logger)
 {
     /// <summary>
-    /// Creates a redirect-disabled back-channel handler with the shared TLS policy.
+    /// Creates a redirect-disabled, cookie-free back-channel handler with the shared TLS policy.
     /// </summary>
     /// <returns>The configured transport.</returns>
     internal SocketsHttpHandler CreateHandler()
     {
-        var handler = new SocketsHttpHandler { AllowAutoRedirect = false };
+        var handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false };
         Apply(handler);
         return handler;
     }

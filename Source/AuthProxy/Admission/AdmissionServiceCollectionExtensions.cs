@@ -52,7 +52,7 @@ public static class AdmissionServiceCollectionExtensions
             .AddHttpClient(CapabilityVerifier.HttpClientName, client => client.Timeout = VerifierTimeout)
             .ConfigurePrimaryHttpMessageHandler(services => services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.BackendTls.RequireTlsOnIdentityHops
                 ? services.GetRequiredService<BackendTlsHttpClientPolicy>().CreateHandler()
-                : new SocketsHttpHandler { AllowAutoRedirect = false });
+                : new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
 
         return builder;
     }
