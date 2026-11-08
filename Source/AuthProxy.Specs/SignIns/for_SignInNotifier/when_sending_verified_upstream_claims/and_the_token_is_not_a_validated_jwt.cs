@@ -13,7 +13,7 @@ public class and_the_token_is_not_a_validated_jwt : a_verified_claims_sign_in_no
 
     async Task Because()
     {
-        VerifiedUpstreamClaims.Capture(_httpContext, Scheme, null);
+        VerifiedUpstreamClaims.Capture(_httpContext, Scheme, null, null);
         await _notifier.Notify(_httpContext, _principal, Scheme);
         _body = Encoding.UTF8.GetString(_handler.LastRequestBytes.Span);
     }

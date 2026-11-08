@@ -63,7 +63,8 @@ public class SignIn
     /// <c language="text">github_id</c>, <c language="text">auth_time</c> and <c language="text">jti</c>. Off by default.
     /// </summary>
     /// <remarks>
-    /// The claims are taken only from the identity token AuthProxy validated, and a claim the token lacks is omitted.
+    /// Each claim is taken only from the identity token or the access token AuthProxy validated in the same code exchange
+    /// (the access token must be valid and name the identity token's subject, or no claim is sent), and a claim its token lacks is omitted.
     /// They are only ever sent inside a signed body, so this requires <see cref="Attestation"/>; without it no
     /// claims are sent and startup validation fails. No token is carried.
     /// </remarks>

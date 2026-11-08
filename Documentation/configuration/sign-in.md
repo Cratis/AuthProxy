@@ -277,9 +277,16 @@ without it.
 
 What a receiver can trust:
 
-- Every value was read by AuthProxy from the identity token it validated for this sign-in (signature, issuer,
-  audience, lifetime, state and PKCE). None comes from the user-info response, the session, a request header or
-  anything the caller sent, and a caller-supplied copy is never forwarded.
+- Every value was read by AuthProxy from a token it validated for this sign-in, as the table below shows. None
+  comes from the user-info response, the session, a request header or anything the caller sent, and a
+  caller-supplied copy is never forwarded.
+- The access token is the one returned in the same authorization-code exchange as the identity token. Before any
+  claim is read from it, AuthProxy checks its signature against the provider's published keys (RS256 or ES256),
+  that its issuer is the identity token's issuer, that its audience is AuthProxy's `ClientId` or the provider's
+  `Resource`, that its `typ` header is `at+jwt`, and that it has not expired. Its `sub` must also equal the
+  identity token's `sub`. If any check fails, or the response carries no access token, **no** `verifiedClaims`
+  are sent — the identity token's claims are not sent on their own. The failure is logged without any token
+  material, and the access token is never stored.
 - A claim the token does not carry, carries more than once, or carries malformed (`auth_time` must be whole
   seconds) is left out. Absence means "not verified", never a default.
 - The claims are inside the body covered by `body_hash`, so changing one invalidates the envelope. Verify the
@@ -288,6 +295,14 @@ What a receiver can trust:
 - Only OpenID Connect providers contribute claims. A sign-in through an OAuth-only provider sends no
   `verifiedClaims`.
 - The object is a statement about the provider's authentication. It grants no membership, role or scope.
+
+| Claim | Source token |
+| --- | --- |
+| `iss`, `sub`, `auth_time`, `jti` | identity token |
+| `idp`, `idp_sub`, `github_id` | access token |
+
+A claim is read only from its own token, so a value placed in the other token is ignored. A value with leading
+or trailing whitespace is left out rather than trimmed.
 
 Without the setting the notification is unchanged.
 
