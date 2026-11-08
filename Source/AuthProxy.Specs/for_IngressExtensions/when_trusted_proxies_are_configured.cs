@@ -34,5 +34,5 @@ public class when_trusted_proxies_are_configured : an_ingress_configuration
     [Fact] void should_know_every_declared_peer() => _options.KnownIPNetworks.Count.ShouldEqual(2);
     [Fact] void should_bind_the_forward_limit() => _options.ForwardLimit.ShouldEqual(3);
     [Fact] void should_still_consume_only_the_address_and_scheme() => _options.ForwardedHeaders.ShouldEqual(ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
-    [Fact] void should_not_report_the_legacy_allow_all_fallback() => _serviceProvider.GetRequiredService<ITrustedProxyPolicy>().IsLegacyAllowAll.ShouldBeFalse();
+    [Fact] void should_not_report_an_empty_boundary() => _serviceProvider.GetRequiredService<ITrustedProxyPolicy>().TrustsNoOne.ShouldBeFalse();
 }

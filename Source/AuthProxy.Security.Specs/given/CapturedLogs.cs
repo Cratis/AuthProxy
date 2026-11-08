@@ -11,12 +11,8 @@ namespace Cratis.AuthProxy.Security.given;
 /// have been told.
 /// </summary>
 /// <remarks>
-/// Normally specs stay away from logging, and for good reason — it is presentation, and asserting on it makes
-/// specs brittle. This is the exception the rule leaves room for: a warning is the entire user-visible
-/// behavior of the compatibility fallback. A deployment that has not declared its trusted proxies is not
-/// refused, is not degraded, and behaves exactly as before; the one thing that tells its operator anything at
-/// all is the line at startup. A spec that skipped it would be leaving the feature's only observable effect
-/// unverified.
+/// Logging is part of the operator-facing behavior when no trusted proxies are configured. These captures
+/// let specs check that startup and ignored-header warnings explain which settings to configure.
 /// </remarks>
 public sealed class CapturedLogs : ILoggerProvider
 {

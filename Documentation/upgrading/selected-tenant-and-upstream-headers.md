@@ -67,6 +67,12 @@ services. Every other cookie arrives unchanged and in order. A service that read
 
 ## Forwarded headers
 
-With no `TrustedProxies` configured, AuthProxy logs one warning per process when a caller at a public address sends
-`X-Forwarded-For` or `X-Forwarded-Proto`. Behavior is unchanged; set `Cratis:AuthProxy:Ingress:TrustedProxies`
-as described in [trusted proxies](../configuration/trusted-proxies.md).
+In default `Configured` mode with no `TrustedProxies`, AuthProxy now ignores forwarded headers from every
+caller and retains the connection's client address and scheme. It logs a startup warning and one warning per
+process when forwarded headers are received in that mode.
+
+Behind an ingress, set `Cratis:AuthProxy:Ingress:TrustedProxies` and
+`Cratis:AuthProxy:Ingress:ForwardLimit` for your deployment. To retain allow-all behavior when only your ingress
+can connect, explicitly select `Cratis:AuthProxy:Ingress:Mode=TrustAny`. See the
+[trusted-proxy upgrade note](../configuration/trusted-proxies.md#upgrading-a-deployment-with-no-trusted-proxies).
+Local Aspire run mode supplies `TrustAny` only when no boundary settings were supplied; publish mode is unchanged.

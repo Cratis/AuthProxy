@@ -33,10 +33,14 @@ public static partial class AuthProxyExtensions
     public static IResourceBuilder<AuthProxyResource> AddAuthProxy(
         this IDistributedApplicationBuilder builder,
         string name,
-        string? tag = null) =>
-        builder
+        string? tag = null)
+    {
+        var resource = builder
             .AddResource(new AuthProxyResource(name))
             .WithImage(AuthProxyResource.ContainerImageName, tag ?? AuthProxyResource.ContainerImageTag);
+        ApplyLocalTrustedProxyDefault(resource);
+        return resource;
+    }
 
     /// <summary>
     /// Registers a backend (API) endpoint for a named service in AuthProxy.

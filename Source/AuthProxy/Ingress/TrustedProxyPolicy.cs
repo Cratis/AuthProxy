@@ -29,7 +29,7 @@ public class TrustedProxyPolicy(IOptions<C.Ingress> ingress) : ITrustedProxyPoli
     readonly System.Net.IPNetwork[] _networks = [.. ingress.Value.TrustedProxies.Select(TrustedProxyAddress.Resolve).OfType<System.Net.IPNetwork>()];
 
     /// <inheritdoc/>
-    public bool IsLegacyAllowAll =>
+    public bool TrustsNoOne =>
         _ingress.Mode == C.TrustedProxyMode.Configured && _ingress.TrustedProxies.Count == 0;
 
     /// <inheritdoc/>
@@ -40,6 +40,12 @@ public class TrustedProxyPolicy(IOptions<C.Ingress> ingress) : ITrustedProxyPoli
 
         options.KnownProxies.Clear();
         options.KnownIPNetworks.Clear();
+
+        if (TrustsNoOne)
+        {
+            options.ForwardedHeaders = ForwardedHeaders.None;
+            return;
+        }
 
         // Loopback-only matches the framework's own default, but is stated rather than inherited. Leaving
         // the options as they came relied on the defaults still being there, and they are not always:
@@ -54,9 +60,8 @@ public class TrustedProxyPolicy(IOptions<C.Ingress> ingress) : ITrustedProxyPoli
         }
 
         // The middleware runs a peer check only when at least one proxy or network is known, so leaving both
-        // empty is what "believe every caller" means to it. That is the legacy posture, and it is also what
-        // an explicit TrustAny asks for.
-        if (_ingress.Mode == C.TrustedProxyMode.TrustAny || IsLegacyAllowAll)
+        // empty is what "believe every caller" means to it. Only an explicit TrustAny asks for that.
+        if (_ingress.Mode == C.TrustedProxyMode.TrustAny)
         {
             return;
         }
@@ -72,7 +77,7 @@ public class TrustedProxyPolicy(IOptions<C.Ingress> ingress) : ITrustedProxyPoli
     {
         C.TrustedProxyMode.TrustAny => true,
         C.TrustedProxyMode.LoopbackOnly => peer is not null && IPAddress.IsLoopback(peer),
-        _ => IsLegacyAllowAll || (peer is not null && Matches(peer)),
+        _ => peer is not null && Matches(peer),
     };
 
     /// <summary>

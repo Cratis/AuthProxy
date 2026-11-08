@@ -67,10 +67,12 @@ public class SecurityHarness : WebApplicationFactory<Program>
     /// Gets everything this deployment warned about, including at startup.
     /// </summary>
     /// <remarks>
-    /// This deployment declares no trusted proxies, which is the compatibility fallback: it behaves exactly
-    /// as AuthProxy always has, and the only thing that tells its operator so is a warning at startup.
+    /// This deployment declares no trusted proxies, so forwarded headers are ignored.
     /// </remarks>
     public CapturedLogs Logs { get; } = new();
+
+    /// <summary>Gets the most recent request after forwarded-header processing.</summary>
+    public RequestObservations Observations { get; } = new();
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
@@ -163,10 +165,14 @@ public class SecurityHarness : WebApplicationFactory<Program>
                 [$"{C.Authentication.SectionKey}:OidcProviders:0:Authority"] = "https://login.example.test/one",
                 [$"{C.Authentication.SectionKey}:OidcProviders:0:ClientId"] = "client-one",
             }))
-            .ConfigureTestServices(services => services
-                .AddAuthentication(HeaderAuthenticationHandler.Scheme)
-                .AddScheme<AuthenticationSchemeOptions, HeaderAuthenticationHandler>(
-                    HeaderAuthenticationHandler.Scheme,
-                    _ => { }));
+            .ConfigureTestServices(services =>
+            {
+                services.AddSingleton<IStartupFilter>(new SimulatedPeerStartupFilter(Observations, TrustedProxyHarness.UntrustedPeer));
+                services
+                    .AddAuthentication(HeaderAuthenticationHandler.Scheme)
+                    .AddScheme<AuthenticationSchemeOptions, HeaderAuthenticationHandler>(
+                        HeaderAuthenticationHandler.Scheme,
+                        _ => { });
+            });
     }
 }

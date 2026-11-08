@@ -13,5 +13,5 @@ public class and_a_peer_is_matched : a_trusted_proxy_policy
     [Fact] void should_trust_the_loopback_address() => _policy.IsTrusted(IPAddress.Loopback).ShouldBeTrue();
     [Fact] void should_trust_the_ipv6_loopback_address() => _policy.IsTrusted(IPAddress.IPv6Loopback).ShouldBeTrue();
     [Fact] void should_not_trust_anything_else() => _policy.IsTrusted(IPAddress.Parse("10.4.5.6")).ShouldBeFalse();
-    [Fact] void should_not_report_the_legacy_fallback() => _policy.IsLegacyAllowAll.ShouldBeFalse();
+    [Fact] void should_not_report_an_empty_boundary() => _policy.TrustsNoOne.ShouldBeFalse();
 }

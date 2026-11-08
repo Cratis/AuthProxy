@@ -34,6 +34,7 @@ public class Ingress
     /// (<c language="text">10.0.0.7</c>, <c language="text">2001:db8::1</c>) or CIDR ranges (<c language="text">10.0.0.0/8</c>, <c language="text">2001:db8::/32</c>).
     /// </summary>
     /// <remarks>
+    /// In the default Configured mode, an empty list means forwarded headers are ignored from every caller.
     /// These are the addresses AuthProxy sees as the immediate peer — the ingress controller, load balancer,
     /// service mesh sidecar, or CDN egress range in front of it — not the addresses of clients. An entry that
     /// cannot be parsed fails startup naming the offending value rather than being quietly dropped, because a

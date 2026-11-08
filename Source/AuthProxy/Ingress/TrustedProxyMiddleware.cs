@@ -25,21 +25,20 @@ public class TrustedProxyMiddleware(RequestDelegate next, ITrustedProxyPolicy po
     {
         var peer = context.Connection.RemoteIpAddress;
         context.MarkTrustedProxyPeer(policy.IsTrusted(peer));
-        WarnOnce(context, peer);
+        WarnOnce(context);
 
         return next(context);
     }
 
-    void WarnOnce(HttpContext context, System.Net.IPAddress? peer)
+    void WarnOnce(HttpContext context)
     {
-        if (!policy.IsLegacyAllowAll
+        if (!policy.TrustsNoOne
             || !(context.Request.Headers.ContainsKey("X-Forwarded-For") || context.Request.Headers.ContainsKey("X-Forwarded-Proto"))
-            || !PublicAddress.Is(peer)
             || Interlocked.Exchange(ref _warned, 1) == 1)
         {
             return;
         }
 
-        logger.ForwardedHeadersFromPublicAddress();
+        logger.ForwardedHeadersIgnored();
     }
 }

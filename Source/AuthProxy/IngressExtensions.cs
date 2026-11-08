@@ -143,7 +143,7 @@ public static class IngressExtensions
     public static WebApplication UseIngress(this WebApplication app)
     {
         var trustedProxyPolicy = app.Services.GetRequiredService<ITrustedProxyPolicy>();
-        if (trustedProxyPolicy.IsLegacyAllowAll)
+        if (trustedProxyPolicy.TrustsNoOne)
         {
             app.Logger.TrustedProxyBoundaryNotConfigured(
                 nameof(C.TrustedProxyMode.Configured),
