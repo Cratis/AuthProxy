@@ -146,4 +146,11 @@ public class BearerRoute
     /// </para>
     /// </remarks>
     public bool AcceptWithoutIdentityVerification { get; set; }
+
+    /// <summary>
+    /// Gets or sets what this route does when the introspection endpoint of a token's issuer cannot be asked.
+    /// Defaults to <see cref="IntrospectionFailurePolicy.Refuse"/>; an MCP route (prefix starting with
+    /// <c language="text">/mcp</c>) cannot use <see cref="IntrospectionFailurePolicy.Accept"/>.
+    /// </summary>
+    public IntrospectionFailurePolicy IntrospectionUnavailable { get; set; } = IntrospectionFailurePolicy.Refuse;
 }

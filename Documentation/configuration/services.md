@@ -992,6 +992,7 @@ every token-authenticated request instead.
 | `RequiredClaims` | `{ Claim, AnyOf }[]` | `[]` | Claim requirements of the route's own, checked against the token's principal after `ClaimMappings`, in addition to the deployment's. Same shape and rules as [`Authorization:RequiredClaims`](authorization.md); a requirement on a role claim is refused at startup, because a token never carries a role. |
 | `IgnoreDeploymentRequiredClaims` | `bool` | `false` | Leave the deployment's claim requirements — proxy-wide and the service's — out on this route. For a deployment whose requirements name a claim the token issuer does not mint. Logged as a warning at startup. |
 | `AcceptWithoutIdentityVerification` | `bool` | `false` | State that this route's callers are accepted without any service's `/.cratis/me` being asked about them. Required when a service declares `IdentityVerification: Required`; under `BestEffort` it silences the startup warning. See [What a bearer route changes](#what-a-bearer-route-changes). |
+| `IntrospectionUnavailable` | `Refuse` \| `Accept` | `Refuse` | What the route does with a token whose issuer has `Introspection` configured when that endpoint cannot be asked. `Refuse` answers `503`. `Accept` proceeds on local validation alone and logs a warning; it is a startup error on an MCP route (prefix starting with `mcp`). A token the endpoint reports inactive is always refused. See [Revocation: edge introspection](authentication.md#revocation-edge-introspection). |
 
 ### BearerIssuerConfig properties
 
@@ -1000,6 +1001,18 @@ every token-authenticated request instead.
 | `Issuer` | `string` | — | The issuer identifier. The token's `iss` and the issuer metadata's `issuer` must both be exactly this value. HTTPS, or plain HTTP on a loopback host for development. |
 | `MetadataAddress` | `string` | RFC 8414 address | The metadata document. Defaults to `/.well-known/oauth-authorization-server` inserted between the issuer's host and path. An OpenID Connect discovery document works too. |
 | `TokenTypes` | `string[]` | `at+jwt`, `application/at+jwt` | Accepted JWT `typ` header values, so an ID token cannot be presented as an access token. |
+| `Introspection` | `BearerIssuerIntrospectionConfig` | `null` | Ask the issuer, per request, whether a validated token is still active (RFC 7662), so a revoked token is refused within `CacheDuration`. Off when unset. See [Revocation: edge introspection](authentication.md#revocation-edge-introspection). |
+
+### BearerIssuerIntrospectionConfig properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `Endpoint` | `string` | — | The introspection endpoint. HTTPS without query, fragment or user information, or plain HTTP on a loopback host for development. |
+| `ClientId` | `string` | — | The client AuthProxy authenticates to the endpoint as, with HTTP Basic. |
+| `ClientSecret` | `string` | — | The client secret. Supply it from the environment or a secret store, for example `AuthProxy__Services__app__BearerRoutes__0__Issuers__0__Introspection__ClientSecret`; never commit it. |
+| `CacheDuration` | `TimeSpan` | `00:00:30` | How long an *active* answer is reused. Between zero and thirty seconds; zero turns the cache off. This is the longest a revoked token can keep working. |
+| `Timeout` | `TimeSpan` | `00:00:02` | How long AuthProxy waits for the endpoint. Between 100 ms and ten seconds. |
+| `MaximumCachedTokens` | `int` | `10000` | The most active answers kept. When full, further answers are not cached; nothing live is evicted. At least 1. |
 
 ### What a bearer route changes
 

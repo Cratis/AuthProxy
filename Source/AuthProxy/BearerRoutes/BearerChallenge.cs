@@ -52,6 +52,7 @@ public static class BearerChallenge
                 break;
 
             case BearerTokenValidationStatus.IssuerUnavailable:
+            case BearerTokenValidationStatus.IntrospectionUnavailable:
                 // The token could not be checked, which is not the same as the token being wrong: telling the
                 // client its token is invalid would send it to sign in again for an outage on the issuer's side.
                 NoStore(context);
@@ -59,6 +60,7 @@ public static class BearerChallenge
                 context.Response.Headers.RetryAfter = IssuerUnavailableRetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 break;
 
+            // Revoked is answered exactly like Invalid, so the response is no revocation oracle.
             default:
                 Unauthorized(context, route.ResourceMetadataUrl, "invalid_token");
                 break;

@@ -22,4 +22,10 @@ public enum BearerRouteWarningKind
     /// that through <see cref="Configuration.BearerRoute.AcceptWithoutIdentityVerification"/>.
     /// </summary>
     IdentityVerificationNotConsulted = 1,
+
+    /// <summary>
+    /// The route is an MCP route and an issuer it accepts has no <see cref="Configuration.BearerIssuer.Introspection"/>,
+    /// so a revoked token keeps working at the edge until it expires.
+    /// </summary>
+    RevocationNotEnforced = 2,
 }

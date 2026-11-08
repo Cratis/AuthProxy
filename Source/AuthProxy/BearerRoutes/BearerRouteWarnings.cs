@@ -45,6 +45,12 @@ public static class BearerRouteWarnings
                 yield return new BearerRouteWarning(BearerRouteWarningKind.IdentityVerificationNotConsulted, route.ServiceName, route.Prefix, consulted);
             }
 
+            var withoutIntrospection = route.Issuers.Where(_ => _.Introspection is null).Select(_ => _.Issuer).ToList();
+            if (BearerRouteTable.IsMcpPrefix(route.Prefix) && withoutIntrospection.Count > 0)
+            {
+                yield return new BearerRouteWarning(BearerRouteWarningKind.RevocationNotEnforced, route.ServiceName, route.Prefix, withoutIntrospection);
+            }
+
             if (route.Route.IgnoreDeploymentRequiredClaims)
             {
                 var ignored = DeploymentRequirementClaims(config, route.ServiceName);

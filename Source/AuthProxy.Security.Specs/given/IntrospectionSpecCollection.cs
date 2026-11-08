@@ -1,0 +1,11 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+namespace Cratis.AuthProxy.Security.given;
+
+[CollectionDefinition(Name, DisableParallelization = true)]
+public class IntrospectionSpecCollection : ICollectionFixture<IntrospectionHarness>
+{
+    /// <summary>The collection name every introspection spec joins.</summary>
+    public const string Name = "Introspection";
+}
