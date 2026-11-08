@@ -31,7 +31,7 @@ public class when_the_token_has_no_tenant(BearerRouteHarness harness) : IAsyncLi
 
     [Fact] public void should_refuse_it() => Assert.Equal(HttpStatusCode.Forbidden, _response!.StatusCode);
     [Fact] public void should_not_forward_anything() => Assert.Empty(harness.Origin.Received);
-    [Fact] public async Task should_not_return_a_body() => Assert.Empty(await _response!.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+    [Fact] public async Task should_return_only_the_machine_readable_error() => Assert.Equal("{\"error\":\"forbidden\"}", await _response!.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     [Fact] public void should_not_return_a_principal() => Assert.False(_response!.Headers.Contains(Headers.Principal));
     [Fact] public void should_not_return_a_tenant() => Assert.False(_response!.Headers.Contains(Headers.TenantId));
 }

@@ -4,7 +4,6 @@
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
-using Microsoft.Net.Http.Headers;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.BearerRoutes;
@@ -95,11 +94,17 @@ public class BearerRouteMiddleware(
 
     async Task ServeResourceMetadata(HttpContext context, ResolvedBearerRoute route)
     {
+        // A route that accepts personal access tokens only has no OAuth metadata to serve, and nothing is
+        // forwarded for it: the answer is the same for every method.
+        if (route.Profile == BearerProfile.PatOnly)
+        {
+            BearerChallenge.MetadataNotFound(context);
+            return;
+        }
+
         if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
-            BearerChallenge.NoStore(context);
-            context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
-            context.Response.Headers[HeaderNames.Allow] = "GET, HEAD";
+            BearerChallenge.MethodNotAllowed(context);
             return;
         }
 

@@ -811,7 +811,21 @@ at startup.
 | Bearer-route token on any other path — whatever the case of the scheme or the whitespace after it, and in any of several `Authorization` headers | `401`, `WWW-Authenticate: Bearer error="invalid_token"` |
 
 `resource_metadata` is omitted when the route declares no `ResourceMetadataUrl`. Every refusal in the table
-carries `Cache-Control: no-store` and an empty body; the reason is logged, not returned.
+carries `Cache-Control: no-store` and a small JSON body with `Content-Type: application/json`, never a page or a
+redirect; the reason is logged, not returned. A `HEAD` request gets the same status and headers without a body.
+
+| Status | Body |
+|--------|------|
+| `400` | `{"error":"invalid_request"}` |
+| `401` | `{"error":"unauthorized"}` |
+| `403` for a missing scope | `{"error":"insufficient_scope"}` |
+| `403` otherwise | `{"error":"forbidden"}` |
+| `404` (resource metadata on a route that has none) | `{"error":"not_found"}` |
+| `405` | `{"error":"method_not_allowed"}` |
+| `503` | `{"error":"service_unavailable"}` |
+
+A route that accepts personal access tokens only advertises no OAuth metadata: its `401` challenge is
+`WWW-Authenticate: Bearer realm="<resource key>"`, and a request for resource metadata is answered `404`.
 
 The path of `ResourceMetadataUrl` (for example `/.well-known/oauth-protected-resource/mcp`) is forwarded to the
 service backend for `GET` and `HEAD` without authentication and without any identity headers, `Cookie` or
