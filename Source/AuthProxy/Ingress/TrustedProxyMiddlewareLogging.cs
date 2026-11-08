@@ -5,6 +5,6 @@ namespace Cratis.AuthProxy.Ingress;
 
 internal static partial class TrustedProxyMiddlewareLogging
 {
-    [LoggerMessage(LogLevel.Warning, "Forwarded headers were accepted from a public address because no trusted proxies are configured; set Ingress:TrustedProxies")]
-    internal static partial void ForwardedHeadersFromPublicAddress(this ILogger logger);
+    [LoggerMessage(LogLevel.Warning, "Forwarded headers were received but ignored because no trusted proxies are configured; set Cratis:AuthProxy:Ingress:TrustedProxies or explicitly select Cratis:AuthProxy:Ingress:Mode=TrustAny")]
+    internal static partial void ForwardedHeadersIgnored(this ILogger logger);
 }

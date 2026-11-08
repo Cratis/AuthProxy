@@ -8,7 +8,7 @@ using Cratis.AuthProxy.given;
 namespace Cratis.AuthProxy.Ingress.for_TrustedProxyMiddleware;
 
 /// <summary>
-/// Believing every caller is only noted, and noted once, when a public address uses forwarded headers.
+/// Ignored forwarded headers from a public peer are noted once.
 /// </summary>
 public class when_no_boundary_is_configured_and_a_public_peer_sends_forwarded_headers : Specification
 {
@@ -17,7 +17,7 @@ public class when_no_boundary_is_configured_and_a_public_peer_sends_forwarded_he
 
     void Establish()
     {
-        _policy.IsLegacyAllowAll.Returns(true);
+        _policy.TrustsNoOne.Returns(true);
     }
 
     async Task Because()

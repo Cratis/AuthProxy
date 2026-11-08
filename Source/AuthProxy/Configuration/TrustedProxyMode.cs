@@ -17,8 +17,8 @@ public enum TrustedProxyMode
     /// Trust only the addresses and ranges named in <see cref="Ingress.TrustedProxies"/>.
     /// </summary>
     /// <remarks>
-    /// The default. Naming nothing is the legacy allow-all posture kept for compatibility: every caller is
-    /// believed, and a warning at startup names the configuration key that leaves it.
+    /// The default. With no trusted proxies configured, forwarded headers from every caller are ignored.
+    /// A startup warning names the settings to configure when an ingress is present.
     /// </remarks>
     Configured = 0,
 

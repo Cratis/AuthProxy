@@ -159,7 +159,7 @@ deployment wants.
 
 | Mode | Trusts | Use it when |
 |------|--------|-------------|
-| `Configured` | Exactly the peers in `TrustedProxies` | Normal deployments. This is the default. |
+| `Configured` | Exactly the peers in `TrustedProxies`; no peers when the list is empty | Normal deployments. This is the default. |
 | `LoopbackOnly` | Only a caller on the loopback interface | A sidecar, or local development. A deployment behind an ingress never sees loopback as the peer, so this refuses every forwarded header it receives. |
 | `TrustAny` | Every caller | Nothing but your own ingress can reach AuthProxy at all — a private network with no other route in, or a listener with no peer address at all (see below). |
 
@@ -186,33 +186,26 @@ like when it is stated rather than stumbled into.
 
 ---
 
-## The compatibility fallback, and the warning
+## Upgrading a deployment with no trusted proxies
 
-`Configured` with an **empty** `TrustedProxies` keeps the behavior AuthProxy has always had: every caller's
-forwarded headers are believed. Upgrading breaks nothing.
+In the default `Configured` mode, an **empty** `TrustedProxies` list now means forwarded headers are
+ignored from every caller. Earlier versions accepted them from every caller in this configuration.
+AuthProxy still starts, but uses the connection's client address and transport scheme. This also affects
+sign-in notifications, cookie `Secure` flags and the public origin used for logout.
 
-It is not, however, silent. At startup AuthProxy logs a warning naming the mode it is running in and the
-configuration key that leaves it:
+For deployments behind an ingress, configure `Cratis:AuthProxy:Ingress:TrustedProxies` with the addresses
+or CIDR ranges AuthProxy sees as peers. Set `Cratis:AuthProxy:Ingress:ForwardLimit` to the number of proxy
+hops to consume (default `1`), including intermediate peers in `TrustedProxies` when more hops are needed.
+The JSON and environment-variable forms are shown under [Declaring the boundary](#declaring-the-boundary).
 
-```text
-warn: AuthProxy is running in Configured trusted-proxy mode with no trusted proxies configured, so it
-      believes the X-Forwarded-For and X-Forwarded-Proto headers of every caller. Set
-      Cratis:AuthProxy:Ingress:TrustedProxies to the addresses or CIDR ranges of the ingress in front of
-      it, or set Cratis:AuthProxy:Ingress:Mode to LoopbackOnly or TrustAny to state the choice explicitly.
-      A future major release will refuse to start in this state.
-```
+If only your own ingress can connect to AuthProxy, explicitly setting `Cratis:AuthProxy:Ingress:Mode` to
+`TrustAny` retains the previous allow-all behavior. An empty list no longer selects it implicitly.
+`LoopbackOnly` remains available for a loopback peer. `ASPNETCORE_FORWARDEDHEADERS_ENABLED` does not
+change the default empty-list behavior.
 
-While in this state AuthProxy also logs one warning per process the first time a caller at a public address sends
-`X-Forwarded-For` or `X-Forwarded-Proto`. The message does not include the address. Nothing else changes.
-
-> [!IMPORTANT]
-> Treat the warning as a task, not as noise. A future major release turns this condition into a refusal to
-> start. Declaring `TrustedProxies` — or stating `TrustAny` deliberately, if that genuinely describes your
-> network — is what clears it.
-
-If you truly do run somewhere nothing else can reach AuthProxy, say `TrustAny` rather than leaving the list
-empty. The behavior is identical; the difference is that one of them is a decision somebody made and the
-other is an omission nobody noticed.
+AuthProxy logs a startup warning in default mode with no `TrustedProxies`. It also logs one warning per
+process when `X-Forwarded-For` or `X-Forwarded-Proto` is received but ignored in that mode, for both public
+and private peers. Warnings name the configuration settings but do not include header values or addresses.
 
 ---
 
@@ -250,6 +243,11 @@ var authProxy = builder.AddAuthProxy("authproxy")
 `WithTrustedProxies` appends, so the peers can be declared wherever each one is known. An entry that is
 neither an address nor a CIDR range is refused when the app host builds, rather than being carried to the
 proxy and refused there.
+
+For local Aspire **run mode** only, `AddAuthProxy` emits `Cratis__AuthProxy__Ingress__Mode=TrustAny` when
+neither `Mode` nor `TrustedProxies` is explicitly supplied. Fluent `WithTrustedProxies` configuration and
+explicit environment settings take precedence. Publish mode does not add this default: configure the
+published deployment's `TrustedProxies` and `ForwardLimit` for its ingress.
 
 ---
 

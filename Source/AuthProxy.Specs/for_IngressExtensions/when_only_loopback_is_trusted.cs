@@ -23,5 +23,5 @@ public class when_only_loopback_is_trusted : an_ingress_configuration
     void Because() => _options = _serviceProvider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
 
     [Fact] void should_keep_a_peer_check() => (_options.KnownIPNetworks.Count + _options.KnownProxies.Count > 0).ShouldBeTrue();
-    [Fact] void should_not_report_the_legacy_allow_all_fallback() => _serviceProvider.GetRequiredService<ITrustedProxyPolicy>().IsLegacyAllowAll.ShouldBeFalse();
+    [Fact] void should_not_report_an_empty_boundary() => _serviceProvider.GetRequiredService<ITrustedProxyPolicy>().TrustsNoOne.ShouldBeFalse();
 }

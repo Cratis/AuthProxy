@@ -8,7 +8,7 @@ using Cratis.AuthProxy.given;
 namespace Cratis.AuthProxy.Ingress.for_TrustedProxyMiddleware;
 
 /// <summary>
-/// A private peer using forwarded headers is not noted.
+/// Ignored forwarded headers from a private peer are noted once.
 /// </summary>
 public class when_no_boundary_is_configured_and_a_private_peer_sends_forwarded_headers : Specification
 {
@@ -17,7 +17,7 @@ public class when_no_boundary_is_configured_and_a_private_peer_sends_forwarded_h
 
     void Establish()
     {
-        _policy.IsLegacyAllowAll.Returns(true);
+        _policy.TrustsNoOne.Returns(true);
     }
 
     async Task Because()
@@ -35,5 +35,5 @@ public class when_no_boundary_is_configured_and_a_private_peer_sends_forwarded_h
         return context;
     }
 
-    [Fact] void should_not_warn() => _logger.Levels.ShouldNotContain(LogLevel.Warning);
+    [Fact] void should_warn_once() => _logger.Levels.Count(_ => _ == LogLevel.Warning).ShouldEqual(1);
 }

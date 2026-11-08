@@ -12,10 +12,10 @@ namespace Cratis.AuthProxy.Ingress;
 public interface ITrustedProxyPolicy
 {
     /// <summary>
-    /// Gets a value indicating whether the deployment has fallen back to believing every caller because it
-    /// named no trusted proxies.
+    /// Gets a value indicating whether the deployment ignores forwarded headers from every caller because
+    /// no trusted proxies are configured in the default mode.
     /// </summary>
-    bool IsLegacyAllowAll { get; }
+    bool TrustsNoOne { get; }
 
     /// <summary>
     /// Applies the boundary to the forwarded-headers middleware's options.

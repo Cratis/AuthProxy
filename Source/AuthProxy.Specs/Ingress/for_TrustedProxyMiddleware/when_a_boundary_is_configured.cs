@@ -17,7 +17,7 @@ public class when_a_boundary_is_configured : Specification
 
     void Establish()
     {
-        _policy.IsLegacyAllowAll.Returns(false);
+        _policy.TrustsNoOne.Returns(false);
     }
 
     async Task Because()

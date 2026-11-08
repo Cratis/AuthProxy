@@ -35,31 +35,22 @@ public class when_adding_ingress_configuration : Specification
     }
 
     /// <summary>
-    /// A deployment that has named no trusted proxies keeps the allow-all posture AuthProxy has always had,
-    /// so this release breaks nothing — but it now says so at startup instead of deleting the framework's
-    /// loopback default in silence.
+    /// A deployment with no trusted proxies disables forwarded-header processing.
     /// </summary>
-    /// <remarks>
-    /// The middleware runs a peer check only when it knows at least one proxy or network, so an empty pair is
-    /// what "believe every caller" means to it. This spec previously asserted the same two zeroes as a
-    /// requirement rather than as a compatibility fallback, which is why the boundary was never noticed to be
-    /// missing. <c language="text">ForwardLimit</c> is asserted alongside them because a bound-but-unread setting would look
-    /// identical here otherwise.
-    /// </remarks>
     [Fact]
-    void should_fall_back_to_believing_every_caller_when_no_trusted_proxies_are_configured()
+    void should_ignore_forwarded_headers_when_no_trusted_proxies_are_configured()
     {
         var options = _serviceProvider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
 
-        options.ForwardedHeaders.ShouldEqual(ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+        options.ForwardedHeaders.ShouldEqual(ForwardedHeaders.None);
         options.KnownIPNetworks.Count.ShouldEqual(0);
         options.KnownProxies.Count.ShouldEqual(0);
         options.ForwardLimit.ShouldEqual(1);
     }
 
     [Fact]
-    void should_report_the_legacy_allow_all_fallback() =>
-        _serviceProvider.GetRequiredService<ITrustedProxyPolicy>().IsLegacyAllowAll.ShouldBeTrue();
+    void should_report_that_no_peer_is_trusted() =>
+        _serviceProvider.GetRequiredService<ITrustedProxyPolicy>().TrustsNoOne.ShouldBeTrue();
 
     [Fact]
     void should_register_tenant_verifier_service() =>
