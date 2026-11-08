@@ -31,14 +31,19 @@ public class and_the_grant_is_live : a_grant_check
     [Fact] void should_add_the_built_in_roles() => _result.Principal!.UserRoles.ShouldContain("authenticated");
     [Fact] void should_keep_the_represented_users_claims() => _result.Principal!.Claims.Any(_ => _.Type == "tid").ShouldBeTrue();
     [Fact] void should_drop_claims_in_the_bearer_route_namespace() => _result.Principal!.Claims.Any(_ => _.Type.StartsWith("urn:cratis:bearer:", StringComparison.Ordinal)).ShouldBeFalse();
+    [Fact] void should_get() => _handler.LastRequest!.Method.ShouldEqual(HttpMethod.Get);
+    [Fact] void should_send_the_attestation_as_a_bearer_token() => _handler.LastRequest!.Headers.Authorization!.Scheme.ShouldEqual("Bearer");
     [Fact] void should_get_the_grant_endpoint() => _handler.LastRequest!.RequestUri!.AbsolutePath.ShouldEqual(WellKnownPaths.OnBehalfGrants);
     [Fact] void should_ask_about_the_subject() => _query["subject"].ToString().ShouldEqual(Sessions.Subject);
     [Fact] void should_ask_about_the_issue() => _query["issue"].ToString().ShouldEqual(Sessions.Issue);
     [Fact] void should_ask_about_the_actor() => _query["actor"].ToString().ShouldEqual(Sessions.ActorSubject);
     [Fact] void should_ask_about_the_session() => _query["session"].ToString().ShouldEqual(_session.SessionId);
     [Fact] void should_send_the_tenant() => _handler.LastHeaders[Headers.TenantId].ShouldEqual(Sessions.Tenant);
+    [Fact] void should_send_the_legacy_tenant() => _handler.LastHeaders[Headers.LegacyTenantId].ShouldEqual(Sessions.Tenant);
     [Fact] void should_send_the_actor() => _handler.LastHeaders[Headers.OnBehalfActor].ShouldEqual(_actor.ToBase64());
     [Fact] void should_not_send_any_principal_as_the_user() => _handler.LastHeaders.ContainsKey(Headers.Principal).ShouldBeFalse();
     [Fact] void should_sign_it_for_the_grant_check() => _token.GetClaim(OnBehalfAttestationClaims.Purpose).Value.ShouldEqual(OnBehalfAttestationClaims.GrantCheckPurpose);
+    [Fact] void should_sign_the_method() => _token.GetClaim(OnBehalfAttestationClaims.HttpMethod).Value.ShouldEqual(_handler.LastRequest!.Method.Method);
+    [Fact] void should_sign_the_target_without_its_query() => _token.GetClaim(OnBehalfAttestationClaims.HttpUri).Value.ShouldEqual(_handler.LastRequest!.RequestUri!.GetLeftPart(UriPartial.Path));
     [Fact] void should_sign_the_empty_body() => _token.GetClaim(OnBehalfAttestationClaims.BodyHash).Value.ShouldEqual(Base64UrlEncoder.Encode(SHA256.HashData([])));
 }

@@ -37,6 +37,13 @@ public class OnBehalf
     public string Service { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets whether to omit the actor header on application grant checks and session started/ended
+    /// notifications. Defaults to false. The receiver must verify the attestation and derive the actor from its
+    /// signed act claim. Forwarded requests and identity calls are unaffected.
+    /// </summary>
+    public bool OmitActorHeaderOnBackChannelCalls { get; set; }
+
+    /// <summary>
     /// Gets or sets the services an on-behalf session may reach. Leave it empty — the default — and only
     /// <see cref="Service"/> is reachable.
     /// </summary>

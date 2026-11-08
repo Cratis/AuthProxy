@@ -80,7 +80,7 @@ public sealed class OnBehalfSessionNotifier(
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Post, target) { Content = content };
-        OnBehalfApplication.AddHeaders(request, session, null, token);
+        OnBehalfApplication.AddHeaders(request, session, null, token, current.OnBehalf?.OmitActorHeaderOnBackChannelCalls ?? false);
 
         using var bounded = OnBehalfApplication.Bounded(current, cancellationToken);
         try

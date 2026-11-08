@@ -33,18 +33,23 @@ static class OnBehalfApplication
     }
 
     /// <summary>
-    /// Adds the headers every call about a session carries: the tenant, the actor and the signed token.
+    /// Adds the tenant and signed token, and optionally the actor, to a call about a session.
     /// </summary>
     /// <param name="request">The outgoing request.</param>
     /// <param name="session">The session the call is about.</param>
     /// <param name="actor">The actor's client principal, when it is known; otherwise the actor is described from the session.</param>
     /// <param name="token">The signed token.</param>
-    public static void AddHeaders(HttpRequestMessage request, OnBehalfSession session, ClientPrincipal? actor, string token)
+    /// <param name="omitActorHeader">Whether server configuration omits the advisory actor header.</param>
+    public static void AddHeaders(HttpRequestMessage request, OnBehalfSession session, ClientPrincipal? actor, string token, bool omitActorHeader)
     {
         var tenant = HeaderValue.ToTransportValue(session.Tenant);
         request.Headers.Add(Headers.TenantId, tenant);
         request.Headers.Add(Headers.LegacyTenantId, tenant);
-        request.Headers.Add(Headers.OnBehalfActor, (actor ?? Describe(session.Actor)).ToBase64());
+        if (!omitActorHeader)
+        {
+            request.Headers.Add(Headers.OnBehalfActor, (actor ?? Describe(session.Actor)).ToBase64());
+        }
+
         request.Headers.Authorization = new("Bearer", token);
     }
 
