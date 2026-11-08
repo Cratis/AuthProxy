@@ -1,5 +1,7 @@
 - name: Upgrading
   href: index.md
+- name: Operator guide, 2.42 to 2.52
+  href: operator-guide-2-42-to-2-52.md
 - name: Identity verification is required by default
   href: identity-verification-required-by-default.md
 - name: Tenant and service headers follow Arc
