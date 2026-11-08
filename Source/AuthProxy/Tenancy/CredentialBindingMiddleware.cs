@@ -5,6 +5,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.Extensions.Options;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Tenancy;
@@ -31,7 +32,7 @@ public class CredentialBindingMiddleware(
     {
         var current = config.CurrentValue;
         context.TryGetOnBehalf(out var onBehalf);
-        if (!RequiresBindingCheck(context, current, onBehalf))
+        if (!RequiresBindingCheck(context, current, onBehalf, checkEffectiveTenant))
         {
             await next(context);
             return;
@@ -59,12 +60,27 @@ public class CredentialBindingMiddleware(
         await next(context);
     }
 
-    static bool RequiresBindingCheck(HttpContext context, C.AuthProxy current, OnBehalfContext? onBehalf)
+    static bool RequiresBindingCheck(HttpContext context, C.AuthProxy current, OnBehalfContext? onBehalf, bool checkEffectiveTenant)
     {
+        var anonymous = AnonymousPaths.IsAnonymousRoute(context);
         if (current.TenantResolutions.Count == 0) return false;
         if (context.User.Identity?.IsAuthenticated != true && onBehalf is null) return false;
-        return !context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant)
-            && !TenantSelectionExemptions.IsExemptPath(context, current);
+        if (anonymous) return false;
+
+        // The chooser answers locally. Any request it continues still passes the second binding check.
+        if (!checkEffectiveTenant
+            && onBehalf is null
+            && ExternalTokenTenantBinding.BoundTenant(context.User) is null
+            && context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant)
+            && TenantSelectionMiddleware.TryGetSelectionOptions(current, out _)
+            && !TenantSelectionExemptions.IsExemptFromTenantSelection(context, current))
+        {
+            return false;
+        }
+
+        if (context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is not null) return true;
+        if (context.IsProxyOwnedFlow()) return false;
+        return context.GetEndpoint() is null || !TenantSelectionExemptions.IsExemptPath(context, current);
     }
 
     static bool HasClientCredentialsIdentity(HttpContext context) =>

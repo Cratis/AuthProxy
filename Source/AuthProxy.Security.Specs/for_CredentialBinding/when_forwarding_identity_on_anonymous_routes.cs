@@ -37,6 +37,12 @@ public class when_forwarding_identity_on_anonymous_routes(AnonymousForwardingHar
     [InlineData("/signin-x")]
     [InlineData("/signin-provider-one/private")]
     [InlineData("/api/private")]
+    [InlineData("/declared-public")]
+    [InlineData("/declared-public/child")]
+    [InlineData("/register")]
+    [InlineData("/.cratis/providers/child")]
+    [InlineData("/.cratis/token/child")]
+    [InlineData("/.cratis/select-tenant")]
     public async Task should_keep_binding_on_non_anonymous_routes(string path)
     {
         harness.Origin.Clear();

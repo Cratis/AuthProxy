@@ -13,6 +13,8 @@ public class AnonymousForwardingHarness : ExternalTokenBindingHarness
         const string root = C.AuthProxy.SectionKey;
         settings[$"{root}:Profile"] = nameof(C.DeploymentProfile.LocalDevelopment);
         settings[$"{root}:Services:app:AnonymousPaths:0"] = "/public";
+        settings[$"{root}:Services:declaration:AnonymousPaths:0"] = "/declared-public";
+        settings[$"{root}:Services:app:Default"] = "true";
         settings[$"{root}:Services:app:ForwardedIdentity:Audience"] = "anonymous-forwarding-spec";
         settings[$"{root}:Services:app:ForwardedIdentity:KeyId"] = "spec-key";
         settings[$"{root}:Services:app:ForwardedIdentity:SecretBase64"] = Convert.ToBase64String(new byte[32]);

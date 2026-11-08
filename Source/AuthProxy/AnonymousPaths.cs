@@ -37,6 +37,8 @@ public static class AnonymousPaths
     /// </summary>
     static readonly ConditionalWeakTable<C.AuthProxy, string[]> _resolvedPrefixes = [];
 
+    static readonly object _routeDispositionKey = new();
+
     /// <summary>
     /// Gets the usable, de-duplicated anonymous path prefixes declared by a single service.
     /// </summary>
@@ -117,11 +119,20 @@ public static class AnonymousPaths
     /// <summary>Determines whether the server-selected proxy route is anonymous.</summary>
     /// <param name="context">The routed request.</param>
     /// <returns>True only for an anonymous proxy route.</returns>
-    internal static bool IsAnonymousRoute(HttpContext context) =>
-        string.Equals(
+    internal static bool IsAnonymousRoute(HttpContext context)
+    {
+        if (context.Items.TryGetValue(_routeDispositionKey, out var disposition))
+        {
+            return disposition is true;
+        }
+
+        var anonymous = string.Equals(
             context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>()?.Config.AuthorizationPolicy,
             MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy,
             StringComparison.OrdinalIgnoreCase);
+        context.Items[_routeDispositionKey] = anonymous;
+        return anonymous;
+    }
 
     static string[] Resolve(C.AuthProxy config) =>
         [.. config.Services.Values
