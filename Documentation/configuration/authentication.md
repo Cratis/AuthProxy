@@ -876,7 +876,8 @@ See [Bearer routes](services.md#bearer-routes).
 ## Back-channel client credentials
 
 AuthProxy can also issue bearer tokens itself after a proxied service verifies the supplied
-client credentials over a private back channel.
+client credentials over a private back channel. The tokens can share their route prefix with a bearer route
+of the same service; see [Sharing a prefix with client credentials](services.md#sharing-a-prefix-with-client-credentials).
 
 1. The client sends `POST /.cratis/token`
 2. The request body uses standard OAuth form fields:

@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Cratis.AuthProxy.Tenancy;
@@ -20,6 +21,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="tenantVerifier">The tenant existence verifier, applied when tenant verification is configured.</param>
 /// <param name="tenantResolver">The request's addressed tenants.</param>
 /// <param name="forwarder">The forwarder to the service backend.</param>
+/// <param name="tokenProtector">Recognizes access tokens AuthProxy issued through its client-credentials grant.</param>
 /// <param name="logger">The logger.</param>
 /// <remarks>
 /// Placed ahead of static files, authentication and everything after them, so a request on a bearer route never
@@ -39,6 +41,12 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// otherwise a route that does not say so is reported at startup (<see cref="BearerRouteStartupReport"/>).
 /// </para>
 /// <para>
+/// A bearer route whose prefix is exactly its service's client-credentials route prefix also carries the tokens
+/// AuthProxy issues through its client-credentials grant. A credential this gate verifies as such a token is judged
+/// by the client-credentials rules only: it is handed on to the client-credentials authentication when it was issued
+/// for this service and prefix and refused here otherwise. Every other credential is judged by the bearer route only.
+/// </para>
+/// <para>
 /// With no bearer route configured it hands every request on untouched.
 /// </para>
 /// </remarks>
@@ -50,6 +58,7 @@ public class BearerRouteMiddleware(
     ITenantVerifier tenantVerifier,
     ITenantResolver tenantResolver,
     IBearerRouteForwarder forwarder,
+    ClientCredentialsTokenProtector tokenProtector,
     ILogger<BearerRouteMiddleware> logger)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
@@ -116,9 +125,16 @@ public class BearerRouteMiddleware(
     {
         // The credential's kind is decided once, here. The branch it lands in is the only one that sees it: a
         // refusal is never retried as the other kind.
-        var (dispatch, reason) = CredentialDispatcher.Dispatch(context.Request, route);
+        var clientCredentialsPrefix = ClientCredentialsOnBearerRoutes.SharedPrefix(current, route);
+        ClientCredentialsTokenPayload? issued = null;
+        var recognizer = clientCredentialsPrefix is null ? null : (Func<string, bool>)(token => TryRecognizeIssued(token, out issued));
+        var (dispatch, reason) = CredentialDispatcher.Dispatch(context.Request, route, recognizer);
         switch (dispatch)
         {
+            case CredentialDispatch.ClientCredentials:
+                await HandOnIssuedToken(context, route, clientCredentialsPrefix!, issued!);
+                return;
+
             case CredentialDispatch.Ambiguous:
                 logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
                 BearerChallenge.MultipleCredentials(context);
@@ -172,6 +188,34 @@ public class BearerRouteMiddleware(
 
         context.User = validation.Principal!;
         await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
+    }
+
+    bool TryRecognizeIssued(string token, out ClientCredentialsTokenPayload? payload)
+    {
+        payload = null;
+
+        if (!ClientCredentialsOnBearerRoutes.CouldBeIssued(token) || !tokenProtector.TryValidate(token, out var validated))
+        {
+            return false;
+        }
+
+        payload = validated;
+        return true;
+    }
+
+    async Task HandOnIssuedToken(HttpContext context, ResolvedBearerRoute route, string prefix, ClientCredentialsTokenPayload payload)
+    {
+        // The token is AuthProxy's own, so the client-credentials rules alone judge it and a refusal here is final.
+        if (!ClientCredentialsOnBearerRoutes.IsIssuedFor(payload, route, prefix, context.Request.Path))
+        {
+            const string reason = "client-credentials token issued for another service or route prefix";
+            logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
+            BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason), route);
+            return;
+        }
+
+        context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = payload;
+        await next(context);
     }
 
     bool BindingConflicts(HttpContext context, C.AuthProxy current, ResolvedBearerRoute route, BearerTokenValidation validation)

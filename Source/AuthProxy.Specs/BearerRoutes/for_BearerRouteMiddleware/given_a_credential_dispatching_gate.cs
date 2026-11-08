@@ -1,8 +1,10 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Cratis.AuthProxy.BearerRoutes.for_BearerRouteMiddleware;
 
@@ -23,6 +25,8 @@ public abstract class given_a_credential_dispatching_gate : Specification
     protected RequestDelegate Next { get; private set; } = default!;
 
     protected BearerRouteMiddleware Middleware { get; private set; } = default!;
+
+    protected ClientCredentialsTokenProtector TokenProtector { get; } = new(new EphemeralDataProtectionProvider());
 
     protected static DefaultHttpContext Request(string path, string method = "GET", params string[] authorization)
     {
@@ -101,6 +105,7 @@ public abstract class given_a_credential_dispatching_gate : Specification
             Substitute.For<ITenantVerifier>(),
             Substitute.For<ITenantResolver>(),
             Forwarder,
+            TokenProtector,
             Substitute.For<ILogger<BearerRouteMiddleware>>());
     }
 }

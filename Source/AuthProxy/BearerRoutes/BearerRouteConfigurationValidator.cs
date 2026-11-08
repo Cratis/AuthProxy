@@ -63,6 +63,8 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
                                 "Bearer routes claim their paths on every host; use non-overlapping prefixes.");
                         }
                     }
+
+                    failures.AddRange(ClientCredentialsOverlaps(serviceName, prefix, options).Select(conflict => $"{at}:{nameof(C.BearerRoute.PathPrefix)} '{prefix}' {conflict}"));
                 }
 
                 if (options.RequiresIdentityVerification && !route.AcceptWithoutIdentityVerification)
@@ -88,6 +90,12 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
+
+    static IEnumerable<string> ClientCredentialsOverlaps(string serviceName, string prefix, C.AuthProxy options) =>
+        options.Services
+            .Where(other => other.Value.ClientCredentials is not null)
+            .Select(other => ClientCredentialsOnBearerRoutes.Conflict(serviceName, prefix, other.Key, other.Value.ClientCredentials!))
+            .OfType<string>();
 
     static void ValidateEnvironment(string at, C.BearerRoute route, C.CredentialBinding binding, List<string> failures)
     {

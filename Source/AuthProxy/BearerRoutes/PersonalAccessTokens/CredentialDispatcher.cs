@@ -12,6 +12,12 @@ namespace Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 /// value is for OAuth validation, where the route accepts it. There is no retry, no second look and no
 /// "first header wins": more than one credential refuses the request before either branch is chosen. Nothing
 /// here is secret, and nothing here reaches a log — the reason it returns is a fixed phrase.
+/// <para>
+/// On a route that shares its prefix with a client-credentials route prefix, a single bearer credential is first
+/// offered to the caller's recognizer of AuthProxy-issued tokens. Only a token the recognizer verifies goes to the
+/// client-credentials branch; anything else — including a token that looks issued but does not verify — is
+/// dispatched as though the recognizer were absent, so a caller cannot choose the client-credentials rules.
+/// </para>
 /// </remarks>
 public static class CredentialDispatcher
 {
@@ -24,8 +30,15 @@ public static class CredentialDispatcher
     /// </summary>
     /// <param name="request">The request.</param>
     /// <param name="route">The route the request was made on.</param>
+    /// <param name="isIssuedByAuthProxy">
+    /// Verifies that a bearer credential is an access token AuthProxy issued, or <see langword="null"/> when the route
+    /// shares no prefix with client credentials.
+    /// </param>
     /// <returns>The branch that handles the credential, and a log-safe reason for a refusal.</returns>
-    public static (CredentialDispatch Dispatch, string Reason) Dispatch(HttpRequest request, ResolvedBearerRoute route)
+    public static (CredentialDispatch Dispatch, string Reason) Dispatch(
+        HttpRequest request,
+        ResolvedBearerRoute route,
+        Func<string, bool>? isIssuedByAuthProxy = null)
     {
         var values = request.Headers.Authorization;
         if (values.Count == 0)
@@ -47,6 +60,12 @@ public static class CredentialDispatcher
         if ((isBearer || string.Equals(scheme, ProofOfPossessionScheme, StringComparison.OrdinalIgnoreCase)) && credential.Contains(','))
         {
             return (CredentialDispatch.Ambiguous, "more than one credential presented");
+        }
+
+        var isIssued = isIssuedByAuthProxy ?? (_ => false);
+        if (isBearer && isIssued(credential.Trim()))
+        {
+            return (CredentialDispatch.ClientCredentials, string.Empty);
         }
 
         var shape = PersonalAccessTokenClassifier.Classify(credential);

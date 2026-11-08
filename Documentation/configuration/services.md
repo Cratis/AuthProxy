@@ -879,7 +879,9 @@ that can later be exchanged for a new access token without resupplying the clien
 `RoutePrefix` defaults to `/api` and is checked against the incoming path, before `StripPathPrefix` removes
 anything. For a service with `PathPrefix: /reporting`, set `ClientCredentials.RoutePrefix` to
 `/reporting/api` to accept bearer tokens on its API routes (or another explicitly permitted external
-prefix). Host routing can distinguish services that share the same `RoutePrefix`.
+prefix). Host routing can distinguish services that share the same `RoutePrefix`. A bearer route may use
+exactly the service's own `RoutePrefix`, but no other overlapping prefix; see
+[Sharing a prefix with client credentials](#sharing-a-prefix-with-client-credentials).
 
 This creates a one-to-one relationship between:
 
@@ -1005,7 +1007,8 @@ every token-authenticated request instead.
 ### What a bearer route changes
 
 - A request on a bearer route is answered before static files, authentication, provider selection, tenant
-  selection and identity enrichment — none of them apply. [Admission](admission.md) and the trusted-proxy
+  selection and identity enrichment — none of them apply. The one exception is a token AuthProxy issued itself on a
+  prefix shared with [client credentials](#sharing-a-prefix-with-client-credentials). [Admission](admission.md) and the trusted-proxy
   boundary run first and apply as to any request.
 - The deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
   the token's principal after `ClaimMappings`, unless the route sets `IgnoreDeploymentRequiredClaims`. The
@@ -1055,6 +1058,44 @@ every token-authenticated request instead.
 - With no bearer route configured, the bearer gate leaves requests untouched. Browser sessions still strip
   inbound `x-cratis-token-scope` and `x-cratis-token-client-id` headers and claims in the `urn:cratis:bearer:`
   namespace, which only bearer routes set.
+
+### Sharing a prefix with client credentials
+
+A service can accept tokens from an authorization server and tokens from AuthProxy's own
+[client-credentials grant](#client-credentials) on the same paths. Give the bearer route exactly the service's
+`ClientCredentials.RoutePrefix`:
+
+```json
+"portal": {
+  "Backend": { "BaseUrl": "http://portal:8080" },
+  "ClientCredentials": { "RoutePrefix": "/api", "VerificationPath": "/.cratis/client-credentials/verify" },
+  "BearerRoutes": [
+    {
+      "PathPrefix": "/api",
+      "Issuers": [{ "Issuer": "https://login.example.com" }],
+      "Audiences": ["portal-api"],
+      "AcceptWithoutIdentityVerification": true
+    }
+  ]
+}
+```
+
+Each credential on that prefix is judged by one set of rules, chosen once, and is never retried under the other:
+
+- A token that AuthProxy can unprotect with its own [Data Protection keys](authentication.md#data-protection-keys-and-horizontal-scaling)
+  as an unexpired client-credentials access token is AuthProxy's. When it was issued for this service and prefix,
+  it continues to client-credentials authentication and is handled exactly as it would be without the bearer route.
+  When it was issued for another service or prefix, it is refused with `401`.
+- Every other token goes to the bearer route's validation only. That includes a token that resembles an
+  AuthProxy token but has been altered, has expired or was issued under another key ring: it cannot be shown to be
+  AuthProxy's, so the client-credentials rules never see it, and the bearer route refuses it with `401`.
+- A request without a credential receives the bearer route's single challenge, naming its `ResourceMetadataUrl`.
+  More than one credential is refused with `400`, as on any bearer route.
+
+Any other overlap stops AuthProxy at startup: a bearer route nested inside a client-credentials prefix or
+containing one, or one that overlaps the client-credentials prefix of another service. In those layouts the
+path alone no longer tells which service and prefix a token belongs to. Use the same prefix, or prefixes that
+do not overlap.
 
 ---
 

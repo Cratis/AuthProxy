@@ -33,4 +33,10 @@ public enum CredentialDispatch
     /// More than one credential was presented, so neither branch is chosen.
     /// </summary>
     Ambiguous = 4,
+
+    /// <summary>
+    /// The credential is an access token AuthProxy issued through its client-credentials grant, verified as such, and
+    /// is judged by the client-credentials rules only.
+    /// </summary>
+    ClientCredentials = 5,
 }
