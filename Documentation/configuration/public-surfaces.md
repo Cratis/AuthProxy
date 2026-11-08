@@ -63,12 +63,11 @@ there.
 
 What the proxy still does:
 
-- Strips every inbound `x-ms-client-principal*` header and the tenant header (`x-cratis-tenant-id`, and the
-  legacy `Tenant-ID`), so a caller cannot assert an identity on the way in.
-- Injects no principal headers, because there is no session.
-- Leaves an authenticated visitor authenticated. A declared path is identity-*optional*, not
-  identity-free: someone who happens to be signed in still arrives with their identity headers, though
-  **without** an `x-cratis-tenant-id` if they have not selected a tenant. Handle a declared path as tenant-optional.
+- Forwards no identity on anonymous routes: principal, tenant (`x-cratis-tenant-id` and legacy `Tenant-ID`),
+  on-behalf/actor, token metadata, forwarded-identity signature, and `Authorization` headers are removed
+  before transport, including caller-supplied copies.
+- Applies the same rule to signed-out callers, authenticated sessions, and bearer-token callers.
+  A declared path is identity-free. Use a non-anonymous route when the application needs forwarded identity.
 
 ---
 

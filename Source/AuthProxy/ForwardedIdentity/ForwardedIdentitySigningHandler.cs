@@ -11,7 +11,13 @@ internal sealed class ForwardedIdentitySigningHandler(IForwardedIdentitySigner s
     /// <inheritdoc/>
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        if (!request.Options.TryGetValue(ForwardedIdentitySigningTarget.OptionsKey, out var target))
+        if (request.Options.TryGetValue(AnonymousPaths.ForwardWithoutIdentity, out var anonymous) && anonymous)
+        {
+            // Last outbound boundary: remove caller-supplied and proxy-generated identity alike.
+            SpoofableHeaders.Strip(request.Headers);
+            request.Headers.Remove("Authorization");
+        }
+        else if (!request.Options.TryGetValue(ForwardedIdentitySigningTarget.OptionsKey, out var target))
         {
             request.Headers.Remove(Headers.ForwardedIdentitySignature);
         }

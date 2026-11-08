@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Cratis.AuthProxy.for_TenantSelectionMiddleware;
 
 public class when_request_is_authentication_bootstrap : Specification
@@ -43,10 +45,17 @@ public class when_request_is_authentication_bootstrap : Specification
             Substitute.For<ILogger<TenantSelectionMiddleware>>(),
             Substitute.For<ForwardedIdentity.IForwardedIdentitySigner>());
 
-        _context = new DefaultHttpContext();
+        var authentication = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        authentication.CurrentValue.Returns(new C.Authentication { OidcProviders = [new() { Name = "Scheme" }] });
+        _context = new DefaultHttpContext
+        {
+            RequestServices = new ServiceCollection().AddSingleton(authentication).BuildServiceProvider()
+        };
         _context.Request.Path = "/signin-scheme";
         _context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("oid", "user-id")], "aad"));
     }
+
+    void Destroy() => (_context.RequestServices as IDisposable)?.Dispose();
 
     async Task Because() => await _middleware.InvokeAsync(_context);
 

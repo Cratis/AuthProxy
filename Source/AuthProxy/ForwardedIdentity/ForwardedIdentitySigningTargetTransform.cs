@@ -13,6 +13,7 @@ internal sealed class ForwardedIdentitySigningTargetTransform(ForwardedIdentityF
     /// <inheritdoc/>
     public override ValueTask ApplyAsync(RequestTransformContext context)
     {
+        context.ProxyRequest.Options.Set(AnonymousPaths.ForwardWithoutIdentity, AnonymousPaths.IsAnonymousRoute(context.HttpContext));
         var service = flow == ForwardedIdentityFlow.BearerRoute
             ? context.HttpContext.Items[BearerRouteDefaults.ServiceItemKey] as string
             : ServiceSelection.FromRoute(context.HttpContext);
