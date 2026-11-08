@@ -267,7 +267,9 @@ A Cratis Identity provider:
   `email`.
 - maps the account's `sub` claim to the [canonical identity](#canonical-federated-identity) claims, with the
   provider's scheme as the provider key. Configure `CanonicalIdentity` yourself to change this; give each
-  Cratis Identity provider a distinct provider key when you configure more than one.
+  Cratis Identity provider a distinct provider key when you configure more than one. The default key comes
+  from the provider's scheme, so renaming the provider changes every user's canonical identity; set
+  `CanonicalIdentity` explicitly to keep the key stable.
 - signs out through the realm's discovered `end_session_endpoint`, sending the `id_token_hint`.
 
 AuthProxy refuses to start when a Cratis Identity provider has no absolute `Authority`, uses an `http`
