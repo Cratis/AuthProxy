@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
 using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.OnBehalfSessions;
+using Cratis.AuthProxy.Telemetry;
 using Cratis.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -71,6 +73,27 @@ public class IdentityDetailsResolver(
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
     {
+        using var activity = AuthProxyTelemetry.Start(WellKnownTelemetryNames.IdentityResolveSpan);
+        var result = await ResolveIdentity(context, principal, tenantId);
+
+        // A refusal tags the span itself, so everything else is an authorization.
+        if (activity?.GetTagItem(WellKnownTelemetryNames.IdentityOutcomeAttribute) is null)
+        {
+            AuthProxyTelemetry.IdentityResolved(activity, true);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Resolves the identity; the traced body of <see cref="Resolve"/>.
+    /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <param name="principal">The caller.</param>
+    /// <param name="tenantId">The tenant.</param>
+    /// <returns>The identity provider result.</returns>
+    internal async Task<IdentityProviderResult> ResolveIdentity(HttpContext context, ClientPrincipal principal, string tenantId)
+    {
         // When a pending invite is in-flight the cookie and memory caches must be bypassed so that
         // the enriched principal (which carries the invite claims jti/invite_type) is always sent to
         // the identity endpoint. A stale .cratis-identity cookie from a previous session would
@@ -111,6 +134,7 @@ public class IdentityDetailsResolver(
         var canReuseRecord = mayReuseRecord && !ReadableIdentityNamesAnotherCaller(context, principal);
         if (canReuseRecord && authorizationCache.IsAuthorized(context, principal, tenantId))
         {
+            AuthProxyTelemetry.IdentityCacheLookup(true);
             return BuildAuthorizedResult(principal, details: null);
         }
 
@@ -123,6 +147,7 @@ public class IdentityDetailsResolver(
         {
             WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
             logger.IdentityDetailsCacheHit(logIdentifier);
+            AuthProxyTelemetry.IdentityCacheLookup(true);
             return cached;
         }
 
@@ -176,9 +201,11 @@ public class IdentityDetailsResolver(
             {
                 WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
                 logger.IdentityDetailsCacheHit(logIdentifier);
+                AuthProxyTelemetry.IdentityCacheLookup(true);
                 return cached;
             }
 
+            AuthProxyTelemetry.IdentityCacheLookup(false);
             var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
             var mergedDetails = new JsonObject();
             var verifiedRequiredServices = new List<string>();
@@ -405,6 +432,8 @@ public class IdentityDetailsResolver(
             logger.IdentityVerificationDenied(serviceName, reason);
         }
 
+        AuthProxyTelemetry.IdentityDenied(reason);
+        AuthProxyTelemetry.IdentityResolved(Activity.Current, false);
         authorizationCache.Clear(context);
         ExpireIdentityCookie(context);
         if (cacheKey is not null)

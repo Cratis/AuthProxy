@@ -12,6 +12,7 @@ using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Management;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.SignIns;
+using Cratis.AuthProxy.Telemetry;
 using Cratis.AuthProxy.Tenancy;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,7 @@ catch (ApplicationContractException exception)
     return 78;
 }
 
+builder.AddTelemetry();
 builder.AddIngressConfiguration();
 builder.AddIngressAuthentication();
 builder.AddIngressAuthorization();
@@ -42,6 +44,9 @@ builder.AddManagement();
 builder.AddGrpcListener();
 
 var app = builder.Build();
+
+// Outermost: the caller's baggage must not reach anything, not even the management listener's answers.
+app.UseTelemetryBaggageStripping();
 
 // Wrap even the management listener's early answers; this adds no routes or authentication decisions.
 app.UseSearchIndexingHeaders();

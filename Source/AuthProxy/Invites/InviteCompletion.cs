@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.Telemetry;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
@@ -45,8 +46,8 @@ class InviteCompletion(
     internal const int MaximumAttestedInvitationTokenLength = 4096;
 
     /// <inheritdoc/>
-    public async Task<InviteExchangeResult> ExchangeForRequest(HttpContext context, string inviteToken) =>
-        IsAttestedProtocolEnabled()
+    public Task<InviteExchangeResult> ExchangeForRequest(HttpContext context, string inviteToken) =>
+        AuthProxyTelemetry.TraceInviteExchange(async () => IsAttestedProtocolEnabled()
             ? await CompleteAttestedInvitation(
                 context,
                 inviteToken,
@@ -61,11 +62,11 @@ class InviteCompletion(
                         authentication.Properties,
                         authentication.Properties?.IssuedUtc);
                 })
-            : await ExchangeInvite(context, inviteToken, context.User, AuthenticationSchemeOf(context, context.User));
+            : await ExchangeInvite(context, inviteToken, context.User, AuthenticationSchemeOf(context, context.User)));
 
     /// <inheritdoc/>
-    public async Task<InviteExchangeResult> ExchangeForTicket(HttpContext context, string inviteToken, ClaimsPrincipal principal, AuthenticationProperties properties) =>
-        IsAttestedProtocolEnabled()
+    public Task<InviteExchangeResult> ExchangeForTicket(HttpContext context, string inviteToken, ClaimsPrincipal principal, AuthenticationProperties properties) =>
+        AuthProxyTelemetry.TraceInviteExchange(async () => IsAttestedProtocolEnabled()
             ? await CompleteAttestedInvitation(
                 context,
                 inviteToken,
@@ -76,7 +77,7 @@ class InviteCompletion(
 
                     // The ticket was received this instant; no handler has stamped an issue instant yet.
                     properties.IssuedUtc ?? DateTimeOffset.UtcNow)))
-            : await ExchangeInvite(context, inviteToken, principal, AuthenticationSchemeOf(context, principal, properties));
+            : await ExchangeInvite(context, inviteToken, principal, AuthenticationSchemeOf(context, principal, properties)));
 
     /// <inheritdoc/>
     public bool TryResolveLobbyRedirect(HttpContext context, string inviteToken, out string lobbyRedirectUrl)
