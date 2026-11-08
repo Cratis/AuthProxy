@@ -6,6 +6,8 @@ using Cratis.OpenTelemetry;
 using OpenTelemetry;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Instrumentation.Http;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
 
 namespace Cratis.AuthProxy.Telemetry;
 
@@ -16,6 +18,29 @@ public static class TelemetryExtensions
 {
     const string BaggageHeader = "baggage";
     const string LegacyBaggageHeader = "Correlation-Context";
+
+    /// <summary>Loggers that write the request path, the query or a full outgoing URL. They stay on the console as configured, but are not exported below Warning.</summary>
+    static readonly string[] _pathLoggingCategories =
+    [
+        "Microsoft.AspNetCore.Hosting",
+        "Microsoft.AspNetCore.Routing",
+        "Microsoft.AspNetCore.Server.Kestrel",
+        "Yarp",
+        "System.Net.Http.HttpClient"
+    ];
+
+    /// <summary>The HTTP client metrics name the host they called, which can carry a tenant; everything else they tag is kept.</summary>
+    static readonly string[] _httpClientMetricTags =
+    [
+        "http.request.method",
+        "http.response.status_code",
+        "error.type",
+        "network.protocol.version",
+        "url.scheme",
+        "http.connection.state"
+    ];
+
+    static readonly string[] _httpClientMeters = ["System.Net.Http", "System.Net.NameResolution", "OpenTelemetry.Instrumentation.Http"];
 
     /// <summary>
     /// Adds the shared Cratis OpenTelemetry setup.
@@ -64,6 +89,18 @@ public static class TelemetryExtensions
                 TelemetryRedaction.Redact(activity);
             };
         });
+
+        // The shared setup exports log scopes, and the hosting scope of a request carries its path (an invitation token).
+        builder.Services.PostConfigure<OpenTelemetryLoggerOptions>(options => options.IncludeScopes = false);
+        foreach (var category in _pathLoggingCategories)
+        {
+            builder.Logging.AddFilter<OpenTelemetryLoggerProvider>(category, LogLevel.Warning);
+        }
+
+        builder.Services.ConfigureOpenTelemetryMeterProvider(provider => provider.AddView(instrument =>
+            _httpClientMeters.Contains(instrument.Meter.Name, StringComparer.Ordinal)
+                ? new MetricStreamConfiguration { TagKeys = _httpClientMetricTags }
+                : null));
         return builder;
     }
 

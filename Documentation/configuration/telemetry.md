@@ -77,6 +77,8 @@ requests, so AuthProxy redacts what it records before any exporter sees it:
 | Incoming request spans | The query string is never recorded, so a sign-in callback's `code` and `state` never appear. A path under `/invite` is recorded as `/invite/{token}`. The host (`server.address`, which is the tenant under subdomain tenancy) and the full URL are never recorded. |
 | Outgoing request spans | The URL, its path and its query are never recorded, so the tenant in a tenant-verification URL and any forwarded path never appear. |
 | Exceptions | Exceptions are not recorded on spans. |
+| Exported logs | Log scopes are not exported, because the hosting scope of a request carries its path. The hosting, routing, Kestrel, reverse proxy and HTTP client loggers, which write request paths, queries and outgoing URLs, are not exported below `Warning`. Console logging is unchanged. |
+| HTTP client metrics | The host the proxy called (`server.address`, `dns.question.name`) is not a metric attribute, because it can carry a tenant. |
 
 The path of any other incoming request is recorded as it arrived. Paths that your application's own routes
 use to carry a secret are your application's to keep out of its URLs; to hide them, drop the request spans
