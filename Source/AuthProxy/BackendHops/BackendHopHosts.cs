@@ -18,10 +18,12 @@ internal static class BackendHopHosts
     /// <param name="config">The deployment configuration.</param>
     /// <returns>A case-insensitive host set.</returns>
     internal static IReadOnlySet<string> For(C.AuthProxy config) =>
-        (RequiresIdentityTls(config)
+        (config.BackendTls.RequireTlsOnIdentityHops
             ? IdentityBearingHops(config).Select(hop => hop.Address)
             : config.Services.Values.Select(service => service.Backend?.BaseUrl)
-                .Concat(Selections(config).Select(selection => selection.Options.TenantsEndpoint)))
+                .Concat(config.Services.Values.Where(service => service.ForwardedIdentity is not null).Select(service => service.Frontend?.BaseUrl))
+                .Concat(Selections(config).Select(selection => selection.Options.TenantsEndpoint))
+                .Concat(IsSigningConfigured(config) ? new[] { config.Invite?.StageUrl, config.Invite?.ExchangeUrl, config.Link?.ExchangeUrl, config.SignIn?.NotifyUrl } : []))
             .Append(config.Invite?.Lobby?.Backend?.BaseUrl)
             .Where(address => Uri.TryCreate(address, UriKind.Absolute, out _))
             .Select(address => new Uri(address!, UriKind.Absolute).IdnHost)
@@ -52,7 +54,9 @@ internal static class BackendHopHosts
     /// <param name="address">The resolved destination address.</param>
     /// <returns>Whether the destination meets the transport policy.</returns>
     internal static bool AllowsIdentityBackChannel(C.AuthProxy config, string address) =>
-        !RequiresIdentityTls(config) || IsHttps(address) || (!RequiresHttps(config) && Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback);
+        config.BackendTls.RequireTlsOnIdentityHops
+            ? IsHttps(address) || (config.Profile == C.DeploymentProfile.LocalDevelopment && Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback)
+            : !RequiresHttps(config) || IsHttps(address);
 
     /// <summary>Lists every destination that can carry identity or tenant context, regardless of signing.</summary>
     /// <param name="config">The deployment configuration.</param>

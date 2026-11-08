@@ -8,6 +8,7 @@ public class when_identity_back_channels_are_configured : given.a_tls_policy
     void Establish()
     {
         configuration.Services["app"].ForwardedIdentity = new();
+        configuration.BackendTls.RequireTlsOnIdentityHops = true;
         configuration.Invite = new() { StageUrl = "https://stage.example/stage", ExchangeUrl = "https://invite.example/exchange" };
         configuration.Link = new() { ExchangeUrl = "https://link.example/exchange" };
         configuration.SignIn = new() { NotifyUrl = "https://notify.example/notify" };

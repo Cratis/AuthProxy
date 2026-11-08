@@ -22,7 +22,7 @@ public class when_signing_is_configured : Specification
     [Fact] void should_include_invitation_exchange() => _hosts.Contains("invite.example").ShouldBeTrue();
     [Fact] void should_include_link_exchange() => _hosts.Contains("link.example").ShouldBeTrue();
     [Fact] void should_include_sign_in_notification() => _hosts.Contains("notify.example").ShouldBeTrue();
-    [Fact] void should_include_capability_verification() => _hosts.Contains("verifier.example").ShouldBeTrue();
-    [Fact] void should_include_tenant_verification() => _hosts.Contains("tenants.example").ShouldBeTrue();
-    [Fact] void should_include_subhost_verification() => _hosts.Contains("subhost.example").ShouldBeTrue();
+    [Fact] void should_not_include_capability_verification_without_opt_in() => _hosts.Contains("verifier.example").ShouldBeFalse();
+    [Fact] void should_not_include_tenant_verification_without_opt_in() => _hosts.Contains("tenants.example").ShouldBeFalse();
+    [Fact] void should_not_include_subhost_verification_without_opt_in() => _hosts.Contains("subhost.example").ShouldBeFalse();
 }
