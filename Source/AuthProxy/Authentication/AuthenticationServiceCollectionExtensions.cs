@@ -371,6 +371,7 @@ public static class AuthenticationServiceCollectionExtensions
             OnTokenValidated = context =>
             {
                 context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
+                VerifiedUpstreamClaims.Capture(context.HttpContext, scheme, context.SecurityToken);
                 return Task.CompletedTask;
             },
             OnTokenResponseReceived = UserTokenSessions.Capture,

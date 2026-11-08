@@ -112,8 +112,8 @@ public class SignInNotifier(
         var userAgent = UserAgentParser.Parse(context.Request.Headers.UserAgent.ToString());
 
         using var client = httpClientFactory.CreateClient();
-        var content = canonicalResolution.Identity is { } canonicalIdentity
-            ? JsonContent.Create(new
+        object payload = canonicalResolution.Identity is { } canonicalIdentity
+            ? new
             {
                 subject,
                 providerKey = canonicalIdentity.ProviderKey,
@@ -124,8 +124,8 @@ public class SignInNotifier(
                 browser = userAgent.Browser,
                 operatingSystem = userAgent.OperatingSystem,
                 userAgent = userAgent.Raw,
-            })
-            : JsonContent.Create(new
+            }
+            : new
             {
                 subject,
                 identityProvider,
@@ -134,7 +134,20 @@ public class SignInNotifier(
                 browser = userAgent.Browser,
                 operatingSystem = userAgent.OperatingSystem,
                 userAgent = userAgent.Raw,
-            });
+            };
+
+        // Verified upstream claims are opt-in and only ever travel inside a signed body: without an attestation
+        // nothing is added. They come solely from the token AuthProxy validated for this very sign-in.
+        var signIn = config.CurrentValue.SignIn;
+        if (signIn is { IncludeVerifiedUpstreamClaims: true, Attestation: not null }
+            && VerifiedUpstreamClaims.For(context, scheme) is { } verified)
+        {
+            var withClaims = JsonSerializer.SerializeToNode(payload, JsonSerializerOptions.Web)!.AsObject();
+            withClaims["verifiedClaims"] = JsonSerializer.SerializeToNode(verified.Values, JsonSerializerOptions.Web);
+            payload = withClaims;
+        }
+
+        var content = JsonContent.Create(payload, payload.GetType());
 
         using var request = new HttpRequestMessage(HttpMethod.Post, notifyUrl)
         {

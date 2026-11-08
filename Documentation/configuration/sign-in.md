@@ -244,6 +244,7 @@ material.
 | `Cratis:AuthProxy:SignIn:Attestation:ActiveKeyId` | the key new envelopes are signed with; must name exactly one configured key |
 | `Cratis:AuthProxy:SignIn:Attestation:SigningKeys` | the available keys, each a `KeyId` and a PEM-encoded RSA `PrivateKeyPem` of at least 2048 bits; every `KeyId` must be unique |
 | `Cratis:AuthProxy:SignIn:Attestation:Lifetime` | the envelope lifetime; between 10 and 60 seconds, defaulting to 60 |
+| `Cratis:AuthProxy:SignIn:IncludeVerifiedUpstreamClaims` | `false` by default; when `true`, adds [verified upstream claims](#verified-upstream-claims) to the signed body and requires `Attestation` |
 
 Supply `PrivateKeyPem` through a secret provider. AuthProxy never returns or logs it — publish only the
 matching public key to the application.
@@ -251,6 +252,44 @@ matching public key to the application.
 To rotate keys, add the new key to `SigningKeys` and configure its public half in the application before moving
 `ActiveKeyId` to it. Keep the previous public key available to the receiver until every envelope it signed is
 outside the receiver's accepted validity window.
+
+### Verified upstream claims
+
+By default the notification names the account but carries nothing the identity provider itself asserted. Set
+`Cratis:AuthProxy:SignIn:IncludeVerifiedUpstreamClaims` to `true` to add a `verifiedClaims` object to the signed
+body. It requires `Attestation`: the claims are only ever sent inside a signed body, so the host refuses to start
+without it.
+
+```json
+{
+  "subject": "...",
+  "verifiedClaims": {
+    "iss": "<issuer of the identity token>",
+    "sub": "<account id>",
+    "idp": "<identity provider>",
+    "idp_sub": "<subject at the identity provider>",
+    "github_id": "<external account id>",
+    "auth_time": 1700000000,
+    "jti": "<token id>"
+  }
+}
+```
+
+What a receiver can trust:
+
+- Every value was read by AuthProxy from the identity token it validated for this sign-in (signature, issuer,
+  audience, lifetime, state and PKCE). None comes from the user-info response, the session, a request header or
+  anything the caller sent, and a caller-supplied copy is never forwarded.
+- A claim the token does not carry, carries more than once, or carries malformed (`auth_time` must be whole
+  seconds) is left out. Absence means "not verified", never a default.
+- The claims are inside the body covered by `body_hash`, so changing one invalidates the envelope. Verify the
+  envelope first, and trust `verifiedClaims` only from a verified envelope.
+- No token is carried, stored or logged; only these claims are.
+- Only OpenID Connect providers contribute claims. A sign-in through an OAuth-only provider sends no
+  `verifiedClaims`.
+- The object is a statement about the provider's authentication. It grants no membership, role or scope.
+
+Without the setting the notification is unchanged.
 
 ### Compatibility and failure behavior
 

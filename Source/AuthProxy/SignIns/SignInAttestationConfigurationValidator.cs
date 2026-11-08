@@ -28,7 +28,9 @@ sealed class SignInAttestationConfigurationValidator : IValidateOptions<C.AuthPr
         var attestation = signIn?.Attestation;
         if (attestation is null)
         {
-            return ValidateOptionsResult.Success;
+            return signIn?.IncludeVerifiedUpstreamClaims == true
+                ? ValidateOptionsResult.Fail("SignIn.IncludeVerifiedUpstreamClaims requires SignIn.Attestation, because the claims are only sent inside a signed body.")
+                : ValidateOptionsResult.Success;
         }
 
         var failures = new List<string>();
