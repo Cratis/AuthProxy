@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
 using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.OnBehalfSessions;
+using Cratis.AuthProxy.Telemetry;
 using Cratis.Json;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
@@ -71,6 +73,28 @@ public class IdentityDetailsResolver(
     /// <inheritdoc/>
     public async Task<IdentityProviderResult> Resolve(HttpContext context, ClientPrincipal principal, string tenantId)
     {
+        using var activity = AuthProxyTelemetry.Start(WellKnownTelemetryNames.IdentityResolveSpan);
+        var result = await ResolveIdentity(context, principal, tenantId, activity);
+
+        // A refusal tags the span itself, so everything else is an authorization.
+        if (activity?.GetTagItem(WellKnownTelemetryNames.IdentityOutcomeAttribute) is null)
+        {
+            AuthProxyTelemetry.IdentityResolved(activity, true);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Resolves the identity; the traced body of <see cref="Resolve"/>.
+    /// </summary>
+    /// <param name="context">The HTTP context.</param>
+    /// <param name="principal">The caller.</param>
+    /// <param name="tenantId">The tenant.</param>
+    /// <param name="activity">The identity span started by <see cref="Resolve"/>, tagged when the caller is refused.</param>
+    /// <returns>The identity provider result.</returns>
+    internal async Task<IdentityProviderResult> ResolveIdentity(HttpContext context, ClientPrincipal principal, string tenantId, Activity? activity = null)
+    {
         // When a pending invite is in-flight the cookie and memory caches must be bypassed so that
         // the enriched principal (which carries the invite claims jti/invite_type) is always sent to
         // the identity endpoint. A stale .cratis-identity cookie from a previous session would
@@ -111,6 +135,7 @@ public class IdentityDetailsResolver(
         var canReuseRecord = mayReuseRecord && !ReadableIdentityNamesAnotherCaller(context, principal);
         if (canReuseRecord && authorizationCache.IsAuthorized(context, principal, tenantId))
         {
+            AuthProxyTelemetry.IdentityCacheLookup(true);
             return BuildAuthorizedResult(principal, details: null);
         }
 
@@ -123,6 +148,7 @@ public class IdentityDetailsResolver(
         {
             WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
             logger.IdentityDetailsCacheHit(logIdentifier);
+            AuthProxyTelemetry.IdentityCacheLookup(true);
             return cached;
         }
 
@@ -165,7 +191,7 @@ public class IdentityDetailsResolver(
             // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
             // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
             return verificationRequired
-                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn, requiredServices: requiredServices)
+                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn, requiredServices: requiredServices, activity: activity)
                 : BuildAuthorizedResult(principal, details: null);
         }
 
@@ -176,9 +202,11 @@ public class IdentityDetailsResolver(
             {
                 WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
                 logger.IdentityDetailsCacheHit(logIdentifier);
+                AuthProxyTelemetry.IdentityCacheLookup(true);
                 return cached;
             }
 
+            AuthProxyTelemetry.IdentityCacheLookup(false);
             var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
             var mergedDetails = new JsonObject();
             var verifiedRequiredServices = new List<string>();
@@ -201,7 +229,7 @@ public class IdentityDetailsResolver(
 
                 if (!Admits(outcome, mode))
                 {
-                    return Deny(context, cacheKey, name, outcome.Reason, mode == C.IdentityVerificationMode.Required);
+                    return Deny(context, cacheKey, name, outcome.Reason, mode == C.IdentityVerificationMode.Required, activity: activity);
                 }
 
                 if (mode == C.IdentityVerificationMode.Required)
@@ -379,6 +407,7 @@ public class IdentityDetailsResolver(
     /// <param name="reason">The bounded code explaining the refusal.</param>
     /// <param name="required">Whether the refusing service requires verification.</param>
     /// <param name="requiredServices">Required services when resolution never reached an endpoint.</param>
+    /// <param name="activity">The identity span to tag as denied.</param>
     /// <returns>The unauthorized result.</returns>
     /// <remarks>
     /// Refusing without erasing would be nearly useless: an earlier success leaves a sealed record, a
@@ -386,7 +415,7 @@ public class IdentityDetailsResolver(
     /// the question that was just answered no. All three go together, and they go on every refusal — the
     /// released code cleared none of them, and <c language="text">Clear</c> had no caller at all.
     /// </remarks>
-    IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason, bool required = false, IEnumerable<string>? requiredServices = null)
+    IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason, bool required = false, IEnumerable<string>? requiredServices = null, Activity? activity = null)
     {
         if (reason == IdentityVerificationReason.Canceled)
         {
@@ -405,6 +434,8 @@ public class IdentityDetailsResolver(
             logger.IdentityVerificationDenied(serviceName, reason);
         }
 
+        AuthProxyTelemetry.IdentityDenied(reason);
+        AuthProxyTelemetry.IdentityResolved(activity, false);
         authorizationCache.Clear(context);
         ExpireIdentityCookie(context);
         if (cacheKey is not null)

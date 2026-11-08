@@ -32,6 +32,8 @@
   href: trusted-proxies.md
 - name: Management Listener
   href: management-listener.md
+- name: Telemetry
+  href: telemetry.md
 - name: Services
   href: services.md
 - name: Forwarded Identity Signing

@@ -4,6 +4,7 @@
 using System.Buffers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.Telemetry;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using static Cratis.AuthProxy.Authentication.SingleClaimValue;
@@ -102,6 +103,21 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
     /// <inheritdoc/>
     public async Task<BearerTokenValidation> Validate(HttpRequest request, ResolvedBearerRoute route, CancellationToken cancellationToken)
+    {
+        using var activity = AuthProxyTelemetry.Start(WellKnownTelemetryNames.BearerValidateSpan);
+        var validation = await ValidateToken(request, route, cancellationToken);
+        AuthProxyTelemetry.BearerValidated(activity, validation.Status);
+        return validation;
+    }
+
+    /// <summary>
+    /// Validates the presented token; the traced body of <see cref="Validate"/>.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="route">The route.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The validation outcome.</returns>
+    internal async Task<BearerTokenValidation> ValidateToken(HttpRequest request, ResolvedBearerRoute route, CancellationToken cancellationToken)
     {
         var header = ReadBearerToken(request, out var token);
         if (header == TokenPresence.Absent)
