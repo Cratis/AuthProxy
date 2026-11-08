@@ -71,7 +71,7 @@ public sealed class OnBehalfGrants(
         }
 
         using var request = new HttpRequestMessage(HttpMethod.Get, target);
-        OnBehalfApplication.AddHeaders(request, session, actor, token);
+        OnBehalfApplication.AddHeaders(request, session, actor, token, current.OnBehalf?.OmitActorHeaderOnBackChannelCalls ?? false);
 
         using var bounded = OnBehalfApplication.Bounded(current, cancellationToken);
         try

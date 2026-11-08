@@ -175,10 +175,22 @@ AuthProxy calls three endpoints on the backend of the service named by `OnBehalf
 |---|---|
 | `Authorization` | `Bearer <token>`, a signed token described in [Verifying AuthProxy's tokens](#verifying-authproxys-tokens). |
 | `x-cratis-tenant-id` | The tenant the session acts in. `Tenant-ID` carries the same value. |
-| `x-cratis-on-behalf-actor` | The actor as a client principal: base64 of the [client principal JSON](#the-client-principal-format). |
+| `x-cratis-on-behalf-actor` | The actor as a client principal: base64 of the [client principal JSON](#the-client-principal-format). Present by default; omitted when `OnBehalf:OmitActorHeaderOnBackChannelCalls` is `true`. |
 
 The calls carry no `x-ms-client-principal`: nobody is signed in as the represented user. Each call times out
 after `OnBehalf:Timeout` (10 seconds by default).
+
+Set the server option `Cratis:AuthProxy:OnBehalf:OmitActorHeaderOnBackChannelCalls` to `true` to omit only
+`x-cratis-on-behalf-actor` on these three calls. Its default is `false`. The environment variable is
+`Cratis__AuthProxy__OnBehalf__OmitActorHeaderOnBackChannelCalls`. The tenant headers, grant query,
+notification bodies and Bearer attestation contract are unchanged. This option does not affect forwarded
+requests or identity endpoint calls.
+
+The receiver must authenticate each call by [fully verifying its attestation](#verifying-authproxys-tokens),
+including replay validation, before deriving the actor from the verified `act` claim. Presence or absence of
+the advisory actor header is not authentication. Reject missing or invalid attestations in either mode; do not
+accept an empty actor or use query/body actor metadata as an authenticated substitute. Enable omission only
+when the receiver implements this contract; it is not an authentication bypass.
 
 ### Grant check: `GET /.cratis/on-behalf/grants`
 
@@ -383,10 +395,16 @@ carry:
 A forwarded request's `htu` is a path rather than a URL because the backend sees AuthProxy's internal address, not
 the one the browser used.
 
+Grant-check and session-notification attestations do not contain `actor_hash`, `principal_hash` or `svc`.
+Their signed `act` claim identifies the actor independently of the advisory actor header. Omitting that header
+therefore does not change their attestation or its validation. Forwarded requests and identity endpoint calls
+still carry the actor header and its `actor_hash` binding; `OmitActorHeaderOnBackChannelCalls` does not change
+those headers, claims or verification requirements.
+
 To verify a token:
 
-1. Select the public key by `kid` from your pinned key set, and require RS256.
-2. Validate `iss`, `aud`, `exp` and `nbf`.
+1. Select the public key by `kid` from your pinned key set, require RS256 and verify the signature.
+2. Validate `iss`, `aud`, `exp` and `nbf` against the expected issuer, audience and current time.
 3. Require the `purpose` the endpoint expects.
 4. For a call, compare `htm` and `htu` with the request, and `body_hash` with the raw body read before
    deserializing.
@@ -394,8 +412,9 @@ To verify a token:
    raw request path the backend received (its path base and path, percent-encoded, without the query), require
    `svc` to name this service, and compare `principal_hash` and `actor_hash` with the SHA-256 of the exact
    header values. A mismatch means the assertion was lifted from another request or sent to another service.
-6. Take `sub`, `act`, `tenant`, `issue` and `sid` from the token, not from the query or body.
-7. Reject a `jti` already seen within the token lifetime.
+6. Reject a `jti` already seen within the token lifetime.
+7. Only after all validation succeeds, take `sub`, `act`, `tenant`, `issue` and `sid` from the verified token,
+   not from headers, the query or body. The actor is `act.sub` together with `act.idp`.
 
 AuthProxy publishes no JWKS document. Pin the public keys in the application's configuration.
 
@@ -443,6 +462,7 @@ AuthProxy publishes no JWKS document. Pin the public keys in the application's c
 | `OnBehalf:RecheckInterval` | `00:00:30` | How long a live answer is trusted. Between 1 second and 5 minutes. This is the longest a revoked grant can go on being honored on one instance. |
 | `OnBehalf:MaximumLifetime` | `01:00:00` | The longest a session may last, however long the grant is valid. Between 1 minute and 24 hours. |
 | `OnBehalf:Timeout` | `00:00:10` | How long AuthProxy waits for each call to the application. Between 1 and 60 seconds. |
+| `OnBehalf:OmitActorHeaderOnBackChannelCalls` | `false` | Omits only `x-cratis-on-behalf-actor` from grant checks and session started/ended notifications. The receiver must verify the attestation and derive the actor from `act`. Forwarded requests and identity calls are unchanged. |
 | `OnBehalf:Attestation:Issuer` | required | Written to `iss`. |
 | `OnBehalf:Attestation:Audience` | required | Written to `aud`. |
 | `OnBehalf:Attestation:ActiveKeyId` | required | The key that signs. It must name exactly one configured key. |
