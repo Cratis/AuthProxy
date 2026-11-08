@@ -25,7 +25,7 @@ static class AuthProxyTelemetry
     static readonly Meter _meter = new(WellKnownTelemetryNames.Scope, _version);
 
     static readonly Counter<long> _signIns = _meter.CreateCounter<long>(
-        WellKnownTelemetryNames.SignInCountMetric,
+        WellKnownTelemetryNames.SignInsMetric,
         unit: "{sign_in}",
         description: "Completed sign-ins, by the outcome of notifying the application.");
 

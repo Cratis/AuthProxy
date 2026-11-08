@@ -77,6 +77,7 @@ public class when_a_bearer_request_is_traced(BearerRouteHarness harness) : IAsyn
         var request = BearerRouteHarness.WithToken(HttpMethod.Post, Path, _token);
         request.Headers.TryAddWithoutValidation("traceparent", $"00-{TraceId}-b7ad6b7169203331-01");
         request.Headers.TryAddWithoutValidation("baggage", Baggage);
+        request.Headers.TryAddWithoutValidation("Correlation-Context", Baggage);
         _response = await client.SendAsync(request);
         _forwarded = harness.Origin.LastRequestTo(Path);
     }
@@ -92,6 +93,7 @@ public class when_a_bearer_request_is_traced(BearerRouteHarness harness) : IAsyn
     [Fact] public void should_forward_the_request() => Assert.Equal(HttpStatusCode.OK, _response!.StatusCode);
     [Fact] public void should_continue_the_callers_trace_to_the_service() => Assert.Contains(TraceId, _forwarded!.Value("traceparent"), StringComparison.Ordinal);
     [Fact] public void should_not_forward_the_callers_baggage() => Assert.False(_forwarded!.Has("baggage"));
+    [Fact] public void should_not_forward_the_legacy_correlation_context() => Assert.False(_forwarded!.Has("Correlation-Context"));
     [Fact] public void should_record_the_bearer_validation_span() => Assert.Contains(WellKnownTelemetryNames.BearerValidateSpan, _spanNames);
     [Fact] public void should_record_something() => Assert.NotEmpty(_recordedValues);
     [Fact] public void should_not_record_the_token() => Assert.DoesNotContain(_recordedValues, value => value.Contains(_token, StringComparison.Ordinal));

@@ -33,8 +33,8 @@ Insights.
 ## Trace context
 
 The W3C `traceparent` and `tracestate` headers a caller sends continue through the proxy to the service, so a
-request is one trace from the caller to your application. The W3C `baggage` header is **not** forwarded:
-what a caller attaches to a request never reaches a service.
+request is one trace from the caller to your application. The W3C `baggage` header and the legacy
+`Correlation-Context` header are **not** forwarded: what a caller attaches to a request never reaches a service.
 
 ---
 
@@ -52,7 +52,7 @@ what a caller attaches to a request never reaches a service.
 
 | Metric | Unit | Attribute | Counts |
 |--------|------|-----------|--------|
-| `cratis.authproxy.sign_in.count` | `{sign_in}` | `cratis.authproxy.sign_in.outcome` | Completed sign-ins. |
+| `cratis.authproxy.sign_ins` | `{sign_in}` | `cratis.authproxy.sign_in.outcome` | Completed sign-ins. |
 | `cratis.authproxy.identity.denials` | `{denial}` | `cratis.authproxy.identity.denial_reason` | Identity verifications that refused the caller. |
 | `cratis.authproxy.identity.cache.requests` | `{request}` | `cratis.authproxy.identity.cache.result` | Identity cache lookups, `hit` or `miss`. |
 | `cratis.authproxy.bearer.validations` | `{validation}` | `cratis.authproxy.bearer.outcome` | Bearer token validations. |
@@ -65,6 +65,19 @@ The names are constants on `Cratis.AuthProxy.Telemetry.WellKnownTelemetryNames`.
 
 ## What is never recorded
 
-Every attribute value is a small, closed set of lowercase words. No token, claim value, subject, email,
-cookie, secret, URL or tenant identifier is ever a span name, span attribute, or metric attribute, so a
-telemetry backend never holds a credential or a person.
+Every attribute AuthProxy adds is a small, closed set of lowercase words. No token, claim value, subject,
+email, cookie, secret, URL or tenant identifier is ever added as a span name, span attribute, or metric
+attribute, so a telemetry backend never holds a credential or a person.
+
+The standard ASP.NET Core and HTTP client instrumentation that comes with the shared setup also records
+requests, so AuthProxy redacts what it records before any exporter sees it:
+
+| Where | Redacted |
+|-------|----------|
+| Incoming request spans | The query string is never recorded, so a sign-in callback's `code` and `state` never appear. A path under `/invite` is recorded as `/invite/{token}`. The host (`server.address`, which is the tenant under subdomain tenancy) and the full URL are never recorded. |
+| Outgoing request spans | The URL, its path and its query are never recorded, so the tenant in a tenant-verification URL and any forwarded path never appear. |
+| Exceptions | Exceptions are not recorded on spans. |
+
+The path of any other incoming request is recorded as it arrived. Paths that your application's own routes
+use to carry a secret are your application's to keep out of its URLs; to hide them, drop the request spans
+in your collector.

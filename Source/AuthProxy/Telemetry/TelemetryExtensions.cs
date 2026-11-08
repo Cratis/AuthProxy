@@ -4,6 +4,8 @@
 using System.Diagnostics;
 using Cratis.OpenTelemetry;
 using OpenTelemetry;
+using OpenTelemetry.Instrumentation.AspNetCore;
+using OpenTelemetry.Instrumentation.Http;
 
 namespace Cratis.AuthProxy.Telemetry;
 
@@ -13,6 +15,7 @@ namespace Cratis.AuthProxy.Telemetry;
 public static class TelemetryExtensions
 {
     const string BaggageHeader = "baggage";
+    const string LegacyBaggageHeader = "Correlation-Context";
 
     /// <summary>
     /// Adds the shared Cratis OpenTelemetry setup.
@@ -26,6 +29,41 @@ public static class TelemetryExtensions
     public static WebApplicationBuilder AddTelemetry(this WebApplicationBuilder builder)
     {
         builder.AddCratisOpenTelemetry(options => options.ServiceName = WellKnownTelemetryNames.DefaultServiceName);
+
+        // The shared instrumentation records the request URL, the host and exceptions. Those carry invitation
+        // tokens, callback codes and tenants, so they are redacted before any exporter sees the span.
+        builder.Services.PostConfigure<AspNetCoreTraceInstrumentationOptions>(options =>
+        {
+            var request = options.EnrichWithHttpRequest;
+            var response = options.EnrichWithHttpResponse;
+            options.RecordException = false;
+            options.EnrichWithHttpRequest = (activity, httpRequest) =>
+            {
+                request?.Invoke(activity, httpRequest);
+                TelemetryRedaction.Redact(activity);
+            };
+            options.EnrichWithHttpResponse = (activity, httpResponse) =>
+            {
+                response?.Invoke(activity, httpResponse);
+                TelemetryRedaction.Redact(activity);
+            };
+        });
+        builder.Services.PostConfigure<HttpClientTraceInstrumentationOptions>(options =>
+        {
+            var request = options.EnrichWithHttpRequestMessage;
+            var response = options.EnrichWithHttpResponseMessage;
+            options.RecordException = false;
+            options.EnrichWithHttpRequestMessage = (activity, message) =>
+            {
+                request?.Invoke(activity, message);
+                TelemetryRedaction.Redact(activity);
+            };
+            options.EnrichWithHttpResponseMessage = (activity, message) =>
+            {
+                response?.Invoke(activity, message);
+                TelemetryRedaction.Redact(activity);
+            };
+        });
         return builder;
     }
 
@@ -44,6 +82,7 @@ public static class TelemetryExtensions
         app.Use((context, next) =>
         {
             context.Request.Headers.Remove(BaggageHeader);
+            context.Request.Headers.Remove(LegacyBaggageHeader);
             Baggage.Current = default;
 
             // ASP.NET Core parses the header into the request activity before any middleware runs, and the HTTP

@@ -51,7 +51,7 @@ public static class WellKnownTelemetryNames
     /// <summary>
     /// The counter of completed sign-ins, by outcome. Unit <c language="text">{sign_in}</c>.
     /// </summary>
-    public const string SignInCountMetric = "cratis.authproxy.sign_in.count";
+    public const string SignInsMetric = "cratis.authproxy.sign_ins";
 
     /// <summary>
     /// The counter of identity verifications that refused the caller, by reason. Unit <c language="text">{denial}</c>.
