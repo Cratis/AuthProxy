@@ -81,6 +81,11 @@ public static class RemoteAuthenticationFailureHandler
             location += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
         }
 
+        if (properties is not null && FreshAuthenticationChallenge.TryGetMaxAge(properties, out var maxAge))
+        {
+            location = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(
+                FreshAuthenticationChallenge.Login(null, returnUrl, maxAge), SignInFailureReason.QueryKey, reason);
+        }
         context.Response.Redirect(location);
         context.HandleResponse();
     }

@@ -70,6 +70,7 @@ public static class LoginChallenge
             return;
         }
 
+        FreshAuthenticationChallenge.Apply(context, properties);
         await context.ChallengeAsync(scheme, properties);
     }
 }

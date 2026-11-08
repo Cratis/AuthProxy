@@ -74,6 +74,7 @@ public static class IngressExtensions
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardedIdentitySigningConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, FreshAuthenticationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SignInCallbackHostConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ClientCredentialsConfigurationValidator>();
         builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
@@ -228,6 +229,7 @@ public static class IngressExtensions
         app.UseMiddleware<ProxyOwnedFlowMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<AccessControlMiddleware>();
+        app.UseMiddleware<FreshAuthenticationMiddleware>();
 
         // After the deployment's gates, so an actor must be allowed in as themselves before acting as anybody, and
         // before tenant selection, tenancy and identity resolution, so all three see the represented user.

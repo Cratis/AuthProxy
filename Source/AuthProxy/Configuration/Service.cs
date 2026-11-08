@@ -144,6 +144,10 @@ public class Service
     /// </remarks>
     public IList<ForwardingPathRule> ForwardedPaths { get; set; } = [];
 
+    /// <summary>Gets or sets opt-in authentication-age rules for this service's protected paths.</summary>
+    /// <remarks>Anonymous paths are not affected. A null or empty array preserves existing session behavior.</remarks>
+    public IList<FreshAuthenticationRule>? FreshAuthentication { get; set; }
+
     /// <summary>Gets or sets the service-relative paths that must never be forwarded.</summary>
     /// <remarks>
     /// Deny rules take precedence over allow rules, including for authenticated callers. Paths and opt-in

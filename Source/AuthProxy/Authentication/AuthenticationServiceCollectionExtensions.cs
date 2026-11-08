@@ -50,6 +50,7 @@ public static class AuthenticationServiceCollectionExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddIngressAuthentication(this WebApplicationBuilder builder)
     {
+        builder.Services.TryAddSingleton(TimeProvider.System);
         var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
         var hasJwtBearer = jwtSection.Exists();
 
@@ -368,9 +369,24 @@ public static class AuthenticationServiceCollectionExtensions
     {
         return new OpenIdConnectEvents
         {
+            OnRedirectToIdentityProvider = context =>
+            {
+                if (FreshAuthenticationChallenge.TryGetMaxAge(context.Properties, out var maxAge))
+                {
+                    context.ProtocolMessage.Prompt = "login";
+                    context.ProtocolMessage.MaxAge = ((int)maxAge.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = context =>
             {
                 context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
+                var validatedClaims = context.SecurityToken?.Claims ?? [];
+                if (!FreshAuthenticationChallenge.ValidateOidc(validatedClaims, context.Properties, FreshAuthenticationChallenge.Now(context.HttpContext)))
+                {
+                    FreshAuthenticationChallenge.Reject(context.HttpContext, context.Properties);
+                    context.HandleResponse();
+                }
                 return Task.CompletedTask;
             },
             OnTokenResponseReceived = UserTokenSessions.Capture,
@@ -583,7 +599,7 @@ public static class AuthenticationServiceCollectionExtensions
             context.Properties!.Items[CanonicalSessionRegistrationFingerprint.StateKey] = createRegistrationFingerprint();
         }
 
-        await CompleteSignIn(context);
+        await CompleteSignIn(context, protocolAssurance == "oidc");
     }
 
     static CanonicalIdentityResolution ResolveFreshCanonicalIdentity(TicketReceivedContext context)
@@ -615,7 +631,7 @@ public static class AuthenticationServiceCollectionExtensions
         AdditionalLogoutCookies.Clear(context.HttpContext, logout.AdditionalCookies);
     }
 
-    static async Task CompleteSignIn(TicketReceivedContext context)
+    static async Task CompleteSignIn(TicketReceivedContext context, bool oidc)
     {
         // A non-link ticket means a real sign-in is completing. Record which provider established this session so
         // a later RP-initiated logout can target the correct identity provider's end-session endpoint (persisted
@@ -625,6 +641,7 @@ public static class AuthenticationServiceCollectionExtensions
         // The same scheme is also recorded as a claim on the session itself, so an account from a provider without
         // canonical identity is named by the provider it signed in with.
         SessionProvider.Stamp(context.Principal!, context.Properties, context.Scheme.Name);
+        FreshAuthenticationChallenge.Stamp(context.Principal!, context.Properties!, FreshAuthenticationChallenge.Now(context.HttpContext), oidc);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);

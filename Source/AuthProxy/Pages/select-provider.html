@@ -40,7 +40,8 @@
             var reasonMessages = {
                 'remote-failure': 'Signing in did not complete. Please try again.',
                 'access-denied': 'The sign-in was cancelled or not approved at the identity provider. Please try again.',
-                'invalid-session': 'Your session is no longer valid. Please sign in again.'
+                'invalid-session': 'Your session is no longer valid. Please sign in again.',
+                'fresh-authentication-required': 'Please sign in again to continue with this operation.'
             };
             var reason = query.get('reason');
             if (reason && reasonMessages[reason]) {
@@ -89,6 +90,9 @@
             providers.forEach(function (provider) {
                 var a = document.createElement('a');
                 a.href = provider.loginUrl + '?returnUrl=' + encodeURIComponent(returnUrl);
+                if (query.get('fresh') === '1') {
+                    a.href += '&fresh=1&maxAge=' + encodeURIComponent(query.get('maxAge') || '300');
+                }
                 a.textContent = 'Sign in with ' + provider.name;
                 a.className = 'provider-btn';
                 container.appendChild(a);

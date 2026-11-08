@@ -17,6 +17,9 @@ public static class SessionClaims
     /// </summary>
     public const string ProviderScheme = "urn:cratis:session:provider-scheme";
 
+    /// <summary>The Unix time of the authentication recorded by AuthProxy.</summary>
+    public const string AuthenticationTime = "urn:cratis:session:auth_time";
+
     /// <summary>
     /// Determines whether a claim type belongs to the namespace reserved for AuthProxy-authored session metadata.
     /// </summary>
