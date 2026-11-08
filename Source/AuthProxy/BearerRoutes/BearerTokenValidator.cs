@@ -6,6 +6,7 @@ using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using static Cratis.AuthProxy.Authentication.SingleClaimValue;
 
 namespace Cratis.AuthProxy.BearerRoutes;
 
@@ -296,14 +297,6 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         {
             return false;
         }
-    }
-
-    static bool TryGetSingleValue(IEnumerable<Claim> claims, string claimType, out string value, bool trim = true)
-    {
-        var values = claims.Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal)).Take(2).ToArray();
-        value = values.Length == 1 ? values[0].Value : string.Empty;
-        if (trim) value = value.Trim();
-        return value.Length > 0;
     }
 
     static bool IsUsableTenantId(string tenantId) => Tenancy.TenantIdentifier.IsUsable(tenantId);

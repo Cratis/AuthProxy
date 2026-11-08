@@ -78,6 +78,9 @@ public class CredentialBindingMiddleware(
             yield break;
         }
 
+        var externalTenant = ExternalTokenTenantBinding.BoundTenant(context.User);
+        if (externalTenant is not null) yield return externalTenant;
+
         var selection = selectedTenantCookie.Read(context);
         if (selection.State == SelectedTenantCookieState.Bound) yield return selection.TenantId;
         foreach (var claim in resolutions.Where(result => result.Strategy == C.TenantSourceIdentifierResolverType.Claim)) yield return claim.TenantId;

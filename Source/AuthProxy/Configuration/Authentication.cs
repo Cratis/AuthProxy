@@ -13,6 +13,9 @@ public class Authentication
     /// </summary>
     public const string SectionKey = $"{AuthProxy.SectionKey}:Authentication";
 
+    /// <summary>Gets or sets tenant binding for the general JWT Bearer handler.</summary>
+    public ExternalTokenTenantBinding ExternalTokenTenantBinding { get; set; } = new();
+
     /// <summary>
     /// Gets or sets the list of OIDC providers available for login.
     /// When more than one provider is configured the ingress redirects unauthenticated
