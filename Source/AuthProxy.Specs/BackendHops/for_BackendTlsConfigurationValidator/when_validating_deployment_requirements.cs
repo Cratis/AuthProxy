@@ -8,6 +8,8 @@ public class when_validating_deployment_requirements
     [Theory]
     [InlineData(false, false, false, false, true)]
     [InlineData(false, false, true, false, true)]
+    [InlineData(false, true, false, false, true)]
+    [InlineData(false, false, false, true, true)]
     [InlineData(true, false, false, false, false)]
     [InlineData(true, true, false, false, false)]
     [InlineData(true, true, true, false, true)]
@@ -70,7 +72,7 @@ public class when_validating_deployment_requirements
                 ["app"] = new()
                 {
                     Backend = backend ? new() { BaseUrl = "https://backend.example" } : null,
-                    Frontend = new() { BaseUrl = "http://frontend.example" },
+                    Frontend = new() { BaseUrl = local ? "http://localhost" : "http://frontend.example" },
                     ForwardedIdentity = local ? new() : null
                 }
             }
@@ -78,16 +80,18 @@ public class when_validating_deployment_requirements
         new BackendTlsConfigurationValidator(TimeProvider.System).Validate(null, options).Succeeded.ShouldBeTrue();
     }
 
-    [Fact]
-    public void should_refuse_a_signed_http_tenant_list_even_without_signed_services()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void should_require_https_for_a_tenant_list_when_signing_is_configured(bool signingEnabled)
     {
         var options = new C.AuthProxy
         {
-            TenantResolutions = [new() { Strategy = C.TenantSourceIdentifierResolverType.Selection, Options = new SelectionOptions { TenantsEndpoint = "http://localhost/tenants", ForwardedIdentity = new() } }]
+            TenantResolutions = [new() { Strategy = C.TenantSourceIdentifierResolverType.Selection, Options = new SelectionOptions { TenantsEndpoint = "http://localhost/tenants", ForwardedIdentity = signingEnabled ? new() : null } }]
         };
         var result = new BackendTlsConfigurationValidator(TimeProvider.System).Validate(null, options);
-        result.Failed.ShouldBeTrue();
-        string.Join(';', result.Failures!).ShouldContain("TenantResolutions:0:Options:TenantsEndpoint");
+        result.Failed.ShouldEqual(signingEnabled);
+        if (signingEnabled) string.Join(';', result.Failures!).ShouldContain("TenantResolutions:0:Options:TenantsEndpoint");
     }
 
     [Fact]

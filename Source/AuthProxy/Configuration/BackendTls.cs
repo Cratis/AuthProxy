@@ -19,6 +19,12 @@ public class BackendTls
     public static readonly TimeSpan MinimumReloadInterval = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Gets or sets whether every identity-bearing destination must use HTTPS, even without forwarded-identity signing.
+    /// Defaults to false. LocalDevelopment permits HTTP only for loopback destinations.
+    /// </summary>
+    public bool RequireTlsOnIdentityHops { get; set; }
+
+    /// <summary>
     /// Gets or sets the PEM client certificate and private key, or null to present no certificate.
     /// </summary>
     public BackendTlsClientCertificate? ClientCertificate { get; set; }

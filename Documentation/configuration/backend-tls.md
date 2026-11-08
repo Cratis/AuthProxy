@@ -18,6 +18,7 @@ Mount the files read-only and configure `Cratis:AuthProxy`:
   "Cratis": {
     "AuthProxy": {
       "BackendTls": {
+        "RequireTlsOnIdentityHops": true,
         "ClientCertificate": {
           "CertificatePath": "/run/authproxy/backend/client.crt",
           "KeyPath": "/run/authproxy/backend/client.key"
@@ -34,17 +35,19 @@ The client certificate and unencrypted private key must be matching PEM files. T
 
 The trust bundle is optional. An empty path uses system trust. A configured PEM bundle replaces system roots for backend hosts; it does not add a fallback to public roots. Backend certificates still need a valid chain, validity period, server-authentication usage and matching hostname. AuthProxy does not fetch missing intermediates or perform online revocation checks for a custom bundle, so origins must present their intermediate chain. OIDC providers and other non-backend hosts keep system trust and are not offered the backend client certificate.
 
-The policy covers YARP proxy requests, bearer routes, identity-details calls and selectable-tenant-list calls. Sign-in callbacks, client-credential callbacks, on-behalf grant checks and session notifications also use their configured backend hosts. Covered hosts come from service backend URLs, signed service frontend URLs, the lobby backend and selection `TenantsEndpoint` URLs. When any forwarded-identity signing is configured, invitation staging/exchange, link exchange and sign-in notification URLs also extend this host set.
+The policy covers YARP proxy requests, bearer routes, identity-details calls and selectable-tenant-list calls. Sign-in callbacks, client-credential callbacks, on-behalf grant checks and session notifications also use their configured backend hosts. With `BackendTls:RequireTlsOnIdentityHops` enabled, every identity-bearing destination extends this host set: all service backends and frontends, tenant-list endpoints, resolved client-credential verification endpoints, invitation staging/exchange, link exchange, sign-in notifications, capability verification and tenant verification. With the setting disabled, the existing host policy is unchanged, including its signed frontends and back channels.
 
-Host matching is case-insensitive and does not distinguish ports: do not share a backend hostname with unrelated endpoints if those endpoints must not receive the client identity. Unsigned frontend hosts, capability and tenant-verification hosts, and identity providers do not extend this host set. A verifier or identity provider sharing an independently configured backend host is subject to that host's backend policy.
+Host matching is case-insensitive and does not distinguish ports: do not share an identity-bearing hostname with unrelated endpoints if those endpoints must not receive the client identity. Registration URLs and identity providers do not extend this host set. An identity provider sharing an independently configured covered host is subject to that host's backend policy.
 
 Sticky replica routing keeps the configured DNS authority as the TLS target even when connecting to a discovered IP address. Issue server certificates for that DNS name, not for the replica's incidental IP address.
 
-## Signed-hop requirements
+## Identity-hop requirements
 
-The default deployment profile requires **HTTPS and a configured client certificate** for every signed hop: service backends, service frontends (including frontend-only services) and tenant-list endpoints. Validation identifies the configuration key and refuses startup before identity is sent. Unsigned deployments keep their existing transport behavior; this requirement is not a global HTTPS enforcement rule.
+Set `Cratis:AuthProxy:BackendTls:RequireTlsOnIdentityHops` to `true` to require **HTTPS on every identity-bearing hop**, even without forwarded-identity signing. This is an operator-controlled server setting, not a caller header or request option. It defaults to `false` in this minor release; a future major release will make it the default. With it off, existing transport behavior is unchanged, including the signing requirements and LocalDevelopment exemptions.
 
-When signing is configured, startup validation also requires HTTPS outside `LocalDevelopment` for callback backend URLs, resolved client-credential verification endpoints, invitation staging/exchange, link exchange, sign-in notification, capability verification and tenant verification. Client-credential validation resolves `VerificationPath` exactly as the verifier does, including absolute URLs that differ from the backend.
+With the setting enabled, startup validation identifies the configuration key and refuses a non-HTTPS identity-bearing target before identity is sent. This covers service backend and frontend URLs (including frontend-only services), tenant-list endpoints, callback backends, resolved client-credential verification endpoints, invitation staging/exchange, link exchange, sign-in notifications, capability verification and tenant verification. Client-credential validation resolves `VerificationPath` exactly as the verifier does, including absolute URLs that differ from the backend. Service backends also carry on-behalf grant checks and session notifications.
+
+Signed service and tenant-list hops additionally require a configured client certificate outside `LocalDevelopment`, as before. Enabling the setting for unsigned hops does not require a client certificate: system-trusted HTTPS is sufficient, or configure a private CA bundle and optional client identity above.
 
 Client-credential and capability verifier destinations, queued callback destinations, resolved tenant-verification URLs, and discovered OIDC token endpoints are checked against the current configuration before a client is created. A refused verifier URL returns its existing failure result; a refused token endpoint returns provider unavailable, without sending a request.
 
@@ -62,9 +65,18 @@ For a developer machine only, explicitly select:
 }
 ```
 
-`LocalDevelopment` permits HTTP and a missing client certificate on signed hops and emits a startup warning when that exception is used. It never disables certificate or hostname validation on HTTPS, and configured certificate files must still be valid. `ASPNETCORE_ENVIRONMENT=Development` does not select this profile.
+With the TLS setting enabled, `LocalDevelopment` permits HTTP only for loopback targets (`localhost`, `127.0.0.1` or `::1`). With it disabled, the existing back-channel exemption still includes non-loopback targets, even with signing. The profile permits a missing client certificate and emits a startup warning when that exception is used. It never disables certificate or hostname validation on HTTPS, and configured certificate files must still be valid. `ASPNETCORE_ENVIRONMENT=Development` does not select this profile.
 
 Aspire's [`WithSignedForwardingTo`](../aspire/index.md#signed-forwarded-identity) selects AuthProxy's local profile in **run mode only**. Publishing emits no development-profile override: provision signing secrets, HTTPS backend URLs and backend TLS credentials for the deployed service. This does not select Arc's separate local-development identity profile.
+
+## Enable for an existing deployment
+
+Before turning on `BackendTls:RequireTlsOnIdentityHops`:
+
+1. Inventory every destination listed above, including unsigned services, frontends, callbacks and tenant-verification templates. Provision HTTPS listeners and certificates matching their configured DNS names.
+2. Change each identity-bearing URL to `https://`. Check absolute `ClientCredentials:VerificationPath` values as well as backend base URLs. Mount a CA bundle if the servers use private roots; configure client credentials where the receiver requires mutual TLS.
+3. For Aspire, choose an HTTPS endpoint explicitly, for example `WithBackend("main", api, "https")`, and call `WithRequiredTlsOnIdentityHops()` on AuthProxy. Apply the same endpoint selection to frontends, tenant lists and other identity-bearing resource registrations. The helper only sets server configuration; AuthProxy startup performs validation, and it does not enable signing or select a development profile.
+4. Enable the setting in a test deployment and verify every flow before enabling it in production. Do not use `LocalDevelopment` to bypass production requirements. A deployment that leaves the setting off and has no signing keeps its current behavior, but should opt in ahead of the future major default.
 
 ## Rotate files without restarting
 

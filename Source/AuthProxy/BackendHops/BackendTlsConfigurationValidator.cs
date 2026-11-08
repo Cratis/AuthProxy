@@ -52,9 +52,14 @@ internal sealed class BackendTlsConfigurationValidator(TimeProvider timeProvider
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 
-    static IEnumerable<string> IdentityBackChannelFailures(C.AuthProxy options) => BackendHopHosts.RequiresHttps(options)
-        ? BackendHopHosts.IdentityBackChannels(options)
-            .Where(channel => !BackendHopHosts.IsHttps(channel.Address))
-            .Select(channel => $"{channel.Key} must use HTTPS while forwarded-identity signing is configured.")
-        : [];
+    static IEnumerable<string> IdentityBackChannelFailures(C.AuthProxy options) => options.BackendTls.RequireTlsOnIdentityHops
+        ? BackendHopHosts.IdentityBearingHops(options)
+            .DistinctBy(channel => channel.Key)
+            .Where(channel => !BackendHopHosts.AllowsIdentityBackChannel(options, channel.Address))
+            .Select(channel => $"{channel.Key} must use HTTPS for an identity-bearing hop; HTTP is allowed only for loopback targets in LocalDevelopment.")
+        : BackendHopHosts.RequiresHttps(options)
+            ? BackendHopHosts.IdentityBackChannels(options)
+                .Where(channel => !BackendHopHosts.IsHttps(channel.Address))
+                .Select(channel => $"{channel.Key} must use HTTPS while forwarded-identity signing is configured.")
+            : [];
 }

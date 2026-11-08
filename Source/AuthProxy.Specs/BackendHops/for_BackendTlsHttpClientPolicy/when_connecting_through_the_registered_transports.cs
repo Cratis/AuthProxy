@@ -4,6 +4,7 @@
 using System.Net;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using Cratis.AuthProxy.Admission;
 using Cratis.AuthProxy.ForwardedIdentity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -27,6 +28,8 @@ public class when_connecting_through_the_registered_transports
     [InlineData("default", false)]
     [InlineData("signed", false)]
     [InlineData("yarp", false)]
+    [InlineData("capability", true)]
+    [InlineData("capability", false)]
     public async Task should_authenticate_both_ends_of_the_backend_hop(string transport, bool trusted)
     {
         using var certificates = new given.TestCertificates();
@@ -54,11 +57,14 @@ public class when_connecting_through_the_registered_transports
         var builder = WebApplication.CreateBuilder();
         builder.AddIngressConfiguration();
         builder.AddForwardedIdentitySigning();
+        builder.AddAdmission();
         builder.Services.Configure<C.AuthProxy>(options =>
         {
             options.BackendTls = certificates.Settings;
             options.BackendTls.ReloadInterval = C.BackendTls.MinimumReloadInterval;
-            options.Services["app"] = new() { Backend = new() { BaseUrl = uri.ToString() }, IdentityVerification = C.IdentityVerificationMode.BestEffort };
+            options.BackendTls.RequireTlsOnIdentityHops = transport == "capability";
+            if (transport == "capability") options.Admission.Capability = new() { VerifierUrl = uri.ToString() };
+            options.Services["app"] = new() { Backend = transport == "capability" ? null : new() { BaseUrl = uri.ToString() }, IdentityVerification = C.IdentityVerificationMode.BestEffort };
         });
         await using var services = builder.Services.BuildServiceProvider();
         HttpMessageInvoker client;
@@ -69,7 +75,7 @@ public class when_connecting_through_the_registered_transports
         }
         else
         {
-            client = services.GetRequiredService<IHttpClientFactory>().CreateClient(transport == "signed" ? ForwardedIdentityServiceCollectionExtensions.HttpClientName : string.Empty);
+            client = services.GetRequiredService<IHttpClientFactory>().CreateClient(transport == "capability" ? CapabilityVerifier.HttpClientName : transport == "signed" ? ForwardedIdentityServiceCollectionExtensions.HttpClientName : string.Empty);
         }
         using (client)
         using (var request = new HttpRequestMessage(HttpMethod.Get, transport == "sticky" ? address : uri.ToString()))

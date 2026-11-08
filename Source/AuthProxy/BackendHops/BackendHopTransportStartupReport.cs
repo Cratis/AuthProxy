@@ -21,7 +21,7 @@ internal sealed class BackendHopTransportStartupReport(IOptionsMonitor<C.AuthPro
         var current = config.CurrentValue;
         var material = source.Current;
         logger.Material(material.TrustAnchors.Count, material.ClientCertificate?.Subject, material.ClientCertificate?.Extensions["2.5.29.17"]?.Format(false), material.ClientCertificate?.GetCertHashString(HashAlgorithmName.SHA256), material.ClientCertificate?.NotAfter);
-        foreach (var hop in BackendHopHosts.SignedHops(current))
+        foreach (var hop in BackendHopHosts.RequiresIdentityTls(current) ? BackendHopHosts.IdentityBearingHops(current) : [])
         {
             var tls = Uri.TryCreate(hop.Address, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
             if (current.Profile == C.DeploymentProfile.LocalDevelopment && (!tls || material.ClientCertificate is null)) logger.LocalException(hop.Name);

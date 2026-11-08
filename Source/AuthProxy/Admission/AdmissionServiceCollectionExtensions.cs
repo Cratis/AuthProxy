@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.BackendHops;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -49,7 +50,9 @@ public static class AdmissionServiceCollectionExtensions
         // calls the one the deployment declared.
         builder.Services
             .AddHttpClient(CapabilityVerifier.HttpClientName, client => client.Timeout = VerifierTimeout)
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+            .ConfigurePrimaryHttpMessageHandler(services => services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.BackendTls.RequireTlsOnIdentityHops
+                ? services.GetRequiredService<BackendTlsHttpClientPolicy>().CreateHandler()
+                : new SocketsHttpHandler { AllowAutoRedirect = false });
 
         return builder;
     }

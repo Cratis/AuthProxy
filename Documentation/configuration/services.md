@@ -8,7 +8,9 @@ description: "Configure the services AuthProxy routes to with YARP, each with a 
 AuthProxy routes requests to one or more **services** using [YARP](https://microsoft.github.io/reverse-proxy/).
 Each service may expose a **backend** (API), a **frontend** (SPA / static assets), or both.
 
-See [Backend TLS](backend-tls.md) to configure backend client certificates, private CA trust and live rotation. Signed service backends require HTTPS and a client certificate outside the explicit local-development profile; unsigned services retain their existing transport behavior.
+See [Backend TLS](backend-tls.md) to configure backend client certificates, private CA trust and live rotation. Enable `Cratis:AuthProxy:BackendTls:RequireTlsOnIdentityHops` to require HTTPS for unsigned services too. Both frontend and backend proxy targets carry identity/tenant headers, so both URLs must use HTTPS when this setting or forwarded-identity signing is enabled. Callback, verifier and notifier destinations are checked too; only loopback HTTP targets are permitted under the explicit `LocalDevelopment` profile. Signed hops additionally require a client certificate outside that profile.
+
+The setting defaults to `false` for compatibility in this minor release: unsigned services retain their existing behavior while it is off. A future major will enable it by default. Before opting in, provision HTTPS endpoints and update all identity-bearing URLs; follow the [deployment checklist](backend-tls.md#enable-for-an-existing-deployment). In Aspire, select HTTPS endpoints explicitly and call `WithRequiredTlsOnIdentityHops()`.
 
 ---
 
