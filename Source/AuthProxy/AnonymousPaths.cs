@@ -28,8 +28,14 @@ namespace Cratis.AuthProxy;
 /// </remarks>
 public static class AnonymousPaths
 {
+    /// <summary>The route metadata key marking an anonymous route whose caller Authorization header is forwarded.</summary>
+    internal const string PassCallerAuthorizationMetadataKey = "Cratis.AuthProxy.PassCallerAuthorization";
+
     /// <summary>The server-selected anonymous route marker for final outbound transport.</summary>
     internal static readonly HttpRequestOptionsKey<bool> ForwardWithoutIdentity = new("Cratis.AuthProxy.AnonymousPath");
+
+    /// <summary>The server-selected marker that the caller's Authorization header is forwarded on this anonymous route.</summary>
+    internal static readonly HttpRequestOptionsKey<bool> PassCallerAuthorization = new("Cratis.AuthProxy.PassCallerAuthorization");
 
     /// <summary>
     /// The usable prefixes resolved for a configuration instance, so <see cref="Matches"/> does not re-parse
@@ -49,6 +55,32 @@ public static class AnonymousPaths
             .Where(_ => _.IsUsable)
             .Select(_ => _.Prefix)
             .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Evaluates every entry a service lists in <see cref="C.Service.PassCallerAuthorizationPaths"/>.
+    /// </summary>
+    /// <param name="service">The service to read.</param>
+    /// <returns>One evaluation per listed entry, in declaration order.</returns>
+    public static IEnumerable<AnonymousPathEvaluation> EvaluatePassCallerAuthorization(C.Service service) =>
+        service.PassCallerAuthorizationPaths.Select(candidate =>
+        {
+            var rejection = AnonymousPathPolicy.Evaluate(candidate, out var prefix);
+            return new AnonymousPathEvaluation(candidate ?? string.Empty, prefix, rejection);
+        });
+
+    /// <summary>
+    /// Gets the usable anonymous prefixes of a service that also forward the caller's Authorization header.
+    /// </summary>
+    /// <param name="service">The service to read.</param>
+    /// <returns>The prefixes both declared anonymous and listed for passthrough.</returns>
+    public static IReadOnlySet<string> PassingCallerAuthorization(C.Service service)
+    {
+        var anonymous = For(service).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return EvaluatePassCallerAuthorization(service)
+            .Where(_ => _.IsUsable && anonymous.Contains(_.Prefix))
+            .Select(_ => _.Prefix)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Evaluates every entry a service declares, keeping the refused ones and the reason for each.
@@ -133,6 +165,15 @@ public static class AnonymousPaths
         context.Items[_routeDispositionKey] = anonymous;
         return anonymous;
     }
+
+    /// <summary>Determines whether the server-selected proxy route is anonymous and forwards the caller's Authorization header.</summary>
+    /// <param name="context">The routed request.</param>
+    /// <returns>True only for an anonymous route the operator listed for passthrough.</returns>
+    internal static bool PassesCallerAuthorization(HttpContext context) =>
+        IsAnonymousRoute(context)
+        && context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>()?.Config.Metadata is { } metadata
+        && metadata.TryGetValue(PassCallerAuthorizationMetadataKey, out var value)
+        && string.Equals(value, bool.TrueString, StringComparison.OrdinalIgnoreCase);
 
     static string[] Resolve(C.AuthProxy config) =>
         [.. config.Services.Values

@@ -13,4 +13,7 @@ internal static partial class MicroserviceReverseProxyConfigProviderLogging
 
     [LoggerMessage(LogLevel.Warning, "Anonymous path '{Path}' declared by service '{Service}' was refused ({Reason}) and remains authenticated. Declare a rooted path of plain literal segments, made only of letters, digits, '-', '.', '_' and '~', that does not start with one of the paths AuthProxy reserves for itself.")]
     internal static partial void AnonymousPathRefused(this ILogger logger, string path, string service, AnonymousPathRejection reason);
+
+    [LoggerMessage(LogLevel.Warning, "Anonymous path '{Path}' on service '{Service}' forwards the caller's Authorization header unchanged. AuthProxy does not validate it; the backend must.")]
+    internal static partial void AnonymousPathPassesCallerAuthorization(this ILogger logger, string path, string service);
 }

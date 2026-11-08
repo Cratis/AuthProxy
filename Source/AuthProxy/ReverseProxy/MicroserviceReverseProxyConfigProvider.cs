@@ -279,6 +279,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     {
         var microserviceKey = serviceName.ToLowerInvariant();
         var index = 0;
+        var passing = AnonymousPaths.PassingCallerAuthorization(service);
 
         foreach (var path in AnonymousPaths.For(service))
         {
@@ -321,6 +322,11 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             claimedPaths[path] = microserviceKey;
 
+            if (passing.Contains(path))
+            {
+                logger.AnonymousPathPassesCallerAuthorization(path, microserviceKey);
+            }
+
             // An anonymous path below a stripped prefix is forwarded the way the rest of the prefix is, so the
             // service sees one consistent path shape whether or not the caller has a session.
             var stripsPrefix = service.StripPathPrefix
@@ -334,7 +340,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                 AuthorizationPolicy = AnonymousAuthorizationPolicy,
                 Match = new RouteMatch { Path = $"{path}/{{**catch-all}}" },
                 Order = 0,
-                Metadata = ServiceMetadata(serviceName, stripsPrefix ? prefix : null),
+                Metadata = RouteMetadata(serviceName, stripsPrefix ? prefix : null, passing.Contains(path)),
             };
 
             index++;
@@ -724,6 +730,17 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         if (stripPrefix is not null)
         {
             metadata[ServiceRoutes.StripPathPrefixMetadataKey] = stripPrefix;
+        }
+
+        return metadata;
+    }
+
+    static Dictionary<string, string> RouteMetadata(string serviceName, string? stripPrefix, bool passCallerAuthorization)
+    {
+        var metadata = ServiceMetadata(serviceName, stripPrefix);
+        if (passCallerAuthorization)
+        {
+            metadata[AnonymousPaths.PassCallerAuthorizationMetadataKey] = bool.TrueString;
         }
 
         return metadata;

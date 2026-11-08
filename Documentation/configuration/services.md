@@ -57,6 +57,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `ActivityTimeout` | `TimeSpan` | The root `ActivityTimeout`, then `00:05:00` | How long a request proxied to this service may sit idle before AuthProxy cancels it. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
+| `PassCallerAuthorizationPaths` | `string[]` | `[]` | Anonymous paths that forward the caller's `Authorization` header unchanged. Each must also be in `AnonymousPaths`. See [Passing the caller's Authorization header](#passing-the-callers-authorization-header). |
 | `ForwardedPaths` | `ForwardingPathRuleConfig[]` | `[]` | Service-relative paths and methods that may be forwarded. Empty permits anything not denied. See [Forwarded and denied paths](#forwarded-and-denied-paths). |
 | `DeniedPaths` | `ForwardingPathRuleConfig[]` | `[]` | Service-relative paths and methods never forwarded, even when an allow rule matches. See [Forwarded and denied paths](#forwarded-and-denied-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
@@ -458,6 +459,24 @@ From Aspire:
 ```csharp
 authProxy.WithAnonymousPaths("portal", "/welcome", "/api/webhooks/payments");
 ```
+
+### Passing the caller's Authorization header
+
+On an anonymous path AuthProxy removes the `Authorization` header a caller sent, along with every identity and
+tenant header. A backend that checks a bearer token itself on one of those paths can ask for the header to be
+forwarded, one path at a time, with `PassCallerAuthorizationPaths`:
+
+```json
+"AnonymousPaths": [ "/welcome", "/api/agents" ],
+"PassCallerAuthorizationPaths": [ "/api/agents" ]
+```
+
+- Each entry must also be listed in `AnonymousPaths` (same prefix, matched case-insensitively). An entry that is
+  not, is not a valid path, or is combined with `CallerAuthorizationHeader` set to `Strip`, stops AuthProxy at startup.
+- The header is forwarded exactly as the caller sent it. AuthProxy does not validate it and derives no user or
+  tenant from it. The backend validates the token.
+- Every identity, tenant, actor, on-behalf and signature header is still removed, including copies the caller sent.
+- Paths that are not listed keep removing the header. The paths that forward it are written to the startup log.
 
 ### Matching
 
@@ -1175,5 +1194,6 @@ their users sign in again once.
 
 On non-anonymous routes, a token AuthProxy obtains for the service, and the bearer token of a caller
 AuthProxy itself authenticated, are always forwarded. On [anonymous paths](#anonymous-paths), `Authorization`
-is always removed regardless of this setting. AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
+is removed regardless of this setting unless the path is listed in
+[`PassCallerAuthorizationPaths`](#passing-the-callers-authorization-header). AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
 every other cookie arrives unchanged.
