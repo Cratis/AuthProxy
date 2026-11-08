@@ -17,6 +17,9 @@ public class BackendTlsHarness(HopCertificates certificates, RecordingBackendTls
     {
         base.AddSettings(settings);
         const string root = C.AuthProxy.SectionKey;
+
+        // This fixture exercises the TLS origins, not the unused HTTP-only legacy origin.
+        foreach (var key in settings.Keys.Where(key => key.StartsWith($"{root}:Services:legacy:", StringComparison.Ordinal)).ToArray()) settings.Remove(key);
         settings[$"{root}:Profile"] = local ? nameof(C.DeploymentProfile.LocalDevelopment) : nameof(C.DeploymentProfile.Default);
         settings[$"{root}:BackendTls:TrustedCertificateAuthoritiesPath"] = certificates.BundlePath;
         settings[$"{root}:BackendTls:ReloadInterval"] = C.BackendTls.MinimumReloadInterval.ToString();

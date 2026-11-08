@@ -10,7 +10,7 @@ public class when_local_development_uses_an_http_verifier_with_signing : given.a
         VerifierAnswering((_, _) => Task.FromResult(Answer(true, _presentation.Transaction, _presentation.Challenge)));
         _config.Profile = C.DeploymentProfile.LocalDevelopment;
         _config.Services["signed"] = new() { Backend = new() { BaseUrl = "https://app.example" }, ForwardedIdentity = new() };
-        _config.Admission.Capability!.VerifierUrl = "http://verifier.example/verify";
+        _config.Admission.Capability!.VerifierUrl = "http://localhost/verify";
     }
 
     async Task Because() => _verification = await _verifier.Verify(_presentation, CancellationToken.None);

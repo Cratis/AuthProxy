@@ -7,8 +7,10 @@ public class when_local_development_uses_a_resolved_http_endpoint : given.a_veri
 {
     protected override C.DeploymentProfile Profile => C.DeploymentProfile.LocalDevelopment;
 
+    protected override string VerificationPath => "http://localhost/verify";
+
     Task Because() => Verify();
 
     [Fact] void should_allow_verification() => _result.Status.ShouldEqual(ClientCredentialsVerificationStatus.Succeeded);
-    [Fact] void should_call_the_resolved_endpoint() => _handler.RequestedUris.Single().AbsoluteUri.ShouldEqual("http://verifier.example/verify");
+    [Fact] void should_call_the_resolved_endpoint() => _handler.RequestedUris.Single().AbsoluteUri.ShouldEqual("http://localhost/verify");
 }

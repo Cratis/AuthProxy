@@ -9,11 +9,13 @@ public class identity_back_channels : Specification
     protected ValidateOptionsResult _result;
 
     protected virtual bool SigningConfigured => true;
+    protected virtual bool RequireTls => false;
     protected virtual C.DeploymentProfile Profile => C.DeploymentProfile.Default;
 
     void Establish() => _configuration = new()
     {
         Profile = Profile,
+        BackendTls = new() { RequireTlsOnIdentityHops = RequireTls },
         Services = new Dictionary<string, C.Service>
         {
             ["app"] = new() { Backend = new() { BaseUrl = "https://app.example" }, ForwardedIdentity = SigningConfigured ? new() : null },

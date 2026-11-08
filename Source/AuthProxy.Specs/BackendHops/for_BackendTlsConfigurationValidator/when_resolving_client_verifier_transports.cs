@@ -14,12 +14,12 @@ public class when_resolving_client_verifier_transports : Specification
     {
         _relativeHttp = Validate("http://backend.example", "verify", C.DeploymentProfile.Default);
         _absoluteHttps = Validate("http://backend.example", "https://verifier.example/verify", C.DeploymentProfile.Default);
-        _localHttp = Validate("https://backend.example", "http://verifier.example/verify", C.DeploymentProfile.LocalDevelopment);
+        _localHttp = Validate("https://backend.example", "http://localhost/verify", C.DeploymentProfile.LocalDevelopment);
     }
 
     [Fact] void should_check_the_resolved_backend_relative_endpoint() => string.Join(';', _relativeHttp.Failures!).ShouldContain(EndpointKey);
     [Fact] void should_allow_an_absolute_https_endpoint() => string.Join(';', _absoluteHttps.Failures!).ShouldNotContain(EndpointKey);
-    [Fact] void should_not_require_the_unused_backend_for_an_absolute_endpoint() => string.Join(';', _absoluteHttps.Failures!).ShouldNotContain("Cratis:AuthProxy:Services:client:Backend:BaseUrl must use HTTPS");
+    [Fact] void should_require_https_for_the_backend_even_with_an_absolute_verifier_endpoint() => string.Join(';', _absoluteHttps.Failures!).ShouldContain("Cratis:AuthProxy:Services:client:Backend:BaseUrl must use HTTPS");
     [Fact] void should_preserve_local_development_http() => _localHttp.Succeeded.ShouldBeTrue();
 
     static ValidateOptionsResult Validate(string backend, string endpoint, C.DeploymentProfile profile) => new BackendTlsConfigurationValidator(TimeProvider.System).Validate(null, new()
