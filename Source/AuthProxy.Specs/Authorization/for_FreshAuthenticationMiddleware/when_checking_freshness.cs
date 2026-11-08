@@ -75,13 +75,27 @@ public class when_checking_freshness : Specification
     [InlineData("unconfigured")]
     [InlineData("unmatched")]
     [InlineData("anonymous")]
-    [InlineData("bearer")]
     [InlineData("internal")]
     public async Task should_preserve_unaffected_requests(string kind)
     {
         var (context, middleware, next) = Create(301, kind);
         await middleware.InvokeAsync(context);
         next.Called.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("bearer", "/main/approve", false)]
+    [InlineData("bearer", "/main/read", true)]
+    [InlineData("onbehalf", "/main/approve", false)]
+    [InlineData("onbehalf", "/main/read", true)]
+    [InlineData("", "/unrouted/x", false)]
+    public async Task should_refuse_a_credential_that_cannot_prove_its_age_on_a_limited_path_only(string kind, string path, bool passes)
+    {
+        var (context, middleware, next) = Create(0, kind);
+        context.Request.Path = path;
+        await middleware.InvokeAsync(context);
+        next.Called.ShouldEqual(passes);
+        if (!passes) context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
     }
 
     [Theory]
@@ -118,6 +132,7 @@ public class when_checking_freshness : Specification
         authentication.AuthenticateAsync(context, CookieAuthenticationDefaults.AuthenticationScheme).Returns(AuthenticateResult.Success(new AuthenticationTicket(context.User, properties, CookieAuthenticationDefaults.AuthenticationScheme)));
         context.RequestServices = new ServiceCollection().AddSingleton(authentication).BuildServiceProvider();
         if (kind == "bearer") context.Items[Authentication.AuthenticationServiceCollectionExtensions.SelectedSchemeItemKey] = "Bearer";
+        if (kind == "onbehalf") context.Request.Headers.Cookie = $"{Cookies.OnBehalf}=x";
         var next = new Invocation();
         Task Pipeline(HttpContext _)
         {

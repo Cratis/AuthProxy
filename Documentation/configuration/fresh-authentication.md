@@ -41,6 +41,8 @@ For an OpenID Connect provider, AuthProxy asks the provider to authenticate agai
 
 An OAuth (non-OpenID Connect) provider cannot prove when the user signed in, and AuthProxy cannot force it to ask again. AuthProxy therefore records no authentication time for these sessions, and a path with a `FreshAuthentication` rule answers `403` with no redirect and no body. Reauthenticating cannot satisfy the limit, so do not put such a rule on a service whose users sign in with an OAuth provider.
 
+A request authenticated by anything other than the interactive session cookie, such as a bearer token, or made inside an on-behalf session, cannot prove how recently a user signed in, so a path with a `FreshAuthentication` rule answers `403` for it.
+
 An identity provider that never emits `auth_time` has the same effect: paths with a rule stay unusable for its users.
 
 ## What the backend receives

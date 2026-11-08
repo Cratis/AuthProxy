@@ -24,8 +24,7 @@ public partial class FreshAuthenticationMiddleware(RequestDelegate next, IOption
     {
         var config = options.CurrentValue;
         if (!FreshAuthenticationPolicy.AnyConfigured(config) || context.User.Identity?.IsAuthenticated != true
-            || context.IsAnonymousPath(config) || context.IsLoginChallenge() || context.Request.Path.StartsWithSegments(WellKnownPaths.Cratis)
-            || (context.Items[Authentication.AuthenticationServiceCollectionExtensions.SelectedSchemeItemKey] is string selected && selected != CookieAuthenticationDefaults.AuthenticationScheme))
+            || context.IsAnonymousPath(config) || context.IsLoginChallenge() || context.Request.Path.StartsWithSegments(WellKnownPaths.Cratis))
         {
             await next(context);
             return;
@@ -46,6 +45,15 @@ public partial class FreshAuthenticationMiddleware(RequestDelegate next, IOption
         if (maxAge is null)
         {
             await next(context);
+            return;
+        }
+
+        // A limited route can only be satisfied by a recent interactive cookie session; any other credential cannot prove its age,
+        // and an on-behalf session (resolved after this check) would otherwise borrow the actor's freshness for the represented user.
+        if ((context.Items[Authentication.AuthenticationServiceCollectionExtensions.SelectedSchemeItemKey] is string selected && selected != CookieAuthenticationDefaults.AuthenticationScheme)
+            || context.Request.Cookies.ContainsKey(Cookies.OnBehalf))
+        {
+            Forbid(context);
             return;
         }
         var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
