@@ -73,28 +73,38 @@ internal static class FreshAuthenticationChallenge
         var time = default(DateTimeOffset);
         var valid = claims.Length == 1 && SessionAuthenticationTime.TryParse(claims[0].Value, out time);
 
-        // An ordinary callback can use local completion time when the provider supplies no usable time.
-        var authenticationTime = valid && time <= now ? time : now;
+        // Only a time the validated token proves is ever recorded; callback time is never a substitute, because a
+        // provider that reuses its own session would make a stale authentication look fresh.
         if (properties.Items.ContainsKey(PropertyKey)
             && (!TryGetMaxAge(properties, out var age) || !valid || time > now || now - time > age))
         {
             return false;
         }
-        properties.Items[ValidatedTimeKey] = authenticationTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        if (valid && time <= now)
+        {
+            properties.Items[ValidatedTimeKey] = time.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        }
         return true;
     }
 
-    /// <summary>Records a completed authentication without extending its provider authentication time.</summary>
+    /// <summary>
+    /// Records the authentication time a validated OIDC token proved. Records nothing otherwise: an OAuth provider
+    /// can neither prove nor force when the user authenticated, and an unproven time is unknown.
+    /// </summary>
     /// <param name="principal">The completed principal.</param>
     /// <param name="properties">The protected session properties.</param>
-    /// <param name="now">The local completion time.</param>
     /// <param name="oidc">Whether a validated OIDC authentication time may be used.</param>
-    internal static void Stamp(ClaimsPrincipal principal, AuthenticationProperties properties, DateTimeOffset now, bool oidc)
+    internal static void Stamp(ClaimsPrincipal principal, AuthenticationProperties properties, bool oidc)
     {
-        var time = oidc && properties.Items.TryGetValue(ValidatedTimeKey, out var value) && SessionAuthenticationTime.TryParse(value, out var validated) ? validated : now;
+        var time = default(DateTimeOffset);
+        var proven = oidc && properties.Items.TryGetValue(ValidatedTimeKey, out var value) && SessionAuthenticationTime.TryParse(value, out time);
         properties.Items.Remove(ValidatedTimeKey);
         properties.Items.Remove(PropertyKey);
-        SessionAuthenticationTime.Stamp(principal, properties, time);
+        properties.Items.Remove(SessionAuthenticationTime.PropertyKey);
+        if (proven)
+        {
+            SessionAuthenticationTime.Stamp(principal, properties, time);
+        }
     }
 
     /// <summary>Builds a retry link; the original operation is never replayed.</summary>

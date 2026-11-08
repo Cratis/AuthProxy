@@ -39,7 +39,7 @@ public partial class FreshAuthenticationMiddleware(RequestDelegate next, IOption
         var path = ForwardingPathPolicy.EffectivePath(context.Request.Path, prefix);
         if (service is null || !FreshAuthenticationPolicy.TryNormalizeRequest(context.Request, path, out var canonical))
         {
-            await Refuse(context, null, TimeSpan.FromMinutes(5), "unresolved");
+            Forbid(context);
             return;
         }
         var maxAge = FreshAuthenticationPolicy.MaxAge(service.Service, canonical, context.Request.Method);
@@ -49,29 +49,49 @@ public partial class FreshAuthenticationMiddleware(RequestDelegate next, IOption
             return;
         }
         var session = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        SessionProvider.TryRead(context.User, session.Properties, out var scheme);
+
+        // An OAuth provider can neither prove nor force when the user authenticated; no reauthentication can satisfy the limit.
+        if (IsOAuthProvider(config, scheme))
+        {
+            FreshAuthenticationRequired(logger, context.Request.Method, RequestPathRedaction.Redact(context.Request.Path), service.Name);
+            Forbid(context);
+            return;
+        }
         if (session.Succeeded && SessionAuthenticationTime.IsFresh(context.User, session.Properties, maxAge.Value, clock.GetUtcNow()))
         {
             await next(context);
             return;
         }
-        SessionProvider.TryRead(context.User, session.Properties, out var scheme);
-        await Refuse(context, string.IsNullOrEmpty(scheme) ? null : scheme, maxAge.Value, service.Name);
+        Refuse(context, string.IsNullOrEmpty(scheme) ? null : scheme, maxAge.Value, service.Name);
     }
 
     [LoggerMessage(LogLevel.Information, "Fresh authentication required for {Method} {Path} on service {Service}")]
     static partial void FreshAuthenticationRequired(ILogger logger, string method, string path, string service);
 
-    async Task Refuse(HttpContext context, string? scheme, TimeSpan maxAge, string service)
+    static bool IsOAuthProvider(C.AuthProxy config, string? scheme) =>
+        !string.IsNullOrEmpty(scheme) && config.Authentication.OAuthProviders.Any(provider => OidcProviderScheme.FromName(provider.Name) == scheme);
+
+    static void Forbid(HttpContext context)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        context.Response.ContentLength = 0;
+    }
+
+    void Refuse(HttpContext context, string? scheme, TimeSpan maxAge, string service)
     {
         FreshAuthenticationRequired(logger, context.Request.Method, RequestPathRedaction.Redact(context.Request.Path), service);
         context.Response.Headers.CacheControl = "no-store";
-        var location = FreshAuthenticationChallenge.Login(scheme, context.GetPathAndQuery(), maxAge);
         if (HttpMethods.IsGet(context.Request.Method) && context.IsDocumentNavigation())
         {
-            context.Response.Redirect(location);
+            context.Response.Redirect(FreshAuthenticationChallenge.Login(scheme, context.GetPathAndQuery(), maxAge));
             return;
         }
-        context.Response.StatusCode = StatusCodes.Status403Forbidden;
-        await context.Response.WriteAsJsonAsync(new { reason = SignInFailureReason.FreshAuthenticationRequired, reauthenticationUrl = location });
+
+        // RFC 9470: a caller that is not a browser navigation cannot follow a login redirect, so it is told how recent
+        // an authentication it needs; the operation is never replayed.
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        context.Response.Headers.WWWAuthenticate = $"Bearer error=\"insufficient_user_authentication\", max_age=\"{(int)maxAge.TotalSeconds}\"";
     }
 }

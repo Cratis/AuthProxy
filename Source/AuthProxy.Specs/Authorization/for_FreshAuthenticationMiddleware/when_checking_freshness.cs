@@ -24,15 +24,30 @@ public class when_checking_freshness : Specification
         var (context, middleware, next) = Create(age);
         await middleware.InvokeAsync(context);
         next.Called.ShouldEqual(passes);
-        if (!passes) context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+        if (!passes) context.Response.StatusCode.ShouldEqual(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task should_refuse_an_oauth_session_uniformly_without_a_redirect()
+    {
+        var (context, middleware, next) = Create(int.MaxValue, "oauth");
+        context.Request.Headers.Accept = "text/html";
+        context.Request.Headers["Sec-Fetch-Dest"] = "document";
+        await middleware.InvokeAsync(context);
+        next.Called.ShouldBeFalse();
+        context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+        context.Response.Headers.Location.Count.ShouldEqual(0);
+        context.Response.Headers.WWWAuthenticate.Count.ShouldEqual(0);
+        context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");
+        context.Response.Body.Length.ShouldEqual(0);
     }
 
     [Theory]
     [InlineData("GET", true, 302)]
-    [InlineData("GET", false, 403)]
-    [InlineData("POST", true, 403)]
-    [InlineData("PUT", true, 403)]
-    [InlineData("DELETE", false, 403)]
+    [InlineData("GET", false, 401)]
+    [InlineData("POST", true, 401)]
+    [InlineData("PUT", true, 401)]
+    [InlineData("DELETE", false, 401)]
     public async Task should_only_redirect_safe_document_navigation(string method, bool document, int status)
     {
         var (context, middleware, next) = Create(301);
@@ -50,10 +65,9 @@ public class when_checking_freshness : Specification
         }
         else
         {
-            context.Response.Body.Position = 0;
-            using var reader = new StreamReader(context.Response.Body);
-            (await reader.ReadToEndAsync(TestContext.Current.CancellationToken)).ShouldContain("fresh-authentication-required");
+            context.Response.Headers.WWWAuthenticate.ToString().ShouldEqual("Bearer error=\"insufficient_user_authentication\", max_age=\"300\"");
             context.Response.Headers.Location.Count.ShouldEqual(0);
+            context.Response.Body.Length.ShouldEqual(0);
         }
     }
 
@@ -97,7 +111,8 @@ public class when_checking_freshness : Specification
         context.Response.Body = new MemoryStream();
         context.User = new ClaimsPrincipal(new ClaimsIdentity([], "session"));
         var properties = new AuthenticationProperties();
-        SessionProvider.Stamp(context.User, properties, "oidc");
+        SessionProvider.Stamp(context.User, properties, kind == "oauth" ? "github" : "oidc");
+        if (kind == "oauth") config.Authentication.OAuthProviders = [new C.OAuthProvider { Name = "GitHub" }];
         if (age != int.MaxValue) SessionAuthenticationTime.Stamp(context.User, properties, _now.AddSeconds(-age));
         var authentication = Substitute.For<IAuthenticationService>();
         authentication.AuthenticateAsync(context, CookieAuthenticationDefaults.AuthenticationScheme).Returns(AuthenticateResult.Success(new AuthenticationTicket(context.User, properties, CookieAuthenticationDefaults.AuthenticationScheme)));
