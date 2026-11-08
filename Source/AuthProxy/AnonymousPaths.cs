@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Runtime.CompilerServices;
+using Cratis.AuthProxy.ReverseProxy;
+using Yarp.ReverseProxy.Model;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy;
@@ -26,11 +28,16 @@ namespace Cratis.AuthProxy;
 /// </remarks>
 public static class AnonymousPaths
 {
+    /// <summary>The server-selected anonymous route marker for final outbound transport.</summary>
+    internal static readonly HttpRequestOptionsKey<bool> ForwardWithoutIdentity = new("Cratis.AuthProxy.AnonymousPath");
+
     /// <summary>
     /// The usable prefixes resolved for a configuration instance, so <see cref="Matches"/> does not re-parse
     /// every declared entry on every request. Weak keys, so a superseded configuration is collectable.
     /// </summary>
     static readonly ConditionalWeakTable<C.AuthProxy, string[]> _resolvedPrefixes = [];
+
+    static readonly object _routeDispositionKey = new();
 
     /// <summary>
     /// Gets the usable, de-duplicated anonymous path prefixes declared by a single service.
@@ -108,6 +115,24 @@ public static class AnonymousPaths
     /// </remarks>
     public static bool TryNormalize(string? candidate, out string prefix) =>
         AnonymousPathPolicy.Evaluate(candidate, out prefix) == AnonymousPathRejection.None;
+
+    /// <summary>Determines whether the server-selected proxy route is anonymous.</summary>
+    /// <param name="context">The routed request.</param>
+    /// <returns>True only for an anonymous proxy route.</returns>
+    internal static bool IsAnonymousRoute(HttpContext context)
+    {
+        if (context.Items.TryGetValue(_routeDispositionKey, out var disposition))
+        {
+            return disposition is true;
+        }
+
+        var anonymous = string.Equals(
+            context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>()?.Config.AuthorizationPolicy,
+            MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy,
+            StringComparison.OrdinalIgnoreCase);
+        context.Items[_routeDispositionKey] = anonymous;
+        return anonymous;
+    }
 
     static string[] Resolve(C.AuthProxy config) =>
         [.. config.Services.Values

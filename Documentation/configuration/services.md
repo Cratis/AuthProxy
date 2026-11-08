@@ -509,14 +509,12 @@ anonymous `/reporting/api/webhook` goes to the reporting backend.
   `x-ms-client-principal-id`, `x-ms-client-principal-name` and `x-cratis-tenant-id` (and the legacy
   `Tenant-ID`) headers are stripped as they
   are for every other request, so a caller cannot assert an identity on an anonymous path.
-- No principal headers are injected for a caller with no session. A caller that *does* present a valid
-  session is still authenticated normally and still gets its identity headers — the path is
-  identity-*optional*, not identity-free.
-- A signed-in caller reaches a declared path **without an `x-cratis-tenant-id` header** when they have not chosen a
-  tenant, because tenant selection is skipped along with everything else. Handle a declared path as
-  tenant-optional: it already has to work for a caller with no identity at all, so identity without a
-  tenant is a strictly better-informed case of the same thing.
-- AuthProxy's own cookies are not forwarded; the caller's `Authorization` header is kept unless the service sets `CallerAuthorizationHeader` to `Strip`.
+- Anonymous routes are identity-free, including for authenticated sessions and bearer-token callers.
+  Principal, tenant, on-behalf/actor, token metadata, forwarded-identity signature, and `Authorization`
+  headers are removed before transport, including caller-supplied copies. Use a non-anonymous route
+  when the application needs forwarded identity.
+- AuthProxy's own cookies are not forwarded. `CallerAuthorizationHeader` cannot enable forwarding of
+  `Authorization` on anonymous routes.
 - The application remains responsible for authorizing these paths. This only stops the proxy from
   demanding a login before the application is ever reached.
 - A declared prefix is claimed for the whole proxy. An anonymous caller cannot send an `x-cratis-microservice`
@@ -1134,10 +1132,11 @@ provider must be configured. AuthProxy refuses to start otherwise.
 
 - Only requests that are authenticated by the AuthProxy session and routed to the service's `Backend` get a
   token. The token replaces any `Authorization` header the browser sent.
-- Requests to the `Frontend`, requests on [anonymous paths](#anonymous-paths), and machine callers that
-  authenticate with their own bearer token ([client credentials](#client-credentials) or JWT bearer) are
-  forwarded as before. A session request to the `Frontend` no longer carries the caller's own `Authorization` header
-  unless the service sets [`CallerAuthorizationHeader`](#caller-authorization-header) to `Forward`.
+- Requests on [anonymous paths](#anonymous-paths) carry neither identity nor `Authorization` headers.
+  Requests to the `Frontend` and machine callers that authenticate with their own bearer token
+  ([client credentials](#client-credentials) or JWT bearer) are otherwise forwarded as before. A session
+  request to the `Frontend` no longer carries the caller's own `Authorization` header unless the service
+  sets [`CallerAuthorizationHeader`](#caller-authorization-header) to `Forward`.
 - Tokens stay bound to the backend and audience selected for the request across configuration reloads.
   Changing only `Backend.BaseUrl` obtains a token again instead of reusing one cached for the previous backend,
   even when the session, provider, scopes, and resource are unchanged.
@@ -1174,6 +1173,7 @@ their users sign in again once.
 | `Forward` | kept | kept |
 | `Strip` | removed | removed |
 
-A token AuthProxy obtains for the service, and the bearer token of a caller AuthProxy itself authenticated,
-are always forwarded. AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
+On non-anonymous routes, a token AuthProxy obtains for the service, and the bearer token of a caller
+AuthProxy itself authenticated, are always forwarded. On [anonymous paths](#anonymous-paths), `Authorization`
+is always removed regardless of this setting. AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
 every other cookie arrives unchanged.

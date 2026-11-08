@@ -22,7 +22,8 @@ public class OnBehalfForwardTransform : RequestTransform
     /// <inheritdoc/>
     public override ValueTask ApplyAsync(RequestTransformContext context)
     {
-        if (!context.HttpContext.TryGetOnBehalf(out var onBehalf))
+        if (AnonymousPaths.IsAnonymousRoute(context.HttpContext)
+            || !context.HttpContext.TryGetOnBehalf(out var onBehalf))
         {
             return ValueTask.CompletedTask;
         }

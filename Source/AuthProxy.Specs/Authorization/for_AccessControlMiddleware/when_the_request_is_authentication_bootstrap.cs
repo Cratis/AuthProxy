@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Cratis.AuthProxy.Authorization.for_AccessControlMiddleware;
 
 /// <summary>
@@ -20,9 +22,14 @@ public class when_the_request_is_authentication_bootstrap : given.an_access_cont
 
     void Establish()
     {
+        var authentication = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        authentication.CurrentValue.Returns(new C.Authentication { OAuthProviders = [new() { Name = "GitHub" }] });
+        _context.RequestServices = new ServiceCollection().AddSingleton(authentication).BuildServiceProvider();
         CallerCarrying(new Claim("urn:github:organization", "some-other-org"));
         BuildMiddleware();
     }
+
+    void Destroy() => (_context.RequestServices as IDisposable)?.Dispose();
 
     async Task Because()
     {

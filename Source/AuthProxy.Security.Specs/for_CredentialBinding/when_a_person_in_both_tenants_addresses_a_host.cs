@@ -8,6 +8,32 @@ namespace Cratis.AuthProxy.Security.for_CredentialBinding;
 [Collection(TwoTenantPersonSpecCollection.Name)]
 public class when_a_person_in_both_tenants_addresses_a_host(TwoTenantPersonHarness harness)
 {
+    [Fact]
+    public async Task should_forward_an_anonymous_route_without_the_browser_identity()
+    {
+        harness.UserBelongsTo(TenantSelectionHarness.TenantA, TenantSelectionHarness.TenantB);
+        using var client = harness.CreateSecurityClient();
+        var cookie = await harness.SelectTenant(client, "anonymous-route-user", TenantSelectionHarness.TenantA);
+        harness.Origin.Clear();
+        using var request = TenantSelectionHarness.Request(TenantSelectionHarness.AnonymousPath, "anonymous-route-user", cookie);
+        request.Headers.Host = "b.direct.example.test";
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer anonymous-route-spec");
+        HostileIdentityHeaders.ApplyTo(request, HostileHeaderVariant.CaseDuplicated);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var forwarded = harness.Origin.LastRequestTo(TenantSelectionHarness.AnonymousPath);
+        Assert.Empty(HostileIdentityHeaders.Leaks(forwarded.Headers));
+        Assert.DoesNotContain(forwarded.Headers.Keys, name =>
+            name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase));
+        Assert.False(forwarded.Has(Headers.TenantId));
+        Assert.False(forwarded.Has(Headers.LegacyTenantId));
+        Assert.False(forwarded.Has(Headers.TokenClientId));
+        Assert.False(forwarded.Has(Headers.TokenScope));
+        Assert.False(forwarded.Has(Headers.ForwardedIdentitySignature));
+        Assert.False(forwarded.Has("Authorization"));
+    }
+
     [Theory]
     [InlineData("a.direct.example.test", HttpStatusCode.OK)]
     [InlineData("b.direct.example.test", HttpStatusCode.Forbidden)]

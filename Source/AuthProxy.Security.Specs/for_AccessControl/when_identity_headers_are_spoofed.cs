@@ -79,20 +79,18 @@ public class when_identity_headers_are_spoofed(SecurityHarness harness) : IAsync
         Assert.NotEqual("victim-tenant", _authenticatedOnProtectedPath!.Value(Headers.TenantId), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Arc resolves its tenant from <c language="text">x-cratis-tenant-id</c> by default, and the tenant picks the Chronicle
-    /// namespace and the tenant-scoped read models. Whatever tenant the origin sees must be the one the proxy
-    /// resolved, under both names during the transition.
+    /// Anonymous routes forward no tenant under either supported header name.
     /// </summary>
     [Fact]
-    public void should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name() =>
-        Assert.Equal(SecurityHarness.TenantId, _anonymousOnAnonymousPath!.Value(Headers.LegacyTenantId), StringComparer.Ordinal);
+    public void should_forward_no_tenant_on_an_anonymous_route() =>
+        Assert.False(_anonymousOnAnonymousPath!.Has(Headers.LegacyTenantId) || _anonymousOnAnonymousPath.Has(Headers.TenantId));
 
-    /// <inheritdoc cref="should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name"/>
+    /// <summary>Non-anonymous routes retain the tenant resolved by the proxy.</summary>
     [Fact]
     public void should_give_an_authenticated_caller_only_the_tenant_the_proxy_resolved() =>
         Assert.Equal(SecurityHarness.TenantId, _authenticatedOnProtectedPath!.Value(Headers.TenantId), StringComparer.Ordinal);
 
-    /// <inheritdoc cref="should_give_an_anonymous_caller_the_resolved_tenant_under_the_legacy_name"/>
+    /// <inheritdoc cref="should_give_an_authenticated_caller_only_the_tenant_the_proxy_resolved"/>
     [Fact]
     public void should_give_an_authenticated_caller_the_resolved_tenant_under_the_legacy_name() =>
         Assert.Equal(SecurityHarness.TenantId, _authenticatedOnProtectedPath!.Value(Headers.LegacyTenantId), StringComparer.Ordinal);

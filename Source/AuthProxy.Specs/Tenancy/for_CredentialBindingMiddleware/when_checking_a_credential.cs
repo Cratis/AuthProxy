@@ -2,8 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Microsoft.AspNetCore.DataProtection;
+using Yarp.ReverseProxy.Configuration;
+using Yarp.ReverseProxy.Forwarder;
+using Yarp.ReverseProxy.Model;
+using Yarp.ReverseProxy.Transforms;
 
 namespace Cratis.AuthProxy.Tenancy.for_CredentialBindingMiddleware;
 
@@ -59,12 +64,14 @@ public class when_checking_a_credential : Specification
     }
 
     [Theory]
-    [InlineData("/.cratis/select-tenant")]
     [InlineData("/.cratis/login")]
+    [InlineData("/.cratis/providers")]
+    [InlineData("/.cratis/token")]
     public async Task should_allow_pre_tenant_flows(string path)
     {
         var context = Context();
         context.Request.Path = path;
+        context.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(), "local"));
         await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], true);
     }
 
@@ -96,6 +103,57 @@ public class when_checking_a_credential : Specification
         await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], true);
         context.User = new();
         await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], true);
+    }
+
+    [Theory]
+    [InlineData("/register")]
+    [InlineData("/.cratis/providers/child")]
+    [InlineData("/.cratis/token/child")]
+    [InlineData("/.cratis/login/provider/child")]
+    [InlineData("/.cratis/select-tenant")]
+    public async Task should_enforce_credential_binding_on_authenticated_routes(string path)
+    {
+        var context = Context();
+        context.Request.Path = path;
+        SetRoute(context, "default");
+        await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], false);
+    }
+
+    [Theory]
+    [InlineData("/register")]
+    [InlineData("/.cratis/providers")]
+    [InlineData("/.cratis/select-tenant")]
+    public async Task should_enforce_credential_binding_when_the_route_is_unknown(string path)
+    {
+        var context = Context();
+        context.Request.Path = path;
+        await Check(context, new(new EphemeralDataProtectionProvider()), [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)], false);
+    }
+
+    [Theory]
+    [InlineData("anonymous", true)]
+    [InlineData("default", false)]
+    [InlineData(null, false)]
+    public async Task should_share_the_route_disposition_with_both_passes_and_forwarding(string? policy, bool anonymous)
+    {
+        var context = Context();
+        context.Request.Path = "/public";
+        SetRoute(context, policy);
+        var cookie = new SelectedTenantCookie(new EphemeralDataProtectionProvider());
+        TenantResolutionResult[] resolutions = [new("tenant-a", C.TenantSourceIdentifierResolverType.Claim), new("tenant-b", C.TenantSourceIdentifierResolverType.Host)];
+        await Check(context, cookie, resolutions, anonymous);
+        SetRoute(context, anonymous ? "default" : "anonymous");
+        await Check(context, cookie, resolutions, anonymous, checkEffectiveTenant: true);
+        var request = new RequestTransformContext { HttpContext = context, ProxyRequest = new HttpRequestMessage() };
+        await new ForwardedIdentitySigningTargetTransform(ForwardedIdentityFlow.ProxiedRequest).ApplyAsync(request);
+        request.ProxyRequest.Options.TryGetValue(AnonymousPaths.ForwardWithoutIdentity, out var withoutIdentity).ShouldBeTrue();
+        withoutIdentity.ShouldEqual(anonymous);
+    }
+
+    static void SetRoute(HttpContext context, string? policy)
+    {
+        var route = new RouteConfig { RouteId = "app", ClusterId = "app", AuthorizationPolicy = policy };
+        context.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(new RouteModel(route, new ClusterState("app"), HttpTransformer.Default)), "proxied"));
     }
 
     static DefaultHttpContext Context() => new()

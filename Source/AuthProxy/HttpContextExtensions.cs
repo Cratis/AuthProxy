@@ -1,6 +1,9 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -180,7 +183,7 @@ public static class HttpContextExtensions
     /// <param name="context">The <see cref="HttpContext"/> to evaluate.</param>
     /// <returns><see langword="true"/> if the request is part of authentication bootstrap; otherwise <see langword="false"/>.</returns>
     public static bool IsAuthenticationBootstrap(this HttpContext context) =>
-        context.IsAuthenticationUI() || (context.Request.Path.Value?.StartsWith(WellKnownPaths.SignInPrefix, StringComparison.OrdinalIgnoreCase) ?? false);
+        context.IsAuthenticationUI() || IsProviderCallback(context);
 
     /// <summary>
     /// Attempts to extract the invitation token from the current invitation request path.
@@ -221,6 +224,26 @@ public static class HttpContextExtensions
         invitationToken = token;
 
         return true;
+    }
+
+    static bool IsProviderCallback(HttpContext context)
+    {
+        var authentication = context.RequestServices?.GetService<IOptionsMonitor<C.Authentication>>()?.CurrentValue;
+        if (authentication is null) return false;
+
+        return authentication.OidcProviders.Any(provider =>
+            IsCallback<OpenIdConnectOptions>(context, provider.Name))
+            || authentication.OAuthProviders.Any(provider =>
+                IsCallback<OAuthOptions>(context, provider.Name));
+    }
+
+    static bool IsCallback<TOptions>(HttpContext context, string providerName)
+        where TOptions : Microsoft.AspNetCore.Authentication.RemoteAuthenticationOptions
+    {
+        var scheme = OidcProviderScheme.FromName(providerName);
+        var callback = context.RequestServices?.GetService<IOptionsMonitor<TOptions>>()?.Get(scheme).CallbackPath
+            ?? new PathString($"{WellKnownPaths.SignInPrefix}{scheme}");
+        return context.Request.Path.Equals(callback, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
