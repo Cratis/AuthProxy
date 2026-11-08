@@ -96,6 +96,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
         builder.Services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
         builder.Services.TryAddSingleton(TimeProvider.System);
@@ -281,6 +282,10 @@ public static class AuthenticationServiceCollectionExtensions
 
     static void RegisterOidcProviders(AuthenticationBuilder authBuilder, IList<C.OidcProvider> providers)
     {
+        // The registration and every reader of the bound options see the same Cratis Identity profile defaults.
+        CratisIdentityProfile.ApplyDefaults(providers);
+        authBuilder.Services.PostConfigure<C.Authentication>(authentication => CratisIdentityProfile.ApplyDefaults(authentication.OidcProviders));
+
         foreach (var provider in providers)
         {
             var scheme = OidcProviderScheme.FromName(provider.Name);
@@ -290,6 +295,12 @@ public static class AuthenticationServiceCollectionExtensions
                 ConfigureOidcOptions(options, capturedProvider, scheme);
                 options.Events = CreateOidcEvents(capturedProvider, scheme);
             });
+
+            if (CratisIdentityProfile.AppliesTo(capturedProvider))
+            {
+                // Registered after AddOpenIdConnect so it runs after the framework has built the back channel.
+                authBuilder.Services.PostConfigure<OpenIdConnectOptions>(scheme, options => CratisIdentityProfile.UseVerifiedDiscovery(options, capturedProvider));
+            }
         }
     }
 
@@ -333,6 +344,11 @@ public static class AuthenticationServiceCollectionExtensions
         foreach (var scope in provider.Scopes)
         {
             options.Scope.Add(scope);
+        }
+
+        if (CratisIdentityProfile.AppliesTo(provider))
+        {
+            CratisIdentityProfile.Configure(options, provider);
         }
 
         options.CallbackPath = $"/signin-{scheme}";
