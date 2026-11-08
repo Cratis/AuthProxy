@@ -722,6 +722,41 @@ The handler applies to every path, but a token from an issuer configured on a
 [bearer route](#bearer-routes-access-tokens-from-an-authorization-server) never reaches it: such a token is refused
 on every path outside its bearer routes.
 
+### Bind external tokens to a tenant
+
+For a multi-tenant deployment, require the validated JWT to establish its tenant independently of request
+routing. Add `ExternalTokenTenantBinding` beside `JwtBearer` under `Cratis:AuthProxy:Authentication`:
+
+```json
+{
+  "ExternalTokenTenantBinding": {
+    "Require": true,
+    "TenantClaimType": "tid",
+    "TenantMapping": {
+      "external-directory-a": "tenant-a"
+    }
+  }
+}
+```
+
+`TenantClaimType` defaults to `tid` and names the raw token claim before JWT inbound claim-name mapping.
+The token must contain exactly one value for that exact claim type. Missing, repeated, empty or unusable
+values fail authentication with 401. With a nonempty `TenantMapping`, only exact, case-sensitive keys are
+accepted; unknown values are refused, not used as tenant IDs. With an empty mapping, the claim value is the
+AuthProxy tenant ID. Values are never trimmed. The resolved ID must be 1–256 ASCII letters, digits or
+`-._~`, and cannot be `.` or `..`.
+
+After authentication, a conflict with any resolved Host, SubHost or configured Route tenant, or with the
+effective tenant, returns 403 before forwarding. Tenant ID comparison follows AuthProxy's existing
+case-insensitive rule. Headers and unconfigured path segments cannot supply a missing credential tenant.
+A bound token does not use the browser tenant chooser or call its membership endpoint; attempts to select a
+tenant return 403. This setting does not configure request tenant resolution itself.
+
+`Require` defaults to `false`, preserving existing JWT behavior. A configured JWT Bearer handler without this
+opt-in emits a startup warning. Enabling it without `JwtBearer`, with an empty claim type, or with an unusable
+mapping target fails startup validation. It applies only to the general JWT Bearer handler: browser sessions,
+AuthProxy client-credentials tokens and bearer-route tokens keep their existing validation rules.
+
 ---
 
 ## Bearer routes: access tokens from an authorization server

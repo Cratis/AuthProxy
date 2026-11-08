@@ -68,6 +68,12 @@ public class TenantSelectionMiddleware(
             return;
         }
 
+        if (ExternalTokenTenantBinding.BoundTenant(context.User) is not null)
+        {
+            await ContinueExternalToken(context);
+            return;
+        }
+
         var exempt = Tenancy.TenantSelectionExemptions.IsExemptFromTenantSelection(context, config.CurrentValue);
         if (!exempt && context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant))
         {
@@ -203,6 +209,17 @@ public class TenantSelectionMiddleware(
             or C.TenantSourceIdentifierResolverType.SubHost
             or C.TenantSourceIdentifierResolverType.Route;
         return exempt || addressed ? resolved : null;
+    }
+
+    Task ContinueExternalToken(HttpContext context)
+    {
+        if (context.Request.Path.StartsWithSegments(WellKnownPaths.SelectTenant))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return Task.CompletedTask;
+        }
+
+        return next(context);
     }
 
     async Task HandleTenantSelection(HttpContext context, Tenancy.SelectionOptions selectionOptions)

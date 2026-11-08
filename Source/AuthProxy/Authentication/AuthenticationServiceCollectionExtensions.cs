@@ -96,6 +96,8 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
+        builder.Services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<ICredentialsLoader>(services => new DefaultCredentialsLoader(services.GetRequiredService<ILogger<DefaultCredentialsLoader>>()));
         builder.Services.TryAddSingleton<IOidcClientAssertions, OidcClientAssertions>();
@@ -104,6 +106,17 @@ public static class AuthenticationServiceCollectionExtensions
         if (jwtSection.Exists())
         {
             authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, jwtSection.Bind);
+            builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                var existing = options.Events.OnTokenValidated;
+                options.Events.OnTokenValidated = async context =>
+                {
+                    await existing(context);
+                    if (context.Result?.Succeeded == false) return;
+                    var config = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.Authentication>>();
+                    ExternalTokenTenantBinding.Apply(context, config.CurrentValue.ExternalTokenTenantBinding);
+                };
+            });
         }
 
         builder.Services.AddAuthorizationBuilder()
