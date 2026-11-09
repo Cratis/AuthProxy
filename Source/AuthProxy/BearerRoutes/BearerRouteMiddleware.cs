@@ -126,8 +126,8 @@ public class BearerRouteMiddleware(
         // The credential's kind is decided once, here. The branch it lands in is the only one that sees it: a
         // refusal is never retried as the other kind.
         var clientCredentialsPrefix = ClientCredentialsOnBearerRoutes.SharedPrefix(current, route);
-        ClientCredentialsTokenPayload? issued = null;
-        var recognizer = clientCredentialsPrefix is null ? null : (Func<string, bool>)(token => TryRecognizeIssued(token, out issued));
+        IssuedBearerRouteCredential? issued = null;
+        var recognizer = clientCredentialsPrefix is null ? null : (Func<string, bool>)(token => TryRecognizeIssued(token, route, out issued));
         var (dispatch, reason) = CredentialDispatcher.Dispatch(context.Request, route, recognizer);
         switch (dispatch)
         {
@@ -190,23 +190,23 @@ public class BearerRouteMiddleware(
         await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
     }
 
-    bool TryRecognizeIssued(string token, out ClientCredentialsTokenPayload? payload)
+    bool TryRecognizeIssued(string token, ResolvedBearerRoute route, out IssuedBearerRouteCredential? credential)
     {
-        payload = null;
+        credential = null;
 
-        if (!ClientCredentialsOnBearerRoutes.CouldBeIssued(token) || !tokenProtector.TryValidate(token, out var validated))
+        if (!ClientCredentialsOnBearerRoutes.CouldBeIssued(token) || !tokenProtector.TryValidate(token, out var validated, out var expiresAt))
         {
             return false;
         }
 
-        payload = validated;
+        credential = new(route, token, validated, expiresAt);
         return true;
     }
 
-    async Task HandOnIssuedToken(HttpContext context, ResolvedBearerRoute route, string prefix, ClientCredentialsTokenPayload payload)
+    async Task HandOnIssuedToken(HttpContext context, ResolvedBearerRoute route, string prefix, IssuedBearerRouteCredential credential)
     {
         // The token is AuthProxy's own, so the client-credentials rules alone judge it and a refusal here is final.
-        if (!ClientCredentialsOnBearerRoutes.IsIssuedFor(payload, route, prefix, context.Request.Path))
+        if (!ClientCredentialsOnBearerRoutes.IsIssuedFor(credential.Payload, route, prefix, context.Request.Path))
         {
             const string reason = "client-credentials token issued for another service or route prefix";
             logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
@@ -214,7 +214,8 @@ public class BearerRouteMiddleware(
             return;
         }
 
-        context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = payload;
+        context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = credential.Payload;
+        IssuedBearerRouteCredential.Store(context, credential);
         await next(context);
     }
 

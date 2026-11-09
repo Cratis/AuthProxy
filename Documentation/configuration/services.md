@@ -1006,11 +1006,15 @@ every token-authenticated request instead.
 
 ### What a bearer route changes
 
+Personal access token (PAT) shape, checksum and resource recognition at the edge are **not authentication**.
+PAT requests bypass the proxy's JWT scope, claim and credential-binding checks. The backend must authenticate
+and authorize every PAT, including its tenant and resource access; recognition alone does not grant access.
+
 - A request on a bearer route is answered before static files, authentication, provider selection, tenant
   selection and identity enrichment — none of them apply. The one exception is a token AuthProxy issued itself on a
   prefix shared with [client credentials](#sharing-a-prefix-with-client-credentials). [Admission](admission.md) and the trusted-proxy
   boundary run first and apply as to any request.
-- The deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
+- For external JWTs, the deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
   the token's principal after `ClaimMappings`, unless the route sets `IgnoreDeploymentRequiredClaims`. The
   route's own `RequiredClaims` apply on top either way. A token that does not satisfy them is refused with `403`.
   A requirement on a role can never be met: roles are dropped from every token.
@@ -1085,7 +1089,8 @@ Each credential on that prefix is judged by one set of rules, chosen once, and i
 - A token that AuthProxy can unprotect with its own [Data Protection keys](authentication.md#data-protection-keys-and-horizontal-scaling)
   as an unexpired client-credentials access token is AuthProxy's. When it was issued for this service and prefix,
   it continues to client-credentials authentication and is handled exactly as it would be without the bearer route.
-  When it was issued for another service or prefix, it is refused with `401`.
+  When it was issued for another service or prefix, it is refused with `401`. If it expires before authentication
+  completes, it is refused with the route's `401` challenge, never retried as a browser session or another token kind.
 - Every other token goes to the bearer route's validation only. That includes a token that resembles an
   AuthProxy token but has been altered, has expired or was issued under another key ring: it cannot be shown to be
   AuthProxy's, so the client-credentials rules never see it, and the bearer route refuses it with `401`.

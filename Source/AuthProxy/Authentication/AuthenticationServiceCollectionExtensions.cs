@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.AccessTokens;
+using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.SignInCallbacks;
@@ -136,6 +137,15 @@ public static class AuthenticationServiceCollectionExtensions
 
     static string SelectAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
+        // A gate decision is final. Missing state on a bearer route must also reach the handler's
+        // fail-closed check, never cookie or JWT authentication. External credentials forward at the gate.
+        var current = context.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue;
+        if (IssuedBearerRouteCredential.Read(context) is not null
+            || BearerRouteTable.TryMatch(context.Request.Path, current, out _))
+        {
+            return ClientCredentialsDefaults.AuthenticationScheme;
+        }
+
         var authorization = context.Request.Headers.Authorization.ToString();
         if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {

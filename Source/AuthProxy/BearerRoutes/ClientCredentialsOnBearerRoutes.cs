@@ -70,7 +70,8 @@ public static class ClientCredentialsOnBearerRoutes
     {
         var prefix = ClientCredentialsServiceResolver.NormalizeRoutePrefix(clientCredentials.RoutePrefix);
 
-        // The root prefix covers every path, which segment matching alone does not report.
+        // A client-credentials "/" prefix covers every bearer route, so startup must refuse it here:
+        // it cannot share exactly one bearer prefix, and segment matching alone misses this overlap.
         var overlaps = prefix == "/"
             || new PathString(routePrefix).StartsWithSegments(prefix)
             || new PathString(prefix).StartsWithSegments(routePrefix);
