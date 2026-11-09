@@ -127,6 +127,20 @@ public class BearerRouteMiddleware(
 
     async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
+        if (RequestAuthentication.HasBearer(context.Request) && RequestAuthentication.HasSession(context))
+        {
+            BearerChallenge.MultipleCredentials(context);
+            return;
+        }
+
+        if (!await TryHandleCredential(context, route, current))
+        {
+            await AuthenticateExternal(context, route, current);
+        }
+    }
+
+    async Task<bool> TryHandleCredential(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
+    {
         // The credential's kind is decided once, here. The branch it lands in is the only one that sees it: a
         // refusal is never retried as the other kind.
         var clientCredentialsPrefix = ClientCredentialsOnBearerRoutes.SharedPrefix(current, route);
@@ -136,31 +150,36 @@ public class BearerRouteMiddleware(
         switch (dispatch)
         {
             case CredentialDispatch.ClientCredentials:
-                await HandOnIssuedToken(context, route, clientCredentialsPrefix!, issued!);
-                return;
+                await HandOnIssuedToken(context, route, clientCredentialsPrefix!, issued);
+                return true;
 
             case CredentialDispatch.Ambiguous:
                 logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
                 BearerChallenge.MultipleCredentials(context);
-                return;
+                return true;
 
             case CredentialDispatch.Refused:
                 logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
                 BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason), route);
-                return;
+                return true;
 
             case CredentialDispatch.Missing:
                 BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Missing, "No bearer token was presented."), route);
-                return;
+                return true;
 
             case CredentialDispatch.PersonalAccessToken:
                 // The service behind the route verifies the token; this gate only recognized it and checked it names
                 // this route's resource.
                 context.Items[BearerRouteDefaults.PassThroughAuthorizationItemKey] = true;
                 await forwarder.Forward(context, route, identity: null);
-                return;
+                return true;
         }
 
+        return false;
+    }
+
+    async Task AuthenticateExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
+    {
         var validation = await validator.Validate(context.Request, route, context.RequestAborted);
         if (!validation.Succeeded)
         {
@@ -203,17 +222,28 @@ public class BearerRouteMiddleware(
     {
         credential = null;
 
-        if (!ClientCredentialsOnBearerRoutes.CouldBeIssued(token) || !tokenProtector.TryValidate(token, out var validated, out var expiresAt))
+        if (!ClientCredentialsOnBearerRoutes.CouldBeIssued(token))
         {
             return false;
+        }
+
+        if (!tokenProtector.TryValidate(token, out var validated, out var expiresAt))
+        {
+            return tokenProtector.IsIssued(token);
         }
 
         credential = new(route, token, validated, expiresAt);
         return true;
     }
 
-    async Task HandOnIssuedToken(HttpContext context, ResolvedBearerRoute route, string prefix, IssuedBearerRouteCredential credential)
+    async Task HandOnIssuedToken(HttpContext context, ResolvedBearerRoute route, string prefix, IssuedBearerRouteCredential? credential)
     {
+        if (credential is null)
+        {
+            BearerChallenge.Unauthorized(context, route.ResourceMetadataUrl, "invalid_token");
+            return;
+        }
+
         // The token is AuthProxy's own, so the client-credentials rules alone judge it and a refusal here is final.
         if (!ClientCredentialsOnBearerRoutes.IsIssuedFor(credential.Payload, route, prefix, context.Request.Path))
         {

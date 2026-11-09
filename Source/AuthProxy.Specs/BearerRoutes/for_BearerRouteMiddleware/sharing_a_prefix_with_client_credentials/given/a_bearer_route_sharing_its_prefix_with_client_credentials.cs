@@ -22,6 +22,8 @@ public abstract class a_bearer_route_sharing_its_prefix_with_client_credentials 
 
     protected IDataProtectionProvider DataProtection { get; } = new EphemeralDataProtectionProvider();
 
+    protected Authentication.for_ClientCredentialsTokenProtector.given.ManualTime Clock { get; } = new(DateTimeOffset.UtcNow);
+
     protected ClientCredentialsTokenProtector TokenProtector { get; private set; } = default!;
 
     protected ConfiguredClientCredentialsService IssuedFor { get; } = new(ServiceName, Prefix, new Uri("https://portal.example.test/verify"));
@@ -54,7 +56,7 @@ public abstract class a_bearer_route_sharing_its_prefix_with_client_credentials 
 
     void Establish()
     {
-        TokenProtector = new ClientCredentialsTokenProtector(DataProtection);
+        TokenProtector = new ClientCredentialsTokenProtector(DataProtection, Clock);
         var current = new C.AuthProxy
         {
             Services = new Dictionary<string, C.Service>

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace Cratis.AuthProxy.Authentication;
 
@@ -25,6 +26,10 @@ public class ClientCredentialsTokenProtector(
     readonly ITimeLimitedDataProtector _protector = dataProtectionProvider
         .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.v1")
         .ToTimeLimitedDataProtector();
+
+    readonly IDataProtector _issuedProtector = dataProtectionProvider
+        .CreateProtector("Cratis.AuthProxy.Authentication.ClientCredentials.v1")
+        .CreateProtector("Microsoft.AspNetCore.DataProtection.TimeLimitedDataProtector.v1");
 
     /// <summary>
     /// Reads refresh tokens issued by earlier versions. They are never issued; their own expiry is their family deadline.
@@ -114,6 +119,25 @@ public class ClientCredentialsTokenProtector(
     /// <returns>The protected refresh token value.</returns>
     public string CreateRefreshToken(ConfiguredClientCredentialsService service, string clientId, string? tenant = null) =>
         Issue(service, clientId, tenant, StartFamily(service)).RefreshToken;
+
+    /// <summary>
+    /// Recognizes an access token minted by this deployment, regardless of expiry. Never authorizes its use.
+    /// </summary>
+    /// <param name="token">The protected access token value.</param>
+    /// <returns>Whether the token can be unprotected with this deployment's access-token purposes.</returns>
+    public bool IsIssued(string token)
+    {
+        try
+        {
+            // The time-limited envelope includes a binary expiry header, not UTF-8 text.
+            _issuedProtector.Unprotect(WebEncoders.Base64UrlDecode(token));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Tries to validate and unprotect an access token.

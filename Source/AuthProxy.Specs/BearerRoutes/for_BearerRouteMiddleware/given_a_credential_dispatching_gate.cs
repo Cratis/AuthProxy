@@ -98,13 +98,17 @@ public abstract class given_a_credential_dispatching_gate : Specification
             .Returns(BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "stub"));
         Forwarder = Substitute.For<IBearerRouteForwarder>();
         Next = Substitute.For<RequestDelegate>();
+        var policy = Substitute.For<IAccessPolicy>();
+        policy.Evaluate(Arg.Any<ClaimsPrincipal>(), Arg.Any<C.AuthProxy>(), Arg.Any<string>(), Arg.Any<C.BearerRoute>()).Returns(AccessDecision.Granted);
+        var tenantVerifier = Substitute.For<ITenantVerifier>();
+        tenantVerifier.VerifyAsync(Arg.Any<string>()).Returns(true);
         Middleware = new BearerRouteMiddleware(
             Next,
             options,
             Validator,
             Substitute.For<IBearerTokenIntrospector>(),
-            Substitute.For<IAccessPolicy>(),
-            Substitute.For<ITenantVerifier>(),
+            policy,
+            tenantVerifier,
             Substitute.For<ITenantResolver>(),
             Forwarder,
             TokenProtector,

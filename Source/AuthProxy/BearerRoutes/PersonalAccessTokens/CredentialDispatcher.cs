@@ -41,14 +41,14 @@ public static class CredentialDispatcher
         Func<string, bool>? isIssuedByAuthProxy = null)
     {
         var values = request.Headers.Authorization;
-        if (values.Count == 0)
-        {
-            return (CredentialDispatch.Missing, string.Empty);
-        }
-
         if (values.Count > 1 || request.Query.ContainsKey(QueryCredentialName))
         {
             return (CredentialDispatch.Ambiguous, "more than one credential presented");
+        }
+
+        if (values.Count == 0)
+        {
+            return (CredentialDispatch.Missing, string.Empty);
         }
 
         var value = values[0] ?? string.Empty;
@@ -57,7 +57,7 @@ public static class CredentialDispatcher
         var isBearer = string.Equals(scheme, BearerScheme, StringComparison.OrdinalIgnoreCase);
         var credential = space >= 0 ? value[(space + 1)..] : isBearer ? string.Empty : value;
 
-        if ((isBearer || string.Equals(scheme, ProofOfPossessionScheme, StringComparison.OrdinalIgnoreCase)) && credential.Contains(','))
+        if (IsCombinedCredential(isBearer, scheme, credential))
         {
             return (CredentialDispatch.Ambiguous, "more than one credential presented");
         }
@@ -73,6 +73,9 @@ public static class CredentialDispatcher
             ? DispatchOther(isBearer, route)
             : DispatchPersonalAccessToken(shape, isBearer, route);
     }
+
+    static bool IsCombinedCredential(bool isBearer, string scheme, string credential) =>
+        (isBearer || string.Equals(scheme, ProofOfPossessionScheme, StringComparison.OrdinalIgnoreCase)) && credential.Contains(',');
 
     static (CredentialDispatch Dispatch, string Reason) DispatchOther(bool isBearer, ResolvedBearerRoute route)
     {

@@ -19,8 +19,8 @@ public class when_an_issued_token_expires_after_the_gate : given.a_real_issued_t
         if (cookie)
         {
             var browser = await Send("/browser", cookie: true);
-            browser.User.Identity!.AuthenticationType.ShouldEqual(CookieAuthenticationDefaults.AuthenticationScheme);
-            browser.User.FindFirst(ClientCredentialsDefaults.TenantClaimType)!.Value.ShouldEqual("tenant-b");
+            browser.User.Identity.AuthenticationType.ShouldEqual(CookieAuthenticationDefaults.AuthenticationScheme);
+            browser.User.FindFirst(ClientCredentialsDefaults.TenantClaimType).Value.ShouldEqual("tenant-b");
             CookieValidations.ShouldEqual(1);
             CookieValidations = 0;
             DownstreamCalls = 0;
@@ -28,10 +28,10 @@ public class when_an_issued_token_expires_after_the_gate : given.a_real_issued_t
 
         BetweenGateAndAuthentication = _ => Clock.ExpireAccessToken();
         var context = await Send(cookie: cookie, token: Token);
-        context.Response.StatusCode.ShouldEqual(StatusCodes.Status401Unauthorized);
-        context.Response.Headers.WWWAuthenticate.ToString().ShouldEqual(patOnly
-            ? "Bearer realm=\"direct\""
-            : $"Bearer error=\"invalid_token\", resource_metadata=\"{Metadata}\"");
+        context.Response.StatusCode.ShouldEqual(cookie ? StatusCodes.Status400BadRequest : StatusCodes.Status401Unauthorized);
+        context.Response.Headers.WWWAuthenticate.ToString().ShouldEqual(cookie
+            ? "Bearer error=\"invalid_request\""
+            : patOnly ? "Bearer realm=\"direct\"" : $"Bearer error=\"invalid_token\", resource_metadata=\"{Metadata}\"");
         context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");
         context.Response.Headers.Location.Count.ShouldEqual(0);
         context.Response.Headers.SetCookie.Count.ShouldEqual(0);

@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Security.for_BearerRoutes;
 public class when_a_session_accompanies_a_bearer(BearerRouteHarness harness)
 {
     [Fact]
-    public async Task should_serve_the_bearer_alone_and_never_the_session()
+    public async Task should_refuse_both_credentials_before_forwarding()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -26,8 +26,10 @@ public class when_a_session_accompanies_a_bearer(BearerRouteHarness harness)
         request.Headers.TryAddWithoutValidation("Cookie", $"{options.Cookie.Name}={options.TicketDataFormat.Protect(ticket)}");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        // The bearer is the only credential a bearer route consults; the cookie neither authenticates nor rescues it.
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(harness.Origin.ReceivedAnythingFor($"{BearerRouteHarness.RoutePrefix}/tools"));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(/*lang=json*/ """{"error":"invalid_request"}""", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("Bearer error=\"invalid_request\"", response.Headers.WwwAuthenticate.ToString());
+        Assert.False(harness.Origin.ReceivedAnythingFor($"{BearerRouteHarness.RoutePrefix}/tools"));
     }
 }

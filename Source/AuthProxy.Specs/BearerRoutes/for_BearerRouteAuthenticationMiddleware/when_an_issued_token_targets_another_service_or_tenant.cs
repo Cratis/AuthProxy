@@ -12,7 +12,7 @@ public class when_an_issued_token_targets_another_service_or_tenant : given.a_re
     [InlineData("portal.test", "tenant-b", StatusCodes.Status403Forbidden)]
     public async Task should_refuse_the_machine_without_authenticating_the_browser(string host, string? tenant, int status)
     {
-        var context = await Send(cookie: true, token: Token, host: host, tenant: tenant);
+        var context = await Send(cookie: false, token: Token, host: host, tenant: tenant);
         context.Response.StatusCode.ShouldEqual(status);
         if (status == StatusCodes.Status401Unauthorized)
         {
@@ -20,8 +20,8 @@ public class when_an_issued_token_targets_another_service_or_tenant : given.a_re
         }
         else
         {
-            context.User.Identity!.AuthenticationType.ShouldEqual(ClientCredentialsDefaults.AuthenticationScheme);
-            context.User.FindFirst(ClientCredentialsDefaults.TenantClaimType)!.Value.ShouldEqual("tenant-a");
+            context.User.Identity.AuthenticationType.ShouldEqual(ClientCredentialsDefaults.AuthenticationScheme);
+            context.User.FindFirst(ClientCredentialsDefaults.TenantClaimType).Value.ShouldEqual("tenant-a");
         }
 
         DownstreamCalls.ShouldEqual(0);
