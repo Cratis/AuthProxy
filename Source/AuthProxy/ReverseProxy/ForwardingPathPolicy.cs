@@ -16,6 +16,7 @@ public static class ForwardingPathPolicy
     static readonly SearchValues<char> _literalPathCharacters = SearchValues.Create("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~/");
     static readonly SearchValues<char> _methodTokenCharacters = SearchValues.Create("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#$%&'*+-.^_`|~");
     static readonly string[] _overrideHeaders = ["X-HTTP-Method-Override", "X-HTTP-Method", "X-Method-Override"];
+    static readonly string[] _overrideQueryKeys = ["_method", "method", .. _overrideHeaders];
 
     /// <summary>Gets whether a service declares either list of forwarding rules.</summary>
     /// <param name="service">The service.</param>
@@ -79,10 +80,11 @@ public static class ForwardingPathPolicy
         return Decide(_policies.GetValue(service, Compile), Normalize(effectivePath), method);
     }
 
-    /// <summary>Detects headers that could change the method interpreted by the backend.</summary>
+    /// <summary>Detects headers or query keys that could change the method interpreted by the backend.</summary>
     /// <param name="request">The request.</param>
-    /// <returns>Whether any method-override header is present, regardless of its value.</returns>
-    internal static bool HasMethodOverride(HttpRequest request) => _overrideHeaders.Any(request.Headers.ContainsKey);
+    /// <returns>Whether a method override is present, regardless of its values.</returns>
+    internal static bool HasMethodOverride(HttpRequest request) =>
+        _overrideHeaders.Any(request.Headers.ContainsKey) || _overrideQueryKeys.Any(request.Query.ContainsKey);
 
     static ForwardingPathRefusal Decide(CompiledPolicy policy, PathString path, string method)
     {

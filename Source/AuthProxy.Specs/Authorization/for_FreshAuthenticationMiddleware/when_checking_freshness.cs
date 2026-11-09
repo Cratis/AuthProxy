@@ -148,7 +148,7 @@ public class when_checking_freshness : Specification
     {
         var (context, middleware, next) = Create(301);
         context.Request.Path = path;
-        context.Features.Get<IHttpRequestFeature>()!.RawTarget = raw;
+        context.Features.Get<IHttpRequestFeature>().RawTarget = raw;
         await middleware.InvokeAsync(context);
         next.Called.ShouldEqual(passes);
     }

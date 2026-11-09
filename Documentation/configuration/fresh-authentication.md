@@ -43,7 +43,7 @@ An OAuth (non-OpenID Connect) provider cannot prove when the user signed in, and
 
 A request authenticated by anything other than the interactive session cookie, or made inside an on-behalf session, cannot prove how recently a user signed in, so a path with a `FreshAuthentication` rule answers `403` for it. Bearer routes use their uniform `404` refusal instead: a valid bearer token cannot satisfy a matching freshness rule, and the request is not forwarded.
 
-Services with freshness rules reject method-override headers even when no forwarding-path rules are configured. A client cannot use a `POST` with `X-HTTP-Method-Override`, `X-Method-Override`, or `X-HTTP-Method` to bypass a method-specific freshness rule.
+Services with freshness rules reject method overrides even when no forwarding-path rules are configured. A client cannot use a `POST` with `X-HTTP-Method-Override`, `X-Method-Override`, or `X-HTTP-Method` headers, or with `_method`, `method`, or any of those header names as query keys, to bypass a method-specific freshness rule. Query names are decoded and compared case-insensitively; overrides are rejected regardless of their values, including empty or multiple values.
 
 An identity provider that never emits `auth_time` has the same effect: paths with a rule stay unusable for its users.
 
