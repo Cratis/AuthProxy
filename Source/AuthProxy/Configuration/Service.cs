@@ -148,6 +148,14 @@ public class Service
     /// <remarks>Anonymous paths are not affected. A null or empty array preserves existing session behavior.</remarks>
     public IList<FreshAuthenticationRule>? FreshAuthentication { get; set; }
 
+    /// <summary>Gets or sets the operator attestation that the backend does not support HTTP method overrides.</summary>
+    /// <remarks>
+    /// Required when any fresh-authentication rule lists methods. Set this only after enforcing that the backend
+    /// does not reinterpret methods through headers, query strings, bodies or other tunnelling mechanisms.
+    /// Defaults to <see langword="false"/>; rules covering all methods do not require this attestation.
+    /// </remarks>
+    public bool FreshAuthenticationMethodOverrideUnsupported { get; set; }
+
     /// <summary>Gets or sets the service-relative paths that must never be forwarded.</summary>
     /// <remarks>
     /// Deny rules take precedence over allow rules, including for authenticated callers. Paths and opt-in

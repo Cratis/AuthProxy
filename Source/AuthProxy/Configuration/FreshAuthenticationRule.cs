@@ -16,6 +16,7 @@ public class FreshAuthenticationRule
     /// <remarks>
     /// GET, HEAD, OPTIONS and TRACE match only their own rules. Other methods match the union of rules
     /// declaring any non-safe method on the path, using the strictest age, regardless of method overrides.
+    /// Nonempty method lists require the service's <see cref="Service.FreshAuthenticationMethodOverrideUnsupported"/> attestation.
     /// </remarks>
     public IList<string> Methods { get; set; } = [];
 

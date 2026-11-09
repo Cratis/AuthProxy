@@ -17,6 +17,9 @@ public class FreshAuthenticationHarness : BearerRouteHarness
     /// <inheritdoc/>
     protected override bool UsesHeaderAuthentication => false;
 
+    /// <summary>Gets or sets the attestation; null omits it to exercise fail-closed startup.</summary>
+    public bool? MethodOverrideUnsupported { get; set; } = true;
+
     /// <summary>Builds a request with a real cookie whose authentication age is independent of its ticket lifetime.</summary>
     /// <param name="method">The transport method.</param>
     /// <param name="path">The path and query to request.</param>
@@ -48,6 +51,10 @@ public class FreshAuthenticationHarness : BearerRouteHarness
     {
         const string service = $"{C.AuthProxy.SectionKey}:Services:app";
         settings[$"{service}:ResolveIdentityDetails"] = "false";
+        if (MethodOverrideUnsupported is { } attested)
+        {
+            settings[$"{service}:FreshAuthenticationMethodOverrideUnsupported"] = attested.ToString();
+        }
         string[] paths = ["/mcp/approve", "/v1/approve", "/approve", ResourceMetadataPath];
         for (var index = 0; index < paths.Length; index++)
         {

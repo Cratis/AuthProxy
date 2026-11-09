@@ -15,6 +15,7 @@ Set `Cratis:AuthProxy:Services:<name>:FreshAuthentication` to a list of rules:
 
 ```json
 {
+  "FreshAuthenticationMethodOverrideUnsupported": true,
   "FreshAuthentication": [
     { "Path": "/settings/payout", "Methods": ["POST", "PUT"], "MaxAge": "00:05:00" },
     { "Path": "/admin", "Prefix": true, "MaxAge": "00:15:00" }
@@ -24,9 +25,21 @@ Set `Cratis:AuthProxy:Services:<name>:FreshAuthentication` to a list of rules:
 
 `Path` is relative to the service. With `Prefix` the rule also covers every descendant path; without it only the exact path matches. An empty `Methods` list matches every method. Safe methods (`GET`, `HEAD`, `OPTIONS`, and `TRACE`) match only rules listing that method or leaving `Methods` empty. Every other method matches the union of rules declaring any non-safe method on the matching path, plus rules with an empty method list. The strictest matching `MaxAge` applies. `MaxAge` defaults to five minutes and accepts values from one second to one day. Anonymous paths are never affected.
 
+`FreshAuthenticationMethodOverrideUnsupported` is a per-service operator attestation, defaulting to `false`. Any rule with a nonempty `Methods` list requires it to be explicitly `true`; otherwise AuthProxy refuses startup with a configuration error. Rules with an empty method list cover all methods and need no attestation.
+
+### Required backend contract
+
+Only attest after enforcing that the backend and its middleware do not reinterpret HTTP methods through headers, query strings, form fields, JSON bodies, or any other tunnelling mechanism, including on safe requests. The setting does not disable backend method-override support for you. Unknown override encodings cannot be exhaustively detected at the proxy, so method-scoped rules are supported only under this backend contract.
+
 ### Security behavior
 
-A `DELETE`-only freshness rule also protects a `POST`, `PUT`, `PATCH`, or any other non-safe request to the same path, even without an explicit method override. AuthProxy does not trust the transport verb to determine what state-changing operation the backend will perform. Overrides in headers, query strings, form fields, JSON bodies, or any other encoding cannot bypass this check. Safe requests are not included in the non-safe union: a `GET` remains unaffected by a `DELETE`-only rule. Deployments using method-specific rules must account for this stricter behavior when upgrading.
+A `DELETE`-only freshness rule also protects a `POST`, `PUT`, `PATCH`, or any other non-safe request to the same path, even without an explicit method override. Non-safe requests use the strictest matching non-safe rule regardless of override encoding. Safe requests are not included in that union: a bodyless `GET` remains unaffected by a `DELETE`-only rule.
+
+As additional defense in depth, AuthProxy refuses `GET` and `HEAD` requests with body-capable framing on any freshness-protected path, regardless of the rule's methods or the session's age. This checks positive content length, transfer encoding and the server's body-detection feature without reading or buffering the body. Interactive requests receive `400` with `Cache-Control: no-store`; bearer routes retain their uniform `404` refusal. Bodyless reads remain available. Existing override-header and query-key refusals remain in place; these checks do not replace the required backend contract.
+
+### Migration
+
+Deployments with any method-scoped rules now fail startup until each affected service sets `FreshAuthenticationMethodOverrideUnsupported` to `true`. First inspect and enforce the backend contract above; do not attest merely to unblock startup. If the backend cannot prohibit method tunnelling, remove `Methods` from every freshness rule so freshness applies across all verbs, including reads. Services whose rules already cover all methods need no attestation or configuration change.
 
 ## What a caller sees
 

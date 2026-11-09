@@ -53,6 +53,13 @@ public partial class FreshAuthenticationMiddleware(RequestDelegate next, IOption
             Forbid(context);
             return;
         }
+        if (FreshAuthenticationPolicy.RefusesSafeBody(context.Request, service.Service, canonical))
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            context.Response.ContentLength = 0;
+            return;
+        }
         var maxAge = FreshAuthenticationPolicy.MaxAge(service.Service, canonical, context.Request.Method);
         if (maxAge is null)
         {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.ReverseProxy;
+using Microsoft.AspNetCore.Http.Features;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Authorization;
@@ -42,7 +43,18 @@ internal static class FreshAuthenticationPolicy
         service.FreshAuthentication is { Count: > 0 } &&
         (ForwardingPathPolicy.HasMethodOverride(request) ||
          !TryNormalizeRequest(request, request.Path, out var path) ||
+         RefusesSafeBody(request, service, path) ||
          MaxAge(service, path, request.Method) is not null);
+
+    /// <summary>Refuses GET or HEAD bodies on rule-matching paths without consuming the request body.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="service">The selected service.</param>
+    /// <param name="path">The canonical service-local path.</param>
+    /// <returns>Whether request framing allows a body on a protected read path.</returns>
+    internal static bool RefusesSafeBody(HttpRequest request, C.Service service, string path) =>
+        (HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method)) &&
+        HasBodyFraming(request) &&
+        (service.FreshAuthentication ?? []).Any(rule => TryNormalize(rule, out var declared, out _) && MatchesPath(rule, declared, path));
 
     /// <summary>Finds the strictest matching rule, pooling non-safe methods so backend overrides cannot bypass freshness.</summary>
     /// <param name="service">The selected service.</param>
@@ -59,15 +71,22 @@ internal static class FreshAuthenticationPolicy
                 continue;
             }
             if (MatchesMethod(methods, method)
-                && (declared == "/" || (rule.Prefix
-                    ? new PathString(path).StartsWithSegments(declared, StringComparison.OrdinalIgnoreCase)
-                    : string.Equals(path, declared, StringComparison.OrdinalIgnoreCase))))
+                && MatchesPath(rule, declared, path))
             {
                 result = result is null || rule.MaxAge < result ? rule.MaxAge : result;
             }
         }
         return result;
     }
+
+    static bool HasBodyFraming(HttpRequest request) =>
+        request.HttpContext.Features.Get<IHttpRequestBodyDetectionFeature>()?.CanHaveBody == true ||
+        request.ContentLength > 0 || request.Headers.ContainsKey("Transfer-Encoding");
+
+    static bool MatchesPath(C.FreshAuthenticationRule rule, string declared, string path) =>
+        declared == "/" || (rule.Prefix
+            ? new PathString(path).StartsWithSegments(declared, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(path, declared, StringComparison.OrdinalIgnoreCase));
 
     static bool MatchesMethod(string[] methods, string method) =>
         methods.Length == 0 || (IsSafe(method)

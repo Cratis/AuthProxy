@@ -15,6 +15,11 @@ public class FreshAuthenticationConfigurationValidator : IValidateOptions<C.Auth
         var failures = new List<string>();
         foreach (var (serviceName, service) in options.Services)
         {
+            if (!service.FreshAuthenticationMethodOverrideUnsupported
+                && service.FreshAuthentication?.Any(rule => rule?.Methods is { Count: > 0 }) == true)
+            {
+                failures.Add($"Service '{serviceName}' uses method-scoped fresh-authentication rules and must set FreshAuthenticationMethodOverrideUnsupported to true only when the backend does not support method overrides.");
+            }
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var rule in service.FreshAuthentication ?? [])
             {

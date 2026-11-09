@@ -137,6 +137,21 @@ public class when_checking_freshness : Specification
     }
 
     [Theory]
+    [InlineData("GET")]
+    [InlineData("HEAD")]
+    public async Task should_refuse_a_safe_body_even_when_the_session_is_fresh(string method)
+    {
+        var (context, middleware, next) = Create(0, methods: ["DELETE"]);
+        context.Request.Method = method;
+        context.Request.ContentLength = 4;
+        await middleware.InvokeAsync(context);
+        next.Called.ShouldBeFalse();
+        context.Response.StatusCode.ShouldEqual(StatusCodes.Status400BadRequest);
+        context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");
+        context.Response.Body.Length.ShouldEqual(0);
+    }
+
+    [Theory]
     [InlineData("unconfigured", "/main/approve")]
     [InlineData("", "/other/approve")]
     public async Task should_not_reject_overrides_for_a_service_without_freshness_rules(string kind, string path)
@@ -163,7 +178,7 @@ public class when_checking_freshness : Specification
 
     (DefaultHttpContext Context, FreshAuthenticationMiddleware Middleware, Invocation Next) Create(int age, string kind = "", string[]? methods = null)
     {
-        var service = new C.Service { Backend = new() { BaseUrl = "http://main" }, PathPrefix = "/main", StripPathPrefix = true, FreshAuthentication = [new() { Path = "/approve", Methods = methods ?? [] }] };
+        var service = new C.Service { Backend = new() { BaseUrl = "http://main" }, PathPrefix = "/main", StripPathPrefix = true, FreshAuthenticationMethodOverrideUnsupported = true, FreshAuthentication = [new() { Path = "/approve", Methods = methods ?? [] }] };
         if (kind == "unconfigured") service.FreshAuthentication = null;
         if (kind == "anonymous") service.AnonymousPaths = ["/main/approve"];
         var config = new C.AuthProxy { Services = new Dictionary<string, C.Service> { ["main"] = service, ["other"] = new() { Backend = new() { BaseUrl = "http://other" }, PathPrefix = "/other", StripPathPrefix = true } } };
