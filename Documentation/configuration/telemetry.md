@@ -5,7 +5,8 @@ description: "AuthProxy emits OpenTelemetry traces and metrics about sign-ins, i
 
 # Telemetry
 
-AuthProxy emits OpenTelemetry **traces** and **metrics** under the instrumentation scope `Cratis.AuthProxy`.
+AuthProxy emits OpenTelemetry **traces** and **metrics** under the instrumentation scope `Cratis.AuthProxy`,
+and exports redacted **logs** through the shared setup.
 It is off until you point it somewhere: with no `OTEL_*` variable set nothing is exported and the proxy
 behaves exactly as before.
 
@@ -18,7 +19,7 @@ apply and need no AuthProxy-specific configuration.
 
 | Variable | Effect |
 |----------|--------|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Where to send traces and metrics over OTLP. Unset means nothing is exported. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Where to send traces, metrics and logs over OTLP. Unset means nothing is exported. |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Headers for the exporter, such as an API key. |
 | `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` or `http/protobuf`. |
 | `OTEL_SERVICE_NAME` | The `service.name` of the proxy. Defaults to `cratis-authproxy`. |
@@ -75,10 +76,18 @@ requests, so AuthProxy redacts what it records before any exporter sees it:
 | Where | Redacted |
 |-------|----------|
 | Incoming request spans | The query string is never recorded, so a sign-in callback's `code` and `state` never appear. A path under `/invite` is recorded as `/invite/{token}`. The host (`server.address`, which is the tenant under subdomain tenancy) and the full URL are never recorded. |
-| Outgoing request spans | The URL, its path and its query are never recorded, so the tenant in a tenant-verification URL and any forwarded path never appear. |
-| Exceptions | Exceptions are not recorded on spans. |
-| Exported logs | Log scopes are not exported, because the hosting scope of a request carries its path. The hosting, routing, Kestrel, reverse proxy and HTTP client loggers, which write request paths, queries and outgoing URLs, are not exported below `Warning`. Console logging is unchanged. |
-| HTTP client metrics | The host the proxy called (`server.address`, `dns.question.name`) is not a metric attribute, because it can carry a tenant. |
+| Outgoing request spans | Full URLs (`url.full`, `http.url`), paths, queries and destination hosts (`server.address`, `http.host`, `net.peer.name`, `network.peer.address`, `dns.question.name`) and destination ports are removed, including on failed calls. |
+| Exceptions | `exception.*` span and event attributes and status descriptions are removed on every activity. Exception events, including native .NET HTTP client events, retain only their name and timestamp, not their payload. Span error status is kept. |
+| Exported logs | Only metadata is exported: timestamp, severity, category, event ID and trace correlation. Every body and formatted message becomes `Log details redacted`; structured attributes, exceptions and scopes are excluded, at all log levels. This includes tenant-verification failures, bearer tenant refusals and Debug identity-endpoint URLs. The hosting, routing, Kestrel, reverse proxy and HTTP client loggers are still excluded below `Warning`. Local console messages retain their original details. |
+| HTTP client metrics | Only `http.request.method`, `http.response.status_code`, `error.type`, `network.protocol.version`, `url.scheme` and `http.connection.state` are retained. The host the proxy called (`server.address`, `dns.question.name`) is not a metric attribute, because it can carry a tenant. |
+
+Sanitization runs on completed activities before exporter queuing, not just during HTTP enrichment.
+If path redaction throws, all span attributes are discarded; the span and its error status can still be
+exported. Incoming `url.full` and `http.url` are explicitly removed. Standard HTTP method, response status,
+timing and trace correlation remain available when redaction succeeds. Log event IDs and categories help
+locate the original console diagnostics; exported logs deliberately do not include their detailed messages.
+Resource attributes supplied through `OTEL_RESOURCE_ATTRIBUTES` are operator-controlled and are not sanitized;
+do not put credentials or tenant identifiers in them.
 
 The path of any other incoming request is recorded as it arrived. Paths that your application's own routes
 use to carry a secret are your application's to keep out of its URLs; to hide them, drop the request spans
