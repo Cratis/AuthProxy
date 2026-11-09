@@ -216,7 +216,23 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             }
         }
 
+        routes.AddRange(IdentityEndpointRoutes(routes).ToArray());
         return routes;
+    }
+
+    static IEnumerable<RouteConfig> IdentityEndpointRoutes(IEnumerable<RouteConfig> routes)
+    {
+        foreach (var route in routes.Where(route => route.Match.Path == "/{**catch-all}"))
+        {
+            var metadata = route.Metadata?.ToDictionary(item => item.Key, item => item.Value) ?? [];
+            metadata[ReservedProxyPathMiddleware.IdentityEndpointMetadataKey] = bool.TrueString;
+            yield return route with
+            {
+                RouteId = $"{route.RouteId}-identity",
+                Match = route.Match with { Path = WellKnownPaths.IdentityDetails },
+                Metadata = metadata,
+            };
+        }
     }
 
     /// <summary>

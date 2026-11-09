@@ -11,6 +11,19 @@ AuthProxy supports three authentication modes that can be active simultaneously:
 - **Machine-to-machine / API** – JWT Bearer tokens from an external identity provider.
 - **Back-channel client credentials** – service-owned client credentials verified by the target service itself.
 
+On protected routes, send one authentication type per request: a bearer token or the
+AuthProxy session cookie, not both. AuthProxy selects authentication once for the request.
+An invalid or expired presented token or session returns `401`; authentication does not
+fall back to another type. A bearer token accompanied by the session cookie also returns
+`401`, including on bearer routes. Clients using bearer authentication should omit the
+AuthProxy session cookie. Failed session cookies are expired in the `401` response, including host-only
+cookies. Local logout (`/.cratis/logout`), login selection, and provider sign-in remain reachable so the
+browser can clear or replace its session. These recovery exceptions apply only to matched local login
+and logout endpoints. Unmatched AuthProxy-reserved `/.cratis/` paths are not forwarded to services;
+`/.cratis/me` retains its explicitly matched, authenticated service identity route.
+Declared anonymous routes keep their existing behavior.
+See the [browser migration guidance](../upgrading/selected-tenant-and-upstream-headers.md#authentication-selection-behavior-change).
+
 ---
 
 ## OIDC providers

@@ -73,6 +73,7 @@ public static class ReverseProxyExtensions
     {
         app.MapReverseProxy(proxy =>
         {
+            proxy.UseMiddleware<ReservedProxyPathMiddleware>();
             proxy.UseMiddleware<UpstreamErrorMiddleware>();
             proxy.UseMiddleware<ForwardingPathMiddleware>();
             proxy.UseMiddleware<AccessTokenForwardingMiddleware>();

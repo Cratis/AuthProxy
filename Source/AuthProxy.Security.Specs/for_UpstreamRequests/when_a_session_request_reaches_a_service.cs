@@ -16,7 +16,9 @@ public class when_a_session_request_reaches_a_service(UpstreamRequestsHarness ha
     {
         using var client = harness.CreateSecurityClient();
         harness.ClearOrigins();
-        await client.SendAsync(UpstreamRequestsHarness.Request(UpstreamRequestsHarness.DefaultHost, "/api/orders", true));
+        using var request = UpstreamRequestsHarness.Request(UpstreamRequestsHarness.DefaultHost, "/api/orders", true);
+        request.Headers.Remove("Authorization");
+        await client.SendAsync(request);
         _received = harness.Default.LastRequestTo("/api/orders");
     }
 

@@ -234,7 +234,10 @@ public static class IngressExtensions
         // Right after authentication so it can tell a session cookie that failed to become a ticket from an
         // absent one. It does nothing for a deployment that configures neither a cookie domain nor a name.
         app.UseMiddleware<SessionCookieHealingMiddleware>();
-        app.UseMiddleware<LogoutMiddleware>();
+        app.UseWhen(
+            context => context.GetEndpoint()?.Metadata.GetMetadata<LocalAuthenticationEndpoint>()?.IsLogout == true,
+            logout => logout.UseMiddleware<LogoutMiddleware>());
+        app.UseMiddleware<RequestAuthenticationMiddleware>();
         app.UseMiddleware<SelectProviderMiddleware>();
         app.UseMiddleware<LinkMiddleware>();
 
@@ -313,11 +316,20 @@ public static class IngressExtensions
         // Initiates the challenge for the requested provider scheme.
         app.MapGet($"{WellKnownPaths.LoginPrefix}/{{scheme}}", (string scheme, HttpContext context, IOptionsMonitor<C.AuthProxy> proxyConfig, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
             LoginChallenge.Begin(scheme, context, proxyConfig.CurrentValue, authConfig.CurrentValue, tenantResolver, writeBody: true))
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .WithMetadata(new LocalAuthenticationEndpoint(false));
 
         app.MapMethods($"{WellKnownPaths.LoginPrefix}/{{scheme}}", [HttpMethods.Head], (string scheme, HttpContext context, IOptionsMonitor<C.AuthProxy> proxyConfig, IOptionsMonitor<C.Authentication> authConfig, ITenantResolver tenantResolver) =>
             LoginChallenge.Begin(scheme, context, proxyConfig.CurrentValue, authConfig.CurrentValue, tenantResolver, writeBody: false))
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .WithMetadata(new LocalAuthenticationEndpoint(false));
+
+        app.Map(WellKnownPaths.Logout, HandleLogout)
+            .AllowAnonymous()
+            .WithMetadata(new LocalAuthenticationEndpoint(true));
+        app.Map(WellKnownPaths.LogoutCallback, HandleLogout)
+            .AllowAnonymous()
+            .WithMetadata(new LocalAuthenticationEndpoint(true));
 
         // Serves the bundled React login-selection SPA. Like every sign-in selection surface it refuses
         // to render framed — a framed login is clickjacking bait.
@@ -329,8 +341,12 @@ public static class IngressExtensions
             context.Response.ContentType = "text/html";
             await context.Response.SendFileAsync(indexHtmlPath);
         })
-        .AllowAnonymous();
+        .AllowAnonymous()
+        .WithMetadata(new LocalAuthenticationEndpoint(false));
     }
+
+    static Task HandleLogout(HttpContext context) => ActivatorUtilities.CreateInstance<LogoutMiddleware>(
+        context.RequestServices, (RequestDelegate)(_ => Task.CompletedTask)).InvokeAsync(context);
 
     static void MapTokenEndpoint(this WebApplication app)
     {
