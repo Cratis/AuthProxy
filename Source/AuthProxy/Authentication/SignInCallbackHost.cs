@@ -90,6 +90,7 @@ public static class SignInCallbackHost
             [BouncedQueryKey] = "1"
         };
 
+        FreshAuthenticationChallenge.Preserve(context, query);
         location = QueryHelpers.AddQueryString($"{context.Request.Scheme}://{host.Value}{WellKnownPaths.LoginPrefix}/{scheme}", query);
         return true;
     }

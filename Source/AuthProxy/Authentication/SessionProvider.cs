@@ -54,7 +54,7 @@ internal static class SessionProvider
     /// <returns><see langword="true"/> when the scheme is recorded; otherwise <see langword="false"/>.</returns>
     internal static bool TryRead(ClaimsPrincipal principal, AuthenticationProperties? properties, out string scheme)
     {
-        var claims = principal.Claims.Where(_ => SessionClaims.IsReserved(_.Type)).ToArray();
+        var claims = principal.Claims.Where(_ => _.Type.StartsWith("urn:cratis:session:provider", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (claims.Length == 1
             && IsWellFormed(claims[0])
             && properties is not null

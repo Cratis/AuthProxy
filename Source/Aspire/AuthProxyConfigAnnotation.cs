@@ -33,6 +33,9 @@ sealed class AuthProxyConfigAnnotation : IResourceAnnotation
     /// </summary>
     public Dictionary<string, int> AnonymousPathCounts { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>Gets the next fresh-authentication rule index for each service.</summary>
+    public Dictionary<string, int> FreshAuthenticationCounts { get; } = new(StringComparer.Ordinal);
+
     /// <summary>
     /// Gets the number of hosts registered per service key, so that repeated calls append rather than
     /// overwrite the indices an earlier call already wrote.

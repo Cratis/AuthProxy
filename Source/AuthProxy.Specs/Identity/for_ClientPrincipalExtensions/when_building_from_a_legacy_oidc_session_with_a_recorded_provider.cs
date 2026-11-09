@@ -23,8 +23,10 @@ public class when_building_from_a_legacy_oidc_session_with_a_recorded_provider :
             RequestServices = new ServiceCollection().BuildServiceProvider(),
             User = principal
         };
+        var properties = new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" });
+        SessionAuthenticationTime.Stamp(principal, properties, DateTimeOffset.FromUnixTimeSeconds(1700000000));
         context.Features.Set<IAuthenticateResultFeature>(new TestAuthenticateResultFeature(
-            AuthenticateResult.Success(new AuthenticationTicket(principal, new AuthenticationProperties(new Dictionary<string, string?> { [SessionProvider.MarkerStateKey] = "microsoft" }), CookieAuthenticationDefaults.AuthenticationScheme))));
+            AuthenticateResult.Success(new AuthenticationTicket(principal, properties, CookieAuthenticationDefaults.AuthenticationScheme))));
         _context = context;
     }
 
