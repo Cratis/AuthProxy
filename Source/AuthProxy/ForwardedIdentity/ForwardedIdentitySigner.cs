@@ -11,8 +11,10 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <param name="config">The current gateway configuration.</param>
 /// <param name="time">The issuance clock.</param>
 /// <param name="logger">The redacted signing logger.</param>
-public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config, TimeProvider time, ILogger<ForwardedIdentitySigner> logger) : IForwardedIdentitySigner
+public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config, TimeProvider time, ILogger<ForwardedIdentitySigner> logger) : IForwardedIdentitySigner, IDisposable
 {
+    readonly ForwardedIdentityV2SigningKeyCache _v2Keys = new(config);
+
     /// <inheritdoc/>
     public ForwardedIdentitySigningOutcome Sign(HttpRequestMessage request, ForwardedIdentitySigningTarget target)
     {
@@ -46,9 +48,12 @@ public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config,
         }
     }
 
+    /// <inheritdoc/>
+    public void Dispose() => _v2Keys.Dispose();
+
     ForwardedIdentitySigningOutcome SignV2(HttpRequestMessage request, ForwardedIdentitySigningTarget target, C.ForwardedIdentitySigning settings)
     {
-        if (!ForwardedIdentitySigningKey.TryCreate(settings, out var key, out _))
+        if (!ForwardedIdentityV2SigningKey.IsValidSettings(settings))
         {
             logger.ConfigurationRefused(target.Flow, target.ServiceName);
             return ForwardedIdentitySigningOutcome.Refused;
@@ -59,18 +64,23 @@ public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config,
             var nonce = ForwardedIdentityV2Envelope.Encode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
             if (!request.Options.TryGetValue(ForwardedIdentityTrustedContext.OptionsKey, out var context)
                 || context is null || !ForwardedIdentityV2ContextHeaders.TryApply(request, context)
-                || !ForwardedIdentityV2CanonicalInput.TryCreate(request, context, key!.Audience, key.KeyId, timestamp, nonce, out var canonical))
+                || !ForwardedIdentityV2CanonicalInput.TryCreate(request, context, settings.Audience, settings.KeyId, timestamp, nonce, out var canonical))
             {
-                logger.SigningFailed(target.Flow, target.ServiceName, key!.KeyId);
+                logger.SigningFailed(target.Flow, target.ServiceName, settings.KeyId);
                 return ForwardedIdentitySigningOutcome.Refused;
             }
-            request.Headers.TryAddWithoutValidation(Headers.ForwardedIdentitySignature, ForwardedIdentityV2Envelope.Sign(key.Secret.ToArray(), key.KeyId, timestamp, nonce, canonical));
-            logger.Signed(target.Flow, target.ServiceName, key.KeyId);
+            if (!_v2Keys.TrySign(settings, timestamp, nonce, canonical, out var proof))
+            {
+                logger.ConfigurationRefused(target.Flow, target.ServiceName);
+                return ForwardedIdentitySigningOutcome.Refused;
+            }
+            request.Headers.TryAddWithoutValidation(Headers.ForwardedIdentitySignature, proof);
+            logger.Signed(target.Flow, target.ServiceName, settings.KeyId);
             return ForwardedIdentitySigningOutcome.SignatureCreated;
         }
         catch (Exception)
         {
-            logger.SigningFailed(target.Flow, target.ServiceName, key!.KeyId);
+            logger.SigningFailed(target.Flow, target.ServiceName, settings.KeyId);
             return ForwardedIdentitySigningOutcome.Refused;
         }
     }

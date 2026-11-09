@@ -94,12 +94,12 @@ public class when_signing_with_explicit_trusted_context : Specification
         return new() { Version = "v2", Audience = "backend", KeyId = "key-1", PrivateKeyPkcs8Base64 = Convert.ToBase64String(key.ExportPkcs8PrivateKey()) };
     }
 
-    static ForwardedIdentitySigner Signer(C.ForwardedIdentitySigning settings, ILogger<ForwardedIdentitySigner>? logger = null)
+    internal static ForwardedIdentitySigner Signer(C.ForwardedIdentitySigning settings, ILogger<ForwardedIdentitySigner>? logger = null)
     {
         var monitor = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         monitor.CurrentValue.Returns(new C.AuthProxy { Services = new Dictionary<string, C.Service> { ["app"] = new() { ForwardedIdentity = settings } } });
         return new(monitor, TimeProvider.System, logger ?? NullLogger<ForwardedIdentitySigner>.Instance);
     }
 
-    static ForwardedIdentitySigningTarget Target() => new(ForwardedIdentityFlow.ProxiedRequest, "app");
+    internal static ForwardedIdentitySigningTarget Target() => new(ForwardedIdentityFlow.ProxiedRequest, "app");
 }

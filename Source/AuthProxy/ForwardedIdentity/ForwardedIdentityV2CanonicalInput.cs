@@ -24,13 +24,15 @@ public static class ForwardedIdentityV2CanonicalInput
     public static bool TryCreate(HttpRequestMessage request, ForwardedIdentityTrustedContext context, string audience, string keyId, string timestamp, string nonce, out byte[] canonical)
     {
         canonical = [];
-        if (request.RequestUri is not { IsAbsoluteUri: true } uri || !ForwardedIdentityV2ContextHeaders.Matches(request, context)) return false;
-        var headers = request.Headers.NonValidated.Select(header => new KeyValuePair<string, IEnumerable<string>>(header.Key, header.Value));
-        if (request.Content is not null)
+        if (request.RequestUri is not { IsAbsoluteUri: true } uri) return false;
+        if (!string.IsNullOrEmpty(uri.Fragment)
+            || !TryCreate(request.Method.Method, uri.PathAndQuery, Snapshot(request), audience, keyId, timestamp, nonce, context.TenantHeader, out var bytes)
+            || !ForwardedIdentityV2ContextHeaders.Matches(request, context))
         {
-            headers = headers.Concat(request.Content.Headers.NonValidated.Select(header => new KeyValuePair<string, IEnumerable<string>>(header.Key, header.Value)));
+            return false;
         }
-        return string.IsNullOrEmpty(uri.Fragment) && TryCreate(request.Method.Method, uri.PathAndQuery, headers, audience, keyId, timestamp, nonce, context.TenantHeader, out canonical);
+        canonical = bytes;
+        return true;
     }
 
     /// <summary>Frames the raw covered snapshot, also used by byte-exact conformance tests.</summary>
@@ -55,16 +57,7 @@ public static class ForwardedIdentityV2CanonicalInput
             return false;
         }
 
-        var snapshot = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var header in headers)
-        {
-            if (!IsCovered(header.Key, tenantHeader)) continue;
-            var values = header.Value.ToArray();
-            if (!IsToken(header.Key) || values.Length != 1) return false;
-            var value = values[0].Trim(' ', '\t');
-            if (value.Any(character => character < 32 || character > 126) || !snapshot.TryAdd(header.Key.ToLowerInvariant(), value)) return false;
-        }
-        if (snapshot.Count > 64) return false;
+        if (!TrySnapshot(headers, tenantHeader, out var snapshot)) return false;
         foreach (var required in new[] { Headers.Principal, Headers.PrincipalId, Headers.PrincipalName })
         {
             if (!snapshot.TryGetValue(required, out var value) || value.Length == 0) return false;
@@ -80,6 +73,38 @@ public static class ForwardedIdentityV2CanonicalInput
         canonical = Encoding.UTF8.GetBytes(input.ToString());
         return canonical.Length <= 32768;
     }
+
+    /// <summary>Checks covered name count and framed byte bounds before any principal or metadata decoding.</summary>
+    /// <param name="request">The complete outbound request.</param>
+    /// <param name="tenantHeader">The configured receiver tenancy header.</param>
+    /// <returns>Whether the covered snapshot is structurally bounded.</returns>
+    internal static bool HasBoundedSnapshot(HttpRequestMessage request, string tenantHeader) => TrySnapshot(Snapshot(request), tenantHeader, out _);
+
+    static IEnumerable<KeyValuePair<string, IEnumerable<string>>> Snapshot(HttpRequestMessage request)
+    {
+        var headers = request.Headers.NonValidated.Select(header => new KeyValuePair<string, IEnumerable<string>>(header.Key, header.Value));
+        return request.Content is null ? headers : headers.Concat(request.Content.Headers.NonValidated.Select(header => new KeyValuePair<string, IEnumerable<string>>(header.Key, header.Value)));
+    }
+
+    static bool TrySnapshot(IEnumerable<KeyValuePair<string, IEnumerable<string>>> headers, string tenantHeader, out SortedDictionary<string, string> snapshot)
+    {
+        snapshot = new(StringComparer.Ordinal);
+        var bytes = 0;
+        foreach (var header in headers)
+        {
+            if (!IsCovered(header.Key, tenantHeader)) continue;
+            var values = header.Value.Take(2).ToArray();
+            if (header.Key.Length > 32768 || !IsToken(header.Key) || values.Length != 1) return false;
+            var value = values[0].Trim(' ', '\t');
+            if (value.Length > 32768 || value.Any(character => character < 32 || character > 126) || !snapshot.TryAdd(header.Key.ToLowerInvariant(), value)) return false;
+            if (snapshot.Count > 64) return false;
+            bytes += FramedSize(header.Key.Length) + FramedSize(value.Length);
+            if (bytes > 32768) return false;
+        }
+        return true;
+    }
+
+    static int FramedSize(int length) => length + length.ToString(CultureInfo.InvariantCulture).Length + 2;
 
     static void Frame(StringBuilder input, string value) => input.Append(Encoding.UTF8.GetByteCount(value).ToString(CultureInfo.InvariantCulture)).Append(':').Append(value).Append('\n');
 

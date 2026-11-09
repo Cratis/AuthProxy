@@ -9,10 +9,10 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <summary>Represents validated v1 signing material.</summary>
 /// <param name="Audience">The receiving audience.</param>
 /// <param name="KeyId">The public key identifier.</param>
-/// <param name="Secret">The 32-byte shared secret.</param>
+/// <param name="Secret">The v1 shared secret, or a v2 public-key fingerprint used only for reuse detection.</param>
 public sealed record ForwardedIdentitySigningKey(string Audience, string KeyId, ReadOnlyMemory<byte> Secret)
 {
-    /// <summary>Gets the pinned wire version; the key bytes hold PKCS#8 private material for v2.</summary>
+    /// <summary>Gets the pinned wire version; v2 retains only a public-key fingerprint, not private material.</summary>
     public string Version { get; init; } = "v1";
 
     /// <summary>Validates signing settings without exposing secret material in diagnostics.</summary>

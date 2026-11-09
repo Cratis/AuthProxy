@@ -23,7 +23,21 @@ public static class ForwardedIdentityV2Envelope
         if (!ForwardedIdentitySigningKey.IsValidKeyId(keyId) || !IsTimestamp(timestamp) || !IsBase64Url(nonce, 16)) throw new ArgumentException("Invalid v2 envelope fields.");
         using var signer = ECDsa.Create();
         signer.ImportPkcs8PrivateKey(privateKey, out var read);
-        if (read != privateKey.Length || signer.ExportParameters(false).Curve.Oid.Value != "1.2.840.10045.3.1.7") throw new CryptographicException("A P-256 private key is required.");
+        if (read != privateKey.Length || !ForwardedIdentityV2SigningKey.IsP256(signer.ExportParameters(false).Curve.Oid)) throw new CryptographicException("A P-256 private key is required.");
+        return Sign(signer, keyId, timestamp, nonce, canonical);
+    }
+
+    /// <summary>Signs using an owned, already validated P-256 handle.</summary>
+    /// <param name="signer">The caller-synchronized P-256 signing handle.</param>
+    /// <param name="keyId">The configured key identifier.</param>
+    /// <param name="timestamp">The issuance timestamp.</param>
+    /// <param name="nonce">The fresh 16-byte nonce.</param>
+    /// <param name="canonical">The bounded canonical bytes.</param>
+    /// <returns>The v2 envelope.</returns>
+    /// <exception cref="ArgumentException">The envelope fields are invalid.</exception>
+    internal static string Sign(ECDsa signer, string keyId, string timestamp, string nonce, byte[] canonical)
+    {
+        if (!ForwardedIdentitySigningKey.IsValidKeyId(keyId) || !IsTimestamp(timestamp) || !IsBase64Url(nonce, 16)) throw new ArgumentException("Invalid v2 envelope fields.");
         var signature = signer.SignData(canonical, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
         return $"v2.{keyId}.{timestamp}.{nonce}.{Encode(signature)}";
     }

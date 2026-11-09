@@ -31,7 +31,11 @@ internal static partial class ForwardedIdentityV2ContextHeaders
     /// <returns>Whether verified context could be applied.</returns>
     internal static bool TryApply(HttpRequestMessage request, ForwardedIdentityTrustedContext context)
     {
-        if (!TryHeaders(context, out var headers) || !PrincipalMatches(request, context) || !BearerMatches(request, context)) return false;
+        if (!ForwardedIdentityV2CanonicalInput.HasBoundedSnapshot(request, context.TenantHeader)
+            || !TryHeaders(context, out var headers) || !PrincipalMatches(request, context) || !BearerMatches(request, context))
+        {
+            return false;
+        }
         foreach (var name in Names) request.Headers.Remove(name);
         foreach (var header in headers) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
         return true;
@@ -43,7 +47,11 @@ internal static partial class ForwardedIdentityV2ContextHeaders
     /// <returns>Whether all context and identity bindings agree.</returns>
     internal static bool Matches(HttpRequestMessage request, ForwardedIdentityTrustedContext context)
     {
-        if (!TryHeaders(context, out var expected) || !PrincipalMatches(request, context) || !BearerMatches(request, context)) return false;
+        if (!ForwardedIdentityV2CanonicalInput.HasBoundedSnapshot(request, context.TenantHeader)
+            || !TryHeaders(context, out var expected) || !PrincipalMatches(request, context) || !BearerMatches(request, context))
+        {
+            return false;
+        }
         foreach (var name in Names)
         {
             var present = request.Headers.NonValidated.TryGetValues(name, out var values);
@@ -84,7 +92,7 @@ internal static partial class ForwardedIdentityV2ContextHeaders
         {
             if (context.Person is not { } person || !SubjectPattern.IsMatch(person.Subject)
                 || person.Issuer != context.TrustedRealmIssuer || !Uri.TryCreate(person.Issuer, UriKind.Absolute, out var issuer) || issuer.Scheme != Uri.UriSchemeHttps
-                || string.IsNullOrEmpty(person.IdentityProvider) || string.IsNullOrEmpty(person.AuthenticationContext) || !NumericDate(person.AuthenticationTime))
+                || string.IsNullOrEmpty(person.IdentityProvider) || person.AuthenticationContext != "basic" || !NumericDate(person.AuthenticationTime))
             {
                 return false;
             }
