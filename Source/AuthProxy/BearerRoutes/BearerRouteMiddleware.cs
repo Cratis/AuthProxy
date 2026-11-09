@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
@@ -108,6 +109,12 @@ public class BearerRouteMiddleware(
 
     async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
+        if (RequestAuthentication.HasBearer(context.Request) && RequestAuthentication.HasSession(context))
+        {
+            BearerChallenge.Unauthorized(context, resourceMetadataUrl: null, "invalid_token");
+            return;
+        }
+
         var validation = await validator.Validate(context.Request, route, context.RequestAborted);
         if (!validation.Succeeded)
         {

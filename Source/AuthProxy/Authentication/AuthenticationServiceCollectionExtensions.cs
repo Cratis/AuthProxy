@@ -129,6 +129,11 @@ public static class AuthenticationServiceCollectionExtensions
 
     static string ResolveAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
+        if (context.Items.TryGetValue(SelectedSchemeItemKey, out var selected) && selected is string selectedScheme)
+        {
+            return selectedScheme;
+        }
+
         var scheme = SelectAuthenticationScheme(context, hasJwtBearer);
         context.Items[SelectedSchemeItemKey] = scheme;
         return scheme;
@@ -137,9 +142,11 @@ public static class AuthenticationServiceCollectionExtensions
     static string SelectAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
         var authorization = context.Request.Headers.Authorization.ToString();
-        if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        if (RequestAuthentication.HasBearer(context.Request))
         {
-            var token = authorization["Bearer ".Length..].Trim();
+            var token = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                ? authorization["Bearer ".Length..].Trim()
+                : string.Empty;
             var tokenProtector = context.RequestServices.GetRequiredService<ClientCredentialsTokenProtector>();
             if (tokenProtector.TryValidate(token, out var payload))
             {
@@ -147,10 +154,9 @@ public static class AuthenticationServiceCollectionExtensions
                 return ClientCredentialsDefaults.AuthenticationScheme;
             }
 
-            if (hasJwtBearer)
-            {
-                return JwtBearerDefaults.AuthenticationScheme;
-            }
+            return hasJwtBearer
+                ? JwtBearerDefaults.AuthenticationScheme
+                : ClientCredentialsDefaults.AuthenticationScheme;
         }
 
         return CookieAuthenticationDefaults.AuthenticationScheme;

@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// unchanged by every refresh token, so refreshing never extends it. Access tokens never outlive it either.
 /// </remarks>
 /// <param name="dataProtectionProvider">Creates the data protector used for AuthProxy-issued bearer tokens.</param>
-/// <param name="timeProvider">The clock used for refresh token expiry.</param>
+/// <param name="timeProvider">The clock used for token expiry.</param>
 public class ClientCredentialsTokenProtector(
     IDataProtectionProvider dataProtectionProvider,
     TimeProvider timeProvider)
@@ -140,11 +140,17 @@ public class ClientCredentialsTokenProtector(
             new ClientCredentialsTokenPayload(service.Name, service.RoutePrefix, clientId, tenant),
             _serializerOptions);
 
-    static bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload)
+    bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload)
     {
         try
         {
-            var protectedPayload = protector.Unprotect(token);
+            var protectedPayload = protector.Unprotect(token, out var expiresAt);
+            if (timeProvider.GetUtcNow() >= expiresAt)
+            {
+                payload = default!;
+                return false;
+            }
+
             var deserialized = JsonSerializer.Deserialize<ClientCredentialsTokenPayload>(protectedPayload, _serializerOptions);
             if (deserialized is null)
             {

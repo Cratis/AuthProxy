@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Cratis.Specifications.XUnit.v3" />
     <PackageReference Include="xunit.v3.mtp-off" />
     <PackageReference Include="coverlet.collector">
