@@ -421,7 +421,7 @@ public static class AuthenticationServiceCollectionExtensions
                     context.HandleResponse();
                     return;
                 }
-                await VerifiedUpstreamClaims.Capture(context, scheme);
+                await VerifiedUpstreamClaims.Capture(context, scheme, CratisIdentityProfile.AppliesTo(provider));
             },
             OnTokenResponseReceived = UserTokenSessions.Capture,
             OnAuthorizationCodeReceived = context => provider.UsesClientAssertion
@@ -525,9 +525,7 @@ public static class AuthenticationServiceCollectionExtensions
 
                 await EnrichProviderClaims(ctx, provider);
 
-                if (provider.CanonicalIdentity is not null
-                    && !string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)
-                    && InvitationAuthenticationState.IsBound(ctx.Properties))
+                if (ShouldFetchVerifiedOAuthEmail(provider, ctx.Properties))
                 {
                     await AddVerifiedOAuthEmail(ctx, provider);
                 }
@@ -676,6 +674,7 @@ public static class AuthenticationServiceCollectionExtensions
         // canonical identity is named by the provider it signed in with.
         SessionProvider.Stamp(context.Principal!, context.Properties, context.Scheme.Name);
         FreshAuthenticationChallenge.Stamp(context.Principal!, context.Properties!, oidc);
+        BrowserSessionEvidence.Stamp(context.HttpContext, context.Principal!, context.Properties!, oidc ? context.Scheme.Name : null);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);
@@ -694,9 +693,9 @@ public static class AuthenticationServiceCollectionExtensions
             return;
         }
 
-        if (inviteCompletion != InviteCallbackCompletionResult.CompletedWithRedirect
-            && context.Properties is not null
-            && TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
+        if (inviteCompletion == InviteCallbackCompletionResult.CompletedWithRedirect) return;
+        if (context.Properties is null) return;
+        if (TenantAuthenticationState.TryResolvePostAuthenticationRedirectUri(
                 context.HttpContext,
                 context.Properties,
                 context.ReturnUri,
@@ -704,6 +703,13 @@ public static class AuthenticationServiceCollectionExtensions
         {
             context.ReturnUri = redirectUri;
         }
+    }
+
+    static bool ShouldFetchVerifiedOAuthEmail(C.OAuthProvider provider, AuthenticationProperties properties)
+    {
+        if (provider.CanonicalIdentity is null) return false;
+        if (string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)) return false;
+        return InvitationAuthenticationState.IsBound(properties);
     }
 
     static async Task AddVerifiedOAuthEmail(OAuthCreatingTicketContext context, C.OAuthProvider provider)

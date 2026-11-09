@@ -1,9 +1,11 @@
 ---
 title: Forwarded Identity Signing
-description: Configure AuthProxy to sign outbound forwarded identity for Arc v1 receivers, including proxy, bearer, identity-details, tenant-list and sign-in callback flows.
+description: Configure version-pinned forwarded identity signing, with v1 HMAC compatibility and opt-in v2 ES256 infrastructure.
 ---
 
 # Forwarded Identity Signing
+
+**Version selection:** `ForwardedIdentity.Version` defaults to `v1`, preserving existing behavior. Explicit `v2` selects ES256 with no negotiation, unsigned bypass, or v1 fallback. The v2 trusted-context producer supports only newly signed-in Cratis Identity browser sessions; legacy sessions and every other credential kind are refused. See [v2 infrastructure](#v2-infrastructure) before configuring it.
 
 AuthProxy can attach an HMAC-SHA256 proof to the identity headers it sends to a backend. Signing is **opt-in per flow**. An installation with no `ForwardedIdentity` blocks keeps its existing unsigned forwarding behavior.
 
@@ -112,3 +114,30 @@ A configured identity-bearing request that cannot be signed is not sent unsigned
 Startup diagnostics list each proxied, bearer, identity-details, tenant-list and sign-in callback flow as signed or not signed, with only service, audience and key ID. On-behalf calls are listed as attested, not envelope-signed. Invitation staging/exchange, link exchange and sign-in notifications have transport-only rows. Check these rows when rolling out: signing a normal request does not prove that the tenant-list flow is signed. Runtime refusals log bounded reason codes, never principal JSON, header values, secrets, canonical input, nonces or MACs.
 
 Signing is not tenant membership, authorization, a replacement for on-behalf assertions, or body integrity. Preserve TLS, backend ingress restrictions and existing authorization checks. Anyone able to verify a shared-key proof can also forge one; constrain access to each service's signing material.
+
+## V2 infrastructure
+
+V2 implements the [Arc signed-forwarded-identity v2 contract](https://github.com/Cratis/Arc/blob/de9e176d5/Documentation/backend/csharp/asp-net-core/signed-forwarded-identity-v2.md). The built-in producer supports **Cratis Identity browser sessions only**. Existing sessions must sign in again to obtain protected v2 evidence; enabling v2 does not upgrade legacy tickets. V1 remains the default. Do not switch a production flow to v2 until its credential pipeline supplies verified evidence and its receiver explicitly supports v2.
+
+For any existing per-flow `ForwardedIdentity` block:
+
+- Set `Version` to the exact string `v2`.
+- Set `Audience` to a 1–64 character lowercase slug: letters/digits separated by single hyphens, starting with a letter.
+- Set `KeyId` to 1–64 ASCII letters, digits, underscores or hyphens.
+- Supply `PrivateKeyPkcs8Base64` through the deployment's secret mechanism: strict standard-base64 PKCS#8 DER containing a P-256 private key. PEM, public-only keys, other curves, trailing bytes and whitespace are refused.
+- Set `TenantHeader` to the receiver host's tenancy header if it differs from `x-cratis-tenant-id`. The gateway strips this header and its underscore aliases inbound, then emits only its resolved tenant. Reserved identity, authentication, callback, hop-by-hop, forwarding and content headers are refused as tenancy headers, including underscore aliases. The canonical `x-cratis-tenant-id` remains valid; the legacy `Tenant-ID` alias is reserved.
+- Leave `SecretBase64` empty. V1 shared material and v2 private material must never be mixed. Existing Aspire pairing helpers remain v1-only; do not give a v2 private key to a backend or to a v1 helper.
+
+The existing HTTPS/mTLS and cross-application key/audience reuse checks apply to v2. Receivers get **only the public key**, under the matching audience and key ID. Keep old public keys during the receiver's permitted rotation window; pin one active private key on each producer flow. There is no algorithm negotiation, key discovery or receiver fallback. The producer caches one synchronized ECDsa handle per private key, disposing handles on configuration reload and shutdown. Temporary private-key import buffers are cleared; validation retains only a public-key fingerprint for reuse detection. P-256 recognition supports both its OID and reviewed platform friendly names when no OID value is available.
+
+A trusted pipeline supplies one immutable `ForwardedIdentityTrustedContext` through `HttpRequestMessage.Options` using `ForwardedIdentityTrustedContext.OptionsKey` before the final signing hop. This record is not deserialized from HTTP headers. It carries authoritative credential kind and non-secret record ID, verified sender evidence (or explicit `none`), allowlisted realm issuer, preserved person issuer/subject/identity-provider/authentication-time/strength evidence, and optional methods, actor, checked grant and policy revision. Original authentication time is never minted from refresh or proof issuance time. Only the reviewed ACR value `basic` is currently accepted; all other authentication-strength strings are refused until explicitly reviewed. Service callers omit person evidence; they are not promoted to people.
+
+At a completed sign-in, only an explicitly configured `CratisIdentity` OIDC provider can create browser evidence. The realm issuer, UUID-v4 subject, upstream `idp` and original `auth_time` must come from verified realm tokens and agree with the canonical principal and the preserved authentication time. Missing evidence is refused, independently of sign-in notification configuration. An arbitrary canonical provider is not a Cratis Identity realm. A fresh random credential ID is protected in the cookie ticket and survives sliding renewal alongside the original authentication time. Browser cookies are unbound credentials (`sender-binding: none`); assurance is conservatively `basic`.
+
+PATs, OAuth bearer grants, DPoP, on-behalf sessions, machine principals and workloads remain unsupported and fail closed, including explicit contexts of these kinds. An inbound Authorization or DPoP header alongside a cookie is also refused. No client ID, token `jti`, caller header, cookie renewal time or proof issuance timestamp can substitute for session evidence.
+
+The signer replaces all inbound v2 context headers with independently verified evidence, validates principal/account-key agreement, and covers the entire v2 allowlist plus `context.TenantHeader` (default `x-cratis-tenant-id`). Duplicate covered headers, including duplicates in content headers, are refused. The canonical input starts with `Cratis.AuthProxy.ForwardedIdentity.v2`; the envelope is `v2.keyId.timestamp.nonce.signature`, with a fresh 16-byte unpadded base64url nonce and a 64-byte IEEE P1363 ES256 signature. Query strings and bodies remain outside the signature; authenticated transport and receiver authorization remain mandatory.
+
+**Absent or incomplete trusted context returns `ForwardedIdentitySigningOutcome.Refused`, even for a request without identity headers.** The normal signed transports then stop the request. No unsigned or v1 fallback is permitted. Proxied browser requests, identity-details calls and tenant-list calls use only the selected protected cookie ticket. Sign-in callbacks carry an immutable snapshot of that evidence across queueing and retries. The snapshot expires 60 seconds after it is queued; every attempt checks that original deadline, and retries cannot extend it. A custom signer host without `IHttpContextAccessor` logs a warning on first v2 use and must supply an explicit trusted snapshot. Per-flow diagnostics include the wire version and report v2 as `browser-session-only`, not universal credential support. Receiver freshness checks, nonce stores and replay policy are receiver responsibilities; this producer does not implement them.
+
+The conformance specs vendor all 220 Arc vectors from commit `de9e176d5`. They reproduce every accepting canonical input byte-for-byte and verify generated P1363 signatures against the supplied public keys, exercise all reference outcomes with a test-only consumer, and separately refuse producer-applicable malformed snapshots and metadata. All published fixture keys are **TEST ONLY** and must never be deployed.

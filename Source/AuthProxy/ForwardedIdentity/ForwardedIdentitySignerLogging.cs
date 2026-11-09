@@ -16,4 +16,7 @@ internal static partial class ForwardedIdentitySignerLogging
 
     [LoggerMessage(3, LogLevel.Debug, "Forwarded identity for {Flow} to {Service}: signed with key {KeyId}")]
     internal static partial void Signed(this ILogger<ForwardedIdentitySigner> logger, ForwardedIdentityFlow flow, string? service, string keyId);
+
+    [LoggerMessage(4, LogLevel.Warning, "Forwarded identity v2: IHttpContextAccessor is unavailable; browser requests cannot be signed without an explicit trusted snapshot")]
+    internal static partial void MissingHttpContextAccessor(this ILogger<ForwardedIdentitySigner> logger);
 }

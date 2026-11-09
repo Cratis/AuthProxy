@@ -197,6 +197,7 @@ public static class IngressExtensions
         app.UseRouting();
         app.Use((context, next) =>
         {
+            ForwardedIdentityTenantHeader.Strip(context.Request.Headers, context.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue);
             AnonymousPaths.CaptureRouteDisposition(context);
             return next(context);
         });

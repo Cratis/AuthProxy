@@ -86,6 +86,9 @@ public class SignInCallbackSender(IHttpClientFactory httpClientFactory, IForward
         // it always does. The marker says the call is AuthProxy's own; a caller cannot send it, because AuthProxy
         // strips it from every inbound request.
         message.SetMicrosoftIdentityHeaders(principal);
+
+        // An incomplete queued snapshot must not fall back to an unrelated ambient browser request.
+        message.Options.Set(ForwardedIdentityTrustedContext.OptionsKey, request.TrustedContext ?? new(string.Empty, string.Empty, string.Empty));
         message.Headers.Add(Headers.SignInCallback, request.Kind.ToString());
 
         var service = HeaderValue.ToTransportValue(request.ServiceName);

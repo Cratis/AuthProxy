@@ -56,15 +56,16 @@ sealed class VerifiedUpstreamClaims
     /// </summary>
     /// <param name="context">The handler's validated-token context; its token endpoint response holds the access token.</param>
     /// <param name="scheme">The authentication scheme that validated the identity token.</param>
+    /// <param name="sessionEvidence">Whether the Cratis Identity session needs verified evidence independently of notifications.</param>
     /// <returns>A task that completes once the claims are recorded or discarded.</returns>
-    internal static async Task Capture(Microsoft.AspNetCore.Authentication.OpenIdConnect.TokenValidatedContext context, string scheme)
+    internal static async Task Capture(Microsoft.AspNetCore.Authentication.OpenIdConnect.TokenValidatedContext context, string scheme, bool sessionEvidence = false)
     {
         var services = context.HttpContext.RequestServices;
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("Cratis.AuthProxy.SignIns.VerifiedUpstreamClaims");
         var idToken = AsJsonWebToken(context.SecurityToken);
         JsonWebToken? accessToken = null;
         if (idToken is not null
-            && services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.SignIn?.IncludeVerifiedUpstreamClaims == true)
+            && (sessionEvidence || services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.SignIn?.IncludeVerifiedUpstreamClaims == true))
         {
             var options = context.Options;
             accessToken = await UpstreamAccessTokenValidator.Validate(

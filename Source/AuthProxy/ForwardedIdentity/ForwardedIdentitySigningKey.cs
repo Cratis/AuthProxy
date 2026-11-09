@@ -9,9 +9,12 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <summary>Represents validated v1 signing material.</summary>
 /// <param name="Audience">The receiving audience.</param>
 /// <param name="KeyId">The public key identifier.</param>
-/// <param name="Secret">The 32-byte shared secret.</param>
+/// <param name="Secret">The v1 shared secret, or a v2 public-key fingerprint used only for reuse detection.</param>
 public sealed record ForwardedIdentitySigningKey(string Audience, string KeyId, ReadOnlyMemory<byte> Secret)
 {
+    /// <summary>Gets the pinned wire version; v2 retains only a public-key fingerprint, not private material.</summary>
+    public string Version { get; init; } = "v1";
+
     /// <summary>Validates signing settings without exposing secret material in diagnostics.</summary>
     /// <param name="settings">The configured settings.</param>
     /// <param name="key">The validated key, when successful.</param>
@@ -21,6 +24,12 @@ public sealed record ForwardedIdentitySigningKey(string Audience, string KeyId, 
     {
         key = null;
         problem = null;
+        if (settings.Version == "v2") return ForwardedIdentityV2SigningKey.TryCreate(settings, out key, out problem);
+        if (settings.Version != "v1" || !string.IsNullOrEmpty(settings.PrivateKeyPkcs8Base64))
+        {
+            problem = "ForwardedIdentity requires an explicit supported version and matching key material (R5).";
+            return false;
+        }
         if (string.IsNullOrWhiteSpace(settings.Audience) || settings.Audience.Length > 128 || settings.Audience.Any(character => character is < ' ' or > '~'))
         {
             problem = "ForwardedIdentity:Audience must be 1–128 printable ASCII characters and not blank (R1).";
@@ -50,4 +59,15 @@ public sealed record ForwardedIdentitySigningKey(string Audience, string KeyId, 
 
     /// <inheritdoc/>
     public override string ToString() => $"Audience = {Audience}, KeyId = {KeyId}";
+
+    /// <summary>Checks the v2 application slug grammar.</summary>
+    /// <param name="value">The audience.</param>
+    /// <returns>Whether it is an unambiguous bounded slug.</returns>
+    internal static bool IsValidAudience(string value) => value.Length is >= 1 and <= 64 && value[0] is >= 'a' and <= 'z'
+        && value.All(character => character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') && value.Split('-').All(segment => segment.Length > 0);
+
+    /// <summary>Checks the bounded envelope key identifier grammar.</summary>
+    /// <param name="value">The key identifier.</param>
+    /// <returns>Whether it is valid.</returns>
+    internal static bool IsValidKeyId(string value) => value.Length is >= 1 and <= 64 && value.All(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '-');
 }
