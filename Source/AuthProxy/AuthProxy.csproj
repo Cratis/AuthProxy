@@ -12,6 +12,7 @@
     <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Keys" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Cratis.Arc.Core" />
+    <PackageReference Include="Cratis.OpenTelemetry" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.Identity.Web.Certificate" />

@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.Telemetry;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -68,6 +69,14 @@ public class SignInNotifier(
 
     /// <inheritdoc/>
     public async Task<SignInNotificationResult> Notify(HttpContext context, ClaimsPrincipal? principal, string? scheme = null)
+    {
+        using var activity = AuthProxyTelemetry.Start(WellKnownTelemetryNames.SignInNotifySpan);
+        var result = await Deliver(context, principal, scheme);
+        AuthProxyTelemetry.SignInNotified(activity, result);
+        return result;
+    }
+
+    async Task<SignInNotificationResult> Deliver(HttpContext context, ClaimsPrincipal? principal, string? scheme)
     {
         var notifyUrl = config.CurrentValue.SignIn?.NotifyUrl;
         if (string.IsNullOrWhiteSpace(notifyUrl))

@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.ReverseProxy;
+using Cratis.AuthProxy.Telemetry;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;
@@ -82,6 +83,7 @@ public sealed class BearerRouteForwarder(
         var error = await forwarder.SendAsync(context, route.BackendBaseUrl, _invoker, requestConfig, _transformer);
         if (error != ForwarderError.None)
         {
+            AuthProxyTelemetry.UpstreamFailed(error);
             logger.BearerRouteForwardingFailed(
                 context.Features.Get<IForwarderErrorFeature>()?.Exception,
                 route.Prefix,

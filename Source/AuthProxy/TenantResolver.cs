@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Telemetry;
 using Microsoft.Extensions.Options;
 
 using C = Cratis.AuthProxy.Configuration;
@@ -33,6 +34,7 @@ public class TenantResolver(
     /// <inheritdoc/>
     public bool TryResolve(HttpContext context, out TenantResolutionResult result)
     {
+        using var activity = AuthProxyTelemetry.Start(WellKnownTelemetryNames.TenantResolveSpan);
         result = new TenantResolutionResult(string.Empty, Type.None);
         context.Items.Remove(TenancyMiddleware.TenantVerificationUrlTemplateItemKey);
         var current = config.CurrentValue;
@@ -40,6 +42,7 @@ public class TenantResolver(
         if (current.TenantResolutions.Count == 0)
         {
             // No resolution configured – treat as single-tenant with empty tenant ID.
+            AuthProxyTelemetry.TenantResolved(activity, true, result.Strategy);
             return true;
         }
 
@@ -47,12 +50,14 @@ public class TenantResolver(
         {
             if (TryResolveWith(context, resolution, current, out result))
             {
+                AuthProxyTelemetry.TenantResolved(activity, true, result.Strategy);
                 return true;
             }
         }
 
         result = new TenantResolutionResult(string.Empty, Type.None);
         logger.NoStrategyResolvedTenant();
+        AuthProxyTelemetry.TenantResolved(activity, false, result.Strategy);
         return false;
     }
 
