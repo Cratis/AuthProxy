@@ -385,10 +385,10 @@ public static class AuthenticationServiceCollectionExtensions
     {
         return new OpenIdConnectEvents
         {
-            OnTokenValidated = context =>
+            OnTokenValidated = async context =>
             {
                 context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
-                return Task.CompletedTask;
+                await VerifiedUpstreamClaims.Capture(context, scheme);
             },
             OnTokenResponseReceived = UserTokenSessions.Capture,
             OnAuthorizationCodeReceived = context => provider.UsesClientAssertion
