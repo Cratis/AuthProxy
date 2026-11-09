@@ -29,7 +29,7 @@ public class InjectIdentityHeadersTransform : RequestTransform
         // the tenancy middleware having run, so nothing a caller sent survives whatever path led here.
         SpoofableHeaders.Strip(context.ProxyRequest.Headers);
 
-        var principal = httpContext.BuildClientPrincipal();
+        var principal = AnonymousPaths.PassesCallerAuthorization(httpContext) ? null : httpContext.BuildClientPrincipal();
         if (principal is not null)
         {
             context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);

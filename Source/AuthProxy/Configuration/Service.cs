@@ -135,6 +135,22 @@ public class Service
     /// </remarks>
     public IList<string> AnonymousPaths { get; set; } = [];
 
+    /// <summary>
+    /// Gets or sets the anonymous paths on this service for which the <c language="text">Authorization</c> header the caller sent is forwarded unchanged.
+    /// </summary>
+    /// <remarks>
+    /// Every anonymous path removes the caller's <c language="text">Authorization</c> header by default. An entry here opts one path
+    /// back in, for a backend that validates a token on its own anonymous surface. Each entry must also be listed in
+    /// <see cref="AnonymousPaths"/> (the same normalized prefix, matched case-insensitively); an entry that is not, that is
+    /// refused, or that is combined with <see cref="CallerAuthorizationHeaderForwarding.Strip"/> stops the host at startup.
+    /// <para>
+    /// Only the header value is forwarded. AuthProxy does not validate it, never derives a principal or tenant from it,
+    /// and still removes every forwarded identity, tenant, actor, on-behalf and signature header. The backend is
+    /// responsible for validating the token.
+    /// </para>
+    /// </remarks>
+    public IList<string> PassCallerAuthorizationPaths { get; set; } = [];
+
     /// <summary>Gets or sets the service-relative paths that may be forwarded; empty permits any path not denied.</summary>
     /// <remarks>
     /// Both lists are opt-in: when both are empty, forwarding is unchanged. Paths are relative to the endpoint

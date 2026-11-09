@@ -24,9 +24,10 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="tokenProtector">Recognizes access tokens AuthProxy issued through its client-credentials grant.</param>
 /// <param name="logger">The logger.</param>
 /// <remarks>
-/// Placed ahead of static files, authentication and everything after them, so a request on a bearer route never
-/// reaches the cookie session, provider selection, tenant selection or the reverse-proxy route table: it is
-/// answered here, by a forward or by an API-style refusal, and nothing else. The only other thing it does is
+/// Placed after endpoint selection but ahead of static files, authentication and everything after them, so a
+/// request on a bearer route never reaches the cookie session, provider selection, tenant selection or reverse-proxy
+/// forwarding: it is answered here, by a forward or by an API-style refusal. Selected passthrough routes are exempt
+/// before any token is read. The only other thing it does is
 /// refuse a token from a bearer-route issuer on a path that is not one of the bearer routes, so such a token
 /// cannot authenticate a browser-only surface through any other bearer support the deployment has configured.
 /// <para>
@@ -65,7 +66,7 @@ public class BearerRouteMiddleware(
     public async Task InvokeAsync(HttpContext context)
     {
         var current = config.CurrentValue;
-        if (BearerRouteTable.All(current).Count == 0)
+        if (AnonymousPaths.PassesCallerAuthorization(context) || BearerRouteTable.All(current).Count == 0)
         {
             await next(context);
             return;

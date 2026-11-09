@@ -28,7 +28,7 @@ public class ClientCredentialsBearerAuthenticationHandler(
     /// <inheritdoc/>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!TryGetBearerToken(out var token))
+        if (AnonymousPaths.PassesCallerAuthorization(Context) || !TryGetBearerToken(out var token))
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }

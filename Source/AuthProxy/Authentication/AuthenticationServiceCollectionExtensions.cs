@@ -137,6 +137,13 @@ public static class AuthenticationServiceCollectionExtensions
 
     static string SelectAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
+        // On a server-selected passthrough route the bearer value belongs only to the backend.
+        // Keep session authentication, but never inspect or validate that header at the proxy.
+        if (AnonymousPaths.PassesCallerAuthorization(context))
+        {
+            return CookieAuthenticationDefaults.AuthenticationScheme;
+        }
+
         // A gate decision is final. Missing state on a bearer route must also reach the handler's
         // fail-closed check, never cookie or JWT authentication. External credentials forward at the gate.
         var current = context.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue;

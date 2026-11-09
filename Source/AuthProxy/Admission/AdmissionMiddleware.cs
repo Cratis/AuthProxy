@@ -16,8 +16,8 @@ namespace Cratis.AuthProxy.Admission;
 /// ordering is the whole feature: <c language="text">/_pages</c> and the bundled assets are served ahead of authentication
 /// by design, so a gate placed anywhere later would leave them public no matter what it decided.
 /// <para>
-/// Nothing else about the pipeline moves. <c language="text">UseRouting()</c> in particular stays exactly where it is, for
-/// the reason recorded beside it: moving it once made every bundled asset answer <c language="text">401</c>.
+/// Endpoint selection still runs after admission, before any bearer inspection. Static files are served with the
+/// selected endpoint temporarily hidden, so the reverse-proxy catch-all cannot swallow bundled assets.
 /// </para>
 /// <para>
 /// A deployment in <see cref="C.AdmissionMode.Public"/> leaves this on the first line of

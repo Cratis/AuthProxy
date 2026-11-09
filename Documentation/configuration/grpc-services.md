@@ -123,8 +123,9 @@ neither hosts nor a prefix; AuthProxy refuses to start otherwise.
 
 A gRPC client is rarely a person with a browser session. Declaring the prefix in `AnonymousPaths` stops AuthProxy
 demanding one, and the service authenticates each call itself, typically by a bearer token in the `authorization`
-metadata. A request without a session keeps the `Authorization` header it arrived with
-(see `CallerAuthorizationHeader` in [Services](services.md)), so the token reaches the backend.
+metadata. An anonymous path removes the `Authorization` header unless the prefix is also listed in
+`PassCallerAuthorizationPaths` (see [Services](services.md#passing-the-callers-authorization-header)). A listed prefix
+forwards the header unchanged and the backend validates the token; AuthProxy does not.
 
 `ResolveIdentityDetails: false` keeps AuthProxy from asking the gRPC backend about signed-in people, which a listener
 serving only gRPC does not answer.
