@@ -18,7 +18,10 @@ fall back to another type. A bearer token accompanied by the session cookie also
 `401`, including on bearer routes. Clients using bearer authentication should omit the
 AuthProxy session cookie. Failed session cookies are expired in the `401` response, including host-only
 cookies. Local logout (`/.cratis/logout`), login selection, and provider sign-in remain reachable so the
-browser can clear or replace its session. Declared anonymous routes keep their existing behavior.
+browser can clear or replace its session. These recovery exceptions apply only to matched local login
+and logout endpoints. Unmatched AuthProxy-reserved `/.cratis/` paths are not forwarded to services;
+`/.cratis/me` retains its explicitly matched, authenticated service identity route.
+Declared anonymous routes keep their existing behavior.
 See the [browser migration guidance](../upgrading/selected-tenant-and-upstream-headers.md#authentication-selection-behavior-change).
 
 ---

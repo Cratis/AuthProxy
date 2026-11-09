@@ -14,7 +14,7 @@ public class RequestAuthenticationMiddleware(RequestDelegate next)
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
-        if (IsSignInOrAnonymous(context))
+        if (IsLocalOrAnonymous(context))
         {
             await next(context);
             return;
@@ -40,11 +40,11 @@ public class RequestAuthenticationMiddleware(RequestDelegate next)
         await next(context);
     }
 
-    static bool IsSignInOrAnonymous(HttpContext context)
+    static bool IsLocalOrAnonymous(HttpContext context)
     {
-        var signIn = context.IsLoginChallenge() || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage);
-        var anonymous = AnonymousPaths.IsAnonymousRoute(context)
-            || context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null;
-        return signIn || anonymous;
+        var metadata = context.GetEndpoint()?.Metadata;
+        var local = metadata?.GetMetadata<LocalAuthenticationEndpoint>() is not null;
+        var anonymous = AnonymousPaths.IsAnonymousRoute(context) || metadata?.GetMetadata<IAllowAnonymous>() is not null;
+        return local || anonymous;
     }
 }

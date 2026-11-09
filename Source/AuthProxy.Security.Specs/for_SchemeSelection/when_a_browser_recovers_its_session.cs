@@ -7,30 +7,39 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
+using CookieSameSite = Microsoft.Net.Http.Headers.SameSiteMode;
 
 namespace Cratis.AuthProxy.Security.for_SchemeSelection;
 
 public class when_a_browser_recovers_its_session
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task should_expire_a_failed_host_only_session_and_accept_a_new_session(bool expired)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task should_expire_a_failed_session_and_accept_a_new_session(bool expired, bool sharedDomain)
     {
-        await using var harness = new CredentialSelectionHarness();
+        await using var harness = sharedDomain ? new SharedSessionSelectionHarness() : new CredentialSelectionHarness();
         harness.VerifyEveryCaller();
         using var client = harness.CreateSecurityClient();
+        client.BaseAddress = new Uri(sharedDomain ? "https://app.example.test" : "https://localhost");
         using var request = FailedSession(harness, RequiredVerificationHarness.ProtectedPath, expired);
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Null(response.Headers.Location);
         var deletions = SessionCookieHarness.SetCookies(response);
-        Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(value, C.Session.DefaultCookieName));
-        Assert.All(deletions, value => Assert.False(SessionCookieHarness.HasDomain(value)));
+        var domain = sharedDomain ? SharedSessionSelectionHarness.SessionDomain : string.Empty;
+        Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(value, C.Session.DefaultCookieName)
+            && SetCookieHeaderValue.Parse(value).Domain.ToString() == domain);
+        Assert.All(deletions, value => AssertSessionCookieAttributes(value, sharedDomain));
+        if (!sharedDomain) Assert.All(deletions, value => Assert.False(SessionCookieHarness.HasDomain(value)));
         if (expired)
         {
-            Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(value, $"{C.Session.DefaultCookieName}C1"));
+            Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(value, $"{C.Session.DefaultCookieName}C1")
+                && SetCookieHeaderValue.Parse(value).Domain.ToString() == domain);
         }
 
         Assert.Empty(harness.Origin.Received);
@@ -70,6 +79,16 @@ public class when_a_browser_recovers_its_session
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(value, C.Session.DefaultCookieName));
         Assert.Empty(harness.Origin.Received);
+    }
+
+    static void AssertSessionCookieAttributes(string value, bool sharedDomain)
+    {
+        var cookie = SetCookieHeaderValue.Parse(value);
+        var hostOnlyCleanup = sharedDomain && cookie.Domain.Length == 0;
+        var sameSite = hostOnlyCleanup ? CookieSameSite.Unspecified : CookieSameSite.Lax;
+        Assert.Equal("/", cookie.Path.ToString());
+        Assert.True(cookie.Secure);
+        Assert.Equal(sameSite, cookie.SameSite);
     }
 
     static HttpRequestMessage FailedSession(CredentialSelectionHarness harness, string path, bool expired)
