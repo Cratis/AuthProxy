@@ -217,8 +217,8 @@ public static class IngressExtensions
         // Right after authentication so it can tell a session cookie that failed to become a ticket from an
         // absent one. It does nothing for a deployment that configures neither a cookie domain nor a name.
         app.UseMiddleware<SessionCookieHealingMiddleware>();
-        app.UseMiddleware<RequestAuthenticationMiddleware>();
         app.UseMiddleware<LogoutMiddleware>();
+        app.UseMiddleware<RequestAuthenticationMiddleware>();
         app.UseMiddleware<SelectProviderMiddleware>();
         app.UseMiddleware<LinkMiddleware>();
 

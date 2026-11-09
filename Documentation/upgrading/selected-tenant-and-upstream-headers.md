@@ -3,6 +3,20 @@ title: Selected tenant and upstream headers
 description: Check AuthProxy upgrade behavior for selected tenants, proxy cookies and caller Authorization headers, including explicit forwarding configuration.
 ---
 
+## Authentication selection: behavior change
+
+**Protected requests carrying both a bearer token and an AuthProxy session cookie now return `401`,
+even when `CallerAuthorizationHeader` is `Forward`. Invalid or expired authentication also returns `401`
+without falling back to another authentication type.** Failed session cookies are expired in that response;
+local logout, login selection, and provider sign-in remain reachable so the browser can recover.
+
+Browser clients using the AuthProxy session must stop attaching their own bearer token to those requests.
+If the service needs a delegated token, configure [`AccessToken`](../configuration/services.md#access-token)
+in AuthProxy instead. Clients using their own bearer token must omit the AuthProxy session cookie; for browser
+`fetch` calls, use `credentials: 'omit'` on those bearer-authenticated requests rather than sending both.
+Keep session-cookie requests cookie-authenticated only, and send users through `/.cratis/login/{scheme}`
+when a session has expired. Anonymous routes retain their existing behavior.
+
 ## The caller's Authorization header
 
 By default, `CallerAuthorizationHeader` on a [service](../configuration/services.md#caller-authorization-header)
@@ -10,13 +24,14 @@ is `Default`:
 
 - On a request authenticated by the AuthProxy session, the `Authorization` header the caller sent is **removed**
   before the request reaches the service.
-- On a request without a session, such as one to an [anonymous path](../configuration/services.md#anonymous-paths),
-  the header is **kept**.
+- On a protected request authenticated by its own bearer token without a session cookie, the header is **kept**.
+- On an [anonymous path](../configuration/services.md#anonymous-paths), the header is always **removed**.
 
 A token AuthProxy obtains for the service through `AccessToken`, and the bearer token of a caller AuthProxy itself
 authenticated, are always forwarded.
 
-A service that relied on receiving the caller's own header on session requests opts in to `Forward`:
+`Forward` can retain a non-bearer caller header on session requests. It does not permit bearer-plus-session
+requests. For a service that explicitly needs that non-bearer header:
 
 ```json
 {

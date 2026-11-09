@@ -16,7 +16,10 @@ AuthProxy session cookie, not both. AuthProxy selects authentication once for th
 An invalid or expired presented token or session returns `401`; authentication does not
 fall back to another type. A bearer token accompanied by the session cookie also returns
 `401`, including on bearer routes. Clients using bearer authentication should omit the
-AuthProxy session cookie. Declared anonymous routes keep their existing behavior.
+AuthProxy session cookie. Failed session cookies are expired in the `401` response, including host-only
+cookies. Local logout (`/.cratis/logout`), login selection, and provider sign-in remain reachable so the
+browser can clear or replace its session. Declared anonymous routes keep their existing behavior.
+See the [browser migration guidance](../upgrading/selected-tenant-and-upstream-headers.md#authentication-selection-behavior-change).
 
 ---
 

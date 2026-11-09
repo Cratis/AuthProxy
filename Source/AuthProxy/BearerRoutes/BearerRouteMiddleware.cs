@@ -109,7 +109,7 @@ public class BearerRouteMiddleware(
 
     async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
-        if (RequestAuthentication.HasBearer(context.Request) && RequestAuthentication.HasSession(context))
+        if (RequestAuthentication.IsAmbiguous(context))
         {
             BearerChallenge.Unauthorized(context, resourceMetadataUrl: null, "invalid_token");
             return;

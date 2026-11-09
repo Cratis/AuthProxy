@@ -16,6 +16,21 @@ internal static class RequestAuthentication
         .SelectMany(value => (value ?? string.Empty).Split(','))
         .Any(value => string.Equals(value.Trim().Split([' ', '\t'], 2)[0], "Bearer", StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Determines whether authentication material is ambiguous.</summary>
+    /// <param name="context">The current context.</param>
+    /// <returns>Whether the request combines authentication types or authorization values.</returns>
+    internal static bool IsAmbiguous(HttpContext context)
+    {
+        var mixed = HasBearer(context.Request) && HasSession(context);
+        return mixed || HasMultipleAuthorization(context.Request);
+    }
+
+    /// <summary>Determines whether more than one authorization value was presented.</summary>
+    /// <param name="request">The current request.</param>
+    /// <returns>Whether the authorization header is repeated or combined.</returns>
+    internal static bool HasMultipleAuthorization(HttpRequest request) => request.Headers.Authorization.Count > 1
+        || request.Headers.Authorization.Any(value => value?.Contains(',') == true);
+
     /// <summary>Determines whether the configured authentication cookie was presented.</summary>
     /// <param name="context">The current context.</param>
     /// <returns>Whether the request contains the authentication cookie.</returns>

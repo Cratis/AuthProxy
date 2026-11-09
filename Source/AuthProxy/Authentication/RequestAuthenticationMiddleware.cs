@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Cratis.AuthProxy.Authentication;
@@ -13,8 +14,7 @@ public class RequestAuthenticationMiddleware(RequestDelegate next)
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
-        if (AnonymousPaths.IsAnonymousRoute(context)
-            || context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null)
+        if (IsSignInOrAnonymous(context))
         {
             await next(context);
             return;
@@ -22,16 +22,29 @@ public class RequestAuthenticationMiddleware(RequestDelegate next)
 
         var bearer = RequestAuthentication.HasBearer(context.Request);
         var session = RequestAuthentication.HasSession(context);
-        var ambiguous = bearer && session;
         var presented = bearer || session;
         var failed = presented && !(await context.AuthenticateAsync()).Succeeded;
-        if (ambiguous || failed)
+        var refused = RequestAuthentication.IsAmbiguous(context);
+        if (refused || failed)
         {
+            if (failed && !bearer)
+            {
+                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             context.Response.Headers.CacheControl = "no-store";
             return;
         }
 
         await next(context);
+    }
+
+    static bool IsSignInOrAnonymous(HttpContext context)
+    {
+        var signIn = context.IsLoginChallenge() || context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage);
+        var anonymous = AnonymousPaths.IsAnonymousRoute(context)
+            || context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null;
+        return signIn || anonymous;
     }
 }

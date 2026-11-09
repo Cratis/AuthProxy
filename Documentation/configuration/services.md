@@ -1131,12 +1131,14 @@ provider must be configured. AuthProxy refuses to start otherwise.
 ### What is forwarded, and when it is refused
 
 - Only requests that are authenticated by the AuthProxy session and routed to the service's `Backend` get a
-  token. The token replaces any `Authorization` header the browser sent.
+  token. AuthProxy writes that token to `Authorization`; the browser must not attach its own bearer token
+  alongside the session cookie.
 - Requests on [anonymous paths](#anonymous-paths) carry neither identity nor `Authorization` headers.
   Requests to the `Frontend` and machine callers that authenticate with their own bearer token
   ([client credentials](#client-credentials) or JWT bearer) are otherwise forwarded as before. A session
-  request to the `Frontend` no longer carries the caller's own `Authorization` header unless the service
-  sets [`CallerAuthorizationHeader`](#caller-authorization-header) to `Forward`.
+  request to the `Frontend` carries a non-bearer caller `Authorization` header only when the service
+  sets [`CallerAuthorizationHeader`](#caller-authorization-header) to `Forward`. A bearer token accompanied
+  by the AuthProxy session cookie is refused with `401`, regardless of that setting.
 - Tokens stay bound to the backend and audience selected for the request across configuration reloads.
   Changing only `Backend.BaseUrl` obtains a token again instead of reusing one cached for the previous backend,
   even when the session, provider, scopes, and resource are unchanged.
@@ -1166,6 +1168,15 @@ their users sign in again once.
 ## Caller Authorization header
 
 `CallerAuthorizationHeader` controls whether the `Authorization` header a caller sent reaches a service.
+It does not change authentication selection: protected requests with both a bearer token and the AuthProxy
+session cookie return `401`, including with `Forward`. The session column below applies to non-bearer
+caller headers only.
+
+Browser clients must choose one mode per request: omit their own bearer header when using the session,
+or omit the AuthProxy session cookie when using a bearer token (`credentials: 'omit'` for browser `fetch`).
+For session-authenticated callers whose backend needs a delegated bearer token, configure
+[`AccessToken`](#access-token) instead of forwarding a browser-supplied token. See the
+[upgrade migration](../upgrading/selected-tenant-and-upstream-headers.md#authentication-selection-behavior-change).
 
 | Value | Requests authenticated by the AuthProxy session | Requests without a session |
 |-------|-------------------------------------------------|----------------------------|

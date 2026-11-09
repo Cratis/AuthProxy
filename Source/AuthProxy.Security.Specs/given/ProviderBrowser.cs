@@ -20,11 +20,12 @@ public static class ProviderBrowser
     /// <param name="client">The client to send with.</param>
     /// <param name="startHost">The host the person starts on.</param>
     /// <param name="returnUrl">The return URL the sign-in carries.</param>
+    /// <param name="cookies">Cookies already held by the browser.</param>
     /// <returns>Every hop of the sign-in.</returns>
-    public static async Task<Handshake> SignIn(HttpClient client, string startHost, string returnUrl)
+    public static async Task<Handshake> SignIn(HttpClient client, string startHost, string returnUrl, params string[] cookies)
     {
         var loginPath = $"{WellKnownPaths.LoginPrefix}/{SessionCookieHarness.ProviderScheme}?returnUrl={Uri.EscapeDataString(returnUrl)}";
-        var first = await client.SendAsync(SessionCookieHarness.Request(startHost, loginPath));
+        var first = await client.SendAsync(SessionCookieHarness.Request(startHost, loginPath, cookies));
 
         var challenge = first;
         var challengeHost = startHost;
@@ -33,7 +34,7 @@ public static class ProviderBrowser
         {
             bounce = first;
             challengeHost = bounceTarget.Authority;
-            challenge = await client.SendAsync(SessionCookieHarness.Request(challengeHost, bounceTarget.PathAndQuery));
+            challenge = await client.SendAsync(SessionCookieHarness.Request(challengeHost, bounceTarget.PathAndQuery, cookies));
         }
 
         var challengeCookies = CookiePairs(challenge);
@@ -47,7 +48,7 @@ public static class ProviderBrowser
         var callback = await client.SendAsync(SessionCookieHarness.Request(
             challengeHost,
             $"/signin-{SessionCookieHarness.ProviderScheme}?code=test-code&state={Uri.EscapeDataString(state)}",
-            [.. challengeCookies]));
+            [.. challengeCookies, .. cookies]));
 
         return new Handshake(bounce, challenge, challengeHost, callback, SessionCookieHarness.SessionFrom(callback));
     }
