@@ -13,6 +13,7 @@ namespace Cratis.AuthProxy.Security.given;
 public class PassthroughAuthenticationHarness : BearerRouteHarness
 {
     public const string PassthroughPath = "/api/passthrough";
+    public const string BackendBearerIssuer = "https://bearer.example.test/";
     public const string AuthenticatedHeader = "X-Spec-Authenticated";
     public const string TenantHeader = "X-Spec-Tenant";
     public const string ValidatedTokenHeader = "X-Spec-Validated-Token";
@@ -36,8 +37,8 @@ public class PassthroughAuthenticationHarness : BearerRouteHarness
     protected override void AddSettings(IDictionary<string, string?> settings)
     {
         const string proxy = C.AuthProxy.SectionKey;
-        settings[$"{proxy}:Services:app:BearerRoutes:0:Issuers:0:Issuer"] = "https://bearer.example.test/";
-        settings[$"{proxy}:Services:app:BearerRoutes:1:Issuers:0:Issuer"] = "https://bearer.example.test/";
+        settings[$"{proxy}:Services:app:BearerRoutes:0:Issuers:0:Issuer"] = BackendBearerIssuer;
+        settings[$"{proxy}:Services:app:BearerRoutes:1:Issuers:0:Issuer"] = BackendBearerIssuer;
         settings[$"{proxy}:Services:app:AnonymousPaths:0"] = PassthroughPath;
         settings[$"{proxy}:Services:app:PassCallerAuthorizationPaths:0"] = PassthroughPath;
         settings[$"{proxy}:Services:app:ClientCredentials:RoutePrefix"] = "/api";

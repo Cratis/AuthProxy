@@ -11,11 +11,13 @@ public class when_a_passthrough_route_receives_a_bearer_token(PassthroughAuthent
     [Theory]
     [InlineData("/api/passthrough")]
     [InlineData("/API/PASSTHROUGH")]
+    [InlineData("/api/passthrough/")]
     [InlineData("/api/passthrough/child")]
+    [InlineData("/API/PASSTHROUGH/child")]
     public async Task should_leave_all_bearer_tokens_to_the_backend(string path)
     {
         using var client = harness.CreateBearerClient();
-        foreach (var token in new[] { ClientCredentialsToken(), JwtToken(), JwtToken("backend-only") })
+        foreach (var token in new[] { ClientCredentialsToken(), JwtToken(), JwtToken("backend-only"), JwtToken("backend-only", PassthroughAuthenticationHarness.BackendBearerIssuer) })
         {
             harness.Origin.Clear();
             var discoveryRequests = harness.Issuer.MetadataRequests;
@@ -52,12 +54,25 @@ public class when_a_passthrough_route_receives_a_bearer_token(PassthroughAuthent
         Assert.True(harness.Origin.ReceivedAnythingFor(WellKnownPaths.IdentityDetails));
     }
 
+    [Fact]
+    public async Task should_still_refuse_a_bearer_route_issuer_outside_the_selected_passthrough_route()
+    {
+        using var client = harness.CreateBearerClient();
+        harness.Origin.Clear();
+        using var request = BearerRouteHarness.WithToken(HttpMethod.Get, "/api/passthrough-other", JwtToken("backend-only", PassthroughAuthenticationHarness.BackendBearerIssuer));
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Empty(harness.Origin.Received);
+    }
+
     string ClientCredentialsToken() => harness.Services.GetRequiredService<ClientCredentialsTokenProtector>().CreateToken(
         new ConfiguredClientCredentialsService("app", "/api", new Uri($"{harness.Origin.BaseUrl}/verify")),
         SecurityHarness.UniqueUser("passthrough"),
         BearerRouteHarness.TenantId);
 
-    string JwtToken(string audience = BearerRouteHarness.Audience) => harness.Issuer.Token(
+    string JwtToken(string audience = BearerRouteHarness.Audience, string? issuer = null) => harness.Issuer.Token(
         claims: new Dictionary<string, object> { ["sub"] = SecurityHarness.UniqueUser("passthrough") },
-        audience: audience);
+        audience: audience,
+        issuer: issuer);
 }

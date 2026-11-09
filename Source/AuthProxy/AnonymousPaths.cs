@@ -151,32 +151,47 @@ public static class AnonymousPaths
     /// <summary>Determines whether the server-selected proxy route is anonymous.</summary>
     /// <param name="context">The routed request.</param>
     /// <returns>True only for an anonymous proxy route.</returns>
-    internal static bool IsAnonymousRoute(HttpContext context)
-    {
-        if (context.Items.TryGetValue(_routeDispositionKey, out var disposition))
-        {
-            return disposition is true;
-        }
+    internal static bool IsAnonymousRoute(HttpContext context) => Disposition(context).Anonymous;
 
-        var anonymous = string.Equals(
-            context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>()?.Config.AuthorizationPolicy,
-            MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy,
-            StringComparison.OrdinalIgnoreCase);
-        context.Items[_routeDispositionKey] = anonymous;
-        return anonymous;
-    }
+    /// <summary>Captures the authoritative route disposition after routing, before any bearer inspection.</summary>
+    /// <param name="context">The routed request.</param>
+    internal static void CaptureRouteDisposition(HttpContext context) => _ = Disposition(context);
+
+    /// <summary>Restores the selected endpoint after the static-file middleware has had an endpoint-free request.</summary>
+    /// <param name="context">The routed request.</param>
+    internal static void RestoreSelectedEndpoint(HttpContext context) => context.SetEndpoint(Disposition(context).Endpoint);
 
     /// <summary>Determines whether the server-selected proxy route is anonymous and forwards the caller's Authorization header.</summary>
     /// <param name="context">The routed request.</param>
     /// <returns>True only for an anonymous route the operator listed for passthrough.</returns>
-    internal static bool PassesCallerAuthorization(HttpContext context) =>
-        IsAnonymousRoute(context)
-        && context.GetEndpoint()?.Metadata.GetMetadata<RouteModel>()?.Config.Metadata is { } metadata
-        && metadata.TryGetValue(PassCallerAuthorizationMetadataKey, out var value)
-        && string.Equals(value, bool.TrueString, StringComparison.OrdinalIgnoreCase);
+    internal static bool PassesCallerAuthorization(HttpContext context) => Disposition(context).PassesCallerAuthorization;
+
+    static RouteDisposition Disposition(HttpContext context)
+    {
+        if (context.Items.TryGetValue(_routeDispositionKey, out var captured) && captured is RouteDisposition disposition)
+        {
+            return disposition;
+        }
+
+        var endpoint = context.GetEndpoint();
+        var route = endpoint?.Metadata.GetMetadata<RouteModel>()?.Config;
+        var anonymous = string.Equals(
+            route?.AuthorizationPolicy,
+            MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy,
+            StringComparison.OrdinalIgnoreCase);
+        var passthrough = anonymous
+            && route?.Metadata is { } metadata
+            && metadata.TryGetValue(PassCallerAuthorizationMetadataKey, out var value)
+            && string.Equals(value, bool.TrueString, StringComparison.OrdinalIgnoreCase);
+        disposition = new RouteDisposition(endpoint, anonymous, passthrough);
+        context.Items[_routeDispositionKey] = disposition;
+        return disposition;
+    }
 
     static string[] Resolve(C.AuthProxy config) =>
         [.. config.Services.Values
             .SelectMany(For)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
+
+    sealed record RouteDisposition(Endpoint? Endpoint, bool Anonymous, bool PassesCallerAuthorization);
 }
