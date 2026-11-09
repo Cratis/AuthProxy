@@ -15,7 +15,7 @@ public sealed record ForwardedIdentityFlowStatus(ForwardedIdentityFlow Flow, str
     public string? Version { get; init; }
 
     /// <summary>Gets the current producer readiness, distinct from whether signing is configured.</summary>
-    public string State => Version == "v2" ? "refusing: no context producer" : IsAttested ? "attested" : IsSigned ? "signed" : "not signed";
+    public string State => Version == "v2" ? "browser-session-only" : IsAttested ? "attested" : IsSigned ? "signed" : "not signed";
 
     /// <summary>Gets whether this flow uses a per-call attestation rather than the forwarded-identity envelope.</summary>
     public bool IsAttested { get; init; }

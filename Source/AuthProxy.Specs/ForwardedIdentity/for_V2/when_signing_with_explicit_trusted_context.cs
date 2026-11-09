@@ -32,11 +32,13 @@ public class when_signing_with_explicit_trusted_context : Specification
         using var fixture = V2Vector.Load();
         var input = fixture.RootElement.GetProperty("cases")[0].GetProperty("inputs");
         using var request = V2Vector.Request(input);
-        var context = V2Vector.Context(input);
+        var context = V2Vector.Context(input) with { CredentialKind = "browser-session", SenderBinding = "none", Actor = null, GrantId = null };
+        request.Headers.Remove("x-cratis-on-behalf-context");
         request.Options.Set(ForwardedIdentityTrustedContext.OptionsKey, context);
         request.Headers.Remove("x-cratis-credential-id");
         request.Headers.Add("x-cratis-credential-id", "caller-controlled");
         var settings = Settings();
+        settings.TenantHeader = context.TenantHeader;
         var signer = Signer(settings);
         Assert.Equal(ForwardedIdentitySigningOutcome.SignatureCreated, signer.Sign(request, Target()));
         var first = request.Headers.GetValues(Headers.ForwardedIdentitySignature).Single();

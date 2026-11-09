@@ -13,7 +13,7 @@ public class when_reporting_v2_readiness : Specification
         var v2 = rows.Single(row => row.Flow == ForwardedIdentityFlow.ProxiedRequest && row.ServiceName == "v2-app");
         Assert.True(v2.IsSigned);
         Assert.Equal("v2", v2.Version);
-        Assert.Equal("refusing: no context producer", v2.State);
+        Assert.Equal("browser-session-only", v2.State);
         var v1 = rows.Single(row => row.Flow == ForwardedIdentityFlow.ProxiedRequest && row.ServiceName == "v1-app");
         Assert.Equal("v1", v1.Version);
         Assert.Equal("signed", v1.State);
@@ -27,7 +27,7 @@ public class when_reporting_v2_readiness : Specification
         var logger = new StartupLogger();
         await new ForwardedIdentitySigningStartupReport(monitor, logger).StartAsync(CancellationToken.None);
         var messages = logger.Messages;
-        Assert.Contains(messages, message => message.Contains("v2-app: v2, refusing: no context producer", StringComparison.Ordinal));
+        Assert.Contains(messages, message => message.Contains("v2-app: v2, browser-session-only", StringComparison.Ordinal));
         Assert.DoesNotContain(messages, message => message.Contains("v2-app: signed", StringComparison.Ordinal));
     }
 

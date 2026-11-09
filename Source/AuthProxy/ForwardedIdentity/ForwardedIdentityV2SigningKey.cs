@@ -34,6 +34,7 @@ static class ForwardedIdentityV2SigningKey
     /// <returns>Whether the metadata and material selection are valid.</returns>
     internal static bool IsValidSettings(ForwardedIdentitySigning settings) => settings.Version == "v2"
         && ForwardedIdentitySigningKey.IsValidAudience(settings.Audience) && ForwardedIdentitySigningKey.IsValidKeyId(settings.KeyId)
+        && ForwardedIdentityTenantHeader.IsValid(settings.TenantHeader)
         && string.IsNullOrEmpty(settings.SecretBase64) && !string.IsNullOrEmpty(settings.PrivateKeyPkcs8Base64)
         && !settings.PrivateKeyPkcs8Base64.Any(char.IsWhiteSpace);
 

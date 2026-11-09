@@ -3,6 +3,8 @@
 
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 using Cratis.AuthProxy.ReverseProxy;
 using Microsoft.AspNetCore.Authentication;
@@ -76,7 +78,8 @@ public class SignInCallbackDispatcher(
 
             // A real sign-in always counts, and it starts the interval over: the request that follows it is not a return.
             Remember(serviceName, principal.UserId, now + callback.Interval, now);
-            Enqueue(serviceName, backend, callback, SignInCallbackKind.SignedIn, principal, tenant, now);
+            var evidence = routed.Service.ForwardedIdentity?.Version == "v2" ? BrowserSessionEvidence.Read(context, user, properties) : null;
+            Enqueue(serviceName, backend, callback, SignInCallbackKind.SignedIn, principal, tenant, now, evidence);
         }
         catch (Exception ex)
         {
@@ -102,7 +105,8 @@ public class SignInCallbackDispatcher(
                 return;
             }
 
-            Enqueue(serviceName, backend, callback, SignInCallbackKind.Returned, principal, tenant, now);
+            var evidence = service.ForwardedIdentity?.Version == "v2" ? BrowserSessionEvidence.For(context) : null;
+            Enqueue(serviceName, backend, callback, SignInCallbackKind.Returned, principal, tenant, now, evidence);
         }
         catch (Exception ex)
         {
@@ -164,10 +168,11 @@ public class SignInCallbackDispatcher(
         SignInCallbackKind kind,
         ClientPrincipal principal,
         string? tenant,
-        DateTimeOffset occurred)
+        DateTimeOffset occurred,
+        ForwardedIdentityTrustedContext? trustedContext)
     {
         var url = backend.BaseUrl.TrimEnd('/') + callback.Path;
-        var request = new SignInCallbackRequest(serviceName, url, callback.Timeout, callback.Secret, kind, principal, tenant, occurred);
+        var request = new SignInCallbackRequest(serviceName, url, callback.Timeout, callback.Secret, kind, principal, tenant, occurred) { TrustedContext = trustedContext };
         if (!queue.TryEnqueue(request))
         {
             logger.CallbackDropped(serviceName, kind);

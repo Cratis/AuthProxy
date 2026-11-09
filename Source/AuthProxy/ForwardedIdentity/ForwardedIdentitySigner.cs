@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Globalization;
+using Cratis.AuthProxy.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -11,7 +12,8 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 /// <param name="config">The current gateway configuration.</param>
 /// <param name="time">The issuance clock.</param>
 /// <param name="logger">The redacted signing logger.</param>
-public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config, TimeProvider time, ILogger<ForwardedIdentitySigner> logger) : IForwardedIdentitySigner, IDisposable
+/// <param name="httpContextAccessor">The current authenticated browser request, when available.</param>
+public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config, TimeProvider time, ILogger<ForwardedIdentitySigner> logger, IHttpContextAccessor? httpContextAccessor = null) : IForwardedIdentitySigner, IDisposable
 {
     readonly ForwardedIdentityV2SigningKeyCache _v2Keys = new(config);
 
@@ -62,8 +64,14 @@ public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config,
         {
             var timestamp = time.GetUtcNow().ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
             var nonce = ForwardedIdentityV2Envelope.Encode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
-            if (!request.Options.TryGetValue(ForwardedIdentityTrustedContext.OptionsKey, out var context)
-                || context is null || !ForwardedIdentityV2ContextHeaders.TryApply(request, context)
+            if (!request.Options.TryGetValue(ForwardedIdentityTrustedContext.OptionsKey, out var context))
+            {
+                context = BrowserSessionEvidence.For(httpContextAccessor?.HttpContext);
+            }
+            if (context is not null) context = context with { TenantHeader = settings.TenantHeader };
+            if (context is null || context.CredentialKind != "browser-session" || context.SenderBinding != "none"
+                || context.Actor is not null || context.GrantId is not null || context.Bearer is not null || !ForwardedIdentityTenantHeader.Apply(request, settings.TenantHeader)
+                || !ForwardedIdentityV2ContextHeaders.TryApply(request, context)
                 || !ForwardedIdentityV2CanonicalInput.TryCreate(request, context, settings.Audience, settings.KeyId, timestamp, nonce, out var canonical))
             {
                 logger.SigningFailed(target.Flow, target.ServiceName, settings.KeyId);

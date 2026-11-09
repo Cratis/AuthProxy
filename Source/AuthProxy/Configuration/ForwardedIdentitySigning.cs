@@ -11,6 +11,9 @@ public class ForwardedIdentitySigning
     /// <summary>Gets or sets the explicit wire version, either v1 (the default) or v2. No negotiation or fallback occurs.</summary>
     public string Version { get; set; } = "v1";
 
+    /// <summary>Gets or sets the receiving host's tenancy header for v2. Inbound values are stripped; only the resolved tenant is sent.</summary>
+    public string TenantHeader { get; set; } = Headers.TenantId;
+
     /// <summary>Gets or sets strict standard-base64 PKCS#8 DER P-256 private key material for v2 only.</summary>
     public string PrivateKeyPkcs8Base64 { get; set; } = string.Empty;
 
