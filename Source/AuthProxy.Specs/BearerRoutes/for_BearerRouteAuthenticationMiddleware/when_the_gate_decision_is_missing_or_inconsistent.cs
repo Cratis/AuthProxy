@@ -15,7 +15,7 @@ public class when_the_gate_decision_is_missing_or_inconsistent : given.a_real_is
     {
         BetweenGateAndAuthentication = context =>
         {
-            var credential = IssuedBearerRouteCredential.Read(context)!;
+            var credential = IssuedBearerRouteCredential.Read(context);
             switch (inconsistency)
             {
                 case "missing":
@@ -29,9 +29,9 @@ public class when_the_gate_decision_is_missing_or_inconsistent : given.a_real_is
                     break;
             }
         };
-        var context = await Send(cookie: true, token: Token);
+        var context = await Send(cookie: false, token: Token);
         context.Response.StatusCode.ShouldEqual(StatusCodes.Status401Unauthorized);
-        context.Items[AuthenticationServiceCollectionExtensions.SelectedSchemeItemKey]!.ShouldEqual(ClientCredentialsDefaults.AuthenticationScheme);
+        context.Items[AuthenticationServiceCollectionExtensions.SelectedSchemeItemKey].ShouldEqual(ClientCredentialsDefaults.AuthenticationScheme);
         context.Response.Headers.WWWAuthenticate.ToString().ShouldEqual($"Bearer error=\"invalid_token\", resource_metadata=\"{Metadata}\"");
         DownstreamCalls.ShouldEqual(0);
         CookieValidations.ShouldEqual(0);
