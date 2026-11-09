@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Security.for_BearerRoutes;
 public class when_a_session_accompanies_a_bearer(BearerRouteHarness harness)
 {
     [Fact]
-    public async Task should_refuse_without_forwarding()
+    public async Task should_serve_the_bearer_alone_and_never_the_session()
     {
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
@@ -26,7 +26,8 @@ public class when_a_session_accompanies_a_bearer(BearerRouteHarness harness)
         request.Headers.TryAddWithoutValidation("Cookie", $"{options.Cookie.Name}={options.TicketDataFormat.Protect(ticket)}");
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Empty(harness.Origin.Received);
+        // The bearer is the only credential a bearer route consults; the cookie neither authenticates nor rescues it.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(harness.Origin.ReceivedAnythingFor($"{BearerRouteHarness.RoutePrefix}/tools"));
     }
 }
