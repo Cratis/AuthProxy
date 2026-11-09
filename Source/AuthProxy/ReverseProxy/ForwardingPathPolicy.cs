@@ -74,10 +74,15 @@ public static class ForwardingPathPolicy
     {
         if (!IsConfigured(service)) return ForwardingPathRefusal.None;
         if (!IsUnambiguous(request.Path)) return ForwardingPathRefusal.NonCanonicalPath;
-        if (_overrideHeaders.Any(request.Headers.ContainsKey)) return ForwardingPathRefusal.MethodOverride;
+        if (HasMethodOverride(request)) return ForwardingPathRefusal.MethodOverride;
         var method = request.HttpContext.Features.Get<IHttpExtendedConnectFeature>()?.IsExtendedConnect == true ? HttpMethods.Get : request.Method;
         return Decide(_policies.GetValue(service, Compile), Normalize(effectivePath), method);
     }
+
+    /// <summary>Detects headers that could change the method interpreted by the backend.</summary>
+    /// <param name="request">The request.</param>
+    /// <returns>Whether any method-override header is present, regardless of its value.</returns>
+    internal static bool HasMethodOverride(HttpRequest request) => _overrideHeaders.Any(request.Headers.ContainsKey);
 
     static ForwardingPathRefusal Decide(CompiledPolicy policy, PathString path, string method)
     {

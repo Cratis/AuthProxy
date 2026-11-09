@@ -99,6 +99,48 @@ public class when_checking_freshness : Specification
     }
 
     [Theory]
+    [InlineData("X-HTTP-Method-Override", "DELETE")]
+    [InlineData("x-http-method-override", "DELETE")]
+    [InlineData("X-HTTP-Method", "DELETE")]
+    [InlineData("X-Method-Override", "DELETE")]
+    [InlineData("X-HTTP-Method-Override", "")]
+    [InlineData("X-HTTP-Method-Override", "PATCH, DELETE")]
+    public async Task should_refuse_method_override_on_a_post_outside_the_delete_only_rule(string header, string value)
+    {
+        var (context, middleware, next) = Create(301, methods: ["DELETE"]);
+        context.Request.Method = "POST";
+        context.Request.Headers[header] = value;
+        await middleware.InvokeAsync(context);
+        next.Called.ShouldBeFalse();
+        context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+        context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");
+        context.Response.Body.Length.ShouldEqual(0);
+    }
+
+    [Theory]
+    [InlineData("POST", true)]
+    [InlineData("DELETE", false)]
+    public async Task should_preserve_transport_method_matching_without_an_override(string method, bool passes)
+    {
+        var (context, middleware, next) = Create(301, methods: ["DELETE"]);
+        context.Request.Method = method;
+        await middleware.InvokeAsync(context);
+        next.Called.ShouldEqual(passes);
+    }
+
+    [Theory]
+    [InlineData("unconfigured", "/main/approve")]
+    [InlineData("", "/other/approve")]
+    public async Task should_not_reject_overrides_for_a_service_without_freshness_rules(string kind, string path)
+    {
+        var (context, middleware, next) = Create(301, kind);
+        context.Request.Path = path;
+        context.Request.Headers["X-HTTP-Method-Override"] = "DELETE";
+        await middleware.InvokeAsync(context);
+        next.Called.ShouldBeTrue();
+    }
+
+    [Theory]
     [InlineData("/main/approve", "/main/approve", false)]
     [InlineData("/main/approve/", "/main/approve/", false)]
     [InlineData("/other/approve", "/other/approve", true)]
@@ -111,9 +153,9 @@ public class when_checking_freshness : Specification
         next.Called.ShouldEqual(passes);
     }
 
-    (DefaultHttpContext Context, FreshAuthenticationMiddleware Middleware, Invocation Next) Create(int age, string kind = "")
+    (DefaultHttpContext Context, FreshAuthenticationMiddleware Middleware, Invocation Next) Create(int age, string kind = "", string[]? methods = null)
     {
-        var service = new C.Service { Backend = new() { BaseUrl = "http://main" }, PathPrefix = "/main", StripPathPrefix = true, FreshAuthentication = [new() { Path = "/approve" }] };
+        var service = new C.Service { Backend = new() { BaseUrl = "http://main" }, PathPrefix = "/main", StripPathPrefix = true, FreshAuthentication = [new() { Path = "/approve", Methods = methods ?? [] }] };
         if (kind == "unconfigured") service.FreshAuthentication = null;
         if (kind == "anonymous") service.AnonymousPaths = ["/main/approve"];
         var config = new C.AuthProxy { Services = new Dictionary<string, C.Service> { ["main"] = service, ["other"] = new() { Backend = new() { BaseUrl = "http://other" }, PathPrefix = "/other", StripPathPrefix = true } } };

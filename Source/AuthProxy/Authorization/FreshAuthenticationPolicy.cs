@@ -34,6 +34,16 @@ internal static class FreshAuthenticationPolicy
         return ForwardingPathPolicy.IsUnambiguous(request.Path);
     }
 
+    /// <summary>Refuses bearer forwarding when the request requires interactive authentication or is ambiguous.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="service">The selected service.</param>
+    /// <returns>Whether bearer forwarding must be refused.</returns>
+    internal static bool RefusesBearerRequest(HttpRequest request, C.Service service) =>
+        service.FreshAuthentication is { Count: > 0 } &&
+        (ForwardingPathPolicy.HasMethodOverride(request) ||
+         !TryNormalizeRequest(request, request.Path, out var path) ||
+         MaxAge(service, path, request.Method) is not null);
+
     /// <summary>Finds the strictest matching authentication-age rule.</summary>
     /// <param name="service">The selected service.</param>
     /// <param name="path">The canonical service-local path.</param>

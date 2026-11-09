@@ -23,14 +23,26 @@ public partial class FreshAuthenticationMiddleware(RequestDelegate next, IOption
     public async Task InvokeAsync(HttpContext context)
     {
         var config = options.CurrentValue;
-        if (!FreshAuthenticationPolicy.AnyConfigured(config) || context.User.Identity?.IsAuthenticated != true
-            || context.IsAnonymousPath(config) || context.IsLoginChallenge() || context.Request.Path.StartsWithSegments(WellKnownPaths.Cratis))
+        if (!FreshAuthenticationPolicy.AnyConfigured(config))
         {
             await next(context);
             return;
         }
 
         var service = ServiceRoutes.Resolve(context.Request, config);
+        if (service?.Service.FreshAuthentication is { Count: > 0 } && ForwardingPathPolicy.HasMethodOverride(context.Request))
+        {
+            Forbid(context);
+            return;
+        }
+
+        if (context.User.Identity?.IsAuthenticated != true
+            || context.IsAnonymousPath(config) || context.IsLoginChallenge() || context.Request.Path.StartsWithSegments(WellKnownPaths.Cratis))
+        {
+            await next(context);
+            return;
+        }
+
         var route = context.GetEndpoint()?.Metadata.GetMetadata<Yarp.ReverseProxy.Model.RouteModel>();
         var prefix = route is not null
             ? route.Config.Metadata?.GetValueOrDefault(ServiceRoutes.StripPathPrefixMetadataKey)
