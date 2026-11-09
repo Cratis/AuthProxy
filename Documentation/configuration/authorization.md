@@ -254,6 +254,8 @@ Every refusal is logged at warning level with the claim that was not satisfied a
 requested. The claim **type** only — never the value the caller carried, which would put an identity in the
 log to record that it was turned away.
 
+To also require a recent sign-in for sensitive paths, see [Fresh Authentication](fresh-authentication.md).
+
 ---
 
 ## What is never gated

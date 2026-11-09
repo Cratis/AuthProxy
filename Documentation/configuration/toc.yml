@@ -6,6 +6,8 @@
   href: application-contract.md
 - name: Authorization
   href: authorization.md
+- name: Fresh Authentication
+  href: fresh-authentication.md
 - name: Admission
   href: admission.md
 - name: Unauthenticated Responses

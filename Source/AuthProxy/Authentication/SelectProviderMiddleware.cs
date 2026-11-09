@@ -56,7 +56,8 @@ public class SelectProviderMiddleware(
             return;
         }
 
-        if (context.User.Identity?.IsAuthenticated == true
+        if ((context.User.Identity?.IsAuthenticated == true
+                && !(context.Request.Path == WellKnownPaths.LoginPage && FreshAuthenticationChallenge.Requested(context)))
             || context.IsInvitation()
             || context.IsRegistration()
             || context.IsLoginChallenge()
@@ -139,6 +140,7 @@ public class SelectProviderMiddleware(
         }
 
         var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl, proxyConfig.CurrentValue);
+        FreshAuthenticationChallenge.Apply(context, properties);
         await context.ChallengeAsync(scheme, properties);
     }
 
