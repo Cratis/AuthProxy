@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes.Introspection;
 using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Microsoft.AspNetCore.DataProtection;
 
@@ -101,6 +102,7 @@ public abstract class given_a_credential_dispatching_gate : Specification
             Next,
             options,
             Validator,
+            Substitute.For<IBearerTokenIntrospector>(),
             Substitute.For<IAccessPolicy>(),
             Substitute.For<ITenantVerifier>(),
             Substitute.For<ITenantResolver>(),

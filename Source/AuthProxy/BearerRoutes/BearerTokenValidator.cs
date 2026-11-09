@@ -111,6 +111,15 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     }
 
     /// <summary>
+    /// Reads the bearer token from a request with the same strict reading <see cref="Validate"/> applies.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="token">The token, only when one was read.</param>
+    /// <returns><see langword="true"/> when the request carries exactly one well-formed bearer token; otherwise <see langword="false"/>.</returns>
+    internal static bool TryReadStrictBearerToken(HttpRequest request, out string token) =>
+        ReadBearerToken(request, out token) == TokenPresence.Present;
+
+    /// <summary>
     /// Validates the presented token; the traced body of <see cref="Validate"/>.
     /// </summary>
     /// <param name="request">The request.</param>
@@ -226,15 +235,6 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         var identity = new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role);
         return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer };
     }
-
-    /// <summary>
-    /// Reads the bearer token from a request with the same strict reading <see cref="Validate"/> applies.
-    /// </summary>
-    /// <param name="request">The request.</param>
-    /// <param name="token">The token, only when one was read.</param>
-    /// <returns><see langword="true"/> when the request carries exactly one well-formed bearer token; otherwise <see langword="false"/>.</returns>
-    internal static bool TryReadStrictBearerToken(HttpRequest request, out string token) =>
-        ReadBearerToken(request, out token) == TokenPresence.Present;
 
     static TokenValidationParameters CreateParameters(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, IReadOnlyCollection<SecurityKey> keys) => new()
     {

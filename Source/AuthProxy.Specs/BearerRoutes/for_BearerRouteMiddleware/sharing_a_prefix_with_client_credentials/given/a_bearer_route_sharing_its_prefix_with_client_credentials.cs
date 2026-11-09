@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes.Introspection;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace Cratis.AuthProxy.BearerRoutes.for_BearerRouteMiddleware.sharing_a_prefix_with_client_credentials.given;
@@ -97,6 +98,7 @@ public abstract class a_bearer_route_sharing_its_prefix_with_client_credentials 
             Next,
             options,
             Validator,
+            Substitute.For<IBearerTokenIntrospector>(),
             accessPolicy,
             tenantVerifier,
             tenantResolver,
