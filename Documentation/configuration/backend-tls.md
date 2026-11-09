@@ -1,6 +1,6 @@
 ---
 title: Backend TLS
-description: Authenticate AuthProxy backend connections with a client certificate, a private CA bundle, and live PEM rotation.
+description: Configure AuthProxy backend TLS: mount a client certificate and private CA bundle, rotate PEM files live, and require HTTPS on every identity-bearing hop.
 ---
 
 # Backend TLS

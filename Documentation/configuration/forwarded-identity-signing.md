@@ -1,6 +1,6 @@
 ---
 title: Forwarded Identity Signing
-description: Configure version-pinned forwarded identity signing, with v1 HMAC compatibility and opt-in v2 ES256 infrastructure.
+description: Sign the identity headers AuthProxy forwards to backends: default v1 HMAC-SHA256 proofs, opt-in v2 ES256, per-service audience, key ID and secret settings.
 ---
 
 # Forwarded Identity Signing
