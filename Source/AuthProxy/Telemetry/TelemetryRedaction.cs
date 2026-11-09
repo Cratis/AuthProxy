@@ -22,8 +22,10 @@ public static class TelemetryRedaction
     public const string RedactedInvitePath = $"{WellKnownPaths.InvitePathPrefix}/{{token}}";
 
     static readonly string[] _queryTags = ["url.query", "http.query"];
-    static readonly string[] _serverHostTags = ["server.address", "http.host", "net.host.name"];
-    static readonly string[] _clientUrlTags = ["url.full", "http.url", "url.path", "http.target"];
+    static readonly string[] _serverHostTags = ["server.address", "server.port", "http.host", "net.host.name"];
+    static readonly string[] _clientHostTags = ["server.address", "server.port", "http.host", "net.peer.name", "net.peer.port", "network.peer.address", "dns.question.name"];
+    static readonly string[] _fullUrlTags = ["url.full", "http.url"];
+    static readonly string[] _clientUrlTags = ["url.path", "http.target"];
     static readonly string[] _serverPathTags = ["url.path", "http.target"];
 
     /// <summary>
@@ -34,12 +36,12 @@ public static class TelemetryRedaction
     {
         // Never a query string: callback requests carry the authorization code and state in it.
         Clear(activity, _queryTags);
+        Clear(activity, _fullUrlTags);
 
         if (activity.Kind == ActivityKind.Server)
         {
             // The host of a subdomain-tenancy request is the tenant.
             Clear(activity, _serverHostTags);
-            activity.SetTag("http.url", null);
             foreach (var key in _serverPathTags)
             {
                 RedactPath(activity, key);
@@ -50,6 +52,7 @@ public static class TelemetryRedaction
 
         // An outgoing URL names the tenant the verifier is asked about, or whatever path was forwarded.
         Clear(activity, _clientUrlTags);
+        Clear(activity, _clientHostTags);
     }
 
     static void RedactPath(Activity activity, string key)

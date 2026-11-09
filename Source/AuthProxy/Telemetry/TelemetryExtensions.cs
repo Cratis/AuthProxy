@@ -8,6 +8,7 @@ using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Instrumentation.Http;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 namespace Cratis.AuthProxy.Telemetry;
 
@@ -53,6 +54,11 @@ public static class TelemetryExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddTelemetry(this WebApplicationBuilder builder)
     {
+        // Register before the shared setup so sanitization runs before both batch and simple exporters.
+        // Instrumentation enrichment is not a security boundary: it can throw, and the runtime can add
+        // exception events independently of the instrumentation's RecordException option.
+        builder.Services.ConfigureOpenTelemetryTracerProvider(provider => provider.AddProcessor(new TelemetryActivityProcessor()));
+        builder.Services.ConfigureOpenTelemetryLoggerProvider(provider => provider.AddProcessor(new TelemetryLogProcessor()));
         builder.AddCratisOpenTelemetry(options => options.ServiceName = WellKnownTelemetryNames.DefaultServiceName);
 
         // The shared instrumentation records the request URL, the host and exceptions. Those carry invitation
