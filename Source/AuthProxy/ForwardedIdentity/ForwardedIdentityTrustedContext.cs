@@ -39,6 +39,9 @@ public sealed record ForwardedIdentityTrustedContext(string CredentialKind, stri
     /// <summary>Gets evidence of local verification of the exact forwarded bearer; absent when no bearer is sent.</summary>
     public ForwardedIdentityVerifiedBearer? Bearer { get; init; }
 
+    /// <summary>Gets the fixed deadline for a queued callback snapshot; retries must not renew it.</summary>
+    internal DateTimeOffset? SnapshotExpiresUtc { get; init; }
+
     /// <inheritdoc/>
     public override string ToString() => nameof(ForwardedIdentityTrustedContext);
 }

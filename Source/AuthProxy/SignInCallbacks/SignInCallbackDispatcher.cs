@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.ForwardedIdentity;
@@ -65,21 +66,22 @@ public class SignInCallbackDispatcher(
             // The principal is described the way the next proxied request will describe it, against the cookie session
             // that is about to carry it.
             var principal = context.BuildClientPrincipal(user, CookieAuthenticationDefaults.AuthenticationScheme, properties);
-            if (principal is null || string.IsNullOrWhiteSpace(principal.UserId))
+            if (!HasIdentity(principal))
             {
                 logger.CallbackWithoutIdentity(serviceName, SignInCallbackKind.SignedIn);
                 return;
             }
 
-            var tenant = services.GetService<ITenantResolver>() is { } tenantResolver && tenantResolver.TryResolve(context, out string tenantId)
-                ? tenantId
-                : null;
+            var tenant = ResolveTenant(context);
             var now = timeProvider.GetUtcNow();
 
             // A real sign-in always counts, and it starts the interval over: the request that follows it is not a return.
             Remember(serviceName, principal.UserId, now + callback.Interval, now);
             var evidence = routed.Service.ForwardedIdentity?.Version == "v2" ? BrowserSessionEvidence.Read(context, user, properties) : null;
-            Enqueue(serviceName, backend, callback, SignInCallbackKind.SignedIn, principal, tenant, now, evidence);
+            Enqueue(new(serviceName, backend.BaseUrl.TrimEnd('/') + callback.Path, callback.Timeout, callback.Secret, SignInCallbackKind.SignedIn, principal, tenant, now)
+            {
+                TrustedContext = Snapshot(evidence, now)
+            });
         }
         catch (Exception ex)
         {
@@ -92,9 +94,8 @@ public class SignInCallbackDispatcher(
     {
         try
         {
-            if (service.SignInCallback is not { } callback
-                || service.Backend is not { } backend
-                || string.IsNullOrWhiteSpace(principal.UserId))
+            if (string.IsNullOrWhiteSpace(principal.UserId)) return;
+            if (service.SignInCallback is not { } callback || service.Backend is not { } backend)
             {
                 return;
             }
@@ -106,13 +107,26 @@ public class SignInCallbackDispatcher(
             }
 
             var evidence = service.ForwardedIdentity?.Version == "v2" ? BrowserSessionEvidence.For(context) : null;
-            Enqueue(serviceName, backend, callback, SignInCallbackKind.Returned, principal, tenant, now, evidence);
+            Enqueue(new(serviceName, backend.BaseUrl.TrimEnd('/') + callback.Path, callback.Timeout, callback.Secret, SignInCallbackKind.Returned, principal, tenant, now)
+            {
+                TrustedContext = Snapshot(evidence, now)
+            });
         }
         catch (Exception ex)
         {
             logger.CallbackNotPrepared(ex, serviceName, SignInCallbackKind.Returned);
         }
     }
+
+    static bool HasIdentity([NotNullWhen(true)] ClientPrincipal? principal) => principal is not null && !string.IsNullOrWhiteSpace(principal.UserId);
+
+    static ForwardedIdentityTrustedContext? Snapshot(ForwardedIdentityTrustedContext? evidence, DateTimeOffset now) => evidence is null
+        ? null
+        : evidence with { SnapshotExpiresUtc = now.AddSeconds(60) };
+
+    string? ResolveTenant(HttpContext context) => services.GetService<ITenantResolver>() is { } tenantResolver && tenantResolver.TryResolve(context, out string tenantId)
+        ? tenantId
+        : null;
 
     bool TryClaim(string serviceName, string subject, DateTimeOffset now, TimeSpan interval)
     {
@@ -161,21 +175,11 @@ public class SignInCallbackDispatcher(
         }
     }
 
-    void Enqueue(
-        string serviceName,
-        C.ServiceEndpoint backend,
-        C.SignInCallback callback,
-        SignInCallbackKind kind,
-        ClientPrincipal principal,
-        string? tenant,
-        DateTimeOffset occurred,
-        ForwardedIdentityTrustedContext? trustedContext)
+    void Enqueue(SignInCallbackRequest request)
     {
-        var url = backend.BaseUrl.TrimEnd('/') + callback.Path;
-        var request = new SignInCallbackRequest(serviceName, url, callback.Timeout, callback.Secret, kind, principal, tenant, occurred) { TrustedContext = trustedContext };
         if (!queue.TryEnqueue(request))
         {
-            logger.CallbackDropped(serviceName, kind);
+            logger.CallbackDropped(request.ServiceName, request.Kind);
         }
     }
 }

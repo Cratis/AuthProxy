@@ -9,14 +9,24 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 internal static class ForwardedIdentityTenantHeader
 {
     const string TokenPunctuation = "!#$%&'*+-.^_`|~";
-    static readonly string[] _reserved = ["Authorization", "DPoP", "Cookie", "Host", "Content-Length", "Content-Type", "Transfer-Encoding", "Connection", Headers.TokenClientId, Headers.TokenScope, Headers.ServiceId, Headers.LegacyServiceId];
+    static readonly string[] _reserved =
+    [
+        "Authorization", "DPoP", "Cookie", "Host", "Connection", "Keep-Alive", "Proxy-Authenticate", "Proxy-Authorization",
+        "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Expect", "Forwarded", "Proxy-Connection",
+        Headers.TokenClientId, Headers.TokenScope, Headers.ServiceId, Headers.LegacyServiceId, Headers.LegacyTenantId
+    ];
+    static readonly string[] _reservedPrefixes = [Headers.PrincipalPrefix, Headers.OnBehalfPrefix, Headers.SignInCallbackPrefix, "X-Forwarded-", "Content-"];
 
     /// <summary>Checks that tenancy cannot overwrite authentication, framing or another signed fact.</summary>
     /// <param name="name">The configured receiver header.</param>
     /// <returns>Whether it is a usable header name.</returns>
-    internal static bool IsValid(string name) => !string.IsNullOrEmpty(name) && name.Length <= 256
-        && name.All(character => char.IsAsciiLetterOrDigit(character) || TokenPunctuation.Contains(character, StringComparison.Ordinal))
-        && !IsReserved(name.Replace('_', '-'));
+    internal static bool IsValid(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return false;
+        if (name.Length > 256) return false;
+        if (!name.All(character => char.IsAsciiLetterOrDigit(character) || TokenPunctuation.Contains(character, StringComparison.Ordinal))) return false;
+        return !IsReserved(name.Replace('_', '-'));
+    }
 
     /// <summary>Strips every configured tenant header, including flows not selected by this request.</summary>
     /// <param name="headers">The inbound headers.</param>
@@ -25,13 +35,9 @@ internal static class ForwardedIdentityTenantHeader
     {
         foreach (var settings in config.Services.Values.Select(service => service.ForwardedIdentity))
         {
-            if (settings?.Version == "v2" && IsValid(settings.TenantHeader)) Strip(headers, settings.TenantHeader);
+            StripConfigured(headers, settings);
         }
-        if (TenantSelectionMiddleware.TryGetSelectionOptions(config, out var selection)
-            && selection.ForwardedIdentity is { } tenantList && tenantList.Version == "v2" && IsValid(tenantList.TenantHeader))
-        {
-            Strip(headers, tenantList.TenantHeader);
-        }
+        if (TenantSelectionMiddleware.TryGetSelectionOptions(config, out var selection)) StripConfigured(headers, selection.ForwardedIdentity);
     }
 
     /// <summary>Replaces the custom header with the gateway-authored tenant, never a copied inbound value.</summary>
@@ -49,11 +55,16 @@ internal static class ForwardedIdentityTenantHeader
         return tenants.Length == 1 && request.Headers.TryAddWithoutValidation(name, tenants[0]);
     }
 
-    static bool IsReserved(string name) => name.StartsWith(Headers.PrincipalPrefix, StringComparison.OrdinalIgnoreCase)
-        || name.StartsWith(Headers.OnBehalfPrefix, StringComparison.OrdinalIgnoreCase)
+    static bool IsReserved(string name) => _reservedPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
         || name.Equals(Headers.ForwardedIdentitySignature, StringComparison.OrdinalIgnoreCase)
         || ForwardedIdentityV2ContextHeaders.Names.Contains(name, StringComparer.OrdinalIgnoreCase)
         || _reserved.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    static void StripConfigured(IHeaderDictionary headers, C.ForwardedIdentitySigning? settings)
+    {
+        if (settings?.Version != "v2") return;
+        if (IsValid(settings.TenantHeader)) Strip(headers, settings.TenantHeader);
+    }
 
     static void Strip(IHeaderDictionary headers, string name)
     {
