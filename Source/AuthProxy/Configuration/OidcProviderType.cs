@@ -21,5 +21,13 @@ public enum OidcProviderType
     GitHub = 3,
 
     /// <summary>Apple Sign-In.</summary>
-    Apple = 4
+    Apple = 4,
+
+    /// <summary>
+    /// The Cratis Identity realm. Selecting it applies the Cratis Identity provider profile: a confidential client
+    /// using the authorization-code flow with PKCE, an issuer-verified discovery document, only the
+    /// <c language="text">openid profile</c> scopes plus those configured, and the account <c language="text">sub</c>
+    /// mapped to the canonical identity claims.
+    /// </summary>
+    CratisIdentity = 5
 }

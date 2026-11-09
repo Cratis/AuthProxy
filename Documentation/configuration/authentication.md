@@ -105,7 +105,7 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | Property | Type | Description |
 | ---------- | ------ | ------------- |
 | `Name` | `string` | Display name shown on the login selection page. |
-| `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). |
+| `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). `CratisIdentity` also applies the [Cratis Identity profile](#cratis-identity-profile). |
 | `Authority` | `string` | OIDC authority URL. |
 | `ClientId` | `string` | OAuth 2.0 client ID. |
 | `ClientSecret` | `string` | OAuth 2.0 client secret. Leave empty when `ClientCredential` selects a certificate or federated credential. |
@@ -231,6 +231,50 @@ assertion-provider errors with the provider and credential source. A credential 
 authorization request happens while starting the sign-in challenge, outside the callback's failed-sign-in
 handling, and returns an HTTP 500 response instead. OAuth 2.0 providers (below) still authenticate with
 `ClientSecret` only.
+
+#### Cratis Identity profile
+
+Set `Type` to `CratisIdentity` to sign people in through a Cratis Identity realm with a ready-made
+configuration. The profile is opt-in and changes nothing for providers of any other type.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Cratis Identity",
+            "Type": "CratisIdentity",
+            "Authority": "https://<identity-host>/<realm>",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+A Cratis Identity provider:
+
+- signs in with the authorization-code flow and PKCE, as a confidential client. Use `ClientSecret` or a
+  certificate or federated `ClientCredential`.
+- reads its endpoints from the realm's discovery document, and refuses the document unless its `issuer` is
+  the configured `Authority`.
+- requests only the `openid` and `profile` scopes, plus any you list in `Scopes`. It does not request
+  `email`.
+- maps the account's `sub` claim to the [canonical identity](#canonical-federated-identity) claims, with the
+  provider's scheme as the provider key. Configure `CanonicalIdentity` yourself to change this; give each
+  Cratis Identity provider a distinct provider key when you configure more than one. The default key comes
+  from the provider's scheme, so renaming the provider changes every user's canonical identity; set
+  `CanonicalIdentity` explicitly to keep the key stable.
+- signs out through the realm's discovered `end_session_endpoint`, sending the `id_token_hint`.
+
+AuthProxy refuses to start when a Cratis Identity provider has no absolute `Authority`, uses an `http`
+authority outside the `LocalDevelopment` deployment profile, has no `ClientId`, or has neither a
+`ClientSecret` nor a `ClientCredential`.
 
 ### Canonical federated identity
 

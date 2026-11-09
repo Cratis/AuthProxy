@@ -35,6 +35,7 @@ public class when_registering_oidc_provider_options : Specification
     [Fact] void should_set_client_credentials() => _options.ClientId.ShouldEqual("client-id");
     [Fact] void should_set_callback_path() => _options.CallbackPath.ToString().ShouldEqual("/signin-microsoft");
     [Fact] void should_include_standard_scopes() => _options.Scope.Contains("openid").ShouldBeTrue();
+    [Fact] void should_keep_requesting_email_outside_the_cratis_identity_profile() => _options.Scope.Contains("email").ShouldBeTrue();
     [Fact] void should_include_custom_scopes() => _options.Scope.Contains("offline_access").ShouldBeTrue();
     [Fact] void should_configure_ticket_received_event() => _options.Events.OnTicketReceived.ShouldNotBeNull();
 }
