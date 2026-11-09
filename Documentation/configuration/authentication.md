@@ -118,7 +118,7 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | Property | Type | Description |
 | ---------- | ------ | ------------- |
 | `Name` | `string` | Display name shown on the login selection page. |
-| `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). |
+| `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). `CratisIdentity` also applies the [Cratis Identity profile](#cratis-identity-profile). |
 | `Authority` | `string` | OIDC authority URL. |
 | `ClientId` | `string` | OAuth 2.0 client ID. |
 | `ClientSecret` | `string` | OAuth 2.0 client secret. Leave empty when `ClientCredential` selects a certificate or federated credential. |
@@ -244,6 +244,50 @@ assertion-provider errors with the provider and credential source. A credential 
 authorization request happens while starting the sign-in challenge, outside the callback's failed-sign-in
 handling, and returns an HTTP 500 response instead. OAuth 2.0 providers (below) still authenticate with
 `ClientSecret` only.
+
+#### Cratis Identity profile
+
+Set `Type` to `CratisIdentity` to sign people in through a Cratis Identity realm with a ready-made
+configuration. The profile is opt-in and changes nothing for providers of any other type.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Cratis Identity",
+            "Type": "CratisIdentity",
+            "Authority": "https://<identity-host>/<realm>",
+            "ClientId": "<client-id>",
+            "ClientSecret": "<client-secret>"
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+A Cratis Identity provider:
+
+- signs in with the authorization-code flow and PKCE, as a confidential client. Use `ClientSecret` or a
+  certificate or federated `ClientCredential`.
+- reads its endpoints from the realm's discovery document, and refuses the document unless its `issuer` is
+  the configured `Authority`.
+- requests only the `openid` and `profile` scopes, plus any you list in `Scopes`. It does not request
+  `email`.
+- maps the account's `sub` claim to the [canonical identity](#canonical-federated-identity) claims, with the
+  provider's scheme as the provider key. Configure `CanonicalIdentity` yourself to change this; give each
+  Cratis Identity provider a distinct provider key when you configure more than one. The default key comes
+  from the provider's scheme, so renaming the provider changes every user's canonical identity; set
+  `CanonicalIdentity` explicitly to keep the key stable.
+- signs out through the realm's discovered `end_session_endpoint`, sending the `id_token_hint`.
+
+AuthProxy refuses to start when a Cratis Identity provider has no absolute `Authority`, uses an `http`
+authority outside the `LocalDevelopment` deployment profile, has no `ClientId`, or has neither a
+`ClientSecret` nor a `ClientCredential`.
 
 ### Canonical federated identity
 
@@ -824,7 +868,21 @@ at startup.
 | Bearer-route token on any other path — whatever the case of the scheme or the whitespace after it, and in any of several `Authorization` headers | `401`, `WWW-Authenticate: Bearer error="invalid_token"` |
 
 `resource_metadata` is omitted when the route declares no `ResourceMetadataUrl`. Every refusal in the table
-carries `Cache-Control: no-store` and an empty body; the reason is logged, not returned.
+carries `Cache-Control: no-store` and a small JSON body with `Content-Type: application/json`, never a page or a
+redirect; the reason is logged, not returned. A `HEAD` request gets the same status and headers without a body.
+
+| Status | Body |
+|--------|------|
+| `400` | `{"error":"invalid_request"}` |
+| `401` | `{"error":"unauthorized"}` |
+| `403` for a missing scope | `{"error":"insufficient_scope"}` |
+| `403` otherwise | `{"error":"forbidden"}` |
+| `404` (resource metadata on a route that has none) | `{"error":"not_found"}` |
+| `405` | `{"error":"method_not_allowed"}` |
+| `503` | `{"error":"service_unavailable"}` |
+
+A route that accepts personal access tokens only advertises no OAuth metadata: its `401` challenge is
+`WWW-Authenticate: Bearer realm="<resource key>"`, and a request for resource metadata is answered `404`.
 
 The path of `ResourceMetadataUrl` (for example `/.well-known/oauth-protected-resource/mcp`) is forwarded to the
 service backend for `GET` and `HEAD` without authentication and without any identity headers, `Cookie` or
@@ -870,12 +928,74 @@ The consequences:
 
 See [Bearer routes](services.md#bearer-routes).
 
+### Revocation: edge introspection
+
+Validating a token's signature and expiry cannot tell that the issuer has since revoked it: a stolen or
+withdrawn token keeps working until it expires. When an issuer sets `Introspection`, AuthProxy asks the issuer's
+RFC 7662 introspection endpoint whether the token is still active, after the token has passed local validation
+and before the request is forwarded.
+
+```json
+{
+  "AuthProxy": {
+    "Services": {
+      "app": {
+        "BearerRoutes": [
+          {
+            "PathPrefix": "/mcp",
+            "Issuers": [
+              {
+                "Issuer": "https://auth.example.test/",
+                "Introspection": {
+                  "Endpoint": "https://auth.example.test/connect/introspect",
+                  "ClientId": "authproxy",
+                  "CacheDuration": "00:00:30"
+                }
+              }
+            ],
+            "Audiences": ["direct-api"]
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Set `ClientSecret` through the environment or a secret store, not in a committed file. The configuration is per
+issuer, so every route that trusts that issuer asks the same endpoint with the same client credential. The
+issuer must allow that client to introspect tokens for every audience its routes accept.
+
+| Endpoint says | Route `Refuse` (default) | Route `Accept` |
+|---------------|--------------------------|----------------|
+| Token active | Forwarded | Forwarded |
+| Token not active | `401` `invalid_token`, the same answer as any invalid token | `401` `invalid_token` |
+| Cannot be asked: timeout, error status, throttled, redirect, unreadable answer, or AuthProxy's own client refused | `503` with `Retry-After` | Forwarded on local validation alone, with a warning |
+
+- **A revoked token is refused within `CacheDuration`** (at most thirty seconds): an *active* answer is reused for
+  that long, never longer than the token's own expiry. Set `CacheDuration` to zero to ask on every request.
+- Only an active answer is cached, so a refusal or a failure is asked again on the next request.
+- Only whether the token is active is used. Nothing else the endpoint returns reaches the forwarded identity, so
+  introspection can narrow who gets through but never widen it. An answer naming a different subject, issuer,
+  client or token type than the validated token is treated as inactive.
+- The endpoint receives the token and AuthProxy's client credential only, over an HTTP client that follows no
+  redirects and sends no cookies. Only tokens that passed local validation are sent. Concurrent requests with the
+  same token share one call.
+- Neither the token nor its hash, the client secret or an answer body is written to a log.
+- `Accept` on an MCP route is refused at startup: an MCP route must not accept a token that could not be
+  confirmed. AuthProxy logs a warning at startup for an MCP route whose issuer has no `Introspection`.
+- This is a decision made once per request at the edge. Backends should keep validating what they are sent, and
+  the generic [JWT Bearer](#jwt-bearer-api) scheme is not covered.
+- Introspection adds a dependency on the issuer to each uncached request; size `Timeout` and `CacheDuration`
+  for it.
+
 ---
 
 ## Back-channel client credentials
 
 AuthProxy can also issue bearer tokens itself after a proxied service verifies the supplied
-client credentials over a private back channel.
+client credentials over a private back channel. The tokens can share their route prefix with a bearer route
+of the same service; see [Sharing a prefix with client credentials](services.md#sharing-a-prefix-with-client-credentials).
 
 1. The client sends `POST /.cratis/token`
 2. The request body uses standard OAuth form fields:

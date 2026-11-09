@@ -28,4 +28,10 @@ public enum BearerTokenValidationStatus
 
     /// <summary>The token lacks a constraint the route requires.</summary>
     UnboundCredential = 6,
+
+    /// <summary>The issuer's introspection endpoint reports the token is no longer active, for example because it was revoked.</summary>
+    Revoked = 7,
+
+    /// <summary>The issuer's introspection endpoint could not be asked, so the token could not be confirmed active.</summary>
+    IntrospectionUnavailable = 8,
 }

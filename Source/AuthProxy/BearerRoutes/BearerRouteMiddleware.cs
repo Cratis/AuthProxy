@@ -3,9 +3,10 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes.Introspection;
+using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
-using Microsoft.Net.Http.Headers;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.BearerRoutes;
@@ -17,15 +18,18 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="validator">The access-token validator.</param>
+/// <param name="introspector">Asks a token's issuer whether the validated token is still active, when the issuer has introspection configured.</param>
 /// <param name="accessPolicy">The deployment's claim requirements, applied to the token's principal.</param>
 /// <param name="tenantVerifier">The tenant existence verifier, applied when tenant verification is configured.</param>
 /// <param name="tenantResolver">The request's addressed tenants.</param>
 /// <param name="forwarder">The forwarder to the service backend.</param>
+/// <param name="tokenProtector">Recognizes access tokens AuthProxy issued through its client-credentials grant.</param>
 /// <param name="logger">The logger.</param>
 /// <remarks>
-/// Placed ahead of static files, authentication and everything after them, so a request on a bearer route never
-/// reaches the cookie session, provider selection, tenant selection or the reverse-proxy route table: it is
-/// answered here, by a forward or by an API-style refusal, and nothing else. The only other thing it does is
+/// Placed after endpoint selection but ahead of static files, authentication and everything after them, so a
+/// request on a bearer route never reaches the cookie session, provider selection, tenant selection or reverse-proxy
+/// forwarding: it is answered here, by a forward or by an API-style refusal. Selected passthrough routes are exempt
+/// before any token is read. The only other thing it does is
 /// refuse a token from a bearer-route issuer on a path that is not one of the bearer routes, so such a token
 /// cannot authenticate a browser-only surface through any other bearer support the deployment has configured.
 /// <para>
@@ -40,6 +44,12 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// otherwise a route that does not say so is reported at startup (<see cref="BearerRouteStartupReport"/>).
 /// </para>
 /// <para>
+/// A bearer route whose prefix is exactly its service's client-credentials route prefix also carries the tokens
+/// AuthProxy issues through its client-credentials grant. A credential this gate verifies as such a token is judged
+/// by the client-credentials rules only: it is handed on to the client-credentials authentication when it was issued
+/// for this service and prefix and refused here otherwise. Every other credential is judged by the bearer route only.
+/// </para>
+/// <para>
 /// With no bearer route configured it hands every request on untouched.
 /// </para>
 /// </remarks>
@@ -47,17 +57,19 @@ public class BearerRouteMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
     IBearerTokenValidator validator,
+    IBearerTokenIntrospector introspector,
     IAccessPolicy accessPolicy,
     ITenantVerifier tenantVerifier,
     ITenantResolver tenantResolver,
     IBearerRouteForwarder forwarder,
+    ClientCredentialsTokenProtector tokenProtector,
     ILogger<BearerRouteMiddleware> logger)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
         var current = config.CurrentValue;
-        if (BearerRouteTable.All(current).Count == 0)
+        if (AnonymousPaths.PassesCallerAuthorization(context) || BearerRouteTable.All(current).Count == 0)
         {
             await next(context);
             return;
@@ -96,11 +108,17 @@ public class BearerRouteMiddleware(
 
     async Task ServeResourceMetadata(HttpContext context, ResolvedBearerRoute route)
     {
+        // A route that accepts personal access tokens only has no OAuth metadata to serve, and nothing is
+        // forwarded for it: the answer is the same for every method.
+        if (route.Profile == BearerProfile.PatOnly)
+        {
+            BearerChallenge.MetadataNotFound(context);
+            return;
+        }
+
         if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
         {
-            BearerChallenge.NoStore(context);
-            context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
-            context.Response.Headers[HeaderNames.Allow] = "GET, HEAD";
+            BearerChallenge.MethodNotAllowed(context);
             return;
         }
 
@@ -109,10 +127,38 @@ public class BearerRouteMiddleware(
 
     async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
-        if (RequestAuthentication.IsAmbiguous(context))
+        // The credential's kind is decided once, here. The branch it lands in is the only one that sees it: a
+        // refusal is never retried as the other kind.
+        var clientCredentialsPrefix = ClientCredentialsOnBearerRoutes.SharedPrefix(current, route);
+        IssuedBearerRouteCredential? issued = null;
+        var recognizer = clientCredentialsPrefix is null ? null : (Func<string, bool>)(token => TryRecognizeIssued(token, route, out issued));
+        var (dispatch, reason) = CredentialDispatcher.Dispatch(context.Request, route, recognizer);
+        switch (dispatch)
         {
-            BearerChallenge.Unauthorized(context, resourceMetadataUrl: null, "invalid_token");
-            return;
+            case CredentialDispatch.ClientCredentials:
+                await HandOnIssuedToken(context, route, clientCredentialsPrefix!, issued!);
+                return;
+
+            case CredentialDispatch.Ambiguous:
+                logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
+                BearerChallenge.MultipleCredentials(context);
+                return;
+
+            case CredentialDispatch.Refused:
+                logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason), route);
+                return;
+
+            case CredentialDispatch.Missing:
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Missing, "No bearer token was presented."), route);
+                return;
+
+            case CredentialDispatch.PersonalAccessToken:
+                // The service behind the route verifies the token; this gate only recognized it and checked it names
+                // this route's resource.
+                context.Items[BearerRouteDefaults.PassThroughAuthorizationItemKey] = true;
+                await forwarder.Forward(context, route, identity: null);
+                return;
         }
 
         var validation = await validator.Validate(context.Request, route, context.RequestAborted);
@@ -120,6 +166,11 @@ public class BearerRouteMiddleware(
         {
             logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
             BearerChallenge.Write(context, validation, route);
+            return;
+        }
+
+        if (!await IsConfirmedActive(context, route, validation))
+        {
             return;
         }
 
@@ -146,6 +197,69 @@ public class BearerRouteMiddleware(
 
         context.User = validation.Principal!;
         await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
+    }
+
+    bool TryRecognizeIssued(string token, ResolvedBearerRoute route, out IssuedBearerRouteCredential? credential)
+    {
+        credential = null;
+
+        if (!ClientCredentialsOnBearerRoutes.CouldBeIssued(token) || !tokenProtector.TryValidate(token, out var validated, out var expiresAt))
+        {
+            return false;
+        }
+
+        credential = new(route, token, validated, expiresAt);
+        return true;
+    }
+
+    async Task HandOnIssuedToken(HttpContext context, ResolvedBearerRoute route, string prefix, IssuedBearerRouteCredential credential)
+    {
+        // The token is AuthProxy's own, so the client-credentials rules alone judge it and a refusal here is final.
+        if (!ClientCredentialsOnBearerRoutes.IsIssuedFor(credential.Payload, route, prefix, context.Request.Path))
+        {
+            const string reason = "client-credentials token issued for another service or route prefix";
+            logger.BearerTokenRefused(route.Prefix, route.ServiceName, BearerTokenValidationStatus.Invalid, reason);
+            BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason), route);
+            return;
+        }
+
+        context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = credential.Payload;
+        IssuedBearerRouteCredential.Store(context, credential);
+        await next(context);
+    }
+
+    async Task<bool> IsConfirmedActive(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
+    {
+        if (validation.Issuer is not { Introspection: not null } issuer)
+        {
+            return true;
+        }
+
+        // The token was read once already, by the same strict reading; failing to read it again refuses, never trusts.
+        var verdict = BearerTokenValidator.TryReadStrictBearerToken(context.Request, out var token)
+            ? await introspector.Introspect(token, validation, issuer, context.RequestAborted)
+            : IntrospectionVerdict.Inactive;
+
+        switch (verdict)
+        {
+            case IntrospectionVerdict.Active:
+                return true;
+
+            case IntrospectionVerdict.Unavailable when route.Route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept
+                && !BearerRouteTable.IsMcpPrefix(route.Prefix):
+                logger.IntrospectionUnavailableAccepted(issuer.Issuer, route.Prefix, route.ServiceName);
+                return true;
+
+            case IntrospectionVerdict.Unavailable:
+                logger.BearerIntrospectionRefused(issuer.Issuer, route.Prefix, route.ServiceName);
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.IntrospectionUnavailable, "The issuer's introspection endpoint is unavailable."), route);
+                return false;
+
+            default:
+                logger.BearerTokenRevoked(route.Prefix, route.ServiceName);
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Revoked, "The issuer reports the token is not active."), route);
+                return false;
+        }
     }
 
     bool BindingConflicts(HttpContext context, C.AuthProxy current, ResolvedBearerRoute route, BearerTokenValidation validation)

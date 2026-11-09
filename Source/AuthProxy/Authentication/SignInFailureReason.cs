@@ -37,4 +37,7 @@ public static class SignInFailureReason
     /// and a fresh sign-in is required.
     /// </summary>
     public const string InvalidSession = "invalid-session";
+
+    /// <summary>The requested operation needs a recent authentication.</summary>
+    public const string FreshAuthenticationRequired = "fresh-authentication-required";
 }

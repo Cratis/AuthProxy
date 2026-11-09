@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <Content Include="../../Contract/*" Link="Contract/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="ForwardedIdentity/for_V2/Fixtures/vectors.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

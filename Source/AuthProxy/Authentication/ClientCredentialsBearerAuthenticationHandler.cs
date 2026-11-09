@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using Cratis.AuthProxy.BearerRoutes;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
@@ -27,7 +28,7 @@ public class ClientCredentialsBearerAuthenticationHandler(
     /// <inheritdoc/>
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!TryGetBearerToken(out var token))
+        if (AnonymousPaths.PassesCallerAuthorization(Context) || !TryGetBearerToken(out var token))
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
@@ -86,15 +87,20 @@ public class ClientCredentialsBearerAuthenticationHandler(
     }
 
     /// <summary>
-    /// Gets the token payload validated earlier by the composite scheme selector, when present,
-    /// to avoid unprotecting the same token twice. Falls back to validating it directly so the
-    /// handler also works when invoked without going through the composite scheme (e.g. in specs).
+    /// Reuses the gate's verified payload on bearer routes, checking its deadline without unprotecting again.
+    /// Outside bearer routes, preserves the composite selector cache and direct validation behavior.
     /// </summary>
     /// <param name="token">The bearer token to validate.</param>
     /// <param name="payload">The resolved token payload.</param>
     /// <returns><see langword="true"/> if a payload was found or validated; otherwise <see langword="false"/>.</returns>
     bool TryGetValidatedPayload(string token, out ClientCredentialsTokenPayload payload)
     {
+        var current = Context.RequestServices.GetRequiredService<IOptionsMonitor<Configuration.AuthProxy>>().CurrentValue;
+        if (BearerRouteTable.TryMatch(Request.Path, current, out var route) || IssuedBearerRouteCredential.Read(Context) is not null)
+        {
+            return TryGetBearerRoutePayload(token, current, route, out payload);
+        }
+
         if (Context.Items.TryGetValue(ClientCredentialsDefaults.ValidatedTokenPayloadItemKey, out var cached)
             && cached is ClientCredentialsTokenPayload cachedPayload)
         {
@@ -103,5 +109,29 @@ public class ClientCredentialsBearerAuthenticationHandler(
         }
 
         return tokenProtector.TryValidate(token, out payload);
+    }
+
+    bool TryGetBearerRoutePayload(string token, Configuration.AuthProxy current, ResolvedBearerRoute? route, out ClientCredentialsTokenPayload payload)
+    {
+        payload = default!;
+        var credential = IssuedBearerRouteCredential.Read(Context);
+        if (route is null || credential is null)
+        {
+            return false;
+        }
+
+        if (!string.Equals(credential.Token, token, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var prefix = ClientCredentialsOnBearerRoutes.SharedPrefix(current, route);
+        if (prefix is null || !credential.IsCurrentFor(route, prefix, Request.Path, TimeProvider.GetUtcNow()))
+        {
+            return false;
+        }
+
+        payload = credential.Payload;
+        return true;
     }
 }

@@ -10,4 +10,10 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="MetadataAddress">The address of the issuer's metadata document.</param>
 /// <param name="TokenTypes">The accepted JWT <c language="text">typ</c> header values.</param>
 /// <param name="RequireHttps">Whether the metadata and JWKS documents must be retrieved over HTTPS.</param>
-public sealed record ResolvedBearerIssuer(string Issuer, string MetadataAddress, IReadOnlyList<string> TokenTypes, bool RequireHttps);
+public sealed record ResolvedBearerIssuer(string Issuer, string MetadataAddress, IReadOnlyList<string> TokenTypes, bool RequireHttps)
+{
+    /// <summary>
+    /// Gets how the issuer is asked whether a validated token is still active, or <see langword="null"/> when it is not.
+    /// </summary>
+    public Configuration.BearerIssuerIntrospection? Introspection { get; init; }
+}

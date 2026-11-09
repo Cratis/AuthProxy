@@ -122,7 +122,7 @@ public class ClientCredentialsTokenProtector(
     /// <param name="payload">The unprotected payload.</param>
     /// <returns><see langword="true"/> if the token is valid; otherwise <see langword="false"/>.</returns>
     public bool TryValidate(string token, out ClientCredentialsTokenPayload payload) =>
-        TryUnprotect(_protector, token, out payload);
+        TryValidate(token, out payload, out _);
 
     /// <summary>
     /// Tries to validate and unprotect a refresh token. The payload carries the deadline of the token's family.
@@ -133,6 +133,14 @@ public class ClientCredentialsTokenProtector(
     public bool TryValidateRefreshToken(string token, out ClientCredentialsTokenPayload payload) =>
         TryUnprotectRefreshToken(token, out payload) || TryUnprotectLegacyRefreshToken(token, out payload);
 
+    /// <summary>Validates an access token and retains its protected deadline for a request-local handoff.</summary>
+    /// <param name="token">The access token.</param>
+    /// <param name="payload">The verified payload.</param>
+    /// <param name="expiresAt">The deadline protected alongside the payload.</param>
+    /// <returns>Whether the token is valid.</returns>
+    internal bool TryValidate(string token, out ClientCredentialsTokenPayload payload, out DateTimeOffset expiresAt) =>
+        TryUnprotect(_protector, token, out payload, out expiresAt);
+
     static DateTimeOffset Earliest(DateTimeOffset first, DateTimeOffset second) => first <= second ? first : second;
 
     static string Serialize(ConfiguredClientCredentialsService service, string clientId, string? tenant) =>
@@ -140,11 +148,12 @@ public class ClientCredentialsTokenProtector(
             new ClientCredentialsTokenPayload(service.Name, service.RoutePrefix, clientId, tenant),
             _serializerOptions);
 
-    bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload)
+    bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload, out DateTimeOffset expiresAt)
     {
+        expiresAt = default;
         try
         {
-            var protectedPayload = protector.Unprotect(token, out var expiresAt);
+            var protectedPayload = protector.Unprotect(token, out expiresAt);
             if (timeProvider.GetUtcNow() >= expiresAt)
             {
                 payload = default!;

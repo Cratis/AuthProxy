@@ -125,9 +125,10 @@ public class ClientCredentialsServiceResolver(
             : null;
     }
 
-    static bool IsHttp(Uri uri) => uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
-
-    static string NormalizeRoutePrefix(string routePrefix)
+    /// <summary>Normalizes a configured client-credentials route prefix the way the token request and the bearer check read it.</summary>
+    /// <param name="routePrefix">The configured route prefix.</param>
+    /// <returns>The normalized prefix; <c language="text">/api</c> when none is configured.</returns>
+    internal static string NormalizeRoutePrefix(string routePrefix)
     {
         var normalized = string.IsNullOrWhiteSpace(routePrefix)
             ? "/api"
@@ -142,6 +143,8 @@ public class ClientCredentialsServiceResolver(
             ? normalized.TrimEnd('/')
             : normalized;
     }
+
+    static bool IsHttp(Uri uri) => uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
 
     IEnumerable<ConfiguredClientCredentialsService> GetConfiguredServices()
     {

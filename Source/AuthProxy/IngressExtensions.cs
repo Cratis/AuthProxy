@@ -74,6 +74,7 @@ public static class IngressExtensions
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardedIdentitySigningConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, FreshAuthenticationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SignInCallbackHostConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ClientCredentialsConfigurationValidator>();
         builder.Services.AddSingleton<ITrustedProxyPolicy, TrustedProxyPolicy>();
@@ -190,29 +191,45 @@ public static class IngressExtensions
         // circuits on its first line for every deployment that has not opted in.
         app.UseMiddleware<AdmissionMiddleware>();
 
-        // Ahead of the pages, the static files and authentication, because a bearer route must reach none of
-        // them: a request on one is answered here, by a forward or an API-style refusal. It hands every request on
-        // untouched when no bearer route is configured.
+        // Normalize the legacy selector before matching the authoritative endpoint, once, ahead of every
+        // bearer reader. All later decisions use this captured disposition, not a second prefix matcher.
+        app.UseMiddleware<LegacyServiceHeaderMiddleware>();
+        app.UseRouting();
+        app.Use((context, next) =>
+        {
+            ForwardedIdentityTenantHeader.Strip(context.Request.Headers, context.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue);
+            AnonymousPaths.CaptureRouteDisposition(context);
+            return next(context);
+        });
+
+        // Still ahead of the pages, static files and authentication: a bearer route is answered here,
+        // but a selected passthrough route leaves its backend-owned Authorization header untouched.
         app.UseMiddleware<BearerRouteMiddleware>();
 
-        // Routes match one service header, so a client still sending the legacy one is given the current one
-        // before any endpoint is selected.
-        app.UseMiddleware<LegacyServiceHeaderMiddleware>();
-
+        // Static files skip requests with an endpoint. Temporarily hide the selected endpoint so the YARP
+        // catch-all cannot swallow bundled assets, then restore it on a miss without routing a second time.
+        // The captured disposition remains available throughout, including while serving a static file.
+        app.Use(async (context, next) =>
+        {
+            context.SetEndpoint(null);
+            try
+            {
+                await next(context);
+            }
+            finally
+            {
+                AnonymousPaths.RestoreSelectedEndpoint(context);
+            }
+        });
         app.Map(WellKnownPaths.Pages, pagesApp => ConfigurePagesPipeline(pagesApp, app.Environment, app.Services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>()));
         app.UseStaticFiles();
-
-        // Without an explicit UseRouting(), ASP.NET Core's implicit routing insertion matches an endpoint
-        // before UseStaticFiles ever runs whenever the reverse proxy has a configured route — YARP's
-        // catch-all matches every path, including this app's own bundled assets. UseStaticFiles is
-        // endpoint-aware and skips serving a file once an endpoint is already selected for the request
-        // (see https://learn.microsoft.com/aspnet/core/fundamentals/static-files), so every asset request
-        // fell through to SelectProviderMiddleware and was refused with 401 instead of being served. Placing
-        // UseRouting() here, right after UseStaticFiles(), anchors endpoint matching to this exact position
-        // so static files are always served before any route — including the reverse proxy's — can claim
-        // the request.
-        app.UseRouting();
+        app.Use((context, next) =>
+        {
+            AnonymousPaths.RestoreSelectedEndpoint(context);
+            return next(context);
+        });
         app.UseAuthentication();
+        app.UseMiddleware<BearerRouteAuthenticationMiddleware>();
 
         // Right after authentication so it can tell a session cookie that failed to become a ticket from an
         // absent one. It does nothing for a deployment that configures neither a cookie domain nor a name.
@@ -231,21 +248,27 @@ public static class IngressExtensions
         app.UseMiddleware<ProxyOwnedFlowMiddleware>();
         app.UseAuthorization();
         app.UseMiddleware<AccessControlMiddleware>();
+        app.UseMiddleware<FreshAuthenticationMiddleware>();
 
-        // After the deployment's gates, so an actor must be allowed in as themselves before acting as anybody, and
-        // before tenant selection, tenancy and identity resolution, so all three see the represented user.
-        app.UseMiddleware<OnBehalfMiddleware>();
+        // Passthrough routes derive no identity or tenant. The same captured endpoint disposition that
+        // bypassed bearer inspection also bypasses membership lookup, impersonation and identity resolution.
+        app.UseWhen(context => !AnonymousPaths.PassesCallerAuthorization(context), identityApp =>
+        {
+            // After the deployment's gates, so an actor must be allowed in as themselves before acting as anybody,
+            // and before tenant selection, tenancy and identity resolution, so all three see the represented user.
+            identityApp.UseMiddleware<OnBehalfMiddleware>();
 
-        // Refuse bound-credential conflicts before membership lookup and namespace selection.
-        app.UseMiddleware<CredentialBindingMiddleware>();
-        app.UseMiddleware<TenantSelectionMiddleware>();
-        app.UseMiddleware<CredentialBindingMiddleware>(true);
-        app.UseMiddleware<TenancyMiddleware>();
-        app.UseInviteMiddleware();
-        app.UseMiddleware<RegistrationMiddleware>();
-        app.UseMiddleware<IdentityMiddleware>();
-        app.UseMiddleware<InviteRedirectMiddleware>();
-        app.UseMiddleware<IdentityForwardingGuardMiddleware>();
+            // Refuse bound-credential conflicts before membership lookup and namespace selection.
+            identityApp.UseMiddleware<CredentialBindingMiddleware>();
+            identityApp.UseMiddleware<TenantSelectionMiddleware>();
+            identityApp.UseMiddleware<CredentialBindingMiddleware>(true);
+            identityApp.UseMiddleware<TenancyMiddleware>();
+            identityApp.UseInviteMiddleware();
+            identityApp.UseMiddleware<RegistrationMiddleware>();
+            identityApp.UseMiddleware<IdentityMiddleware>();
+            identityApp.UseMiddleware<InviteRedirectMiddleware>();
+            identityApp.UseMiddleware<IdentityForwardingGuardMiddleware>();
+        });
 
         app.MapIngressEndpoints();
         app.UseReverseProxy();

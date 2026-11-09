@@ -5,7 +5,8 @@ import type { OidcProvider } from './types';
 const reasonMessages: Record<string, string> = {
     'remote-failure': 'Signing in did not complete. Please try again.',
     'access-denied': 'The sign-in was cancelled or not approved at the identity provider. Please try again.',
-    'invalid-session': 'Your session is no longer valid. Please sign in again.'
+    'invalid-session': 'Your session is no longer valid. Please sign in again.',
+    'fresh-authentication-required': 'Please sign in again to continue with this operation.'
 };
 
 export default function App() {
@@ -44,7 +45,7 @@ export default function App() {
             {!loading && !showError && (
                 <div className="providers">
                     {providers.map(provider => (
-                        <ProviderButton key={provider.name} provider={provider} returnUrl={returnUrl} />
+                        <ProviderButton key={provider.name} provider={provider} returnUrl={returnUrl} fresh={query.get('fresh') === '1'} maxAge={query.get('maxAge') ?? '300'} />
                     ))}
                 </div>
             )}

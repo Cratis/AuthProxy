@@ -17,6 +17,7 @@ public static class ForwardedIdentityServiceCollectionExtensions
     public static void AddForwardedIdentitySigning(this WebApplicationBuilder builder)
     {
         builder.Services.AddBackendTls();
+        builder.Services.AddHttpContextAccessor();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IForwardedIdentitySigner, ForwardedIdentitySigner>();
         builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, ForwardedIdentitySigningStartupReport>());

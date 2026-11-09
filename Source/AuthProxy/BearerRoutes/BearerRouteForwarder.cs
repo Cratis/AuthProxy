@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.ReverseProxy;
 using Cratis.AuthProxy.Telemetry;
@@ -55,7 +56,7 @@ public sealed class BearerRouteForwarder(
     {
         var current = config.CurrentValue;
         current.Services.TryGetValue(route.ServiceName, out var service);
-        if (service is null || ForwardingPathPolicy.Evaluate(context.Request, service, context.Request.Path) != ForwardingPathRefusal.None)
+        if (service is null || !CanForward(context.Request, service))
         {
             logger.ForwardingPathRefused(context.Request.Method, RequestPathRedaction.Redact(context.Request.Path), route.ServiceName);
             await UniformDenial.Write(context);
@@ -94,4 +95,8 @@ public sealed class BearerRouteForwarder(
 
     /// <inheritdoc/>
     public void Dispose() => _invoker.Dispose();
+
+    static bool CanForward(HttpRequest request, C.Service service) =>
+        !FreshAuthenticationPolicy.RefusesBearerRequest(request, service)
+        && ForwardingPathPolicy.Evaluate(request, service, request.Path) == ForwardingPathRefusal.None;
 }

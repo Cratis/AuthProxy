@@ -61,6 +61,7 @@ public static class ForwardedIdentitySigningReport
     static ForwardedIdentityFlowStatus Row(ForwardedIdentityFlow flow, string? service, C.ForwardedIdentitySigning? settings, string? address, C.AuthProxy config) =>
         new(flow, service, settings is not null, settings?.KeyId, settings?.Audience)
         {
+            Version = settings?.Version,
             Transport = Uri.TryCreate(address, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
                 ? config.BackendTls.ClientCertificate is null ? BackendHops.BackendHopTransport.Tls : BackendHops.BackendHopTransport.MutualTls
                 : BackendHops.BackendHopTransport.PlainHttp

@@ -3,6 +3,7 @@
 
 using System.Buffers;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -62,6 +63,8 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
                                 "Bearer routes claim their paths on every host; use non-overlapping prefixes.");
                         }
                     }
+
+                    failures.AddRange(ClientCredentialsOverlaps(serviceName, prefix, options).Select(conflict => $"{at}:{nameof(C.BearerRoute.PathPrefix)} '{prefix}' {conflict}"));
                 }
 
                 if (options.RequiresIdentityVerification && !route.AcceptWithoutIdentityVerification)
@@ -87,6 +90,12 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
+
+    static IEnumerable<string> ClientCredentialsOverlaps(string serviceName, string prefix, C.AuthProxy options) =>
+        options.Services
+            .Where(other => other.Value.ClientCredentials is not null)
+            .Select(other => ClientCredentialsOnBearerRoutes.Conflict(serviceName, prefix, other.Key, other.Value.ClientCredentials!))
+            .OfType<string>();
 
     static void ValidateEnvironment(string at, C.BearerRoute route, C.CredentialBinding binding, List<string> failures)
     {
@@ -135,9 +144,11 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             }
         }
 
-        if (route.Issuers.Count == 0)
+        ValidatePersonalAccessTokens(at, route, failures);
+
+        if (route.Issuers.Count == 0 && route.PersonalAccessTokens is null)
         {
-            failures.Add($"{at}:{nameof(C.BearerRoute.Issuers)} is empty. A bearer route must name the authorization server whose tokens it accepts.");
+            failures.Add($"{at}:{nameof(C.BearerRoute.Issuers)} is empty. A bearer route must name the authorization server whose tokens it accepts, or declare {nameof(C.BearerRoute.PersonalAccessTokens)}.");
         }
 
         for (var i = 0; i < route.Issuers.Count; i++)
@@ -150,7 +161,8 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             }
         }
 
-        if (route.Audiences.All(string.IsNullOrWhiteSpace))
+        var acceptsTokensOnly = route.Issuers.Count == 0 && route.PersonalAccessTokens is not null;
+        if (!acceptsTokensOnly && route.Audiences.All(string.IsNullOrWhiteSpace))
         {
             failures.Add($"{at}:{nameof(C.BearerRoute.Audiences)} is empty. A bearer route must name the audience its tokens are issued for.");
         }
@@ -164,6 +176,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
         }
 
         ValidateResourceMetadata(at, serviceName, route, metadataPaths, failures);
+        ValidateIntrospection(at, route, failures);
 
         if (route.ClockSkew is { } skew && (skew < TimeSpan.Zero || skew > C.BearerRoute.MaximumClockSkew))
         {
@@ -207,6 +220,72 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             if (!mappingTargets.Add(target))
             {
                 failures.Add($"{at}:{nameof(C.BearerRoute.ClaimMappings)} has conflicting targets differing only by case: '{target}'.");
+            }
+        }
+    }
+
+    static void ValidatePersonalAccessTokens(string at, C.BearerRoute route, List<string> failures)
+    {
+        if (route.PersonalAccessTokens is not { } tokens)
+        {
+            return;
+        }
+
+        if (!PersonalAccessTokenClassifier.IsValidResourceKey(tokens.ResourceKey))
+        {
+            failures.Add(
+                $"{at}:{nameof(C.BearerRoute.PersonalAccessTokens)}:{nameof(C.BearerRoutePersonalAccessTokens.ResourceKey)} must be 'direct', 'studio' or 'stage-<app-key>' " +
+                "with a lowercase letter, digit or hyphen app key.");
+        }
+
+        if (route.Issuers.Count == 0 && !string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
+        {
+            failures.Add($"{at}:{nameof(C.BearerRoute.ResourceMetadataUrl)} is set on a route that accepts personal access tokens only, which has no OAuth metadata to advertise.");
+        }
+    }
+
+    static void ValidateIntrospection(string at, C.BearerRoute route, List<string> failures)
+    {
+        if (route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept && BearerRouteTable.IsMcpPrefix(route.PathPrefix))
+        {
+            failures.Add(
+                $"{at}:{nameof(C.BearerRoute.IntrospectionUnavailable)} cannot be {nameof(C.IntrospectionFailurePolicy.Accept)} on an MCP route: " +
+                "a revoked token must never be accepted because the issuer could not be asked.");
+        }
+
+        for (var i = 0; i < route.Issuers.Count; i++)
+        {
+            if (route.Issuers[i].Introspection is not { } introspection)
+            {
+                continue;
+            }
+
+            var issuerAt = $"{at}:{nameof(C.BearerRoute.Issuers)}:{i}:{nameof(C.BearerIssuer.Introspection)}";
+            if (!BearerRouteTable.TryParseAuthorityUri(introspection.Endpoint, out _, out _))
+            {
+                failures.Add(
+                    $"{issuerAt}:{nameof(C.BearerIssuerIntrospection.Endpoint)} must be an absolute HTTPS URI without query, " +
+                    "fragment or user information (plain HTTP is accepted only on a loopback host).");
+            }
+
+            if (string.IsNullOrWhiteSpace(introspection.ClientId) || string.IsNullOrEmpty(introspection.ClientSecret))
+            {
+                failures.Add($"{issuerAt}: {nameof(C.BearerIssuerIntrospection.ClientId)} and {nameof(C.BearerIssuerIntrospection.ClientSecret)} are required.");
+            }
+
+            if (introspection.CacheDuration < TimeSpan.Zero || introspection.CacheDuration > C.BearerIssuerIntrospection.MaximumCacheDuration)
+            {
+                failures.Add($"{issuerAt}:{nameof(C.BearerIssuerIntrospection.CacheDuration)} must be between zero and {C.BearerIssuerIntrospection.MaximumCacheDuration}, which bounds how long a revoked token can still be accepted.");
+            }
+
+            if (introspection.Timeout < C.BearerIssuerIntrospection.MinimumTimeout || introspection.Timeout > C.BearerIssuerIntrospection.MaximumTimeout)
+            {
+                failures.Add($"{issuerAt}:{nameof(C.BearerIssuerIntrospection.Timeout)} must be between {C.BearerIssuerIntrospection.MinimumTimeout} and {C.BearerIssuerIntrospection.MaximumTimeout}.");
+            }
+
+            if (introspection.MaximumCachedTokens < 1)
+            {
+                failures.Add($"{issuerAt}:{nameof(C.BearerIssuerIntrospection.MaximumCachedTokens)} must be at least 1.");
             }
         }
     }

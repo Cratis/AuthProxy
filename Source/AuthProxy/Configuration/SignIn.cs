@@ -55,4 +55,18 @@ public class SignIn
     /// Leave it unset — the default — and notifications are posted unsigned, exactly as they always have been.
     /// </summary>
     public SignInAttestation? Attestation { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the signed notification also carries the fixed set of upstream claims
+    /// AuthProxy itself verified during the OpenID Connect sign-in, under <c language="text">verifiedClaims</c>:
+    /// <c language="text">iss</c>, <c language="text">sub</c>, <c language="text">idp</c>, <c language="text">idp_sub</c>,
+    /// <c language="text">github_id</c>, <c language="text">auth_time</c> and <c language="text">jti</c>. Off by default.
+    /// </summary>
+    /// <remarks>
+    /// Each claim is taken only from the identity token or the access token AuthProxy validated in the same code exchange
+    /// (the access token must be valid and name the identity token's subject, or no claim is sent), and a claim its token lacks is omitted.
+    /// They are only ever sent inside a signed body, so this requires <see cref="Attestation"/>; without it no
+    /// claims are sent and startup validation fails. No token is carried.
+    /// </remarks>
+    public bool IncludeVerifiedUpstreamClaims { get; set; }
 }

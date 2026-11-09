@@ -5,6 +5,9 @@ namespace Cratis.AuthProxy.ForwardedIdentity;
 
 internal static partial class ForwardedIdentitySigningStartupReportLogging
 {
+    [LoggerMessage(4, LogLevel.Information, "Forwarded identity for {Flow} to {Service}: {Version}, {State}")]
+    internal static partial void FlowRefusing(this ILogger<ForwardedIdentitySigningStartupReport> logger, ForwardedIdentityFlow flow, string? service, string version, string state);
+
     [LoggerMessage(3, LogLevel.Information, "Forwarded identity for {Flow} to {Service}: attested, not envelope-signed")]
     internal static partial void FlowAttested(this ILogger<ForwardedIdentitySigningStartupReport> logger, ForwardedIdentityFlow flow, string? service);
 

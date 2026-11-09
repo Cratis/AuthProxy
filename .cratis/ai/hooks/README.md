@@ -13,11 +13,49 @@ Three layers:
 | Hard block | `PreToolUse` on a write | `scripts/cratis-guard-writes.sh` | zero | exits **2** — the write does not happen |
 | Hard block | `PreToolUse` on `Bash` | `scripts/cratis-guard-shell-writes.sh` | zero tokens; one batch Write/Edit classification | exits **2** — a protected reference requires read-only syntax throughout the command; best-effort, not a sandbox |
 | Hard block | `PreToolUse` on `Bash` | `scripts/cratis-guard-store-mutations.sh` | zero; parses only commands that mention `cratis` | exits **2** — the store-changing `cratis chronicle` command does not run |
-| Hard block | `PreToolUse` on `Bash` | `scripts/cratis-guard-secrets.sh` | zero; parses only commands that mention a credential-bearing tool or file | exits **2** — the guard is a **best-effort, defense-in-depth text filter, NOT a sandbox**: it refuses some harmless commands rather than model the whole shell. Real protection requires **OS-level sandboxing or file permissions**. A command is *tainted* when a protected file-name stem appears in any token, including option values, in any letter case, after quotes, backslashes and line continuations are removed. Only search regex text is exempt: `-e`/`--regexp` values, or the first operand when neither `-e` nor `-f` is present. `-f`/`--file` values and all other operands are paths, not exempt patterns. The stems are `.env`, `.pem`, `.p12`, `.pfx`, `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`, `.netrc`, `.npmrc`, `.pgpass`, `.pypirc`, `.git-credentials`, `.kube/`, `kubeconfig`, `credentials`, `.docker/`, `/environ` and `run/secrets`. Stars, question marks, bracket expressions and grouped pathname patterns count as the characters they can match when the pattern retains at least two literal stem characters. A command is also tainted when an assignment value or any expanded word can contain a stem. A tainted command runs only when it is a single simple command with every word literal: `cat`, `head`, `tail`, `less`, `more`, `wc`, `grep`, `egrep`, `fgrep` or `rg` of paths that are not protected (such as `cat .env.example`); `test` of literal paths; or `cp SOURCE DEST` with no options and a source that is not protected (for example, `cp .env.example example.txt`; the shell-write guard separately refuses `.env` destinations). A single simple `ls` or `stat` may also take glob operands, but not variables, substitutions, wrappers or other shell structure. Tainted searches cannot recurse, search a directory with `rg`, omit `rg` path operands, or use value-taking options other than `-e`/`--regexp`. Every other tainted command is refused, including variables, command substitution, globs for content readers, loops, conditionals, pipes, redirections, here-strings, here-documents, wrappers, `bash -c`, `eval` and transfer tools. Shell-option changes are checked even without a protected stem: modifying `shopt`, `setopt`, `unsetopt` and `emulate` are refused. `extglob` is refused as an option, not merely as text. Shell invocation `-o`/`-O` options, including clustered flags, must name a supported option. Expanded `set` arguments are refused. Only `set` flags `e`, `u`, `x`, `f`, `v`, `E`, `T` and named options `errexit`, `nounset`, `pipefail`, `xtrace`, `verbose`, `noglob`, `errtrace`, `functrace` (including their `+` forms) are supported. The message names the stem: run the read on its own with literal paths, or put long text that mentions the name in a file. Commands without a stem keep the full analysis. In that analysis a variable can hold any value the command assigns to it anywhere, a positional parameter or an unquoted expansion with glob or space characters is unknown, and an unknown file operand is refused. Residual classes include **shell glob grammar across bash and zsh, option toggles, option arity and quote concatenation**, as well as runtime-generated names, inherited state, filesystem indirection, user-defined commands, external programs and scripts, and searches without a named protected path. These classes are not modeled exhaustively. Use OS-level sandboxing or file permissions, harness isolation and least privilege as the primary boundary. Token files and key-extension globs (`*.key`, `*.jks`) are refused only through the listed reader, input, `dd` and transfer commands; see [`secrets.md`](../rules/secrets.md) |
+| Hard block | `PreToolUse` on `Bash` | `scripts/cratis-guard-secrets.sh` | zero; parses only commands that mention a credential-bearing tool or file | exits **2** — the guard is a **best-effort, defense-in-depth text filter, NOT a sandbox**: it refuses some harmless commands rather than model the whole shell. Real protection requires **OS-level sandboxing or file permissions**. A command is *tainted* when a protected file-name stem appears in any token, including option values, in any letter case, after quotes, backslashes and line continuations are removed. Only search regex text is exempt: `-e`/`--regexp` values, or the first operand when neither `-e` nor `-f` is present. `-f`/`--file` values and all other operands are paths, not exempt patterns. The stems are `.env`, `.pem`, `.p12`, `.pfx`, `id_rsa`, `id_ed25519`, `id_ecdsa`, `id_dsa`, `.netrc`, `.npmrc`, `.pgpass`, `.pypirc`, `.git-credentials`, `.kube/`, `kubeconfig`, `credentials`, `.docker/`, `/environ` and `run/secrets`. Stars, question marks, bracket expressions and grouped pathname patterns count as the characters they can match when the pattern retains at least two literal stem characters. For `credentials` only, an embedded occurrence in a longer directory component or a recognized source filename (for example `Specs/for_ApplicationCredentials/a.cs` or `CredentialsProvider.cs`) is not a stem hit; exact `credentials`, `credentials.*` and a `credentials/` component remain protected. A command is also tainted when an assignment value or any expanded word can contain a stem. A tainted command runs only when it is a single simple command with every word literal: `cat`, `head`, `tail`, `less`, `more`, `wc`, `grep`, `egrep`, `fgrep` or `rg` of paths that are not protected (such as `cat .env.example`); `test` of literal paths; or `cp SOURCE DEST` with no options and a source that is not protected (for example, `cp .env.example example.txt`; the shell-write guard separately refuses `.env` destinations). A single simple `ls` or `stat` may also take glob operands, but not variables, substitutions, wrappers or other shell structure. Tainted searches cannot recurse, search a directory with `rg`, omit `rg` path operands, or use value-taking options other than `-e`/`--regexp`. Every other tainted command is refused, including variables, command substitution, globs for content readers, loops, conditionals, pipes, redirections, here-strings, here-documents, wrappers, `bash -c`, `eval` and transfer tools. Shell-option changes are checked even without a protected stem: modifying `shopt`, `setopt`, `unsetopt` and `emulate` are refused. `extglob` is refused as an option, not merely as text. Shell invocation `-o`/`-O` options, including clustered flags, must name a supported option. Expanded `set` arguments are refused. Only `set` flags `e`, `u`, `x`, `f`, `v`, `E`, `T` and named options `errexit`, `nounset`, `pipefail`, `xtrace`, `verbose`, `noglob`, `errtrace`, `functrace` (including their `+` forms) are supported. The message names the stem: list the directory with `ls`, then name exact non-credential paths, or use `rg -l PATTERN literal-file`. Narrowing to safe literal files is supported remediation, not a workaround; disguising the same secret read behind a variable, glob, wrapper, script or alias remains prohibited. Commands without a stem keep the full analysis. In that analysis a variable can hold any value the command assigns to it anywhere, a positional parameter or an unquoted expansion with glob or space characters is unknown, and an unknown file operand is refused. Residual classes include **shell glob grammar across bash and zsh, option toggles, option arity and quote concatenation**, as well as runtime-generated names, inherited state, filesystem indirection, user-defined commands, external programs and scripts, and searches without a named protected path. These classes are not modeled exhaustively. Use OS-level sandboxing or file permissions, harness isolation and least privilege as the primary boundary. Token files and key-extension globs (`*.key`, `*.jks`) are refused only through the listed reader, input, `dd` and transfer commands; see [`secrets.md`](../rules/secrets.md) |
 | Hard block | `PreToolUse` on `Bash` | `scripts/cratis-guard-pr-body.sh` | fetches shared rules only for `gh pr create/edit` | exits **2** for inline bodies, invalid notes or conflicting release labels; warns and allows when offline with no cache |
 | Cleanup of delivered work | `PostToolUse` on `Bash` (`gh pr merge`, `git pull/merge/worktree`) and `SessionStart` (Pi: `tool_result` and `session_start`) | `scripts/cratis-cleanup-worktrees.sh --hook` | zero when the command is unrelated | never blocks; removes delivered worktrees and branches, reports what it kept |
 | Quality gate (Claude) | `Stop` | `scripts/cratis-quality-gate.sh` | one build/test run, only when relevant files changed | exits **2** — the turn does not end |
 | Quality gate (Pi) | explicit `cratis_quality_gate` tool | same script | only at a requested verification checkpoint | error on failure; no turn-end hook |
+
+For false positives, a literal-prefix trailing `*`, including literal directory components, can be
+resolved in a known, readable cwd and parent directory. A single reader may stand alone or appear in
+an `&&` chain of literal read-only Git metadata commands, optionally after a literal leading `cd`.
+The probe is bound to that reader's parsed command index. Arbitrary earlier/later commands, functions,
+quoted command names, other separators and shell evaluation do not qualify. Quoted search patterns
+and format values remain data. Only fixed code with quoted positional arguments performs expansion;
+command text is never evaluated. At most 200 ordinary, non-symlink matches are checked in both physical
+absolute and original path contexts. Case-insensitive probing overapproximates filesystem case rules.
+Protected matches block even filename-only searches. Unknown cwd, unreadable/missing directories,
+complex patterns and ambiguous shell state fail closed. A successful empty expansion of a non-secret
+prefix may pass; secret-like patterns (`.env*`, `*.pem`, `*.key`, `id_rsa*`) still block. Empty content
+searches with secret/certificate/key-like prefixes also remain blocked. For ripgrep, `-L` follows
+symlinks, not filename-only mode. Literal directory checks retain the process-cwd fallback when the
+payload omits cwd; glob probing does not. Filesystem check/use races remain: this is not a sandbox.
+
+The shell-write reference scan keeps conservative leading-dot intersections: a tool named `Bash`,
+`SHELL`, and the hook process's options do not establish the execution shell's options. Globbed writes
+therefore remain blocked. Read operands under protected paths are not write targets: `rg -n`/`-l`,
+quoted `--glob`/`-g` filters, and numeric/last-line `sed -n …p` scripts are recognized as read-only.
+`sed -n` scripts with writes, execution or extra options are not exempt. New `cd` and
+`git branch --show-current` exemptions permit only `&&`-only read/search chains, not semicolons,
+pipelines or other separators. Any file redirection in a cwd-changing chain fails closed because
+its target is not proven against the changed cwd. Mutating commands and protected redirects stay
+blocked. No shell-option assumption is used to dismiss leading-dot intersections.
+Heredoc bodies receive the same conservative whole-text reference scan as other command text,
+including code-like braces. Interpreter syntax does not exempt embedded shell strings. If an inline
+script is blocked, write it with the edit/write tool and run the script file instead.
+Portable bracket classes are kept; ambiguous backslash-bearing classes are widened instead of passed
+as invalid awk regexes.
+
+Literal `git ls-files` pathspecs are filename metadata, including `-s`/`--stage` and `--debug`,
+so credential-worded source directories do not taint that single command. Other Git subcommands
+receive no metadata exemption. Bare `git grep` uses grep's pattern/file distinction, including `-e`
+pattern values; protected pathspecs remain blocked. `git show` and `git cat-file` of secret paths
+remain content reads, not filename metadata.
+
+Consumers receive these hook changes by running `cratis ai update`.
 
 The Claude Code wiring that fires them is tracked here, in
 [`settings.template.json`](./settings.template.json). Claude reads `.claude/settings.json`. In a
@@ -190,7 +228,8 @@ Dependency manifests, including `package.json`, retain their origin/opt-in allow
 **every simple command must be on this read-only allowlist**:
 
 Only the following **exact options** are exempt, because they select/present reads rather
-than create files or invoke helpers. Any other option denies, including long-option
+than create files or name helpers. Repository configuration can still run helpers for
+allowed Git verbs. Any other option denies, including long-option
 abbreviations and unlisted `--option=value` forms. `--` ends option checking; remaining
 arguments are operands. A lone `-` is a stdin operand. Value-free short flags may combine
 (e.g. `grep -ni`); value-taking forms must use the explicitly listed spelling.
@@ -201,24 +240,33 @@ arguments are operands. A lone `-` is a stdin operand. Value-free short flags ma
 | `head`, `tail` | `-n N`, `-nN`, `-c N`, `-N` (numeric counts); no `-f` |
 | `wc` | `-l -w -c -m` |
 | `ls` | `-l -a -A -1 -h -d -R -t -r -F` |
+| `rg` | `-n` only; no long options |
 | `grep`, `egrep`, `fgrep` | `-n -i -r -R -l -L -c -v -w -x -F -E -H -h -o -q -s`; `-e PATTERN`, `-A N`, `-B N`, `-C N`; no long options |
 | `echo` | `-n -e -E` |
 | `printf`, `test`, `[`, `true`, `false`, `pwd` | None (in particular, no `printf -v`) |
 | `git status` | `-s -b --short --porcelain` |
-| `git diff` | `--stat --name-only --name-status --cached --staged --check -p -U<N> --no-color` |
+| `git diff` | `--stat --numstat --name-only --name-status --cached --staged --check -p -U<N> --no-color` |
 | `git log` | `--oneline --stat --name-only -n N -nN -<N> -p --no-color --format=<fmt> --pretty=<fmt> --follow` |
 | `git show` | `--stat --name-only -p --no-color --format=<fmt>` |
 | `git add` | `-A -u -p` |
 | `git commit` | `-m MSG`, `-mMSG`, `-a`, `-q`; `-F FILE` only for a literal non-protected file; no `--no-verify` |
 | `git blame`, `ls-files`, `rev-parse`, `check-ignore`, `grep` | None |
 
-No global git options are exempt (`-C`, `-c`, `--no-pager` etc. deny before the subcommand).
+The only global Git option exemption is a single separate `-C <dir>` with a literal,
+non-empty directory word not starting with `-`, followed by exactly one of these tails:
+`status --short`, `rev-parse HEAD`, `branch --show-current`, or `tag --list <pattern>`.
+The tag tail takes exactly one pattern not starting with `-` (for example, `'*7.321*'`).
+No extra words are accepted. Attached `-Cdir`/`-C=dir`, repeated `-C`, other verbs and
+all other global options (`-c`, `--git-dir`, `--work-tree`, `--no-pager`, `--exec-path`, etc.)
+remain denied. `-C` gives **no protection** from a hostile repository's configuration:
+fsmonitor, hooks, pager and diff/textconv helpers can still run. This is a syntax filter,
+not a repository sandbox.
 Git format values containing `%(` are not accepted. Index/commit operations are deliberate
 allowances, not general shell execution permission. Output-to-file options such as
 `git diff --output=...` are never exempt, even with a non-protected destination on a line
 that references a protected file.
 
-`gh` (all subcommands), `rg`, `ag`, `sort`, `uniq`, `cut`, `jq`, `yq`, `less`, `more`, `stat`,
+`gh` (all subcommands), `ag`, `sort`, `uniq`, `cut`, `jq`, `yq`, `less`, `more`, `stat`,
 `file`, `diff`, `cmp`, checksum tools, `realpath`, `dirname`, `basename`, `which` and `type`
 are not on this list: their option surfaces are deliberately not analysed here.
 

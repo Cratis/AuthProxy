@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.ForwardedIdentity;
 using Cratis.AuthProxy.Identity;
 
 namespace Cratis.AuthProxy.SignInCallbacks;
@@ -24,4 +25,8 @@ public sealed record SignInCallbackRequest(
     SignInCallbackKind Kind,
     ClientPrincipal Principal,
     string? Tenant,
-    DateTimeOffset Occurred);
+    DateTimeOffset Occurred)
+{
+    /// <summary>Gets the immutable protected browser-session evidence captured before queueing.</summary>
+    internal ForwardedIdentityTrustedContext? TrustedContext { get; init; }
+}
