@@ -16,6 +16,8 @@ public class when_no_token_is_presented(BearerRouteHarness harness) : IAsyncLife
 
     HttpResponseMessage? _anonymous;
     HttpResponseMessage? _withSession;
+    string _body = string.Empty;
+    string _sessionBody = string.Empty;
     bool _forwarded;
 
     public async ValueTask InitializeAsync()
@@ -25,6 +27,8 @@ public class when_no_token_is_presented(BearerRouteHarness harness) : IAsyncLife
 
         _anonymous = await client.SendAsync(new HttpRequestMessage(HttpMethod.Get, Path));
         _withSession = await client.SendAsync(SecurityHarness.Authenticated(HttpMethod.Get, Path));
+        _body = await _anonymous.Content.ReadAsStringAsync();
+        _sessionBody = await _withSession.Content.ReadAsStringAsync();
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 
@@ -40,5 +44,9 @@ public class when_no_token_is_presented(BearerRouteHarness harness) : IAsyncLife
         Assert.Equal($"Bearer resource_metadata=\"{BearerRouteHarness.ResourceMetadataUrl}\"", _anonymous!.Headers.WwwAuthenticate.ToString());
     [Fact] public void should_not_let_a_browser_session_stand_in_for_the_token() => Assert.Equal(HttpStatusCode.Unauthorized, _withSession!.StatusCode);
     [Fact] public void should_not_forward_anything() => Assert.False(_forwarded);
+    [Fact] public void should_answer_with_json() => Assert.Equal("application/json", _anonymous!.Content.Headers.ContentType?.MediaType);
+    [Fact] public void should_carry_the_unauthorized_error() => Assert.Equal("{\"error\":\"unauthorized\"}", _body);
+    [Fact] public void should_never_answer_with_markup() => Assert.DoesNotContain('<', _body + _sessionBody);
+    [Fact] public void should_never_redirect() => Assert.Null(_withSession!.Headers.Location);
     [Fact] public void should_not_be_cached() => Assert.True(_anonymous!.Headers.CacheControl?.NoStore);
 }

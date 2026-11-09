@@ -57,6 +57,7 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `IdentityVerificationTimeout` | `TimeSpan` | `00:00:10` under `Required` (the default), unbounded under `BestEffort` | How long to wait for the answer. Zero or negative leaves the wait unbounded. See [Two settings, two questions](#two-settings-two-questions). |
 | `ActivityTimeout` | `TimeSpan` | The root `ActivityTimeout`, then `00:05:00` | How long a request proxied to this service may sit idle before AuthProxy cancels it. See [Timeouts and streaming](#timeouts-and-streaming). |
 | `AnonymousPaths` | `string[]` | `[]` | Path prefixes on this service served to unauthenticated callers. See [Anonymous paths](#anonymous-paths). |
+| `PassCallerAuthorizationPaths` | `string[]` | `[]` | Anonymous paths that forward the caller's `Authorization` header unchanged. Each must also be in `AnonymousPaths`. See [Passing the caller's Authorization header](#passing-the-callers-authorization-header). |
 | `ForwardedPaths` | `ForwardingPathRuleConfig[]` | `[]` | Service-relative paths and methods that may be forwarded. Empty permits anything not denied. See [Forwarded and denied paths](#forwarded-and-denied-paths). |
 | `DeniedPaths` | `ForwardingPathRuleConfig[]` | `[]` | Service-relative paths and methods never forwarded, even when an allow rule matches. See [Forwarded and denied paths](#forwarded-and-denied-paths). |
 | `ClientCredentials` | `ServiceClientCredentialsConfig` | `null` | Enables back-channel client-credentials verification and token minting for this service. |
@@ -458,6 +459,24 @@ From Aspire:
 ```csharp
 authProxy.WithAnonymousPaths("portal", "/welcome", "/api/webhooks/payments");
 ```
+
+### Passing the caller's Authorization header
+
+On an anonymous path AuthProxy removes the `Authorization` header a caller sent, along with every identity and
+tenant header. A backend that checks a bearer token itself on one of those paths can ask for the header to be
+forwarded, one path at a time, with `PassCallerAuthorizationPaths`:
+
+```json
+"AnonymousPaths": [ "/welcome", "/api/agents" ],
+"PassCallerAuthorizationPaths": [ "/api/agents" ]
+```
+
+- Each entry must also be listed in `AnonymousPaths` (same prefix, matched case-insensitively). An entry that is
+  not, is not a valid path, or is combined with `CallerAuthorizationHeader` set to `Strip`, stops AuthProxy at startup.
+- The header is forwarded exactly as the caller sent it. AuthProxy does not validate it and derives no user or
+  tenant from it. The backend validates the token.
+- Every identity, tenant, actor, on-behalf and signature header is still removed, including copies the caller sent.
+- Paths that are not listed keep removing the header. The paths that forward it are written to the startup log.
 
 ### Matching
 
@@ -879,7 +898,9 @@ that can later be exchanged for a new access token without resupplying the clien
 `RoutePrefix` defaults to `/api` and is checked against the incoming path, before `StripPathPrefix` removes
 anything. For a service with `PathPrefix: /reporting`, set `ClientCredentials.RoutePrefix` to
 `/reporting/api` to accept bearer tokens on its API routes (or another explicitly permitted external
-prefix). Host routing can distinguish services that share the same `RoutePrefix`.
+prefix). Host routing can distinguish services that share the same `RoutePrefix`. A bearer route may use
+exactly the service's own `RoutePrefix`, but no other overlapping prefix; see
+[Sharing a prefix with client credentials](#sharing-a-prefix-with-client-credentials).
 
 This creates a one-to-one relationship between:
 
@@ -979,8 +1000,9 @@ every token-authenticated request instead.
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `PathPrefix` | `string` | — | The prefix this route covers, for example `/mcp`. Matched case-insensitively on segment boundaries, with the same rules as [anonymous paths](#what-a-valid-entry-looks-like). The longest matching prefix wins. |
-| `Issuers` | `BearerIssuerConfig[]` | — | The authorization servers whose tokens are accepted. At least one. |
-| `Audiences` | `string[]` | — | The token's `aud` must exactly match at least one of these, including any trailing slash. At least one. |
+| `Issuers` | `BearerIssuerConfig[]` | `[]` | The authorization servers whose tokens are accepted. At least one, unless `PersonalAccessTokens` is declared. |
+| `Audiences` | `string[]` | — | The token's `aud` must exactly match at least one of these, including any trailing slash. At least one, unless the route accepts personal access tokens only. |
+| `PersonalAccessTokens` | `{ ResourceKey }` | `null` | Accept personal access tokens of one resource on this route: `ResourceKey` is `direct`, `studio` or `stage-<app-key>`. With `Issuers` the route accepts either kind of credential; without, personal access tokens alone, and it takes no `ResourceMetadataUrl` (its well-known metadata path answers `404`). A token is recognized by its `<resource-key>_pat_` prefix, checked for shape and checksum and for its resource, and handed to the service unchanged; the service verifies it. A value is handled as one kind only and never retried as the other. |
 | `RequiredScopes` | `string[]` | `[]` | Scopes the token must carry, every one of them. |
 | `ResourceMetadataUrl` | `string` | `null` | Absolute URL of the RFC 9728 protected-resource metadata document. Named in every challenge; its path is forwarded to the backend without authentication and must be outside every bearer-route prefix. |
 | `TenantClaimType` | `string` | `tid` | The token claim the tenant is read from. See [Tenancy](tenancy.md#bearer-routes). |
@@ -992,6 +1014,7 @@ every token-authenticated request instead.
 | `RequiredClaims` | `{ Claim, AnyOf }[]` | `[]` | Claim requirements of the route's own, checked against the token's principal after `ClaimMappings`, in addition to the deployment's. Same shape and rules as [`Authorization:RequiredClaims`](authorization.md); a requirement on a role claim is refused at startup, because a token never carries a role. |
 | `IgnoreDeploymentRequiredClaims` | `bool` | `false` | Leave the deployment's claim requirements — proxy-wide and the service's — out on this route. For a deployment whose requirements name a claim the token issuer does not mint. Logged as a warning at startup. |
 | `AcceptWithoutIdentityVerification` | `bool` | `false` | State that this route's callers are accepted without any service's `/.cratis/me` being asked about them. Required when a service declares `IdentityVerification: Required`; under `BestEffort` it silences the startup warning. See [What a bearer route changes](#what-a-bearer-route-changes). |
+| `IntrospectionUnavailable` | `Refuse` \| `Accept` | `Refuse` | What the route does with a token whose issuer has `Introspection` configured when that endpoint cannot be asked. `Refuse` answers `503`. `Accept` proceeds on local validation alone and logs a warning; it is a startup error on an MCP route (prefix starting with `mcp`). A token the endpoint reports inactive is always refused. See [Revocation: edge introspection](authentication.md#revocation-edge-introspection). |
 
 ### BearerIssuerConfig properties
 
@@ -1000,13 +1023,30 @@ every token-authenticated request instead.
 | `Issuer` | `string` | — | The issuer identifier. The token's `iss` and the issuer metadata's `issuer` must both be exactly this value. HTTPS, or plain HTTP on a loopback host for development. |
 | `MetadataAddress` | `string` | RFC 8414 address | The metadata document. Defaults to `/.well-known/oauth-authorization-server` inserted between the issuer's host and path. An OpenID Connect discovery document works too. |
 | `TokenTypes` | `string[]` | `at+jwt`, `application/at+jwt` | Accepted JWT `typ` header values, so an ID token cannot be presented as an access token. |
+| `Introspection` | `BearerIssuerIntrospectionConfig` | `null` | Ask the issuer, per request, whether a validated token is still active (RFC 7662), so a revoked token is refused within `CacheDuration`. Off when unset. See [Revocation: edge introspection](authentication.md#revocation-edge-introspection). |
+
+### BearerIssuerIntrospectionConfig properties
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `Endpoint` | `string` | — | The introspection endpoint. HTTPS without query, fragment or user information, or plain HTTP on a loopback host for development. |
+| `ClientId` | `string` | — | The client AuthProxy authenticates to the endpoint as, with HTTP Basic. |
+| `ClientSecret` | `string` | — | The client secret. Supply it from the environment or a secret store, for example `AuthProxy__Services__app__BearerRoutes__0__Issuers__0__Introspection__ClientSecret`; never commit it. |
+| `CacheDuration` | `TimeSpan` | `00:00:30` | How long an *active* answer is reused. Between zero and thirty seconds; zero turns the cache off. This is the longest a revoked token can keep working. |
+| `Timeout` | `TimeSpan` | `00:00:02` | How long AuthProxy waits for the endpoint. Between 100 ms and ten seconds. |
+| `MaximumCachedTokens` | `int` | `10000` | The most active answers kept. When full, further answers are not cached; nothing live is evicted. At least 1. |
 
 ### What a bearer route changes
 
+Personal access token (PAT) shape, checksum and resource recognition at the edge are **not authentication**.
+PAT requests bypass the proxy's JWT scope, claim and credential-binding checks. The backend must authenticate
+and authorize every PAT, including its tenant and resource access; recognition alone does not grant access.
+
 - A request on a bearer route is answered before static files, authentication, provider selection, tenant
-  selection and identity enrichment — none of them apply. [Admission](admission.md) and the trusted-proxy
+  selection and identity enrichment — none of them apply. The one exception is a token AuthProxy issued itself on a
+  prefix shared with [client credentials](#sharing-a-prefix-with-client-credentials). [Admission](admission.md) and the trusted-proxy
   boundary run first and apply as to any request.
-- The deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
+- For external JWTs, the deployment's [claim requirements](authorization.md) — proxy-wide and the route's service's — apply to
   the token's principal after `ClaimMappings`, unless the route sets `IgnoreDeploymentRequiredClaims`. The
   route's own `RequiredClaims` apply on top either way. A token that does not satisfy them is refused with `403`.
   A requirement on a role can never be met: roles are dropped from every token.
@@ -1054,6 +1094,45 @@ every token-authenticated request instead.
 - With no bearer route configured, the bearer gate leaves requests untouched. Browser sessions still strip
   inbound `x-cratis-token-scope` and `x-cratis-token-client-id` headers and claims in the `urn:cratis:bearer:`
   namespace, which only bearer routes set.
+
+### Sharing a prefix with client credentials
+
+A service can accept tokens from an authorization server and tokens from AuthProxy's own
+[client-credentials grant](#client-credentials) on the same paths. Give the bearer route exactly the service's
+`ClientCredentials.RoutePrefix`:
+
+```json
+"portal": {
+  "Backend": { "BaseUrl": "http://portal:8080" },
+  "ClientCredentials": { "RoutePrefix": "/api", "VerificationPath": "/.cratis/client-credentials/verify" },
+  "BearerRoutes": [
+    {
+      "PathPrefix": "/api",
+      "Issuers": [{ "Issuer": "https://login.example.com" }],
+      "Audiences": ["portal-api"],
+      "AcceptWithoutIdentityVerification": true
+    }
+  ]
+}
+```
+
+Each credential on that prefix is judged by one set of rules, chosen once, and is never retried under the other:
+
+- A token that AuthProxy can unprotect with its own [Data Protection keys](authentication.md#data-protection-keys-and-horizontal-scaling)
+  as an unexpired client-credentials access token is AuthProxy's. When it was issued for this service and prefix,
+  it continues to client-credentials authentication and is handled exactly as it would be without the bearer route.
+  When it was issued for another service or prefix, it is refused with `401`. If it expires before authentication
+  completes, it is refused with the route's `401` challenge, never retried as a browser session or another token kind.
+- Every other token goes to the bearer route's validation only. That includes a token that resembles an
+  AuthProxy token but has been altered, has expired or was issued under another key ring: it cannot be shown to be
+  AuthProxy's, so the client-credentials rules never see it, and the bearer route refuses it with `401`.
+- A request without a credential receives the bearer route's single challenge, naming its `ResourceMetadataUrl`.
+  More than one credential is refused with `400`, as on any bearer route.
+
+Any other overlap stops AuthProxy at startup: a bearer route nested inside a client-credentials prefix or
+containing one, or one that overlaps the client-credentials prefix of another service. In those layouts the
+path alone no longer tells which service and prefix a token belongs to. Use the same prefix, or prefixes that
+do not overlap.
 
 ---
 
@@ -1175,5 +1254,6 @@ their users sign in again once.
 
 On non-anonymous routes, a token AuthProxy obtains for the service, and the bearer token of a caller
 AuthProxy itself authenticated, are always forwarded. On [anonymous paths](#anonymous-paths), `Authorization`
-is always removed regardless of this setting. AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
+is removed regardless of this setting unless the path is listed in
+[`PassCallerAuthorizationPaths`](#passing-the-callers-authorization-header). AuthProxy's own cookies (the session cookie and the `.cratis-*` cookies) are never forwarded;
 every other cookie arrives unchanged.

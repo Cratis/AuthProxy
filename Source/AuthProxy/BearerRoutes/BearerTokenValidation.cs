@@ -24,6 +24,11 @@ public sealed record BearerTokenValidation(
     public string? Environment { get; init; }
 
     /// <summary>
+    /// Gets the issuer that signed the accepted token.
+    /// </summary>
+    public ResolvedBearerIssuer? Issuer { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the token was accepted.
     /// </summary>
     public bool Succeeded => Status == BearerTokenValidationStatus.Succeeded;

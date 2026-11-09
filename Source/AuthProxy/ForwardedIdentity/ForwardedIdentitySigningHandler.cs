@@ -15,7 +15,12 @@ internal sealed class ForwardedIdentitySigningHandler(IForwardedIdentitySigner s
         {
             // Last outbound boundary: remove caller-supplied and proxy-generated identity alike.
             SpoofableHeaders.Strip(request.Headers);
-            request.Headers.Remove("Authorization");
+
+            // Only an operator-listed route forwards the caller's own header; nothing else identity-related survives.
+            if (!request.Options.TryGetValue(AnonymousPaths.PassCallerAuthorization, out var pass) || !pass)
+            {
+                request.Headers.Remove("Authorization");
+            }
         }
         else if (!request.Options.TryGetValue(ForwardedIdentitySigningTarget.OptionsKey, out var target))
         {

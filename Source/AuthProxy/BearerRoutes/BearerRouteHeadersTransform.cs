@@ -32,7 +32,8 @@ public class BearerRouteHeadersTransform : RequestTransform
             ? item as BearerForwardedIdentity
             : null;
 
-        if (identity?.ForwardAuthorizationHeader != true)
+        var passThrough = context.HttpContext.Items.TryGetValue(BearerRouteDefaults.PassThroughAuthorizationItemKey, out var marker) && marker is true;
+        if (identity?.ForwardAuthorizationHeader != true && !passThrough)
         {
             headers.Authorization = null;
         }

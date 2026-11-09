@@ -18,6 +18,7 @@ public class a_proxied_request : Specification
     protected string? _scheme = CookieAuthenticationDefaults.AuthenticationScheme;
     protected bool _authenticated = true;
     protected bool _proxyWroteHeader;
+    protected bool _passesCallerAuthorization;
     protected C.CallerAuthorizationHeaderForwarding _setting;
     protected RequestTransformContext _transformContext;
 
@@ -50,7 +51,17 @@ public class a_proxied_request : Specification
                     : new Dictionary<string, string> { [MicroserviceReverseProxyConfigProvider.CallerAuthorizationHeaderMetadataKey] = _setting.ToString() }
             },
             new HttpMessageInvoker(new HttpClientHandler()));
-        var route = new RouteModel(new RouteConfig { RouteId = "route", ClusterId = "cluster" }, new ClusterState("cluster"), HttpTransformer.Default);
+        var routeConfig = _passesCallerAuthorization
+            ? new RouteConfig
+            {
+                RouteId = "route",
+                ClusterId = "cluster",
+                AuthorizationPolicy = MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy,
+                Metadata = new Dictionary<string, string> { [AnonymousPaths.PassCallerAuthorizationMetadataKey] = bool.TrueString }
+            }
+            : new RouteConfig { RouteId = "route", ClusterId = "cluster" };
+        var route = new RouteModel(routeConfig, new ClusterState("cluster"), HttpTransformer.Default);
+        http.SetEndpoint(new Endpoint(null, new EndpointMetadataCollection(route), "proxied"));
         http.Features.Set<IReverseProxyFeature>(new ReverseProxyFeature
         {
             Route = route,

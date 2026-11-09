@@ -49,6 +49,8 @@ public class ServiceRoutingConfigurationValidator : IValidateOptions<C.AuthProxy
                 failures.Add($"Service '{serviceName}' sets StripPathPrefix but declares no PathPrefix to strip.");
             }
 
+            failures.AddRange(PassCallerAuthorizationFailures(serviceName, service));
+
             if (hosts.Count > 0 || prefix is not null)
             {
                 declared.Add((serviceName, prefix, [.. hosts]));
@@ -59,6 +61,26 @@ public class ServiceRoutingConfigurationValidator : IValidateOptions<C.AuthProxy
         failures.AddRange(DefaultServiceFailures(options));
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
+    }
+
+    static IEnumerable<string> PassCallerAuthorizationFailures(string serviceName, C.Service service)
+    {
+        var anonymous = AnonymousPaths.For(service).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in AnonymousPaths.EvaluatePassCallerAuthorization(service))
+        {
+            if (!entry.IsUsable)
+            {
+                yield return $"Service '{serviceName}': PassCallerAuthorizationPaths entry '{entry.DeclaredForDisplay}' is refused ({entry.Rejection}).";
+            }
+            else if (!anonymous.Contains(entry.Prefix))
+            {
+                yield return $"Service '{serviceName}': PassCallerAuthorizationPaths entry '{entry.DeclaredForDisplay}' is not listed in AnonymousPaths. The caller's Authorization header can be forwarded only on a path that is anonymous to AuthProxy.";
+            }
+            else if (service.CallerAuthorizationHeader == C.CallerAuthorizationHeaderForwarding.Strip)
+            {
+                yield return $"Service '{serviceName}': PassCallerAuthorizationPaths entry '{entry.DeclaredForDisplay}' contradicts CallerAuthorizationHeader Strip.";
+            }
+        }
     }
 
     static string? ValidatePathPrefix(string serviceName, C.Service service, List<string> failures)

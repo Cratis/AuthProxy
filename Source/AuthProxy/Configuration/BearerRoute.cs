@@ -146,4 +146,19 @@ public class BearerRoute
     /// </para>
     /// </remarks>
     public bool AcceptWithoutIdentityVerification { get; set; }
+
+    /// <summary>
+    /// Gets or sets the personal access tokens the route accepts, when it does. A route with both this and
+    /// <see cref="Issuers"/> accepts either kind of credential and never retries one as the other; a route with
+    /// this and no issuers accepts personal access tokens alone, advertises no OAuth metadata, and takes no
+    /// <see cref="ResourceMetadataUrl"/>.
+    /// </summary>
+    public BearerRoutePersonalAccessTokens? PersonalAccessTokens { get; set; }
+
+    /// <summary>
+    /// Gets or sets what this route does when the introspection endpoint of a token's issuer cannot be asked.
+    /// Defaults to <see cref="IntrospectionFailurePolicy.Refuse"/>; an MCP route (prefix starting with
+    /// <c language="text">/mcp</c>) cannot use <see cref="IntrospectionFailurePolicy.Accept"/>.
+    /// </summary>
+    public IntrospectionFailurePolicy IntrospectionUnavailable { get; set; } = IntrospectionFailurePolicy.Refuse;
 }

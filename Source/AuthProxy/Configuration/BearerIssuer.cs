@@ -42,4 +42,11 @@ public class BearerIssuer
     /// JWT the issuer signs from being presented as an access token.
     /// </summary>
     public IList<string> TokenTypes { get; set; } = [];
+
+    /// <summary>
+    /// Gets or sets how AuthProxy asks this issuer whether a validated token is still active, so a revoked token is
+    /// refused within <see cref="BearerIssuerIntrospection.CacheDuration"/>. Leave unset to rely on local validation
+    /// alone, where a token works until it expires.
+    /// </summary>
+    public BearerIssuerIntrospection? Introspection { get; set; }
 }

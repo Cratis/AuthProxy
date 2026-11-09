@@ -38,7 +38,7 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
         else
         {
             Assert.Empty(harness.Origin.Received);
-            Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+            Assert.Equal("{\"error\":\"forbidden\"}", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
             Assert.False(response.Headers.Contains(Headers.Principal));
             Assert.False(response.Headers.Contains(Headers.TenantId));
         }
@@ -55,7 +55,7 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Empty(harness.Origin.Received);
-        Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("{\"error\":\"forbidden\"}", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.False(response.Headers.Contains(Headers.Principal));
         Assert.False(response.Headers.Contains(Headers.TenantId));
     }
@@ -71,7 +71,7 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Empty(harness.Origin.Received);
-        Assert.Empty(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("{\"error\":\"unauthorized\"}", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.False(response.Headers.Contains(Headers.Principal));
         Assert.False(response.Headers.Contains(Headers.TenantId));
     }
