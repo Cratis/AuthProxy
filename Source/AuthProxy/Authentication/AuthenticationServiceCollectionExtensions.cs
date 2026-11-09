@@ -136,6 +136,13 @@ public static class AuthenticationServiceCollectionExtensions
 
     static string SelectAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
+        // On a server-selected passthrough route the bearer value belongs only to the backend.
+        // Keep session authentication, but never inspect or validate that header at the proxy.
+        if (AnonymousPaths.PassesCallerAuthorization(context))
+        {
+            return CookieAuthenticationDefaults.AuthenticationScheme;
+        }
+
         var authorization = context.Request.Headers.Authorization.ToString();
         if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
