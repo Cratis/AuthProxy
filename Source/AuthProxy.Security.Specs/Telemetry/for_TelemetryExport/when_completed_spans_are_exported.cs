@@ -25,10 +25,10 @@ public class when_completed_spans_are_exported : given.an_export_pipeline
                 .SetStatus(ActivityStatusCode.Error, SensitiveUrl)
                 .AddException(new HttpRequestException(SensitiveUrl))
                 .AddEvent(new ActivityEvent("diagnostic", tags: new ActivityTagsCollection
-            {
-                ["exception.stacktrace"] = SensitiveUrl,
-                ["outcome"] = "failed"
-            }));
+                {
+                    ["exception.stacktrace"] = SensitiveUrl,
+                    ["outcome"] = "failed"
+                }));
         }
     }
 
