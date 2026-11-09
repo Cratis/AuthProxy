@@ -13,6 +13,10 @@ public class FreshAuthenticationRule
     public bool Prefix { get; set; }
 
     /// <summary>Gets or sets the HTTP methods to match. An empty array matches every method.</summary>
+    /// <remarks>
+    /// GET, HEAD, OPTIONS and TRACE match only their own rules. Other methods match the union of rules
+    /// declaring any non-safe method on the path, using the strictest age, regardless of method overrides.
+    /// </remarks>
     public IList<string> Methods { get; set; } = [];
 
     /// <summary>Gets or sets the maximum authentication age, from one second through one day. Defaults to five minutes.</summary>

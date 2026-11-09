@@ -105,7 +105,7 @@ public class when_checking_freshness : Specification
     [InlineData("X-Method-Override", "DELETE")]
     [InlineData("X-HTTP-Method-Override", "")]
     [InlineData("X-HTTP-Method-Override", "PATCH, DELETE")]
-    public async Task should_refuse_method_override_on_a_post_outside_the_delete_only_rule(string header, string value)
+    public async Task should_refuse_method_override_on_a_post_to_the_delete_only_path(string header, string value)
     {
         var (context, middleware, next) = Create(301, methods: ["DELETE"]);
         context.Request.Method = "POST";
@@ -118,9 +118,17 @@ public class when_checking_freshness : Specification
     }
 
     [Theory]
-    [InlineData("POST", true)]
+    [InlineData("GET", true)]
+    [InlineData("HEAD", true)]
+    [InlineData("OPTIONS", true)]
+    [InlineData("TRACE", true)]
+    [InlineData("POST", false)]
+    [InlineData("PUT", false)]
+    [InlineData("PATCH", false)]
     [InlineData("DELETE", false)]
-    public async Task should_preserve_transport_method_matching_without_an_override(string method, bool passes)
+    [InlineData("CONNECT", false)]
+    [InlineData("CUSTOM", false)]
+    public async Task should_union_non_safe_methods_without_affecting_safe_methods(string method, bool passes)
     {
         var (context, middleware, next) = Create(301, methods: ["DELETE"]);
         context.Request.Method = method;

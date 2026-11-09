@@ -22,7 +22,11 @@ Set `Cratis:AuthProxy:Services:<name>:FreshAuthentication` to a list of rules:
 }
 ```
 
-`Path` is relative to the service. With `Prefix` the rule also covers every descendant path; without it only the exact path matches. `Methods` limits the rule to the listed HTTP methods, and an empty list matches all of them. `MaxAge` defaults to five minutes and accepts values from one second to one day. Anonymous paths are never affected.
+`Path` is relative to the service. With `Prefix` the rule also covers every descendant path; without it only the exact path matches. An empty `Methods` list matches every method. Safe methods (`GET`, `HEAD`, `OPTIONS`, and `TRACE`) match only rules listing that method or leaving `Methods` empty. Every other method matches the union of rules declaring any non-safe method on the matching path, plus rules with an empty method list. The strictest matching `MaxAge` applies. `MaxAge` defaults to five minutes and accepts values from one second to one day. Anonymous paths are never affected.
+
+### Security behavior
+
+A `DELETE`-only freshness rule also protects a `POST`, `PUT`, `PATCH`, or any other non-safe request to the same path, even without an explicit method override. AuthProxy does not trust the transport verb to determine what state-changing operation the backend will perform. Overrides in headers, query strings, form fields, JSON bodies, or any other encoding cannot bypass this check. Safe requests are not included in the non-safe union: a `GET` remains unaffected by a `DELETE`-only rule. Deployments using method-specific rules must account for this stricter behavior when upgrading.
 
 ## What a caller sees
 

@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 
@@ -51,7 +52,7 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
         using var client = harness.CreateBearerClient();
         using var request = path.StartsWith(BearerRouteHarness.RoutePrefix, StringComparison.Ordinal)
             ? BearerRouteHarness.WithToken(HttpMethod.Post, path, harness.Issuer.Token())
-            : SecurityHarness.Authenticated(HttpMethod.Post, path, SecurityHarness.UniqueUser("freshness"));
+            : harness.WithSession(HttpMethod.Post, path);
         request.Headers.TryAddWithoutValidation(header, "DELETE");
         harness.Origin.Clear();
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
@@ -86,7 +87,7 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
     {
         using var client = harness.CreateBearerClient();
         using var request = path == "/approve"
-            ? SecurityHarness.Authenticated(HttpMethod.Post, $"{path}?{query}", SecurityHarness.UniqueUser("freshness-query"))
+            ? harness.WithSession(HttpMethod.Post, $"{path}?{query}")
             : BearerRouteHarness.WithToken(HttpMethod.Post, $"{path}?{query}", harness.Issuer.Token());
         harness.Origin.Clear();
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
@@ -107,6 +108,7 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
     public async Task should_not_forward_genuine_multi_value_override_headers(string path, string header)
     {
         var token = harness.Issuer.Token();
+        using var session = harness.WithSession(HttpMethod.Post, path);
         harness.Origin.Clear();
         var context = await harness.Server.SendAsync(
             request =>
@@ -117,7 +119,7 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
                 Assert.Equal(2, request.Request.Headers[header].Count);
                 if (path == "/approve")
                 {
-                    request.Request.Headers[SecurityHarness.AuthenticatedUserHeader] = SecurityHarness.UniqueUser("freshness-headers");
+                    request.Request.Headers.Cookie = session.Headers.GetValues("Cookie").Single();
                 }
                 else
                 {
@@ -133,12 +135,12 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
     [InlineData("/approve")]
     [InlineData("/mcp/approve")]
     [InlineData("/v1/approve")]
-    public async Task should_forward_an_ordinary_query_without_changing_method_matching(string path)
+    public async Task should_forward_a_safe_request_with_an_ordinary_query(string path)
     {
         using var client = harness.CreateBearerClient();
         using var request = path == "/approve"
-            ? SecurityHarness.Authenticated(HttpMethod.Post, $"{path}?mode=DELETE", SecurityHarness.UniqueUser("freshness-query-control"))
-            : BearerRouteHarness.WithToken(HttpMethod.Post, $"{path}?mode=DELETE", harness.Issuer.Token());
+            ? harness.WithSession(HttpMethod.Get, $"{path}?mode=DELETE")
+            : BearerRouteHarness.WithToken(HttpMethod.Get, $"{path}?mode=DELETE", harness.Issuer.Token());
         harness.Origin.Clear();
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -151,10 +153,78 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
     public async Task should_forward_a_valid_bearer_when_the_method_does_not_require_freshness(string path)
     {
         using var client = harness.CreateBearerClient();
-        using var request = BearerRouteHarness.WithToken(HttpMethod.Post, path, harness.Issuer.Token());
+        using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token());
         harness.Origin.Clear();
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(path, Assert.Single(harness.Origin.Received).Path);
+    }
+
+    /// <summary>Provides state-changing requests regardless of the channel used to override their method.</summary>
+    /// <returns>Interactive and bearer paths with each override encoding and an unmodified POST control.</returns>
+    public static IEnumerable<TheoryDataRow<string, string>> NonSafeRequests()
+    {
+        foreach (var path in new[] { "/approve", "/mcp/approve", "/v1/approve" })
+        {
+            foreach (var channel in new[] { "none", "header", "query", "form", "json" })
+            {
+                yield return new(path, channel);
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(NonSafeRequests))]
+    public async Task should_not_forward_a_non_safe_request_without_fresh_authentication(string path, string channel)
+    {
+        using var client = harness.CreateBearerClient();
+        using var request = path == "/approve"
+            ? harness.WithSession(HttpMethod.Post, path)
+            : BearerRouteHarness.WithToken(HttpMethod.Post, path, harness.Issuer.Token());
+        ApplyOverride(request, channel);
+        harness.Origin.Clear();
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var expected = path != "/approve" ? HttpStatusCode.NotFound
+            : channel == "header" || channel == "query" ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized;
+        Assert.Equal(expected, response.StatusCode);
+        if (expected == HttpStatusCode.Unauthorized)
+        {
+            Assert.Equal("Bearer error=\"insufficient_user_authentication\", max_age=\"300\"", response.Headers.WwwAuthenticate.ToString());
+        }
+        Assert.Empty(harness.Origin.Received);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("form")]
+    [InlineData("json")]
+    public async Task should_forward_body_overrides_only_when_the_cookie_session_is_fresh(string channel)
+    {
+        using var client = harness.CreateBearerClient();
+        using var request = harness.WithSession(HttpMethod.Post, "/approve", TimeSpan.Zero);
+        ApplyOverride(request, channel);
+        harness.Origin.Clear();
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(harness.Origin.Received);
+    }
+
+    static void ApplyOverride(HttpRequestMessage request, string channel)
+    {
+        switch (channel)
+        {
+            case "header":
+                request.Headers.TryAddWithoutValidation("X-HTTP-Method-Override", "DELETE");
+                break;
+            case "query":
+                request.RequestUri = new Uri($"{request.RequestUri}?_method=DELETE", UriKind.Relative);
+                break;
+            case "form":
+                request.Content = new FormUrlEncodedContent([KeyValuePair.Create("_method", "DELETE")]);
+                break;
+            case "json":
+                request.Content = new StringContent(/*lang=json,strict*/ "{\"_method\":\"DELETE\"}", Encoding.UTF8, "application/json");
+                break;
+        }
     }
 }

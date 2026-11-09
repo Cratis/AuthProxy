@@ -44,7 +44,7 @@ internal static class FreshAuthenticationPolicy
          !TryNormalizeRequest(request, request.Path, out var path) ||
          MaxAge(service, path, request.Method) is not null);
 
-    /// <summary>Finds the strictest matching authentication-age rule.</summary>
+    /// <summary>Finds the strictest matching rule, pooling non-safe methods so backend overrides cannot bypass freshness.</summary>
     /// <param name="service">The selected service.</param>
     /// <param name="path">The canonical service-local path.</param>
     /// <param name="method">The request method.</param>
@@ -58,8 +58,7 @@ internal static class FreshAuthenticationPolicy
             {
                 continue;
             }
-            if ((methods.Length == 0 || methods.Contains(method, StringComparer.OrdinalIgnoreCase)
-                    || (HttpMethods.IsHead(method) && methods.Contains(HttpMethods.Get, StringComparer.OrdinalIgnoreCase)))
+            if (MatchesMethod(methods, method)
                 && (declared == "/" || (rule.Prefix
                     ? new PathString(path).StartsWithSegments(declared, StringComparison.OrdinalIgnoreCase)
                     : string.Equals(path, declared, StringComparison.OrdinalIgnoreCase))))
@@ -69,4 +68,12 @@ internal static class FreshAuthenticationPolicy
         }
         return result;
     }
+
+    static bool MatchesMethod(string[] methods, string method) =>
+        methods.Length == 0 || (IsSafe(method)
+            ? methods.Contains(method, StringComparer.OrdinalIgnoreCase)
+            : methods.Any(declared => !IsSafe(declared)));
+
+    static bool IsSafe(string method) =>
+        HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method) || HttpMethods.IsTrace(method);
 }
