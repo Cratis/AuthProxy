@@ -1,6 +1,6 @@
 ---
 title: "Telemetry"
-description: "AuthProxy emits OpenTelemetry traces and metrics about sign-ins, identity, tenancy, invitations and bearer tokens, exported only when you configure an OTLP endpoint."
+description: "Export AuthProxy OpenTelemetry traces and metrics for sign-ins, identity, tenancy, invitations and bearer tokens by setting an OTLP endpoint; off by default."
 ---
 
 # Telemetry

@@ -1,6 +1,6 @@
 ---
 title: Operator upgrade guide, 2.42 to 2.52
-description: Version-by-version guide for operators moving AuthProxy from 2.42 to 2.52, covering trusted proxies, backend TLS, credential binding, token tenant binding and on-behalf settings.
+description: Operator guide for upgrading AuthProxy from 2.42 to 2.52: trusted proxies, backend TLS, credential binding, token tenant binding and on-behalf settings.
 ---
 
 This guide is for operators who run AuthProxy 2.42 and are moving to 2.52. It lists what each release changes,
