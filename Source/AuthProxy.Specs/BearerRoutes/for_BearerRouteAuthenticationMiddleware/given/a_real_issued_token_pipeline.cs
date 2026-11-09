@@ -122,6 +122,7 @@ public abstract class a_real_issued_token_pipeline : Specification
         Forwarder = Substitute.For<IBearerRouteForwarder>();
         builder.Services.AddSingleton(Validator);
         builder.Services.AddSingleton(Forwarder);
+        builder.Services.AddSingleton(Substitute.For<Cratis.AuthProxy.BearerRoutes.Introspection.IBearerTokenIntrospector>());
         var policy = Substitute.For<IAccessPolicy>();
         policy.Evaluate(Arg.Any<ClaimsPrincipal>(), Arg.Any<C.AuthProxy>(), Arg.Any<string>(), Arg.Any<C.BearerRoute>()).Returns(AccessDecision.Granted);
         builder.Services.AddSingleton(policy);
