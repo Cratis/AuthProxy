@@ -22,7 +22,7 @@ namespace Cratis.AuthProxy.BearerRoutes.Introspection;
 /// names a different subject, issuer, client or token type than the validated token is treated as inactive. Only
 /// a well-formed <c language="text">200</c> answer says anything about the token; every other outcome is
 /// <see cref="IntrospectionVerdict.Unavailable"/>, never "active" and never "inactive". Concurrent requests for the
-/// same token share one call, made under a deadline of its own so one caller abandoning its request does not fail
+/// same token and cache window share one call, made under a deadline of its own so one caller abandoning its request does not fail
 /// the others. Nothing here logs the token, its hash, the secret or the answer.
 /// </remarks>
 public sealed class BearerTokenIntrospector(
@@ -46,7 +46,9 @@ public sealed class BearerTokenIntrospector(
             return IntrospectionVerdict.Unavailable;
         }
 
-        var key = IntrospectionCache.CreateKey(settings.Endpoint, settings.ClientId, token);
+        // Neither cached answers nor in-flight calls may cross cache-window policies.
+        var cacheDuration = Min(settings.CacheDuration, C.BearerIssuerIntrospection.MaximumCacheDuration);
+        var key = string.Create(CultureInfo.InvariantCulture, $"{IntrospectionCache.CreateKey(settings.Endpoint, settings.ClientId, token)}:{cacheDuration.Ticks}");
         if (cache.IsActive(key))
         {
             return IntrospectionVerdict.Active;
