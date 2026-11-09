@@ -3,6 +3,7 @@
 
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes.Introspection;
 using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 using Cratis.AuthProxy.Tenancy;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
 /// <param name="validator">The access-token validator.</param>
+/// <param name="introspector">Asks a token's issuer whether the validated token is still active, when the issuer has introspection configured.</param>
 /// <param name="accessPolicy">The deployment's claim requirements, applied to the token's principal.</param>
 /// <param name="tenantVerifier">The tenant existence verifier, applied when tenant verification is configured.</param>
 /// <param name="tenantResolver">The request's addressed tenants.</param>
@@ -55,6 +57,7 @@ public class BearerRouteMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
     IBearerTokenValidator validator,
+    IBearerTokenIntrospector introspector,
     IAccessPolicy accessPolicy,
     ITenantVerifier tenantVerifier,
     ITenantResolver tenantResolver,
@@ -166,6 +169,11 @@ public class BearerRouteMiddleware(
             return;
         }
 
+        if (!await IsConfirmedActive(context, route, validation))
+        {
+            return;
+        }
+
         if (BindingConflicts(context, current, route, validation))
         {
             BearerChallenge.Forbidden(context);
@@ -218,6 +226,40 @@ public class BearerRouteMiddleware(
         context.Items[ClientCredentialsDefaults.ValidatedTokenPayloadItemKey] = credential.Payload;
         IssuedBearerRouteCredential.Store(context, credential);
         await next(context);
+    }
+
+    async Task<bool> IsConfirmedActive(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
+    {
+        if (validation.Issuer is not { Introspection: not null } issuer)
+        {
+            return true;
+        }
+
+        // The token was read once already, by the same strict reading; failing to read it again refuses, never trusts.
+        var verdict = BearerTokenValidator.TryReadStrictBearerToken(context.Request, out var token)
+            ? await introspector.Introspect(token, validation, issuer, context.RequestAborted)
+            : IntrospectionVerdict.Inactive;
+
+        switch (verdict)
+        {
+            case IntrospectionVerdict.Active:
+                return true;
+
+            case IntrospectionVerdict.Unavailable when route.Route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept
+                && !BearerRouteTable.IsMcpPrefix(route.Prefix):
+                logger.IntrospectionUnavailableAccepted(issuer.Issuer, route.Prefix, route.ServiceName);
+                return true;
+
+            case IntrospectionVerdict.Unavailable:
+                logger.BearerIntrospectionRefused(issuer.Issuer, route.Prefix, route.ServiceName);
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.IntrospectionUnavailable, "The issuer's introspection endpoint is unavailable."), route);
+                return false;
+
+            default:
+                logger.BearerTokenRevoked(route.Prefix, route.ServiceName);
+                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Revoked, "The issuer reports the token is not active."), route);
+                return false;
+        }
     }
 
     bool BindingConflicts(HttpContext context, C.AuthProxy current, ResolvedBearerRoute route, BearerTokenValidation validation)

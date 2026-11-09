@@ -60,6 +60,7 @@ public static class BearerChallenge
                 break;
 
             case BearerTokenValidationStatus.IssuerUnavailable:
+            case BearerTokenValidationStatus.IntrospectionUnavailable:
                 // The token could not be checked, which is not the same as the token being wrong: telling the
                 // client its token is invalid would send it to sign in again for an outage on the issuer's side.
                 NoStore(context);
@@ -68,6 +69,7 @@ public static class BearerChallenge
                 MachineResponse.Write(context, StatusCodes.Status503ServiceUnavailable, "service_unavailable");
                 break;
 
+            // Revoked is answered exactly like Invalid, so the response is no revocation oracle.
             default:
                 Refuse(context, StatusCodes.Status401Unauthorized, "unauthorized", RouteChallenge(route, "invalid_token", scope: null));
                 break;

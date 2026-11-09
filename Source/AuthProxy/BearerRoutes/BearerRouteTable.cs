@@ -159,6 +159,14 @@ public static class BearerRouteTable
     public static bool IsBearerRouteIssuer(string issuer, C.AuthProxy config) => Resolve(config).Issuers.Contains(issuer);
 
     /// <summary>
+    /// Determines whether a path prefix is an MCP route: its first segment is <c language="text">mcp</c>, ignoring case.
+    /// </summary>
+    /// <param name="prefix">The path prefix, as configured or normalized.</param>
+    /// <returns><see langword="true"/> when the prefix is <c language="text">/mcp</c> or lies under it; otherwise <see langword="false"/>.</returns>
+    public static bool IsMcpPrefix(string? prefix) =>
+        (prefix ?? string.Empty).Trim().Trim('/').Split('/')[0].Equals("mcp", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Resolves a configured issuer, applying its defaults.
     /// </summary>
     /// <param name="issuer">The configured issuer.</param>
@@ -193,7 +201,10 @@ public static class BearerRouteTable
             issuer.Issuer.Trim(),
             metadataAddress,
             tokenTypes.Length > 0 ? tokenTypes : C.BearerIssuer.DefaultTokenTypes,
-            RequireHttps: !isLoopbackHttp);
+            RequireHttps: !isLoopbackHttp)
+        {
+            Introspection = issuer.Introspection,
+        };
 
         return true;
     }

@@ -871,6 +871,67 @@ The consequences:
 
 See [Bearer routes](services.md#bearer-routes).
 
+### Revocation: edge introspection
+
+Validating a token's signature and expiry cannot tell that the issuer has since revoked it: a stolen or
+withdrawn token keeps working until it expires. When an issuer sets `Introspection`, AuthProxy asks the issuer's
+RFC 7662 introspection endpoint whether the token is still active, after the token has passed local validation
+and before the request is forwarded.
+
+```json
+{
+  "AuthProxy": {
+    "Services": {
+      "app": {
+        "BearerRoutes": [
+          {
+            "PathPrefix": "/mcp",
+            "Issuers": [
+              {
+                "Issuer": "https://auth.example.test/",
+                "Introspection": {
+                  "Endpoint": "https://auth.example.test/connect/introspect",
+                  "ClientId": "authproxy",
+                  "CacheDuration": "00:00:30"
+                }
+              }
+            ],
+            "Audiences": ["direct-api"]
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Set `ClientSecret` through the environment or a secret store, not in a committed file. The configuration is per
+issuer, so every route that trusts that issuer asks the same endpoint with the same client credential. The
+issuer must allow that client to introspect tokens for every audience its routes accept.
+
+| Endpoint says | Route `Refuse` (default) | Route `Accept` |
+|---------------|--------------------------|----------------|
+| Token active | Forwarded | Forwarded |
+| Token not active | `401` `invalid_token`, the same answer as any invalid token | `401` `invalid_token` |
+| Cannot be asked: timeout, error status, throttled, redirect, unreadable answer, or AuthProxy's own client refused | `503` with `Retry-After` | Forwarded on local validation alone, with a warning |
+
+- **A revoked token is refused within `CacheDuration`** (at most thirty seconds): an *active* answer is reused for
+  that long, never longer than the token's own expiry. Set `CacheDuration` to zero to ask on every request.
+- Only an active answer is cached, so a refusal or a failure is asked again on the next request.
+- Only whether the token is active is used. Nothing else the endpoint returns reaches the forwarded identity, so
+  introspection can narrow who gets through but never widen it. An answer naming a different subject, issuer,
+  client or token type than the validated token is treated as inactive.
+- The endpoint receives the token and AuthProxy's client credential only, over an HTTP client that follows no
+  redirects and sends no cookies. Only tokens that passed local validation are sent. Concurrent requests with the
+  same token share one call.
+- Neither the token nor its hash, the client secret or an answer body is written to a log.
+- `Accept` on an MCP route is refused at startup: an MCP route must not accept a token that could not be
+  confirmed. AuthProxy logs a warning at startup for an MCP route whose issuer has no `Introspection`.
+- This is a decision made once per request at the edge. Backends should keep validating what they are sent, and
+  the generic [JWT Bearer](#jwt-bearer-api) scheme is not covered.
+- Introspection adds a dependency on the issuer to each uncached request; size `Timeout` and `CacheDuration`
+  for it.
+
 ---
 
 ## Back-channel client credentials

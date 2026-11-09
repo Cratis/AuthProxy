@@ -176,6 +176,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
         }
 
         ValidateResourceMetadata(at, serviceName, route, metadataPaths, failures);
+        ValidateIntrospection(at, route, failures);
 
         if (route.ClockSkew is { } skew && (skew < TimeSpan.Zero || skew > C.BearerRoute.MaximumClockSkew))
         {
@@ -240,6 +241,52 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
         if (route.Issuers.Count == 0 && !string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
         {
             failures.Add($"{at}:{nameof(C.BearerRoute.ResourceMetadataUrl)} is set on a route that accepts personal access tokens only, which has no OAuth metadata to advertise.");
+        }
+    }
+
+    static void ValidateIntrospection(string at, C.BearerRoute route, List<string> failures)
+    {
+        if (route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept && BearerRouteTable.IsMcpPrefix(route.PathPrefix))
+        {
+            failures.Add(
+                $"{at}:{nameof(C.BearerRoute.IntrospectionUnavailable)} cannot be {nameof(C.IntrospectionFailurePolicy.Accept)} on an MCP route: " +
+                "a revoked token must never be accepted because the issuer could not be asked.");
+        }
+
+        for (var i = 0; i < route.Issuers.Count; i++)
+        {
+            if (route.Issuers[i].Introspection is not { } introspection)
+            {
+                continue;
+            }
+
+            var issuerAt = $"{at}:{nameof(C.BearerRoute.Issuers)}:{i}:{nameof(C.BearerIssuer.Introspection)}";
+            if (!BearerRouteTable.TryParseAuthorityUri(introspection.Endpoint, out _, out _))
+            {
+                failures.Add(
+                    $"{issuerAt}:{nameof(C.BearerIssuerIntrospection.Endpoint)} must be an absolute HTTPS URI without query, " +
+                    "fragment or user information (plain HTTP is accepted only on a loopback host).");
+            }
+
+            if (string.IsNullOrWhiteSpace(introspection.ClientId) || string.IsNullOrEmpty(introspection.ClientSecret))
+            {
+                failures.Add($"{issuerAt}: {nameof(C.BearerIssuerIntrospection.ClientId)} and {nameof(C.BearerIssuerIntrospection.ClientSecret)} are required.");
+            }
+
+            if (introspection.CacheDuration < TimeSpan.Zero || introspection.CacheDuration > C.BearerIssuerIntrospection.MaximumCacheDuration)
+            {
+                failures.Add($"{issuerAt}:{nameof(C.BearerIssuerIntrospection.CacheDuration)} must be between zero and {C.BearerIssuerIntrospection.MaximumCacheDuration}, which bounds how long a revoked token can still be accepted.");
+            }
+
+            if (introspection.Timeout < C.BearerIssuerIntrospection.MinimumTimeout || introspection.Timeout > C.BearerIssuerIntrospection.MaximumTimeout)
+            {
+                failures.Add($"{issuerAt}:{nameof(C.BearerIssuerIntrospection.Timeout)} must be between {C.BearerIssuerIntrospection.MinimumTimeout} and {C.BearerIssuerIntrospection.MaximumTimeout}.");
+            }
+
+            if (introspection.MaximumCachedTokens < 1)
+            {
+                failures.Add($"{issuerAt}:{nameof(C.BearerIssuerIntrospection.MaximumCachedTokens)} must be at least 1.");
+            }
         }
     }
 
