@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Globalization;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.BearerRoutes;
@@ -16,6 +17,9 @@ namespace Cratis.AuthProxy.Identity;
 /// </summary>
 public static class ClientPrincipalExtensions
 {
+    /// <summary>The forwarded claim carrying the session's authentication time, in Unix seconds.</summary>
+    internal const string AuthenticationTimeClaim = "auth_time";
+
     /// <summary>
     /// Builds the <see cref="ClientPrincipal"/> the request acts as: the represented user while an on-behalf session
     /// is active on it, otherwise the authenticated caller (see <see cref="BuildActorClientPrincipal"/>).
@@ -90,6 +94,13 @@ public static class ClientPrincipalExtensions
             return null;
         }
 
+        // Only a browser session records the authentication time AuthProxy observed; read it before the principal is
+        // replaced by a canonical one, which carries no session metadata.
+        var authenticationTime = string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal)
+            && SessionAuthenticationTime.TryRead(user, properties, out var sessionTime)
+                ? sessionTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)
+                : null;
+
         var canonicalResolution = context.RequestServices is { } requestServices
             ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)
             : null;
@@ -130,8 +141,15 @@ public static class ClientPrincipalExtensions
         // get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
         // own record of how the session was signed in and stays inside the proxy.
         var claims = user.Claims
-            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !IsReservedSessionMetadata(c.Type))
+            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !IsReservedSessionMetadata(c.Type) && !IsAuthenticationTime(c.Type))
             .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
+
+        // A provider's own auth_time is never forwarded: the only one a receiver may see is the time AuthProxy
+        // validated and recorded for the session, carried inside the signed principal.
+        if (authenticationTime is not null)
+        {
+            claims = claims.Append(new ClientPrincipalClaim { Type = AuthenticationTimeClaim, Value = authenticationTime });
+        }
 
         return new ClientPrincipal
         {
@@ -196,6 +214,9 @@ public static class ClientPrincipalExtensions
             requestMessage.Headers.Add(Headers.PrincipalNameExtended, userDetails);
         }
     }
+
+    static bool IsAuthenticationTime(string claimType) =>
+        string.Equals(claimType, AuthenticationTimeClaim, StringComparison.OrdinalIgnoreCase);
 
     static bool IsReservedSessionMetadata(string claimType) =>
         BearerRouteClaims.IsReserved(claimType) || SessionClaims.IsReserved(claimType);

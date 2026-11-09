@@ -31,6 +31,11 @@ public class CallerAuthorizationHeaderTransform : RequestTransform
             return ValueTask.CompletedTask;
         }
 
+        if (AnonymousPaths.PassesCallerAuthorization(http))
+        {
+            return ValueTask.CompletedTask;
+        }
+
         var scheme = http.Items[Authentication.AuthenticationServiceCollectionExtensions.SelectedSchemeItemKey] as string;
         var authenticated = http.User.Identity?.IsAuthenticated == true;
         if (authenticated && (scheme == JwtBearerDefaults.AuthenticationScheme || scheme == ClientCredentialsDefaults.AuthenticationScheme))

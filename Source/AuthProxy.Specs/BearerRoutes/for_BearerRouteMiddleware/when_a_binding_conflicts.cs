@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authorization;
+using Cratis.AuthProxy.BearerRoutes.Introspection;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace Cratis.AuthProxy.BearerRoutes.for_BearerRouteMiddleware;
 
@@ -45,7 +47,7 @@ public class when_a_binding_conflicts : Specification
         var verifier = Substitute.For<ITenantVerifier>();
         var forwarder = Substitute.For<IBearerRouteForwarder>();
         var next = Substitute.For<RequestDelegate>();
-        var middleware = new BearerRouteMiddleware(next, options, validator, policy, verifier, resolver, forwarder, Substitute.For<ILogger<BearerRouteMiddleware>>());
+        var middleware = new BearerRouteMiddleware(next, options, validator, Substitute.For<IBearerTokenIntrospector>(), policy, verifier, resolver, forwarder, new(new EphemeralDataProtectionProvider()), Substitute.For<ILogger<BearerRouteMiddleware>>());
         await middleware.InvokeAsync(context);
         context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
         context.Response.Headers.CacheControl.ToString().ShouldEqual("no-store");

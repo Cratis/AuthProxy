@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.BearerRoutes.Introspection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -22,6 +24,11 @@ public static class BearerRouteServiceCollectionExtensions
     public static readonly int MaximumMetadataSize = 64 * 1024;
 
     /// <summary>
+    /// The maximum buffered size of an introspection response, in bytes.
+    /// </summary>
+    public static readonly int MaximumIntrospectionResponseSize = 16 * 1024;
+
+    /// <summary>
     /// Registers the services bearer routes need. Registering them changes nothing for a deployment that
     /// declares no bearer route.
     /// </summary>
@@ -41,6 +48,19 @@ public static class BearerRouteServiceCollectionExtensions
 
             // An issuer's response cannot choose a second address for AuthProxy to fetch.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
+
+        // The deadline of an introspection call is the issuer's configured Timeout, enforced by the call itself.
+        builder.Services.AddHttpClient(BearerRouteDefaults.IntrospectionHttpClientName, client =>
+        {
+            client.Timeout = Timeout.InfiniteTimeSpan;
+            client.MaxResponseContentBufferSize = MaximumIntrospectionResponseSize;
+        })
+
+            // The endpoint cannot redirect AuthProxy, and the token is never replayed anywhere else.
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<IntrospectionCache>();
+        builder.Services.AddSingleton<IBearerTokenIntrospector, BearerTokenIntrospector>();
         builder.Services.AddSingleton<IBearerIssuerMetadata, BearerIssuerMetadata>();
         builder.Services.AddSingleton<IBearerTokenValidator, BearerTokenValidator>();
         builder.Services.AddSingleton<IBearerRouteForwarder, BearerRouteForwarder>();

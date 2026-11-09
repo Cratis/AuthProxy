@@ -15,6 +15,8 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="Route">The route configuration.</param>
 /// <param name="ResourceMetadataUrl">The protected-resource metadata URL named in challenges, when configured.</param>
 /// <param name="ResourceMetadataPath">The normalized path of <paramref name="ResourceMetadataUrl"/>, when configured.</param>
+/// <param name="Profile">The kinds of credential the route accepts, which decides what its refusals advertise.</param>
+/// <param name="ResourceKey">The resource key a personal-access-token-only route names as its challenge realm.</param>
 public sealed record ResolvedBearerRoute(
     string ServiceName,
     string BackendBaseUrl,
@@ -22,7 +24,9 @@ public sealed record ResolvedBearerRoute(
     IReadOnlyList<ResolvedBearerIssuer> Issuers,
     C.BearerRoute Route,
     Uri? ResourceMetadataUrl,
-    string? ResourceMetadataPath)
+    string? ResourceMetadataPath,
+    BearerProfile Profile = BearerProfile.OAuthOnly,
+    string? ResourceKey = null)
 {
     /// <summary>
     /// Gets the clock skew allowed when validating a token lifetime on this route, never more than

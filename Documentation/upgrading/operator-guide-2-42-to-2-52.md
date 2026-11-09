@@ -167,7 +167,8 @@ configured without the binding. See
 On routes configured as anonymous, AuthProxy now removes forwarded identity, tenant, authorization, on-behalf and
 signature material before the request reaches the backend, including copies the caller supplied. This applies
 to authenticated sessions and bearer-token callers as well. A backend that expects identity on a path in
-`AnonymousPaths` must serve that path from a route that is not anonymous. See
+`AnonymousPaths` must serve that path from a route that is not anonymous. A path that must still receive the
+caller's own `Authorization` header can be listed in `PassCallerAuthorizationPaths`. See
 [Anonymous paths](../configuration/services.md#anonymous-paths).
 
 Authentication bootstrap path matching also accepts only the configured callback paths, not any path starting

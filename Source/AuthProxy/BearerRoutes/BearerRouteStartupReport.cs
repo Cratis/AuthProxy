@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.BearerRoutes.Introspection;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -27,6 +28,10 @@ public sealed class BearerRouteStartupReport(IOptionsMonitor<C.AuthProxy> config
 
                 case BearerRouteWarningKind.IdentityVerificationNotConsulted:
                     logger.BearerRouteDoesNotConsultIdentityVerification(warning.Prefix, warning.ServiceName, subjects);
+                    break;
+
+                case BearerRouteWarningKind.RevocationNotEnforced:
+                    logger.BearerRouteWithoutIntrospection(warning.Prefix, warning.ServiceName, subjects);
                     break;
             }
         }

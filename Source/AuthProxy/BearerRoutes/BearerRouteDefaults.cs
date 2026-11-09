@@ -14,6 +14,11 @@ public static class BearerRouteDefaults
     public const string MetadataHttpClientName = "Cratis.AuthProxy.BearerRoutes.Metadata";
 
     /// <summary>
+    /// The name of the HTTP client used to ask an issuer's introspection endpoint about a token.
+    /// </summary>
+    public const string IntrospectionHttpClientName = "Cratis.AuthProxy.BearerRoutes.Introspection";
+
+    /// <summary>
     /// The JWT signing algorithms accepted on a bearer route. Symmetric algorithms and <c language="text">none</c> are
     /// never accepted.
     /// </summary>
@@ -24,6 +29,12 @@ public static class BearerRouteDefaults
     /// authenticated on a bearer route. Absent for everything else, including a protected-resource metadata request.
     /// </summary>
     internal const string ForwardedIdentityItemKey = "Cratis.AuthProxy.BearerRoutes.ForwardedIdentity";
+
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key marking a request whose credential is handed on to the service as
+    /// presented, because the service is the one that verifies it.
+    /// </summary>
+    internal const string PassThroughAuthorizationItemKey = "Cratis.AuthProxy.BearerRoutes.PassThroughAuthorization";
 
     /// <summary>The service selected by the bearer route.</summary>
     internal const string ServiceItemKey = "Cratis.AuthProxy.BearerRoutes.Service";

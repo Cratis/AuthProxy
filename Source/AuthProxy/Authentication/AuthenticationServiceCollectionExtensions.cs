@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.AccessTokens;
+using Cratis.AuthProxy.BearerRoutes;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.SignInCallbacks;
@@ -50,6 +51,7 @@ public static class AuthenticationServiceCollectionExtensions
     /// <returns>The same <see cref="WebApplicationBuilder"/> for chaining.</returns>
     public static WebApplicationBuilder AddIngressAuthentication(this WebApplicationBuilder builder)
     {
+        builder.Services.TryAddSingleton(TimeProvider.System);
         var jwtSection = builder.Configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer");
         var hasJwtBearer = jwtSection.Exists();
 
@@ -96,6 +98,7 @@ public static class AuthenticationServiceCollectionExtensions
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
         builder.Services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
         builder.Services.TryAddSingleton(TimeProvider.System);
@@ -136,6 +139,22 @@ public static class AuthenticationServiceCollectionExtensions
 
     static string SelectAuthenticationScheme(HttpContext context, bool hasJwtBearer)
     {
+        // On a server-selected passthrough route the bearer value belongs only to the backend.
+        // Keep session authentication, but never inspect or validate that header at the proxy.
+        if (AnonymousPaths.PassesCallerAuthorization(context))
+        {
+            return CookieAuthenticationDefaults.AuthenticationScheme;
+        }
+
+        // A gate decision is final. Missing state on a bearer route must also reach the handler's
+        // fail-closed check, never cookie or JWT authentication. External credentials forward at the gate.
+        var current = context.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue;
+        if (IssuedBearerRouteCredential.Read(context) is not null
+            || BearerRouteTable.TryMatch(context.Request.Path, current, out _))
+        {
+            return ClientCredentialsDefaults.AuthenticationScheme;
+        }
+
         var authorization = context.Request.Headers.Authorization.ToString();
         if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
@@ -281,6 +300,10 @@ public static class AuthenticationServiceCollectionExtensions
 
     static void RegisterOidcProviders(AuthenticationBuilder authBuilder, IList<C.OidcProvider> providers)
     {
+        // The registration and every reader of the bound options see the same Cratis Identity profile defaults.
+        CratisIdentityProfile.ApplyDefaults(providers);
+        authBuilder.Services.PostConfigure<C.Authentication>(authentication => CratisIdentityProfile.ApplyDefaults(authentication.OidcProviders));
+
         foreach (var provider in providers)
         {
             var scheme = OidcProviderScheme.FromName(provider.Name);
@@ -290,6 +313,12 @@ public static class AuthenticationServiceCollectionExtensions
                 ConfigureOidcOptions(options, capturedProvider, scheme);
                 options.Events = CreateOidcEvents(capturedProvider, scheme);
             });
+
+            if (CratisIdentityProfile.AppliesTo(capturedProvider))
+            {
+                // Registered after AddOpenIdConnect so it runs after the framework has built the back channel.
+                authBuilder.Services.PostConfigure<OpenIdConnectOptions>(scheme, options => CratisIdentityProfile.UseVerifiedDiscovery(options, capturedProvider));
+            }
         }
     }
 
@@ -335,6 +364,11 @@ public static class AuthenticationServiceCollectionExtensions
             options.Scope.Add(scope);
         }
 
+        if (CratisIdentityProfile.AppliesTo(provider))
+        {
+            CratisIdentityProfile.Configure(options, provider);
+        }
+
         options.CallbackPath = $"/signin-{scheme}";
 
         // Lax + SameAsRequest keeps the handshake cookies flowing across the provider redirect,
@@ -368,10 +402,26 @@ public static class AuthenticationServiceCollectionExtensions
     {
         return new OpenIdConnectEvents
         {
-            OnTokenValidated = context =>
+            OnRedirectToIdentityProvider = context =>
+            {
+                if (FreshAuthenticationChallenge.TryGetMaxAge(context.Properties, out var maxAge))
+                {
+                    context.ProtocolMessage.Prompt = "login";
+                    context.ProtocolMessage.MaxAge = ((int)maxAge.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                }
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = async context =>
             {
                 context.Properties.Items[ValidatedIssuerStateKey] = context.SecurityToken.Issuer;
-                return Task.CompletedTask;
+                var validatedClaims = context.SecurityToken?.Claims ?? [];
+                if (!FreshAuthenticationChallenge.ValidateOidc(validatedClaims, context.Properties, FreshAuthenticationChallenge.Now(context.HttpContext)))
+                {
+                    FreshAuthenticationChallenge.Reject(context.HttpContext, context.Properties);
+                    context.HandleResponse();
+                    return;
+                }
+                await VerifiedUpstreamClaims.Capture(context, scheme);
             },
             OnTokenResponseReceived = UserTokenSessions.Capture,
             OnAuthorizationCodeReceived = context => provider.UsesClientAssertion
@@ -583,7 +633,7 @@ public static class AuthenticationServiceCollectionExtensions
             context.Properties!.Items[CanonicalSessionRegistrationFingerprint.StateKey] = createRegistrationFingerprint();
         }
 
-        await CompleteSignIn(context);
+        await CompleteSignIn(context, protocolAssurance == "oidc");
     }
 
     static CanonicalIdentityResolution ResolveFreshCanonicalIdentity(TicketReceivedContext context)
@@ -615,7 +665,7 @@ public static class AuthenticationServiceCollectionExtensions
         AdditionalLogoutCookies.Clear(context.HttpContext, logout.AdditionalCookies);
     }
 
-    static async Task CompleteSignIn(TicketReceivedContext context)
+    static async Task CompleteSignIn(TicketReceivedContext context, bool oidc)
     {
         // A non-link ticket means a real sign-in is completing. Record which provider established this session so
         // a later RP-initiated logout can target the correct identity provider's end-session endpoint (persisted
@@ -625,6 +675,7 @@ public static class AuthenticationServiceCollectionExtensions
         // The same scheme is also recorded as a claim on the session itself, so an account from a provider without
         // canonical identity is named by the provider it signed in with.
         SessionProvider.Stamp(context.Principal!, context.Properties, context.Scheme.Name);
+        FreshAuthenticationChallenge.Stamp(context.Principal!, context.Properties!, oidc);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();
         await notifier.Notify(context.HttpContext, context.Principal, context.Scheme.Name);

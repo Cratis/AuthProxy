@@ -101,6 +101,8 @@ The proof binds the audience, key ID, timestamp, nonce, uppercase HTTP method, f
 
 Covered headers are every `x-ms-client-principal*` and `x-cratis-on-behalf*` header, token client ID and scope, and both modern and legacy tenant and service headers. Values retain their exact printable ASCII transport representation after trimming only outer SP/HTAB. Internal commas, base64 padding and percent escapes are not normalized. At most 64 covered names and 32,768 canonical UTF-8 bytes are accepted. Repeated covered values, missing required principal fields, malformed paths and remaining controls or non-ASCII values are refused.
 
+The signed principal can carry an `auth_time` claim, in Unix seconds, when a service uses [fresh authentication](fresh-authentication.md). A receiver may rely on it only after the proof verifies.
+
 Arc also covers a custom `Tenancy.HttpHeader` when configured. AuthProxy signs only its fixed modern/legacy tenant headers; a receiver configured to consume another tenant header is not compatible with this producer configuration.
 
 ## Failures and diagnostics
