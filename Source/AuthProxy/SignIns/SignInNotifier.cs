@@ -76,6 +76,17 @@ public class SignInNotifier(
         return result;
     }
 
+    static bool HasUsableIdentity(CanonicalIdentityResolution resolution) =>
+        !resolution.IsConfigured || (resolution.Succeeded && resolution.Identity is not null);
+
+    static string SubjectOf(CanonicalIdentityResolution resolution, ClaimsPrincipal? principal) =>
+        resolution.Identity?.Subject
+        ?? principal?.FindFirst("sub")?.Value
+        ?? principal?.FindFirst("oid")?.Value
+        ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? principal?.FindFirst("id")?.Value
+        ?? string.Empty;
+
     async Task<SignInNotificationResult> Deliver(HttpContext context, ClaimsPrincipal? principal, string? scheme)
     {
         var notifyUrl = config.CurrentValue.SignIn?.NotifyUrl;
@@ -89,17 +100,12 @@ public class SignInNotifier(
             ?? principal?.Identity?.AuthenticationType;
         var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, authenticationScheme)
             ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
-        if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
+        if (!HasUsableIdentity(canonicalResolution))
         {
             return SignInNotificationResult.Failed;
         }
 
-        var subject = canonicalResolution.Identity?.Subject
-            ?? principal?.FindFirst("sub")?.Value
-            ?? principal?.FindFirst("oid")?.Value
-            ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? principal?.FindFirst("id")?.Value
-            ?? string.Empty;
+        var subject = SubjectOf(canonicalResolution, principal);
 
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -107,15 +113,7 @@ public class SignInNotifier(
             return SignInNotificationResult.Failed;
         }
 
-        // The scheme names the provider that was actually challenged — authoritative over anything sniffed
-        // from claims, which for some providers bottoms out in the meaningless "AuthenticationTypes.Federation".
-        var identityProvider = canonicalResolution.Identity?.ProviderKey
-            ?? OidcProviderScheme.NameFromScheme(config.CurrentValue.Authentication, scheme)
-            ?? principal?.FindFirst("iss")?.Value
-            ?? principal?.FindFirst("identity_provider")?.Value
-            ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
-            ?? principal?.Identity?.AuthenticationType
-            ?? string.Empty;
+        var identityProvider = IdentityProviderOf(canonicalResolution, principal, scheme);
 
         var location = locationResolver.Resolve(context);
         var userAgent = UserAgentParser.Parse(context.Request.Headers.UserAgent.ToString());
@@ -145,16 +143,7 @@ public class SignInNotifier(
                 userAgent = userAgent.Raw,
             };
 
-        // Verified upstream claims are opt-in and only ever travel inside a signed body: without an attestation
-        // nothing is added. They come solely from the token AuthProxy validated for this very sign-in.
-        var signIn = config.CurrentValue.SignIn;
-        if (signIn is { IncludeVerifiedUpstreamClaims: true, Attestation: not null }
-            && VerifiedUpstreamClaims.For(context, scheme) is { } verified)
-        {
-            var withClaims = JsonSerializer.SerializeToNode(payload, JsonSerializerOptions.Web)!.AsObject();
-            withClaims["verifiedClaims"] = JsonSerializer.SerializeToNode(verified.Values, JsonSerializerOptions.Web);
-            payload = withClaims;
-        }
+        payload = AddVerifiedClaims(context, scheme, payload);
 
         var content = JsonContent.Create(payload, payload.GetType());
 
@@ -163,6 +152,45 @@ public class SignInNotifier(
             Content = content,
         };
 
+        if (!await TrySign(request, content))
+        {
+            return SignInNotificationResult.Failed;
+        }
+
+        return await Send(client, request, notifyUrl);
+    }
+
+    string IdentityProviderOf(CanonicalIdentityResolution resolution, ClaimsPrincipal? principal, string? scheme)
+    {
+        // The scheme names the provider that was actually challenged — authoritative over anything sniffed
+        // from claims, which for some providers bottoms out in the meaningless "AuthenticationTypes.Federation".
+        return resolution.Identity?.ProviderKey
+            ?? OidcProviderScheme.NameFromScheme(config.CurrentValue.Authentication, scheme)
+            ?? principal?.FindFirst("iss")?.Value
+            ?? principal?.FindFirst("identity_provider")?.Value
+            ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
+            ?? principal?.Identity?.AuthenticationType
+            ?? string.Empty;
+    }
+
+    object AddVerifiedClaims(HttpContext context, string? scheme, object payload)
+    {
+        // Verified upstream claims are opt-in and only ever travel inside a signed body: without an attestation
+        // nothing is added. They come solely from the token AuthProxy validated for this very sign-in.
+        var signIn = config.CurrentValue.SignIn;
+        if (signIn is { IncludeVerifiedUpstreamClaims: true, Attestation: not null }
+            && VerifiedUpstreamClaims.For(context, scheme) is { } verified)
+        {
+            var withClaims = JsonSerializer.SerializeToNode(payload, JsonSerializerOptions.Web)!.AsObject();
+            withClaims["verifiedClaims"] = JsonSerializer.SerializeToNode(verified.Values, JsonSerializerOptions.Web);
+            return withClaims;
+        }
+
+        return payload;
+    }
+
+    async Task<bool> TrySign(HttpRequestMessage request, JsonContent content)
+    {
         // Signing is opt-in, and the gate is the presence of the configuration section alone. Without it the
         // request leaves exactly as it always has: the same body, and no header of any kind added here. With
         // it, the envelope is bound to the serialized bytes this request will actually carry — which is why
@@ -174,12 +202,17 @@ public class SignInNotifier(
             if (signer is null || !signer.TryIssue(request.Method, request.RequestUri!, body, out var envelope))
             {
                 logger.SignInNotificationCouldNotBeSigned();
-                return SignInNotificationResult.Failed;
+                return false;
             }
 
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", envelope);
         }
 
+        return true;
+    }
+
+    async Task<SignInNotificationResult> Send(HttpClient client, HttpRequestMessage request, string notifyUrl)
+    {
         HttpResponseMessage response;
         try
         {
