@@ -263,16 +263,17 @@ public static class BearerRouteTable
             return false;
         }
 
-        var profile = (issuers.Count, tokens) switch
+        resolved = new ResolvedBearerRoute(serviceName, backendBaseUrl, prefix, issuers, route, metadata.Url, metadata.Path, ProfileOf(issuers.Count, tokens), tokens?.ResourceKey);
+        return true;
+    }
+
+    static BearerProfile ProfileOf(int issuerCount, C.BearerRoutePersonalAccessTokens? tokens) =>
+        (issuerCount, tokens) switch
         {
             (0, not null) => BearerProfile.PatOnly,
             (_, not null) => BearerProfile.Combined,
             _ => BearerProfile.OAuthOnly,
         };
-
-        resolved = new ResolvedBearerRoute(serviceName, backendBaseUrl, prefix, issuers, route, metadata.Url, metadata.Path, profile, tokens?.ResourceKey);
-        return true;
-    }
 
     static bool ContainsAmbiguousCharacters(string value) =>
         value.Contains('%', StringComparison.Ordinal)
