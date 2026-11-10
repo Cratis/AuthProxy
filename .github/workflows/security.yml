@@ -45,7 +45,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Build security specs
-        run: dotnet build Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj --configuration Release
+        run: dotnet build Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj --configuration Release -warnaserror
 
       - name: Run security specs
         run: |

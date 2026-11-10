@@ -52,10 +52,10 @@ jobs:
       # under Debug, so a Release-only build can go green over code that does not compile for anyone
       # working on it locally.
       - name: Build (Debug)
-        run: dotnet build --configuration Debug
+        run: dotnet build --configuration Debug -warnaserror
 
       - name: Build (Release)
-        run: dotnet build --configuration Release
+        run: dotnet build --configuration Release -warnaserror
 
       # xUnit v3 spec projects are executables; the process exit code fails the step.
       - name: Test
