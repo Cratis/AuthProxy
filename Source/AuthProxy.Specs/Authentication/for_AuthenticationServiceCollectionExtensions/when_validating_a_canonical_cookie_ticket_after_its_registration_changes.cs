@@ -17,7 +17,7 @@ public class when_validating_a_canonical_cookie_ticket_after_its_registration_ch
         var properties = await IssueCanonicalTicket();
         var originalMetadataAddress = _oidcOptions.MetadataAddress;
 
-        UseAuthentication(InitialAuthentication(authority: "https://login.example.com/organizations/v2.0"));
+        UseAuthentication(InitialAuthentication(new() { Authority = "https://login.example.com/organizations/v2.0" }));
         _acceptedByChange["OIDC authority"] = await IsAccepted(CanonicalPrincipal(), properties);
 
         UseAuthentication(InitialAuthentication());
@@ -25,19 +25,19 @@ public class when_validating_a_canonical_cookie_ticket_after_its_registration_ch
         _acceptedByChange["effective discovery source"] = await IsAccepted(CanonicalPrincipal(), properties);
         _oidcOptions.MetadataAddress = originalMetadataAddress;
 
-        UseAuthentication(InitialAuthentication(clientId: "different-client"));
+        UseAuthentication(InitialAuthentication(new() { ClientId = "different-client" }));
         _acceptedByChange["client ID"] = await IsAccepted(CanonicalPrincipal(), properties);
 
-        UseAuthentication(InitialAuthentication(subjectClaimType: "sub"));
+        UseAuthentication(InitialAuthentication(new() { SubjectClaimType = "sub" }));
         _acceptedByChange["subject claim type"] = await IsAccepted(CanonicalPrincipal(), properties);
 
-        UseAuthentication(InitialAuthentication(providerKey: "different-workforce"));
+        UseAuthentication(InitialAuthentication(new() { ProviderKey = "different-workforce" }));
         _acceptedByChange["provider key"] = await IsAccepted(CanonicalPrincipal(), properties);
 
         UseAuthentication(OAuthAuthentication());
         _acceptedByChange["provider protocol"] = await IsAccepted(CanonicalPrincipal(), properties);
 
-        UseAuthentication(InitialAuthentication(name: "Microsoft Workforce"));
+        UseAuthentication(InitialAuthentication(new() { Name = "Microsoft Workforce" }));
         _acceptedByChange["provider scheme"] = await IsAccepted(CanonicalPrincipal(), properties);
     }
 

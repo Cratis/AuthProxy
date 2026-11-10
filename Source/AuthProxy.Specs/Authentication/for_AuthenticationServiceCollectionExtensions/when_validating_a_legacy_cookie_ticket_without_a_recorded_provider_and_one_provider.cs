@@ -15,7 +15,7 @@ public class when_validating_a_legacy_cookie_ticket_without_a_recorded_provider_
 
     async Task Because()
     {
-        UseAuthentication(InitialAuthentication(subjectClaimType: "sub"));
+        UseAuthentication(InitialAuthentication(new() { SubjectClaimType = "sub" }));
         _result = await Validate(LegacyPrincipal(null), new AuthenticationProperties());
     }
 

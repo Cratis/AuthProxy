@@ -15,7 +15,7 @@ public class when_evaluating_a_canonical_oauth_session_after_its_registration_ch
     async Task Because()
     {
         var properties = await IssueCanonicalOAuthTicket();
-        UseAuthentication(OAuthAuthentication(tokenEndpoint: "https://changed.example.com/token"));
+        UseAuthentication(OAuthAuthentication(new() { TokenEndpoint = "https://changed.example.com/token" }));
         _result = Evaluate(CanonicalOAuthPrincipal(), properties);
     }
 

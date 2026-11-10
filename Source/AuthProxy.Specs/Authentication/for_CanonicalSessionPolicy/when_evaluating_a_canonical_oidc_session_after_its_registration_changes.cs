@@ -15,7 +15,7 @@ public class when_evaluating_a_canonical_oidc_session_after_its_registration_cha
     async Task Because()
     {
         var properties = await IssueCanonicalTicket();
-        UseAuthentication(InitialAuthentication(clientId: "changed-client"));
+        UseAuthentication(InitialAuthentication(new() { ClientId = "changed-client" }));
         _result = Evaluate(CanonicalPrincipal(), properties);
     }
 
