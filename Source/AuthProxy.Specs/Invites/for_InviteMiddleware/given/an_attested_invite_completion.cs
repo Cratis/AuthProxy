@@ -98,27 +98,8 @@ public class an_attested_invite_completion : Specification
         var authenticationOptions = Substitute.For<IOptionsMonitor<C.Authentication>>();
         authenticationOptions.CurrentValue.Returns(authentication);
 
-        var claims = new List<Claim>
-        {
-            new(CanonicalIdentityClaims.ProviderKey, "workforce"),
-            new(CanonicalIdentityClaims.Issuer, "https://identity.example.com"),
-            new(CanonicalIdentityClaims.Subject, "provider-subject"),
-            new("acr", "mfa"),
-        };
-        if (IncludeVerifiedEmailClaims)
-        {
-            claims.Add(new Claim("email", Email));
-            claims.Add(new Claim("email_verified", bool.TrueString.ToLowerInvariant()));
-        }
-
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
-        var properties = new AuthenticationProperties
-        {
-            IssuedUtc = new DateTimeOffset(2026, 8, 10, 1, 2, 3, TimeSpan.Zero),
-        };
-        properties.Items[InvitationAuthenticationState.TransactionStateKey] = Transaction;
-        properties.Items[InvitationAuthenticationState.ChallengeStateKey] = SessionChallenge;
-        properties.Items[InvitationAuthenticationState.CapabilityHashStateKey] = CapabilityHash;
+        var principal = CreatePrincipal();
+        var properties = CreateSessionProperties();
 
         // The only await between resolving the entry state and issuing the attestation. A configuration
         // reload published here is the exact race a completion stage that re-reads configuration loses.
@@ -147,6 +128,12 @@ public class an_attested_invite_completion : Specification
         };
         _context.Request.Path = "/";
 
+        var protector = EstablishInvitationSession(inviteSigningKey, properties);
+        EstablishMiddleware(inviteOptions, authenticationOptions, protector);
+    }
+
+    IInvitationEntryStateProtector EstablishInvitationSession(RsaSecurityKey inviteSigningKey, AuthenticationProperties properties)
+    {
         var token = TokenFixture.CreateToken(
             inviteSigningKey,
             InviteIssuer,
@@ -175,7 +162,14 @@ public class an_attested_invite_completion : Specification
                     DateTimeOffset.UtcNow.AddMinutes(10));
                 return true;
             });
+        return protector;
+    }
 
+    void EstablishMiddleware(
+        IOptionsMonitor<C.AuthProxy> inviteOptions,
+        IOptionsMonitor<C.Authentication> authenticationOptions,
+        IInvitationEntryStateProtector protector)
+    {
         _attestationIssuer = new();
         _handler = new();
         var httpClientFactory = Substitute.For<IHttpClientFactory>();
@@ -200,6 +194,36 @@ public class an_attested_invite_completion : Specification
             new CanonicalIdentityResolver(authenticationOptions),
             _attestationIssuer,
             protector);
+    }
+
+    ClaimsPrincipal CreatePrincipal()
+    {
+        var claims = new List<Claim>
+        {
+            new(CanonicalIdentityClaims.ProviderKey, "workforce"),
+            new(CanonicalIdentityClaims.Issuer, "https://identity.example.com"),
+            new(CanonicalIdentityClaims.Subject, "provider-subject"),
+            new("acr", "mfa"),
+        };
+        if (IncludeVerifiedEmailClaims)
+        {
+            claims.Add(new Claim("email", Email));
+            claims.Add(new Claim("email_verified", bool.TrueString.ToLowerInvariant()));
+        }
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme));
+    }
+
+    AuthenticationProperties CreateSessionProperties()
+    {
+        var properties = new AuthenticationProperties
+        {
+            IssuedUtc = new DateTimeOffset(2026, 8, 10, 1, 2, 3, TimeSpan.Zero),
+        };
+        properties.Items[InvitationAuthenticationState.TransactionStateKey] = Transaction;
+        properties.Items[InvitationAuthenticationState.ChallengeStateKey] = SessionChallenge;
+        properties.Items[InvitationAuthenticationState.CapabilityHashStateKey] = CapabilityHash;
+        return properties;
     }
 
     protected static string ComputeHash(string token) =>
