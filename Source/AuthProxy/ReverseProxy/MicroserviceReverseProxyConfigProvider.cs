@@ -352,13 +352,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     static string? AnonymousClusterId(C.Service service, string microserviceKey, string path, out string? prefix)
     {
         prefix = ServiceRoutes.PathPrefixOf(service);
-        var relativePath = new PathString(path);
-        if (prefix is not null && relativePath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase, out var remaining))
-        {
-            relativePath = remaining;
-        }
-
-        var prefersBackend = relativePath.StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);
+        var prefersBackend = RelativeToPrefix(path, prefix).StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);
         return (prefersBackend, service.Backend, service.Frontend) switch
         {
             (true, not null, _) => BackendClusterId(microserviceKey),
@@ -367,6 +361,14 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             (_, null, not null) => FrontendClusterId(microserviceKey),
             _ => null,
         };
+    }
+
+    static PathString RelativeToPrefix(string path, string? prefix)
+    {
+        var relativePath = new PathString(path);
+        return prefix is not null && relativePath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase, out var remaining)
+            ? remaining
+            : relativePath;
     }
 
     static string? AnonymousStripPrefix(C.Service service, string? prefix, string path) =>
