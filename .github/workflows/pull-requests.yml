@@ -69,7 +69,7 @@ jobs:
             AuthProxy.slnx
 
       - name: Build
-        run: dotnet build --configuration Release
+        run: dotnet build --configuration Release -warnaserror
 
       - name: Publish
         run: dotnet publish Source/AuthProxy/AuthProxy.csproj --configuration Release -o Source/AuthProxy/out
