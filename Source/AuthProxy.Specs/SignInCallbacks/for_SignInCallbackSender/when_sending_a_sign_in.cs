@@ -16,7 +16,7 @@ public class when_sending_a_sign_in : given.a_sender
     async Task Because()
     {
         _delivered = await _sender.Send(CreateRequest(), CancellationToken.None);
-        _body = JsonDocument.Parse(_handler.LastRequestBody!).RootElement;
+        _body = JsonElement.Parse(_handler.LastRequestBody!);
     }
 
     [Fact] void should_report_it_delivered() => _delivered.ShouldBeTrue();

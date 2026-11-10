@@ -3,7 +3,6 @@
 
 using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Http.Json;
 using Cratis.AuthProxy.Admission;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

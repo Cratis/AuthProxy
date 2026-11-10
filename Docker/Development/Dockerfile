@@ -5,7 +5,7 @@
 # Runtime image — binaries pre-built on the GitHub runner.
 ####################################
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble
+FROM mcr.microsoft.com/dotnet/aspnet:11.0-resolute
 ARG VERSION
 
 RUN echo Version = ${VERSION}

@@ -12,7 +12,7 @@ public class when_sending_a_return : given.a_sender
     async Task Because()
     {
         _delivered = await _sender.Send(CreateRequest(SignInCallbackKind.Returned), CancellationToken.None);
-        _body = JsonDocument.Parse(_handler.LastRequestBody!).RootElement;
+        _body = JsonElement.Parse(_handler.LastRequestBody!);
     }
 
     [Fact] void should_mark_the_call_as_a_return() => Header(Headers.SignInCallback).ShouldEqual("Returned");

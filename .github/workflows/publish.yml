@@ -7,7 +7,9 @@ concurrency:
   queue: max
 
 env:
-  DOTNET_VERSION: "10.0.x"
+  DOTNET_VERSION: |
+    10.0.x
+    11.0.x
   NUGET_OUTPUT: ./Artifacts/NuGet
 
 on:

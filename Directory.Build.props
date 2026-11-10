@@ -19,10 +19,6 @@
         <Configuration>Debug</Configuration>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)'=='Debug' AND '$(TargetFramework)'=='' AND '$(TargetFrameworks)'==''">
-        <TargetFramework>net10.0</TargetFramework>
-    </PropertyGroup>
-
     <ItemGroup>
         <PackageReference Include="StyleCop.Analyzers" PrivateAssets="All" />
         <PackageReference Include="Roslynator.Analyzers" PrivateAssets="All" />

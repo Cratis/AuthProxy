@@ -5,7 +5,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOTNET_VERSION: "10.0.x"
+  DOTNET_VERSION: |
+    10.0.x
+    11.0.x
 
 on:
   pull_request:
@@ -67,7 +69,7 @@ jobs:
             AuthProxy.slnx
 
       - name: Build
-        run: dotnet build --configuration Release
+        run: dotnet build --configuration Release -warnaserror
 
       - name: Publish
         run: dotnet publish Source/AuthProxy/AuthProxy.csproj --configuration Release -o Source/AuthProxy/out
