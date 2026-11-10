@@ -70,7 +70,7 @@ internal static class DpopTargetUri
     static string? PublicPath(HttpRequest request, C.BearerRoute route)
     {
         if (route.Dpop!.PublicPathPrefix is not { } prefix) return (request.PathBase + request.Path).ToUriComponent();
-        if (!ValidPath(prefix) || !request.Path.StartsWithSegments(route.PathPrefix, StringComparison.OrdinalIgnoreCase, out var remaining)) return null;
+        if (!ValidPath(prefix) || !request.Path.StartsWithSegments(route.PathPrefix, StringComparison.Ordinal, out var remaining)) return null;
         var path = (prefix == "/" ? string.Empty : prefix.TrimEnd('/')) + remaining.ToUriComponent();
         return path.Length == 0 ? "/" : path;
     }

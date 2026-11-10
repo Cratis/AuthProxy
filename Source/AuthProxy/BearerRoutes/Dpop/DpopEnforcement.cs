@@ -41,7 +41,7 @@ public sealed class DpopEnforcement(IDpopReplayStore store, IDataProtectionProvi
         if (route.Route.Dpop is null || validation.SenderConstraint is null) return validation;
         if (validation.DpopError is not null)
         {
-            if (enforcement is not null) return await enforcement.RefusePresentation(context, route, validation.SenderConstraint.Jkt);
+            if (enforcement is not null) return enforcement.Refuse(context, route, "bound_token_as_bearer");
             DpopChallenge.Write(context, validation, route);
             return null;
         }
@@ -72,10 +72,10 @@ public sealed class DpopEnforcement(IDpopReplayStore store, IDataProtectionProvi
 
     async Task<BearerTokenValidation?> VerifyRequest(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
     {
-        if (await store.CheckHealth(context.RequestAborted) != DpopReplayResult.Accepted) return Refuse(context, route, "jti_cache_unavailable");
         var jkt = validation.SenderConstraint!.Jkt;
         var proof = ReadProof(context.Request, route, jkt);
-        if (proof.Status != DpopProofStatus.Valid) return Refuse(context, route, proof.Reason, jkt);
+        if (proof.Status != DpopProofStatus.Valid) return Refuse(context, route, proof.Reason);
+        if (await store.CheckHealth(context.RequestAborted) != DpopReplayResult.Accepted) return Refuse(context, route, "jti_cache_unavailable");
         if (options.Value.Dpop.NonceRequired && !_nonce.Valid(proof.Nonce, route, jkt))
         {
             logger.Refused("nonce_required");
@@ -94,12 +94,6 @@ public sealed class DpopEnforcement(IDpopReplayStore store, IDataProtectionProvi
         if (consumed == DpopReplayResult.Replay) return Refuse(context, route, "replayed_jti", jkt);
         if (options.Value.Dpop.NonceRequired) context.Response.Headers["DPoP-Nonce"] = _nonce.Create(route, jkt);
         return validation with { SenderBinding = SenderBinding(jkt, proof.Jti!) };
-    }
-
-    async Task<BearerTokenValidation?> RefusePresentation(HttpContext context, ResolvedBearerRoute route, string jkt)
-    {
-        var healthy = await store.CheckHealth(context.RequestAborted) == DpopReplayResult.Accepted;
-        return Refuse(context, route, healthy ? "bound_token_as_bearer" : "jti_cache_unavailable", healthy ? jkt : null);
     }
 
     DpopProofResult ReadProof(HttpRequest request, ResolvedBearerRoute route, string jkt)

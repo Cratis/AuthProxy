@@ -27,11 +27,29 @@ internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimePr
         "if redis.call('SET', KEYS[2], '1', 'NX', 'PX', 390000) then return {1, now} end\n" +
         "return {2, now}";
 
+    static readonly TimeSpan _healthInterval = TimeSpan.FromSeconds(10);
     readonly SemaphoreSlim _connect = new(1, 1);
+    readonly SemaphoreSlim _healthLock = new(1, 1);
+    long? _healthCheckedAt;
+    DpopReplayResult _healthResult = DpopReplayResult.Unavailable;
     ConnectionMultiplexer? _connection;
 
     /// <inheritdoc/>
-    public Task<DpopReplayResult> CheckHealth(CancellationToken cancellationToken) => Execute(null, cancellationToken);
+    public async Task<DpopReplayResult> CheckHealth(CancellationToken cancellationToken)
+    {
+        await _healthLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_healthCheckedAt is { } checkedAt && clock.GetElapsedTime(checkedAt, clock.GetTimestamp()) < _healthInterval) return _healthResult;
+            _healthResult = await Execute(null, cancellationToken);
+            _healthCheckedAt = clock.GetTimestamp();
+            return _healthResult;
+        }
+        finally
+        {
+            _healthLock.Release();
+        }
+    }
 
     /// <inheritdoc/>
     public Task<DpopReplayResult> TryConsume(string origin, string jkt, string jti, CancellationToken cancellationToken) => Execute(DpopEncoding.Hash("resource\0" + origin + "\0" + jkt + "\0" + jti), cancellationToken);
@@ -41,6 +59,7 @@ internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimePr
     {
         _connection?.Dispose();
         _connect.Dispose();
+        _healthLock.Dispose();
     }
 
     async Task<ConnectionMultiplexer> Connection(CancellationToken cancellationToken)

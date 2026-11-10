@@ -18,6 +18,9 @@ public class given_a_dpop_gate : given_a_signed_proof
     protected ResolvedBearerRoute Route;
     protected SharedReplayStore Store;
     protected IBearerRouteForwarder Forwarder;
+    protected IAccessPolicy Access;
+    protected ITenantVerifier Tenants;
+    protected IBearerTokenValidator Validator;
     protected RequestDelegate Next;
     protected BearerRouteMiddleware Gate;
     protected BearerTokenValidation Validation;
@@ -50,14 +53,14 @@ public class given_a_dpop_gate : given_a_signed_proof
     {
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         options.CurrentValue.Returns(Options);
-        var validator = Substitute.For<IBearerTokenValidator>();
-        validator.Validate(Arg.Any<HttpRequest>(), Arg.Any<ResolvedBearerRoute>(), Arg.Any<CancellationToken>())
+        Validator = Substitute.For<IBearerTokenValidator>();
+        Validator.Validate(Arg.Any<HttpRequest>(), Arg.Any<ResolvedBearerRoute>(), Arg.Any<CancellationToken>())
             .Returns(call => DpopPresentation.Check(call.Arg<HttpRequest>(), Route, Validation));
-        var access = Substitute.For<IAccessPolicy>();
-        access.Evaluate(Arg.Any<ClaimsPrincipal>(), Arg.Any<C.AuthProxy>(), Arg.Any<string>(), Arg.Any<C.BearerRoute>()).Returns(AccessDecision.Granted);
-        var tenants = Substitute.For<ITenantVerifier>();
-        tenants.VerifyAsync(Arg.Any<string>()).Returns(true);
-        return new(Next, options, validator, Substitute.For<IBearerTokenIntrospector>(), access, tenants, Substitute.For<ITenantResolver>(), Forwarder, new ClientCredentialsTokenProtector(Protection), Substitute.For<ILogger<BearerRouteMiddleware>>(), new DpopEnforcement(Store, Protection, Clock, Substitute.For<ILogger<DpopEnforcement>>(), Microsoft.Extensions.Options.Options.Create(Options)));
+        Access = Substitute.For<IAccessPolicy>();
+        Access.Evaluate(Arg.Any<ClaimsPrincipal>(), Arg.Any<C.AuthProxy>(), Arg.Any<string>(), Arg.Any<C.BearerRoute>()).Returns(AccessDecision.Granted);
+        Tenants = Substitute.For<ITenantVerifier>();
+        Tenants.VerifyAsync(Arg.Any<string>()).Returns(true);
+        return new(Next, options, Validator, Substitute.For<IBearerTokenIntrospector>(), Access, Tenants, Substitute.For<ITenantResolver>(), Forwarder, new ClientCredentialsTokenProtector(Protection), Substitute.For<ILogger<BearerRouteMiddleware>>(), new DpopEnforcement(Store, Protection, Clock, Substitute.For<ILogger<DpopEnforcement>>(), Microsoft.Extensions.Options.Options.Create(Options)));
     }
 
     protected DefaultHttpContext Request(string? proof = null, string scheme = "DPoP")
@@ -92,11 +95,23 @@ public class given_a_dpop_gate : given_a_signed_proof
     protected sealed class SharedReplayStore : IDpopReplayStore
     {
         readonly ConcurrentDictionary<string, bool> _seen = new();
+        int _healthChecks;
+        int _consumes;
         public bool Available { get; set; } = true;
         public long ClockOffset { get; set; }
         public int Count => _seen.Count;
-        public Task<DpopReplayResult> CheckHealth(CancellationToken cancellationToken) => Task.FromResult(Available && Math.Abs(ClockOffset) <= 30 ? DpopReplayResult.Accepted : DpopReplayResult.Unavailable);
-        public async Task<DpopReplayResult> TryConsume(string origin, string jkt, string jti, CancellationToken cancellationToken) =>
-            await CheckHealth(cancellationToken) != DpopReplayResult.Accepted ? DpopReplayResult.Unavailable : _seen.TryAdd(origin + "\n" + jkt + "\n" + jti, true) ? DpopReplayResult.Accepted : DpopReplayResult.Replay;
+        public int HealthChecks => _healthChecks;
+        public int Consumes => _consumes;
+        public Task<DpopReplayResult> CheckHealth(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _healthChecks);
+            return Task.FromResult(Available && Math.Abs(ClockOffset) <= 30 ? DpopReplayResult.Accepted : DpopReplayResult.Unavailable);
+        }
+        public Task<DpopReplayResult> TryConsume(string origin, string jkt, string jti, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _consumes);
+            var result = !Available || Math.Abs(ClockOffset) > 30 ? DpopReplayResult.Unavailable : _seen.TryAdd(origin + "\n" + jkt + "\n" + jti, true) ? DpopReplayResult.Accepted : DpopReplayResult.Replay;
+            return Task.FromResult(result);
+        }
     }
 }

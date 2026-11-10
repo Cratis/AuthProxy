@@ -32,8 +32,12 @@ internal static class DpopProofVerifier
             using var header = DpopEncoding.Json(parts[0]);
             using var payload = DpopEncoding.Json(parts[1]);
             if (!ValidHeader(header.RootElement)) return DpopProofResult.Invalid("invalid_header");
+            if (DpopEncoding.Text(header.RootElement, "alg") != "ES256") return DpopProofResult.Invalid("invalid_signature");
+            var claims = ValidateClaims(payload.RootElement, request);
+            if (claims.Status != DpopProofStatus.Valid) return claims;
             if (!DpopPublicKey.Verify(header.RootElement, Encoding.ASCII.GetBytes(parts[0] + "." + parts[1]), DpopEncoding.Decode(parts[2]), out var thumbprint)) return DpopProofResult.Invalid("invalid_signature");
-            return ValidateClaims(payload.RootElement, request, thumbprint);
+            if (!DpopEncoding.Equal(thumbprint, request.Jkt)) return DpopProofResult.Invalid("jkt_mismatch");
+            return claims with { Jkt = thumbprint };
         }
         catch (Exception exception) when (exception is JsonException or FormatException or CryptographicException or ArgumentException)
         {
@@ -49,7 +53,7 @@ internal static class DpopProofVerifier
         && !header.TryGetProperty("jku", out _)
         && !header.TryGetProperty("x5u", out _);
 
-    static DpopProofResult ValidateClaims(JsonElement payload, DpopProofRequest request, string jkt)
+    static DpopProofResult ValidateClaims(JsonElement payload, DpopProofRequest request)
     {
         if (DpopEncoding.Text(payload, "htm") != request.Method) return DpopProofResult.Invalid("htm_mismatch");
         if (!DpopTargetUri.Matches(DpopEncoding.Text(payload, "htu") ?? string.Empty, request.Target)) return DpopProofResult.Invalid("htu_mismatch");
@@ -57,8 +61,7 @@ internal static class DpopProofVerifier
         var jti = DpopEncoding.Text(payload, "jti");
         if (!ValidJti(jti)) return DpopProofResult.Invalid("invalid_jti");
         if (!DpopEncoding.Equal(DpopEncoding.Text(payload, "ath") ?? string.Empty, DpopEncoding.Hash(request.Token))) return DpopProofResult.Invalid("ath_mismatch");
-        if (!DpopEncoding.Equal(jkt, request.Jkt)) return DpopProofResult.Invalid("jkt_mismatch");
-        return new(DpopProofStatus.Valid, "valid", jkt, jti, DpopEncoding.Text(payload, "nonce"));
+        return new(DpopProofStatus.Valid, "valid", null, jti, DpopEncoding.Text(payload, "nonce"));
     }
 
     static bool ValidTime(JsonElement payload, long now) =>

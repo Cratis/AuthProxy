@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Numerics;
 using System.Security.Cryptography;
 
 namespace Cratis.AuthProxy.BearerRoutes.Dpop;
@@ -9,6 +10,8 @@ namespace Cratis.AuthProxy.BearerRoutes.Dpop;
 internal static class DpopPublicKey
 {
     static readonly HashSet<string> _members = ["kty", "crv", "x", "y", "use", "key_ops", "alg"];
+    static readonly BigInteger _prime = new(Convert.FromHexString("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF"), isUnsigned: true, isBigEndian: true);
+    static readonly BigInteger _coefficient = new(Convert.FromHexString("5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B"), isUnsigned: true, isBigEndian: true);
 
     /// <summary>Verifies a P-256 public point without private or remote key material.</summary>
     /// <param name="header">The unique JOSE header.</param>
@@ -24,10 +27,23 @@ internal static class DpopPublicKey
         var x = DpopEncoding.Text(jwk, "x") ?? string.Empty;
         var y = DpopEncoding.Text(jwk, "y") ?? string.Empty;
         var point = new ECPoint { X = DpopEncoding.Decode(x), Y = DpopEncoding.Decode(y) };
-        if (point.X.Length != 32 || point.Y.Length != 32) return false;
+        if (!OnCurve(point)) return false;
         using var key = ECDsa.Create(new ECParameters { Curve = ECCurve.NamedCurves.nistP256, Q = point });
         thumbprint = DpopEncoding.Hash($"{{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"{x}\",\"y\":\"{y}\"}}");
         return key.VerifyData(input, signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+    }
+
+    static bool OnCurve(ECPoint point)
+    {
+        if (point.X is not { Length: 32 } || point.Y is not { Length: 32 }) return false;
+        var x = new BigInteger(point.X, isUnsigned: true, isBigEndian: true);
+        var y = new BigInteger(point.Y, isUnsigned: true, isBigEndian: true);
+        if (x >= _prime || y >= _prime) return false;
+        var squared = y * y;
+        var left = squared % _prime;
+        var cubic = x * x * x;
+        var right = (cubic - (3 * x) + _coefficient) % _prime;
+        return left == right;
     }
 
     static bool Valid(JsonElement jwk) =>

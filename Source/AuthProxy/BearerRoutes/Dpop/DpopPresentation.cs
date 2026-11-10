@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Security.Claims;
+using Cratis.AuthProxy.BearerRoutes.PersonalAccessTokens;
 
 namespace Cratis.AuthProxy.BearerRoutes.Dpop;
 
@@ -47,12 +48,17 @@ internal static class DpopPresentation
         return error is null ? validation : Refused(validation, error);
     }
 
-    /// <summary>Prevents DPoP from entering PAT or local-token dispatch on routes without opt-in.</summary>
+    /// <summary>Rejects ambiguous credentials on opted-in routes and DPoP on routes without opt-in.</summary>
     /// <param name="context">The request.</param>
     /// <param name="route">The route.</param>
     /// <returns>Whether the request was refused.</returns>
     internal static bool RefuseUnsupported(HttpContext context, ResolvedBearerRoute route)
     {
+        if (route.Route.Dpop is not null && CredentialDispatcher.Dispatch(context.Request, route).Dispatch == CredentialDispatch.Ambiguous)
+        {
+            BearerChallenge.MultipleCredentials(context);
+            return true;
+        }
         if (!IsDpop(context.Request) || route.Route.Dpop is not null) return false;
         BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, BearerTokenValidator.SenderConstrainedTokenReason), route);
         return true;

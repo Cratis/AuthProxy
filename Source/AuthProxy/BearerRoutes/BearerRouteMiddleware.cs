@@ -192,14 +192,11 @@ public class BearerRouteMiddleware(
             return;
         }
 
-        if (!await IsConfirmedActive(context, route, validation)
-            || !await MayForwardExternal(context, route, current, validation))
-        {
-            return;
-        }
+        if (!await IsConfirmedActive(context, route, validation)) return;
 
         validation = await Dpop.DpopEnforcement.Verify(dpop, context, route, validation);
         if (validation is null) return;
+        if (!await MayForwardExternal(context, route, current, validation)) return;
 
         context.User = validation.Principal!;
         Dpop.DpopEnforcement.PrepareForward(context, validation);
