@@ -30,6 +30,16 @@ public static class OnBehalfEndpoints
     const string EndSegment = "/end";
     const string SecFetchSite = "Sec-Fetch-Site";
 
+    static readonly Dictionary<OnBehalfStartStatus, (int StatusCode, string Error)> _startRefusals = new()
+    {
+        [OnBehalfStartStatus.NotEnabled] = (StatusCodes.Status404NotFound, "not-enabled"),
+        [OnBehalfStartStatus.Unauthenticated] = (StatusCodes.Status401Unauthorized, "unauthenticated"),
+        [OnBehalfStartStatus.Invalid] = (StatusCodes.Status400BadRequest, "invalid-request"),
+        [OnBehalfStartStatus.Forbidden] = (StatusCodes.Status403Forbidden, "actor-not-permitted"),
+        [OnBehalfStartStatus.Conflict] = (StatusCodes.Status409Conflict, "session-active"),
+        [OnBehalfStartStatus.NotGranted] = (StatusCodes.Status403Forbidden, "not-granted"),
+    };
+
     /// <summary>
     /// Answers one request under <see cref="WellKnownPaths.OnBehalf"/>.
     /// </summary>
@@ -51,7 +61,7 @@ public static class OnBehalfEndpoints
         var method = context.Request.Method;
         switch (segment)
         {
-            case "" when HttpMethods.IsGet(method) || HttpMethods.IsHead(method):
+            case "" when IsReadMethod(method):
                 await Current(context, sessions);
                 return;
 
@@ -87,16 +97,7 @@ public static class OnBehalfEndpoints
             return;
         }
 
-        OnBehalfStartRequest? request;
-        try
-        {
-            request = await context.Request.ReadFromJsonAsync<OnBehalfStartRequest>(context.RequestAborted);
-        }
-        catch (JsonException)
-        {
-            request = null;
-        }
-
+        var request = await ReadStartRequest(context);
         if (request is null)
         {
             await Refuse(context, StatusCodes.Status400BadRequest, "invalid-request");
@@ -104,55 +105,46 @@ public static class OnBehalfEndpoints
         }
 
         var result = await sessions.Start(context, request);
-        switch (result.Status)
+        await WriteStartResult(context, result);
+    }
+
+    static async Task<OnBehalfStartRequest?> ReadStartRequest(HttpContext context)
+    {
+        try
         {
-            case OnBehalfStartStatus.Started:
-                var session = result.Session!;
-                await context.Response.WriteAsJsonAsync(new
-                {
-                    sessionId = session.SessionId,
-                    tenant = session.Tenant,
-                    subject = session.Subject,
-                    issue = session.Issue,
-                    startedAt = session.StartedAt,
-                    expiresAt = session.ExpiresAt,
-                    grantValidUntil = result.Grant!.ValidUntil,
-                });
-                return;
-
-            case OnBehalfStartStatus.NotEnabled:
-                await Refuse(context, StatusCodes.Status404NotFound, "not-enabled");
-                return;
-
-            case OnBehalfStartStatus.Unauthenticated:
-                await Refuse(context, StatusCodes.Status401Unauthorized, "unauthenticated");
-                return;
-
-            case OnBehalfStartStatus.Invalid:
-                await Refuse(context, StatusCodes.Status400BadRequest, "invalid-request");
-                return;
-
-            case OnBehalfStartStatus.Forbidden:
-                await Refuse(context, StatusCodes.Status403Forbidden, "actor-not-permitted");
-                return;
-
-            case OnBehalfStartStatus.Conflict:
-                await Refuse(context, StatusCodes.Status409Conflict, "session-active");
-                return;
-
-            case OnBehalfStartStatus.NotGranted:
-                await Refuse(context, StatusCodes.Status403Forbidden, "not-granted");
-                return;
-
-            default:
-                await Refuse(context, StatusCodes.Status503ServiceUnavailable, "unavailable");
-                return;
+            return await context.Request.ReadFromJsonAsync<OnBehalfStartRequest>(context.RequestAborted);
         }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    static async Task WriteStartResult(HttpContext context, OnBehalfStartResult result)
+    {
+        if (result.Status != OnBehalfStartStatus.Started)
+        {
+            var refusal = _startRefusals.GetValueOrDefault(result.Status, (StatusCodes.Status503ServiceUnavailable, "unavailable"));
+            await Refuse(context, refusal.Item1, refusal.Item2);
+            return;
+        }
+
+        var session = result.Session!;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            sessionId = session.SessionId,
+            tenant = session.Tenant,
+            subject = session.Subject,
+            issue = session.Issue,
+            startedAt = session.StartedAt,
+            expiresAt = session.ExpiresAt,
+            grantValidUntil = result.Grant!.ValidUntil,
+        });
     }
 
     static async Task End(HttpContext context, IOnBehalfSessions sessions)
     {
-        if (IsCrossOrigin(context.Request) || !(IsSameOrigin(context.Request) || context.Request.HasJsonContentType()))
+        if (!CanEnd(context.Request))
         {
             await Refuse(context, StatusCodes.Status403Forbidden, "same-origin-required");
             return;
@@ -210,9 +202,7 @@ public static class OnBehalfEndpoints
     static bool IsCrossOrigin(HttpRequest request)
     {
         var site = request.Headers[SecFetchSite].ToString();
-        if (site.Length > 0
-            && !string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(site, "none", StringComparison.OrdinalIgnoreCase))
+        if (IsForeignSite(site))
         {
             return true;
         }
@@ -220,6 +210,23 @@ public static class OnBehalfEndpoints
         var origin = request.Headers.Origin.ToString();
         return origin.Length > 0 && !IsOwnOrigin(request, origin);
     }
+
+    static bool IsReadMethod(string method) => HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
+
+    static bool CanEnd(HttpRequest request)
+    {
+        if (IsCrossOrigin(request))
+        {
+            return false;
+        }
+
+        return IsSameOrigin(request) || request.HasJsonContentType();
+    }
+
+    static bool IsForeignSite(string site) =>
+        site.Length > 0
+        && !string.Equals(site, "same-origin", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(site, "none", StringComparison.OrdinalIgnoreCase);
 
     static bool IsSameOrigin(HttpRequest request) =>
         string.Equals(request.Headers[SecFetchSite].ToString(), "same-origin", StringComparison.OrdinalIgnoreCase)

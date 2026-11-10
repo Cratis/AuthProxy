@@ -87,9 +87,7 @@ public static class UserTokenSessions
     internal static async Task Complete(CookieSigningInContext context)
     {
         var previousSession = Of(context.HttpContext);
-        if (previousSession is null
-            && context.Options.Cookie.Name is { } cookieName
-            && context.HttpContext.Request.Cookies.ContainsKey(cookieName))
+        if (previousSession is null && HasPreviousCookie(context))
         {
             var previousTicket = await context.HttpContext.AuthenticateAsync(context.Scheme.Name);
             previousTicket.Properties?.Items.TryGetValue(PropertiesKey, out previousSession);
@@ -128,7 +126,12 @@ public static class UserTokenSessions
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     internal static async Task RenewRetention(CookieValidatePrincipalContext context)
     {
-        if (context.Principal is not null && context.Options.SlidingExpiration && Of(context.HttpContext) is { } sessionId)
+        if (context.Principal is null || !context.Options.SlidingExpiration)
+        {
+            return;
+        }
+
+        if (Of(context.HttpContext) is { } sessionId)
         {
             await context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>().Get(sessionId, context.HttpContext.RequestAborted);
         }
@@ -149,4 +152,8 @@ public static class UserTokenSessions
         await context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>().Remove(sessionId, CancellationToken.None);
         context.HttpContext.Items.Remove(HttpContextItemKey);
     }
+
+    static bool HasPreviousCookie(CookieSigningInContext context) =>
+        context.Options.Cookie.Name is { } cookieName
+        && context.HttpContext.Request.Cookies.ContainsKey(cookieName);
 }

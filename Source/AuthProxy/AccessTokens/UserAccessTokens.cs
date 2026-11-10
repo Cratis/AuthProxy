@@ -98,14 +98,37 @@ public sealed class UserAccessTokens(
         root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     static TimeSpan Lifetime(JsonElement root) =>
-        root.TryGetProperty("expires_in", out var value) && value.ValueKind switch
+        root.TryGetProperty("expires_in", out var value) ? ReadLifetime(value) ?? DefaultLifetime : DefaultLifetime;
+
+    static TimeSpan? ReadLifetime(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.Number => value.TryGetInt64(out var seconds) && seconds > 0 ? TimeSpan.FromSeconds(seconds) : null,
+        JsonValueKind.String => long.TryParse(value.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) && seconds > 0 ? TimeSpan.FromSeconds(seconds) : null,
+        _ => null
+    };
+
+    static bool TryReadBearerToken(JsonElement root, out string token)
+    {
+        token = string.Empty;
+        if (root.ValueKind != JsonValueKind.Object)
         {
-            JsonValueKind.Number => value.TryGetInt64(out var seconds) && seconds > 0 ? TimeSpan.FromSeconds(seconds) : (TimeSpan?)null,
-            JsonValueKind.String => long.TryParse(value.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) && seconds > 0 ? TimeSpan.FromSeconds(seconds) : null,
-            _ => null
-        } is { } lifetime
-            ? lifetime
-            : DefaultLifetime;
+            return false;
+        }
+
+        var value = StringProperty(root, "access_token");
+        if (value is not { Length: > 0 })
+        {
+            return false;
+        }
+
+        if (!string.Equals(StringProperty(root, "token_type"), "Bearer", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        token = value;
+        return true;
+    }
 
     async Task<UserAccessTokenResult> RefreshUnderLock(string sessionId, string audience, C.ServiceAccessToken accessToken)
     {
@@ -127,7 +150,7 @@ public sealed class UserAccessTokens(
             var session = await store.Get(sessionId, cancellationToken);
             return session is null
                 ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
-                : await Refresh(sessionId, session, audience, accessToken, cancellationToken);
+                : await Refresh(new RefreshRequest(sessionId, session, audience, accessToken), cancellationToken);
         }
         catch (OperationCanceledException) when (operation.IsCancellationRequested)
         {
@@ -155,13 +178,9 @@ public sealed class UserAccessTokens(
             : null;
     }
 
-    async Task<UserAccessTokenResult> Refresh(
-        string sessionId,
-        UserTokenSession session,
-        string audience,
-        C.ServiceAccessToken accessToken,
-        CancellationToken cancellationToken)
+    async Task<UserAccessTokenResult> Refresh(RefreshRequest refresh, CancellationToken cancellationToken)
     {
+        var session = refresh.Session;
         var provider = authentication.CurrentValue.OidcProviders
             .FirstOrDefault(_ => string.Equals(OidcProviderScheme.FromName(_.Name), session.Scheme, StringComparison.Ordinal));
         if (provider is null)
@@ -181,50 +200,13 @@ public sealed class UserAccessTokens(
             }
             using var request = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint)
             {
-                Content = new FormUrlEncodedContent(await Form(session, provider, options, accessToken, tokenEndpoint, cancellationToken))
+                Content = new FormUrlEncodedContent(await Form(refresh, new RefreshClient(provider, options, tokenEndpoint), cancellationToken))
             };
             request.Headers.Accept.ParseAdd("application/json");
 
             using var response = await httpClientFactory.CreateClient(HttpClientName).SendAsync(request, cancellationToken);
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
-            var root = document.RootElement;
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = root.ValueKind == JsonValueKind.Object ? StringProperty(root, "error") : null;
-                logger.RefreshRefused(session.Scheme, (int)response.StatusCode, error ?? "(none)");
-                if (string.Equals(error, "invalid_grant", StringComparison.Ordinal))
-                {
-                    // invalid_grant may mean missing consent or resource-specific policy, not a dead session.
-                    await store.SetRefreshRejected(sessionId, audience, timeProvider.GetUtcNow() + _refreshRejectionBackoff, CancellationToken.None);
-                    return UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected);
-                }
-
-                return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
-            }
-
-            if (root.ValueKind != JsonValueKind.Object
-                || StringProperty(root, "access_token") is not { Length: > 0 } token
-                || !string.Equals(StringProperty(root, "token_type"), "Bearer", StringComparison.OrdinalIgnoreCase))
-            {
-                logger.RefreshAnsweredWithoutBearerToken(session.Scheme);
-                return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
-            }
-
-            if (StringProperty(root, "refresh_token") is { Length: > 0 } rotated && rotated != session.RefreshToken)
-            {
-                await store.Update(sessionId, session with { RefreshToken = rotated }, CancellationToken.None);
-            }
-
-            var now = timeProvider.GetUtcNow();
-            var lifetime = Lifetime(root);
-            var renewAt = now + lifetime - (lifetime > RenewalMargin * 2 ? RenewalMargin : lifetime / 2);
-            await store.SetAccessToken(sessionId, audience, new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
-
-            // A logout during redemption must also prevent this request from forwarding the new token.
-            return await store.Get(sessionId, CancellationToken.None) is null
-                ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
-                : UserAccessTokenResult.Success(token);
+            return await ReadRefreshResponse(refresh, response, document.RootElement);
         }
         catch (Exception exception) when (
             exception is HttpRequestException or JsonException or OidcClientCredentialUnavailable or InvalidOperationException or IOException
@@ -235,14 +217,56 @@ public sealed class UserAccessTokens(
         }
     }
 
-    async Task<Dictionary<string, string>> Form(
-        UserTokenSession session,
-        C.OidcProvider provider,
-        OpenIdConnectOptions options,
-        C.ServiceAccessToken accessToken,
-        string tokenEndpoint,
-        CancellationToken cancellationToken)
+    async Task<UserAccessTokenResult> ReadRefreshResponse(RefreshRequest refresh, HttpResponseMessage response, JsonElement root)
     {
+        if (!response.IsSuccessStatusCode)
+        {
+            return await HandleRefreshRefusal(refresh, response, root);
+        }
+
+        if (!TryReadBearerToken(root, out var token))
+        {
+            logger.RefreshAnsweredWithoutBearerToken(refresh.Session.Scheme);
+            return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
+        }
+
+        var session = refresh.Session;
+        if (StringProperty(root, "refresh_token") is { Length: > 0 } rotated && rotated != session.RefreshToken)
+        {
+            await store.Update(refresh.SessionId, session with { RefreshToken = rotated }, CancellationToken.None);
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var lifetime = Lifetime(root);
+        var renewAt = now + lifetime - (lifetime > RenewalMargin * 2 ? RenewalMargin : lifetime / 2);
+        await store.SetAccessToken(refresh.SessionId, refresh.Audience, new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
+
+        // A logout during redemption must also prevent this request from forwarding the new token.
+        return await store.Get(refresh.SessionId, CancellationToken.None) is null
+            ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
+            : UserAccessTokenResult.Success(token);
+    }
+
+    async Task<UserAccessTokenResult> HandleRefreshRefusal(RefreshRequest refresh, HttpResponseMessage response, JsonElement root)
+    {
+        var error = root.ValueKind == JsonValueKind.Object ? StringProperty(root, "error") : null;
+        logger.RefreshRefused(refresh.Session.Scheme, (int)response.StatusCode, error ?? "(none)");
+        if (string.Equals(error, "invalid_grant", StringComparison.Ordinal))
+        {
+            // invalid_grant may mean missing consent or resource-specific policy, not a dead session.
+            await store.SetRefreshRejected(refresh.SessionId, refresh.Audience, timeProvider.GetUtcNow() + _refreshRejectionBackoff, CancellationToken.None);
+            return UserAccessTokenResult.Failed(UserAccessTokenFailure.RefreshTokenRejected);
+        }
+
+        return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
+    }
+
+    async Task<Dictionary<string, string>> Form(RefreshRequest refresh, RefreshClient client, CancellationToken cancellationToken)
+    {
+        var session = refresh.Session;
+        var accessToken = refresh.AccessToken;
+        var provider = client.Provider;
+        var options = client.Options;
         var form = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["grant_type"] = "refresh_token",
@@ -264,7 +288,7 @@ public sealed class UserAccessTokens(
         if (provider.UsesClientAssertion)
         {
             form["client_assertion_type"] = OidcClientAuthentication.JwtBearerAssertionType;
-            form["client_assertion"] = await clientAssertions.Create(session.Scheme, provider, tokenEndpoint, cancellationToken);
+            form["client_assertion"] = await clientAssertions.Create(session.Scheme, provider, client.TokenEndpoint, cancellationToken);
         }
         else if (!string.IsNullOrEmpty(options.ClientSecret))
         {
@@ -273,4 +297,8 @@ public sealed class UserAccessTokens(
 
         return form;
     }
+
+    sealed record RefreshRequest(string SessionId, UserTokenSession Session, string Audience, C.ServiceAccessToken AccessToken);
+
+    sealed record RefreshClient(C.OidcProvider Provider, OpenIdConnectOptions Options, string TokenEndpoint);
 }
