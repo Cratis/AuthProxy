@@ -5,7 +5,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  DOTNET_VERSION: "10.0.x"
+  DOTNET_VERSION: |
+    10.0.x
+    11.0.x
 
 on:
   pull_request:
