@@ -139,7 +139,7 @@ public sealed class StubIssuer : IAsyncDisposable
         DateTime? expires = null,
         string? issuer = null,
         params string[] without) =>
-        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, claims, audience, expires, issuer, without);
+        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, new(claims, audience, expires, issuer, without));
 
     /// <summary>
     /// Replaces the published signing key and its identifier.
@@ -158,7 +158,7 @@ public sealed class StubIssuer : IAsyncDisposable
     /// <param name="setDefaultTimes">Whether the handler fills in lifetimes the descriptor leaves unset.</param>
     /// <returns>The token.</returns>
     public string TokenShaped(Action<SecurityTokenDescriptor> shape, bool setDefaultTimes = true) =>
-        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, null, BearerRouteHarness.Audience, null, null, [], shape, setDefaultTimes);
+        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, TokenRequest.Default with { Shape = shape, SetDefaultTimes = setDefaultTimes });
 
     /// <summary>
     /// Signs a token with HMAC, keyed with this issuer's published public key — the algorithm-confusion attack on
@@ -168,7 +168,7 @@ public sealed class StubIssuer : IAsyncDisposable
     public string TokenSignedWithThePublicKeyAsASecret()
     {
         var publicKey = _rsa.ExportSubjectPublicKeyInfo();
-        return Sign(new SymmetricSecurityKey(publicKey) { KeyId = KeyId }, null, BearerRouteHarness.Audience, null, null, [], algorithm: SecurityAlgorithms.HmacSha256);
+        return Sign(new SymmetricSecurityKey(publicKey) { KeyId = KeyId }, TokenRequest.Default with { Algorithm = SecurityAlgorithms.HmacSha256 });
     }
 
     /// <summary>
@@ -178,7 +178,7 @@ public sealed class StubIssuer : IAsyncDisposable
     public string TokenSignedByAnotherKey()
     {
         using var other = RSA.Create(2048);
-        return Sign(new RsaSecurityKey(other) { KeyId = KeyId }, null, BearerRouteHarness.Audience, null, null, []);
+        return Sign(new RsaSecurityKey(other) { KeyId = KeyId }, TokenRequest.Default);
     }
 
     /// <summary>
@@ -227,44 +227,51 @@ public sealed class StubIssuer : IAsyncDisposable
         _rsa.Dispose();
     }
 
-    string Sign(
-        SecurityKey key,
-        IDictionary<string, object>? claims,
-        string audience,
-        DateTime? expires,
-        string? issuer,
-        string[] without,
-        Action<SecurityTokenDescriptor>? shape = null,
-        bool setDefaultTimes = true,
-        string algorithm = SecurityAlgorithms.RsaSha256)
+    sealed record TokenRequest(
+        IDictionary<string, object>? Claims,
+        string Audience,
+        DateTime? Expires,
+        string? Issuer,
+        string[] Without)
+    {
+        public static TokenRequest Default { get; } = new(null, BearerRouteHarness.Audience, null, null, []);
+
+        public Action<SecurityTokenDescriptor>? Shape { get; init; }
+
+        public bool SetDefaultTimes { get; init; } = true;
+
+        public string Algorithm { get; init; } = SecurityAlgorithms.RsaSha256;
+    }
+
+    string Sign(SecurityKey key, TokenRequest request)
     {
         var merged = DefaultClaims();
-        foreach (var type in without)
+        foreach (var type in request.Without)
         {
             merged.Remove(type);
         }
 
-        foreach (var (type, value) in claims ?? new Dictionary<string, object>())
+        foreach (var (type, value) in request.Claims ?? new Dictionary<string, object>())
         {
             merged[type] = value;
         }
 
-        var expiry = expires ?? DateTime.UtcNow.AddMinutes(15);
+        var expiry = request.Expires ?? DateTime.UtcNow.AddMinutes(15);
         var issuedAt = expiry.AddMinutes(-15);
 
         var descriptor = new SecurityTokenDescriptor
         {
-            Issuer = issuer ?? Issuer,
-            Audience = audience,
+            Issuer = request.Issuer ?? Issuer,
+            Audience = request.Audience,
             Claims = merged,
             IssuedAt = issuedAt,
             NotBefore = issuedAt,
             Expires = expiry,
             TokenType = "at+jwt",
-            SigningCredentials = new SigningCredentials(key, algorithm),
+            SigningCredentials = new SigningCredentials(key, request.Algorithm),
         };
-        shape?.Invoke(descriptor);
+        request.Shape?.Invoke(descriptor);
 
-        return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = setDefaultTimes }.CreateToken(descriptor);
+        return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = request.SetDefaultTimes }.CreateToken(descriptor);
     }
 }
