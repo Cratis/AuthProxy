@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.Invites;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -141,45 +142,57 @@ internal sealed record IdentityAccountBinding
             return false;
         }
 
-        if (!TryGetCanonicalClaims(reservedClaims, out var providerKey, out var issuer, out var subject))
+        if (!TryGetCanonicalClaims(reservedClaims, out var claims))
         {
             return false;
         }
 
-        if (!IsNormalizedIssuer(issuer, out var normalizedIssuer))
+        if (!IsNormalizedIssuer(claims.Issuer, out var normalizedIssuer))
         {
             return false;
         }
 
-        if (!NamesPrincipal(principal, providerKey, subject))
+        if (!NamesPrincipal(principal, claims))
         {
             return false;
         }
 
-        binding = new(CanonicalKind, providerKey, normalizedIssuer, subject);
+        binding = new(CanonicalKind, claims.ProviderKey, normalizedIssuer, claims.Subject);
         return true;
     }
 
-    static bool TryGetCanonicalClaims(ClientPrincipalClaim[] reservedClaims, out string providerKey, out string issuer, out string subject)
+    static bool TryGetCanonicalClaims(ClientPrincipalClaim[] reservedClaims, out CanonicalClaims claims)
     {
-        issuer = subject = string.Empty;
-        return TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.ProviderKey, out providerKey)
-            && TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Issuer, out issuer)
-            && TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Subject, out subject);
+        claims = default;
+        if (
+            (
+                FindSingleExactClaim(reservedClaims, CanonicalIdentityClaims.ProviderKey),
+                FindSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Issuer),
+                FindSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Subject))
+            is not (string providerKey, string issuer, string subject))
+        {
+            return false;
+        }
+
+        claims = new(providerKey, issuer, subject);
+        return true;
     }
+
+    static string? FindSingleExactClaim(IEnumerable<ClientPrincipalClaim> claims, ClaimType claimType) =>
+        TryGetSingleExactClaim(claims, claimType, out var value) ? value : null;
 
     static bool IsNormalizedIssuer(string issuer, out string normalizedIssuer) =>
         CanonicalIssuer.TryNormalize(issuer, out normalizedIssuer)
         && string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal);
 
-    static bool NamesPrincipal(ClientPrincipal principal, string providerKey, string subject) =>
-        string.Equals(providerKey, principal.IdentityProvider, StringComparison.Ordinal)
-        && string.Equals(subject, principal.UserId, StringComparison.Ordinal);
+    static bool NamesPrincipal(ClientPrincipal principal, CanonicalClaims claims) =>
+        string.Equals(claims.ProviderKey, principal.IdentityProvider, StringComparison.Ordinal)
+        && string.Equals(claims.Subject, principal.UserId, StringComparison.Ordinal);
 
-    static bool TryGetSingleExactClaim(IEnumerable<ClientPrincipalClaim> claims, string claimType, out string value)
+    static bool TryGetSingleExactClaim(IEnumerable<ClientPrincipalClaim> claims, ClaimType claimType, out string value)
     {
-        var matches = claims.Where(claim => string.Equals(claim.Type, claimType, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (matches.Length != 1 || !string.Equals(matches[0].Type, claimType, StringComparison.Ordinal))
+        var matches = claims.Where(claim => string.Equals(claim.Type, claimType.Value, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (matches.Length != 1 || !string.Equals(matches[0].Type, claimType.Value, StringComparison.Ordinal))
         {
             value = string.Empty;
             return false;
@@ -199,4 +212,6 @@ internal sealed record IdentityAccountBinding
         !string.IsNullOrWhiteSpace(value)
         && string.Equals(value, value.Trim(), StringComparison.Ordinal)
         && value.Length <= 2048;
+
+    readonly record struct CanonicalClaims(string ProviderKey, string Issuer, string Subject);
 }

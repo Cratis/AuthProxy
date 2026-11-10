@@ -20,10 +20,8 @@ public sealed class InvitationLifecycle
     readonly InviteCompletion _completion;
     readonly IOptionsMonitor<C.AuthProxy> _config;
     readonly ITenantResolver _tenantResolver;
-    readonly IHttpClientFactory _httpClientFactory;
     readonly ILogger<InviteMiddleware> _logger;
-    readonly IInvitationAttestationIssuer? _attestationIssuer;
-    readonly IInvitationEntryStateProtector? _entryStateProtector;
+    readonly InvitationStagingServices _staging;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="InvitationLifecycle"/> class.
@@ -31,26 +29,20 @@ public sealed class InvitationLifecycle
     /// <param name="completion">The shared invitation completion.</param>
     /// <param name="config">The auth proxy configuration monitor.</param>
     /// <param name="tenantResolver">The tenant resolver used to capture tenant metadata in authentication state.</param>
-    /// <param name="httpClientFactory">The HTTP client factory used for the stage call.</param>
     /// <param name="logger">The logger, typed to the middleware so the log category does not drift.</param>
-    /// <param name="attestationIssuer">The signed invitation-attestation issuer, or <see langword="null"/> when staging is unavailable.</param>
-    /// <param name="entryStateProtector">The protected invitation-entry state service, or <see langword="null"/> when staging is unavailable.</param>
+    /// <param name="staging">The collaborators used to stage the invitation with the backend.</param>
     internal InvitationLifecycle(
         InviteCompletion completion,
         IOptionsMonitor<C.AuthProxy> config,
         ITenantResolver tenantResolver,
-        IHttpClientFactory httpClientFactory,
         ILogger<InviteMiddleware> logger,
-        IInvitationAttestationIssuer? attestationIssuer,
-        IInvitationEntryStateProtector? entryStateProtector)
+        InvitationStagingServices staging)
     {
         _completion = completion;
         _config = config;
         _tenantResolver = tenantResolver;
-        _httpClientFactory = httpClientFactory;
         _logger = logger;
-        _attestationIssuer = attestationIssuer;
-        _entryStateProtector = entryStateProtector;
+        _staging = staging;
     }
 
     /// <summary>
@@ -64,7 +56,7 @@ public sealed class InvitationLifecycle
         var invite = _config.CurrentValue.Invite;
         var entryState = TryCreateEntryState(context, inviteToken, invite);
         if (entryState is null
-            || !_attestationIssuer!.TryIssueStage(entryState, out var attestation))
+            || !_staging.AttestationIssuer!.TryIssueStage(entryState, out var attestation))
         {
             return null;
         }
@@ -82,7 +74,7 @@ public sealed class InvitationLifecycle
     /// </summary>
     /// <param name="state">The staged entry state.</param>
     /// <returns>The protected state.</returns>
-    internal string ProtectEntryState(InvitationEntryState state) => _entryStateProtector!.Protect(state);
+    internal string ProtectEntryState(InvitationEntryState state) => _staging.EntryStateProtector!.Protect(state);
 
     /// <summary>
     /// Creates the provider challenge properties bound to the invitation.
@@ -144,18 +136,22 @@ public sealed class InvitationLifecycle
         && !string.IsNullOrWhiteSpace(invite.StageUrl)
         && !string.IsNullOrWhiteSpace(invite.TenantClaim);
 
+    bool IsStagingAvailable([NotNullWhen(true)] C.Invite? invite, string inviteToken) =>
+        IsStagingConfigured(invite, inviteToken)
+        && _staging.AttestationIssuer is not null
+        && _staging.EntryStateProtector is not null;
+
+    (string InvitationId, string TenantId)? ReadInvitation(HttpContext context, string inviteToken, C.Invite invite) =>
+        InvitationClaimReader.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
+        && InvitationClaimReader.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
+        && _completion.ResolvedTenantMatchesWhenPresent(context, tenantId)
+            ? (invitationId, tenantId)
+            : null;
+
     InvitationEntryState? TryCreateEntryState(HttpContext context, string inviteToken, C.Invite? invite)
     {
-        if (!IsStagingConfigured(invite, inviteToken)
-            || _attestationIssuer is null
-            || _entryStateProtector is null)
-        {
-            return null;
-        }
-
-        if (!InvitationClaimReader.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !InvitationClaimReader.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
-            || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
+        if (!IsStagingAvailable(invite, inviteToken)
+            || ReadInvitation(context, inviteToken, invite) is not (var invitationId, var tenantId))
         {
             return null;
         }
@@ -175,7 +171,7 @@ public sealed class InvitationLifecycle
         string attestation,
         InvitationStageRequest body)
     {
-        using var client = _httpClientFactory.CreateClient();
+        using var client = _staging.HttpClientFactory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, invite.StageUrl);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
         request.Content = JsonContent.Create(body);

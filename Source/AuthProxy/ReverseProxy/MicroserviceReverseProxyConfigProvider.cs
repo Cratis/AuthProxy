@@ -163,7 +163,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
         foreach (var (name, ms) in services)
         {
-            var key = name.ToLowerInvariant();
+            var key = ServiceKey.From(name);
 
             ReportRefusedAnonymousPaths(key, ms, logger);
             ForwardingPathDeclarations.Warn(name, ms, logger);
@@ -196,7 +196,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
     static IEnumerable<RouteConfig> DefaultRoutes(string name, C.Service service)
     {
-        var key = name.ToLowerInvariant();
+        var key = ServiceKey.From(name);
         if (service.Frontend is not null)
         {
             yield return new RouteConfig
@@ -250,7 +250,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// encoded character, gets a service that behaves exactly as if they had never declared it. Startup is
     /// the only place the two can be compared, so the refusal is named here.
     /// </remarks>
-    static void ReportRefusedAnonymousPaths(string microserviceKey, C.Service service, ILogger logger)
+    static void ReportRefusedAnonymousPaths(ServiceKey microserviceKey, C.Service service, ILogger logger)
     {
         foreach (var refused in AnonymousPaths.Evaluate(service).Where(_ => !_.IsUsable))
         {
@@ -296,7 +296,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         Dictionary<string, string> claimedPaths,
         ILogger logger)
     {
-        var microserviceKey = serviceName.ToLowerInvariant();
+        var microserviceKey = ServiceKey.From(serviceName);
         var index = 0;
         var passing = AnonymousPaths.PassingCallerAuthorization(service);
 
@@ -349,7 +349,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         }
     }
 
-    static string? AnonymousClusterId(C.Service service, string microserviceKey, string path, out string? prefix)
+    static string? AnonymousClusterId(C.Service service, ServiceKey microserviceKey, string path, out string? prefix)
     {
         prefix = ServiceRoutes.PathPrefixOf(service);
         var prefersBackend = RelativeToPrefix(path, prefix).StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);
@@ -388,7 +388,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// </remarks>
     static IEnumerable<RouteConfig> PathPrefixRoutes(string serviceName, C.Service service)
     {
-        var microserviceKey = serviceName.ToLowerInvariant();
+        var microserviceKey = ServiceKey.From(serviceName);
         if (ServiceRoutes.PathPrefixOf(service) is not { } prefix)
         {
             yield break;
@@ -417,7 +417,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         }
     }
 
-    static RouteConfig PrefixApiRoute(string microserviceKey, string prefix, string[] hosts, Dictionary<string, string> metadata) => new()
+    static RouteConfig PrefixApiRoute(ServiceKey microserviceKey, string prefix, string[] hosts, Dictionary<string, string> metadata) => new()
     {
         RouteId = $"{microserviceKey}-prefix-api",
         ClusterId = BackendClusterId(microserviceKey),
@@ -439,7 +439,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// </remarks>
     static IEnumerable<RouteConfig> HostRoutes(string serviceName, C.Service service)
     {
-        var microserviceKey = serviceName.ToLowerInvariant();
+        var microserviceKey = ServiceKey.From(serviceName);
         var hosts = ServiceRoutes.HostsOf(service).Select(_ => _.Value!).ToArray();
         if (hosts.Length == 0 || ServiceRoutes.PathPrefixOf(service) is not null)
         {
@@ -473,7 +473,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         }
     }
 
-    static string? CatchAllClusterId(string microserviceKey, C.Service service) => (service.Frontend, service.Backend) switch
+    static string? CatchAllClusterId(ServiceKey microserviceKey, C.Service service) => (service.Frontend, service.Backend) switch
     {
         (not null, _) => FrontendClusterId(microserviceKey),
         (null, not null) => BackendClusterId(microserviceKey),
@@ -482,7 +482,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
     static IEnumerable<RouteConfig> BackendRoutes(string serviceName, bool isSingle)
     {
-        var microserviceKey = serviceName.ToLowerInvariant();
+        var microserviceKey = ServiceKey.From(serviceName);
 
         // Header-matched API route
         yield return new RouteConfig
@@ -529,7 +529,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
     static IEnumerable<RouteConfig> FrontendRoutes(string serviceName)
     {
-        var microserviceKey = serviceName.ToLowerInvariant();
+        var microserviceKey = ServiceKey.From(serviceName);
 
         // Header-matched frontend route
         yield return new RouteConfig
@@ -562,7 +562,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
     static RouteConfig QueryRoute(string serviceName, string parameter, int order, bool backend)
     {
-        var microserviceKey = serviceName.ToLowerInvariant();
+        var microserviceKey = ServiceKey.From(serviceName);
         var endpoint = backend ? "backend" : "frontend";
         var selector = parameter == ServiceRoutes.CanonicalServiceQueryParameter ? "canonical-query" : "query";
         return new RouteConfig
@@ -594,7 +594,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         var clusters = new List<ClusterConfig>();
         foreach (var (name, ms) in config.Services)
         {
-            var key = name.ToLowerInvariant();
+            var key = ServiceKey.From(name);
 
             if (ms.Backend is not null)
             {
@@ -684,7 +684,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         (string.IsNullOrWhiteSpace(sticky.ReplicaHost) ? new Uri(backend.BaseUrl).IdnHost : sticky.ReplicaHost.Trim()).ToLowerInvariant();
 
     static Dictionary<string, string> ClusterMetadata(
-        string key,
+        ServiceKey key,
         string endpoint,
         C.CallerAuthorizationHeaderForwarding callerAuthorizationHeader,
         C.ServiceAccessToken? accessToken = null)
@@ -707,7 +707,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         return metadata;
     }
 
-    static string BackendDestinationId(string key, C.Service service)
+    static string BackendDestinationId(ServiceKey key, C.Service service)
     {
         if (service.AccessToken is null)
         {
@@ -774,8 +774,8 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         return metadata;
     }
 
-    static string BackendClusterId(string key) => $"{key}-backend-cluster";
-    static string FrontendClusterId(string key) => $"{key}-frontend-cluster";
+    static string BackendClusterId(ServiceKey key) => $"{key}-backend-cluster";
+    static string FrontendClusterId(ServiceKey key) => $"{key}-frontend-cluster";
 
     /// <summary>
     /// Rebuilds the route table from a reloaded configuration.
@@ -813,5 +813,5 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         }
     }
 
-    sealed record StickyBackend(string ServiceKey, string DestinationId, C.ServiceEndpoint Endpoint, C.StickyRouting Settings);
+    sealed record StickyBackend(ServiceKey ServiceKey, string DestinationId, C.ServiceEndpoint Endpoint, C.StickyRouting Settings);
 }

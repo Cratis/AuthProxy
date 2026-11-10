@@ -59,10 +59,11 @@ public static class InvitesServiceCollectionExtensions
                 sp.GetRequiredService<IInvitationEntryStateProtector>()),
             sp.GetRequiredService<IOptionsMonitor<Configuration.AuthProxy>>(),
             sp.GetRequiredService<ITenantResolver>(),
-            sp.GetRequiredService<IHttpClientFactory>(),
             sp.GetRequiredService<ILogger<InviteMiddleware>>(),
-            sp.GetRequiredService<IInvitationAttestationIssuer>(),
-            sp.GetRequiredService<IInvitationEntryStateProtector>()));
+            new InvitationStagingServices(
+                sp.GetRequiredService<IHttpClientFactory>(),
+                sp.GetRequiredService<IInvitationAttestationIssuer>(),
+                sp.GetRequiredService<IInvitationEntryStateProtector>())));
 
         return builder;
     }

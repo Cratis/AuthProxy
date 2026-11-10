@@ -23,10 +23,8 @@ public class when_constructed_with_an_invitation_lifecycle : given.an_attested_i
                 _protector),
             _configurationMonitor,
             tenantResolver,
-            _httpClientFactory,
             _logger,
-            _issuer,
-            _protector);
+            new InvitationStagingServices(_httpClientFactory, _issuer, _protector));
 
         _context.Items["middleware"] = new InviteMiddleware(
             Next,
