@@ -121,10 +121,7 @@ class InviteCompletion(
             var claims = new JsonWebTokenHandler().ReadJsonWebToken(token).Claims
                 .Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal))
                 .ToArray();
-            if (claims.Length != 1
-                || string.IsNullOrWhiteSpace(claims[0].Value)
-                || claims[0].Value.Length > 2048
-                || !string.Equals(claims[0].Value, claims[0].Value.Trim(), StringComparison.Ordinal))
+            if (claims.Length != 1 || !IsExactClaimValue(claims[0].Value))
             {
                 return false;
             }
@@ -186,10 +183,7 @@ class InviteCompletion(
     static bool TryGetSingleExactClaim(ClaimsPrincipal principal, string claimType, out string value)
     {
         var claims = principal.Claims.Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal)).ToArray();
-        if (claims.Length != 1
-            || string.IsNullOrWhiteSpace(claims[0].Value)
-            || claims[0].Value.Length > 2048
-            || !string.Equals(claims[0].Value, claims[0].Value.Trim(), StringComparison.Ordinal))
+        if (claims.Length != 1 || !IsExactClaimValue(claims[0].Value))
         {
             value = string.Empty;
             return false;
@@ -198,6 +192,11 @@ class InviteCompletion(
         value = claims[0].Value;
         return true;
     }
+
+    static bool IsExactClaimValue(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Length <= 2048
+        && string.Equals(value, value.Trim(), StringComparison.Ordinal);
 
     static bool FixedTimeEquals(string expected, string actual) =>
         CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(expected), Encoding.UTF8.GetBytes(actual));
@@ -222,45 +221,6 @@ class InviteCompletion(
 
         logger.AttestedInvitationCompletionFailed(identityResolution.Reason);
         return InviteExchangeResult.Failed;
-    }
-
-    /// <summary>Calls the invitation exchange endpoint with a freshly issued attestation.</summary>
-    /// <param name="httpClientFactory">The HTTP client factory used for the exchange call.</param>
-    /// <param name="logger">The logger to record the outcome on.</param>
-    /// <param name="context">The current <see cref="HttpContext"/>, consulted only for its cancellation token.</param>
-    /// <param name="entryResolution">The succeeded <see cref="EntryStateResolution"/> naming the exchange URL and transaction.</param>
-    /// <param name="attestation">The signed attestation bearer token.</param>
-    /// <returns>The outcome of the exchange call.</returns>
-    static async Task<InviteExchangeResult> SendAttestedExchangeRequest(IHttpClientFactory httpClientFactory, ILogger logger, HttpContext context, EntryStateResolution entryResolution, string attestation)
-    {
-        using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, entryResolution.Invite.ExchangeUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
-        request.Content = JsonContent.Create(new InvitationCompleteRequest(entryResolution.EntryState.InvitationTransaction));
-
-        try
-        {
-            using var response = await client.SendAsync(request, context.RequestAborted);
-            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-            {
-                logger.InviteSubjectAlreadyExists();
-                return InviteExchangeResult.DuplicateSubject;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.InviteExchangeEndpointFailed((int)response.StatusCode);
-                return InviteExchangeResult.Failed;
-            }
-
-            logger.InviteExchangedSuccessfully();
-            return InviteExchangeResult.Success;
-        }
-        catch (Exception exception)
-        {
-            logger.FailedToCallInviteExchangeEndpoint(exception, entryResolution.Invite.ExchangeUrl);
-            return InviteExchangeResult.Failed;
-        }
     }
 
     /// <summary>
@@ -301,16 +261,102 @@ class InviteCompletion(
             return VerifiedIdentityResolution.EmailUnavailable(invitedEmail);
         }
 
-        if (!TryGetSingleExactClaim(principal, provider.EmailVerifiedClaimType, out var rawEmailVerified)
-            || !bool.TryParse(rawEmailVerified, out var emailVerified)
-            || !emailVerified
-            || !string.Equals(invitedEmail, email, StringComparison.OrdinalIgnoreCase))
+        if (!HasVerifiedMatchingEmail(principal, provider, invitedEmail, email))
         {
             return VerifiedIdentityResolution.EmailMismatch(invitedEmail, email);
         }
 
         return VerifiedIdentityResolution.Success(new InvitationVerifiedIdentity(
             canonical.ProviderKey, canonical.NormalizedIssuer, canonical.Subject, email, assurance, authenticatedAt));
+    }
+
+    static InvitationCompletionFailureReason ValidateEntryCapability(InvitationEntryState entryState, string inviteToken)
+    {
+        if (entryState.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return InvitationCompletionFailureReason.EntryStateExpired;
+        }
+
+        if (!FixedTimeEquals(entryState.CapabilityHash, InvitationAuthenticationState.ComputeCapabilityHash(inviteToken)))
+        {
+            return InvitationCompletionFailureReason.CapabilityHashMismatch;
+        }
+
+        if (!TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId))
+        {
+            return InvitationCompletionFailureReason.InvitationIdClaimInvalid;
+        }
+
+        if (!FixedTimeEquals(entryState.InvitationId, invitationId))
+        {
+            return InvitationCompletionFailureReason.InvitationIdMismatch;
+        }
+
+        return InvitationCompletionFailureReason.None;
+    }
+
+    static string ResolveSubject(ClaimsPrincipal principal, CanonicalFederatedIdentity? identity) =>
+        identity?.Subject
+        ?? principal.FindFirst("sub")?.Value
+        ?? principal.FindFirst("oid")?.Value
+        ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? principal.FindFirst("id")?.Value
+        ?? string.Empty;
+
+    static string ResolveIdentityProvider(ClaimsPrincipal principal, CanonicalFederatedIdentity? identity) =>
+        identity?.ProviderKey
+        ?? principal.FindFirst("iss")?.Value
+        ?? principal.FindFirst("identity_provider")?.Value
+        ?? principal.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
+        ?? principal.Identity?.AuthenticationType
+        ?? string.Empty;
+
+    static bool HasVerifiedMatchingEmail(ClaimsPrincipal principal, C.CanonicalIdentity provider, string invitedEmail, string email)
+    {
+        if (!TryGetSingleExactClaim(principal, provider.EmailVerifiedClaimType, out var rawEmailVerified)
+            || !bool.TryParse(rawEmailVerified, out var emailVerified))
+        {
+            return false;
+        }
+
+        return emailVerified && string.Equals(invitedEmail, email, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Calls the invitation exchange endpoint with a freshly issued attestation.</summary>
+    /// <param name="context">The current <see cref="HttpContext"/>, consulted only for its cancellation token.</param>
+    /// <param name="entryResolution">The succeeded <see cref="EntryStateResolution"/> naming the exchange URL and transaction.</param>
+    /// <param name="attestation">The signed attestation bearer token.</param>
+    /// <returns>The outcome of the exchange call.</returns>
+    async Task<InviteExchangeResult> SendAttestedExchangeRequest(HttpContext context, EntryStateResolution entryResolution, string attestation)
+    {
+        using var client = httpClientFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, entryResolution.Invite.ExchangeUrl);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", attestation);
+        request.Content = JsonContent.Create(new InvitationCompleteRequest(entryResolution.EntryState.InvitationTransaction));
+
+        try
+        {
+            using var response = await client.SendAsync(request, context.RequestAborted);
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                logger.InviteSubjectAlreadyExists();
+                return InviteExchangeResult.DuplicateSubject;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.InviteExchangeEndpointFailed((int)response.StatusCode);
+                return InviteExchangeResult.Failed;
+            }
+
+            logger.InviteExchangedSuccessfully();
+            return InviteExchangeResult.Success;
+        }
+        catch (Exception exception)
+        {
+            logger.FailedToCallInviteExchangeEndpoint(exception, entryResolution.Invite.ExchangeUrl);
+            return InviteExchangeResult.Failed;
+        }
     }
 
     async Task<InviteExchangeResult> CompleteAttestedInvitation(HttpContext context, string inviteToken, Func<Task<InvitationCompletionSession>> sessionFactory)
@@ -352,7 +398,7 @@ class InviteCompletion(
             return InviteExchangeResult.Failed;
         }
 
-        return await SendAttestedExchangeRequest(httpClientFactory, logger, context, entryResolution, attestation);
+        return await SendAttestedExchangeRequest(context, entryResolution, attestation);
     }
 
     /// <summary>
@@ -365,7 +411,12 @@ class InviteCompletion(
     EntryStateResolution ResolveEntryState(HttpContext context, string inviteToken)
     {
         var invite = config.CurrentValue.Invite;
-        if (invite is null || canonicalIdentityResolver is null || attestationIssuer is null || entryStateProtector is null)
+        if (invite is null)
+        {
+            return EntryStateResolution.Failure(InvitationCompletionFailureReason.ProtocolMisconfigured);
+        }
+
+        if (canonicalIdentityResolver is null || attestationIssuer is null || entryStateProtector is null)
         {
             return EntryStateResolution.Failure(InvitationCompletionFailureReason.ProtocolMisconfigured);
         }
@@ -381,24 +432,10 @@ class InviteCompletion(
             return EntryStateResolution.Failure(InvitationCompletionFailureReason.EntryStateUnprotectFailed);
         }
 
-        if (entryState.ExpiresAt <= DateTimeOffset.UtcNow)
+        var capabilityFailure = ValidateEntryCapability(entryState, inviteToken);
+        if (capabilityFailure != InvitationCompletionFailureReason.None)
         {
-            return EntryStateResolution.Failure(InvitationCompletionFailureReason.EntryStateExpired);
-        }
-
-        if (!FixedTimeEquals(entryState.CapabilityHash, InvitationAuthenticationState.ComputeCapabilityHash(inviteToken)))
-        {
-            return EntryStateResolution.Failure(InvitationCompletionFailureReason.CapabilityHashMismatch);
-        }
-
-        if (!TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId))
-        {
-            return EntryStateResolution.Failure(InvitationCompletionFailureReason.InvitationIdClaimInvalid);
-        }
-
-        if (!FixedTimeEquals(entryState.InvitationId, invitationId))
-        {
-            return EntryStateResolution.Failure(InvitationCompletionFailureReason.InvitationIdMismatch);
+            return EntryStateResolution.Failure(capabilityFailure);
         }
 
         return ResolveTenantScopedEntryState(context, invite, entryState, inviteToken);
@@ -436,11 +473,13 @@ class InviteCompletion(
         }
 
         var invitedEmail = string.Empty;
-        if (string.IsNullOrEmpty(recipientProviderKey)
-            && (!TryGetSingleTokenClaim(inviteToken, invite.EmailClaim, out invitedEmail)
-                || !InviteMiddleware.IsAnEmailAddress(invitedEmail)))
+        if (string.IsNullOrEmpty(recipientProviderKey))
         {
-            return EntryStateResolution.Failure(InvitationCompletionFailureReason.RecipientModeInvalid);
+            if (!TryGetSingleTokenClaim(inviteToken, invite.EmailClaim, out invitedEmail)
+                || !InviteMiddleware.IsAnEmailAddress(invitedEmail))
+            {
+                return EntryStateResolution.Failure(InvitationCompletionFailureReason.RecipientModeInvalid);
+            }
         }
 
         if (!ResolvedTenantMatchesWhenPresent(context, tenantId))
@@ -503,16 +542,7 @@ class InviteCompletion(
     VerifiedIdentityResolution ResolveVerifiedIdentityForCanonical(
         ClaimsPrincipal principal, InvitationCompletionSession session, EntryStateResolution entryResolution, CanonicalFederatedIdentity canonical)
     {
-        // One snapshot answers both provider questions: two reads of the monitor could disagree and admit a
-        // provider that never appeared in a single configuration state.
-        var authentication = authConfig.CurrentValue;
-        var providers = authentication.OidcProviders
-            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
-            .Select(_ => _.CanonicalIdentity!)
-            .Concat(authentication.OAuthProviders
-                .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
-                .Select(_ => _.CanonicalIdentity!))
-            .ToArray();
+        var providers = ResolveCanonicalProviders(canonical);
         if (providers.Length != 1)
         {
             return VerifiedIdentityResolution.Failure(InvitationCompletionFailureReason.ProviderConfigurationAmbiguous);
@@ -544,6 +574,20 @@ class InviteCompletion(
             canonical.ProviderKey, canonical.NormalizedIssuer, canonical.Subject, null, assurance, authenticatedAt));
     }
 
+    C.CanonicalIdentity[] ResolveCanonicalProviders(CanonicalFederatedIdentity canonical)
+    {
+        // One snapshot answers both provider questions: two reads of the monitor could disagree and admit a
+        // provider that never appeared in a single configuration state.
+        var authentication = authConfig.CurrentValue;
+        return authentication.OidcProviders
+            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
+            .Select(_ => _.CanonicalIdentity!)
+            .Concat(authentication.OAuthProviders
+                .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
+                .Select(_ => _.CanonicalIdentity!))
+            .ToArray();
+    }
+
     async Task<InviteExchangeResult> ExchangeInvite(HttpContext context, string inviteToken, ClaimsPrincipal principal, string? authenticationScheme)
     {
         InvitationPageEmails.Clear(context);
@@ -561,19 +605,8 @@ class InviteCompletion(
             return InviteExchangeResult.Failed;
         }
 
-        var subject = canonicalResolution.Identity?.Subject
-            ?? principal.FindFirst("sub")?.Value
-            ?? principal.FindFirst("oid")?.Value
-            ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? principal.FindFirst("id")?.Value
-            ?? string.Empty;
-
-        var identityProvider = canonicalResolution.Identity?.ProviderKey
-            ?? principal.FindFirst("iss")?.Value
-            ?? principal.FindFirst("identity_provider")?.Value
-            ?? principal.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
-            ?? principal.Identity?.AuthenticationType
-            ?? string.Empty;
+        var subject = ResolveSubject(principal, canonicalResolution.Identity);
+        var identityProvider = ResolveIdentityProvider(principal, canonicalResolution.Identity);
 
         var email = ResolveAuthenticatedEmail(principal, out var emailVerified);
 
@@ -612,6 +645,11 @@ class InviteCompletion(
             })
             : JsonContent.Create(new { subject, identityProvider, email, emailVerified });
 
+        return await SendLegacyExchangeRequest(client, request, exchangeUrl);
+    }
+
+    async Task<InviteExchangeResult> SendLegacyExchangeRequest(HttpClient client, HttpRequestMessage request, string exchangeUrl)
+    {
         HttpResponseMessage response;
         try
         {

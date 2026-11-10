@@ -576,22 +576,21 @@ public class InviteMiddleware(
         // deployment where the invitation binding fails to survive the provider round-trip stops here
         // rather than bouncing the browser between the invitation and the provider forever.
         var isAlreadyAuthenticated = context.User.Identity?.IsAuthenticated == true;
-        if (providers.Count > 1 || (providers.Count == 1 && isAlreadyAuthenticated))
+        if (providers.Count == 0)
+        {
+            // No providers configured - let Phase 2 or later middleware handle it.
+            await next(context);
+            return;
+        }
+
+        if (providers.Count > 1 || isAlreadyAuthenticated)
         {
             await ServeProviderSelection(context, token, providers);
             return;
         }
 
         // Single provider: trigger OIDC login directly for that provider.
-        // No providers: would require error handling (skipped for now).
-        if (providers.Count == 1)
-        {
-            await ChallengeSingleProvider(context, token, providers[0], entryState);
-            return;
-        }
-
-        // No providers configured - let Phase 2 or later middleware handle it.
-        await next(context);
+        await ChallengeSingleProvider(context, token, providers[0], entryState);
     }
 
     Task WriteInvitationInvalid(HttpContext context, int statusCode) =>

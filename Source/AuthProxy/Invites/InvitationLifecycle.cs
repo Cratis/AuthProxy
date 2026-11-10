@@ -148,8 +148,12 @@ public sealed class InvitationLifecycle
     {
         if (!IsStagingConfigured(invite, inviteToken)
             || _attestationIssuer is null
-            || _entryStateProtector is null
-            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
+            || _entryStateProtector is null)
+        {
+            return null;
+        }
+
+        if (!InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
             || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
             || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
         {
