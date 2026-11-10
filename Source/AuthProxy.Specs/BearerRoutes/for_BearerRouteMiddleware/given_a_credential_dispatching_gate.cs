@@ -19,6 +19,10 @@ public abstract class given_a_credential_dispatching_gate : Specification
     protected const string CombinedPath = "/both";
     protected const string JwtLikeToken = "eyJhbGciOiJSUzI1NiJ9.e30.c2ln";
 
+    protected C.AuthProxy Current { get; private set; } = default!;
+
+    protected IAccessPolicy AccessPolicy { get; private set; } = default!;
+
     protected IBearerTokenValidator Validator { get; private set; } = default!;
 
     protected IBearerRouteForwarder Forwarder { get; private set; } = default!;
@@ -91,6 +95,7 @@ public abstract class given_a_credential_dispatching_gate : Specification
                 },
             },
         };
+        Current = current;
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         options.CurrentValue.Returns(current);
         Validator = Substitute.For<IBearerTokenValidator>();
@@ -98,8 +103,8 @@ public abstract class given_a_credential_dispatching_gate : Specification
             .Returns(BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "stub"));
         Forwarder = Substitute.For<IBearerRouteForwarder>();
         Next = Substitute.For<RequestDelegate>();
-        var policy = Substitute.For<IAccessPolicy>();
-        policy.Evaluate(Arg.Any<ClaimsPrincipal>(), Arg.Any<C.AuthProxy>(), Arg.Any<string>(), Arg.Any<C.BearerRoute>()).Returns(AccessDecision.Granted);
+        AccessPolicy = Substitute.For<IAccessPolicy>();
+        AccessPolicy.Evaluate(Arg.Any<ClaimsPrincipal>(), Arg.Any<C.AuthProxy>(), Arg.Any<string>(), Arg.Any<C.BearerRoute>()).Returns(AccessDecision.Granted);
         var tenantVerifier = Substitute.For<ITenantVerifier>();
         tenantVerifier.VerifyAsync(Arg.Any<string>()).Returns(true);
         Middleware = new BearerRouteMiddleware(
@@ -107,7 +112,7 @@ public abstract class given_a_credential_dispatching_gate : Specification
             options,
             Validator,
             Substitute.For<IBearerTokenIntrospector>(),
-            policy,
+            AccessPolicy,
             tenantVerifier,
             Substitute.For<ITenantResolver>(),
             Forwarder,

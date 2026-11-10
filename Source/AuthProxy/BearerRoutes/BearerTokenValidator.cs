@@ -79,22 +79,15 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     public static bool TryFindPresentedIssuer(HttpRequest request, Func<string, bool> matches, out string issuer)
     {
         issuer = string.Empty;
-        foreach (var value in request.Headers.Authorization)
+        var parts = request.Headers.Authorization
+            .Where(value => !string.IsNullOrEmpty(value))
+            .SelectMany(value => value!.Split(','));
+        foreach (var part in parts)
         {
-            if (string.IsNullOrEmpty(value))
+            if (TryReadMatchingIssuer(part, matches, out var candidate))
             {
-                continue;
-            }
-
-            foreach (var part in value.Split(','))
-            {
-                if (TryReadLenientBearerToken(part, out var token)
-                    && TryReadUnvalidatedIssuer(token, out var candidate)
-                    && matches(candidate))
-                {
-                    issuer = candidate;
-                    return true;
-                }
+                issuer = candidate;
+                return true;
             }
         }
 
@@ -150,34 +143,17 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
             return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "The token's issuer is not accepted on this route.");
         }
 
-        var keys = await metadata.GetSigningKeys(issuer, cancellationToken);
-        if (keys is null)
+        return await ValidateSignedToken(token, route, issuer, cancellationToken);
+    }
+
+    static BearerTokenValidation ValidateClaims(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims)
+    {
+        // Proof verification is not supported. A sender-constrained token must never become an ordinary bearer token.
+        if (claims.Any(IsSenderConstrained))
         {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.IssuerUnavailable, "The issuer's signing keys are unavailable.");
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "Sender-constrained access tokens are not supported.");
         }
 
-        var result = await _handler.ValidateTokenAsync(token, CreateParameters(route, issuer, keys));
-        if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
-        {
-            // The token names a key this proxy has not seen — the issuer may have rotated. Ask for fresh keys once;
-            // refreshes are rate limited, so this cannot be turned into a flood of requests to the issuer.
-            keys = await metadata.GetSigningKeys(issuer, cancellationToken, refresh: true);
-            if (keys is null)
-            {
-                return BearerTokenValidation.Refused(BearerTokenValidationStatus.IssuerUnavailable, "The issuer's signing keys are unavailable.");
-            }
-
-            result = await _handler.ValidateTokenAsync(token, CreateParameters(route, issuer, keys));
-        }
-
-        if (!result.IsValid || result.ClaimsIdentity is null)
-        {
-            return BearerTokenValidation.Refused(
-                BearerTokenValidationStatus.Invalid,
-                $"The token failed validation ({result.Exception?.GetType().Name ?? "unknown"}).");
-        }
-
-        var claims = result.ClaimsIdentity.Claims.ToArray();
         var scopes = claims
             .Where(_ => string.Equals(_.Type, ScopeClaimType, StringComparison.Ordinal))
             .SelectMany(_ => _.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -206,21 +182,32 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
             return BearerTokenValidation.Refused(BearerTokenValidationStatus.UnboundCredential, "The token carries no single usable environment constraint.");
         }
 
+        var identity = BuildIdentity(route, issuer, claims, scopes, out var reason);
+        if (identity is null)
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason);
+        }
+
+        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer };
+    }
+
+    static ClaimsIdentity? BuildIdentity(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims, string[] scopes, out string reason)
+    {
+        reason = "The token carries no single subject.";
         if (!TryGetSingleValue(claims, SubjectClaimType, out var subject))
         {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "The token carries no single subject.");
+            return null;
         }
 
         if (!TryBuildForwardedClaims(route, claims, out var forwarded, out var missingSource))
         {
-            return BearerTokenValidation.Refused(
-                BearerTokenValidationStatus.Invalid,
-                $"The token carries no '{missingSource}' claim for a configured claim mapping.");
+            reason = $"The token carries no '{missingSource}' claim for a configured claim mapping.";
+            return null;
         }
 
         if (!TryGetSingleValue(forwarded, SubjectClaimType, out _))
         {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "The token carries no single subject.");
+            return null;
         }
 
         forwarded.Add(new Claim(BearerRouteClaims.Issuer, issuer.Issuer));
@@ -232,8 +219,26 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
         forwarded.AddRange(scopes.Select(_ => new Claim(BearerRouteClaims.Scope, _)));
 
-        var identity = new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role);
-        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer };
+        return new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role);
+    }
+
+    static bool IsSenderConstrained(Claim claim)
+    {
+        if (!string.Equals(claim.Type, "cnf", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var confirmation = JsonDocument.Parse(claim.Value);
+            return confirmation.RootElement.ValueKind == JsonValueKind.Object
+                && confirmation.RootElement.TryGetProperty("jkt", out _);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     static TokenValidationParameters CreateParameters(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, IReadOnlyCollection<SecurityKey> keys) => new()
@@ -280,6 +285,17 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         return token.Length > 0 && token.AsSpan().IndexOfAnyExcept(_tokenCharacters) < 0
             ? TokenPresence.Present
             : TokenPresence.Malformed;
+    }
+
+    static bool TryReadMatchingIssuer(string part, Func<string, bool> matches, out string issuer)
+    {
+        issuer = string.Empty;
+        if (!TryReadLenientBearerToken(part, out var token) || !TryReadUnvalidatedIssuer(token, out issuer))
+        {
+            return false;
+        }
+
+        return matches(issuer);
     }
 
     static bool TryReadLenientBearerToken(string value, out string token)
@@ -363,5 +379,37 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         }
 
         return true;
+    }
+
+    async Task<BearerTokenValidation> ValidateSignedToken(string token, ResolvedBearerRoute route, ResolvedBearerIssuer issuer, CancellationToken cancellationToken)
+    {
+        var keys = await metadata.GetSigningKeys(issuer, cancellationToken);
+        if (keys is null)
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.IssuerUnavailable, "The issuer's signing keys are unavailable.");
+        }
+
+        var result = await _handler.ValidateTokenAsync(token, CreateParameters(route, issuer, keys));
+        if (!result.IsValid && result.Exception is SecurityTokenSignatureKeyNotFoundException)
+        {
+            // The token names a key this proxy has not seen — the issuer may have rotated. Ask for fresh keys once;
+            // refreshes are rate limited, so this cannot be turned into a flood of requests to the issuer.
+            keys = await metadata.GetSigningKeys(issuer, cancellationToken, refresh: true);
+            if (keys is null)
+            {
+                return BearerTokenValidation.Refused(BearerTokenValidationStatus.IssuerUnavailable, "The issuer's signing keys are unavailable.");
+            }
+
+            result = await _handler.ValidateTokenAsync(token, CreateParameters(route, issuer, keys));
+        }
+
+        if (!result.IsValid || result.ClaimsIdentity is null)
+        {
+            return BearerTokenValidation.Refused(
+                BearerTokenValidationStatus.Invalid,
+                $"The token failed validation ({result.Exception?.GetType().Name ?? "unknown"}).");
+        }
+
+        return ValidateClaims(route, issuer, result.ClaimsIdentity.Claims.ToArray());
     }
 }
