@@ -65,9 +65,6 @@ public class LinkSubjectExchanger(
         }
 
         var subject = SubjectOf(canonicalResolution, principal);
-
-        var identityProvider = IdentityProviderOf(canonicalResolution, principal, scheme);
-
         if (string.IsNullOrWhiteSpace(subject))
         {
             logger.LinkSubjectMissing();
@@ -75,9 +72,19 @@ public class LinkSubjectExchanger(
         }
 
         using var client = httpClientFactory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, exchangeUrl);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", linkToken);
-        request.Content = canonicalResolution.Identity is { } canonicalIdentity
+        using var request = BuildRequest(exchangeUrl, linkToken!, BuildPayload(canonicalResolution, subject, IdentityProviderOf(canonicalResolution, principal, scheme)));
+        return await Send(client, request, exchangeUrl);
+    }
+
+    static HttpRequestMessage BuildRequest(string exchangeUrl, string linkToken, JsonContent payload) =>
+        new(HttpMethod.Post, exchangeUrl)
+        {
+            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", linkToken) },
+            Content = payload
+        };
+
+    static JsonContent BuildPayload(CanonicalIdentityResolution resolution, string subject, string identityProvider) =>
+        resolution.Identity is { } canonicalIdentity
             ? JsonContent.Create(new
             {
                 subject,
@@ -86,9 +93,6 @@ public class LinkSubjectExchanger(
                 identityProvider
             })
             : JsonContent.Create(new { subject, identityProvider });
-
-        return await Send(client, request, exchangeUrl);
-    }
 
     static bool TryReadLinkToken(AuthenticationProperties properties, out string? linkToken) =>
         properties.Items.TryGetValue(LinkMiddleware.LinkTokenPropertyKey, out linkToken)
