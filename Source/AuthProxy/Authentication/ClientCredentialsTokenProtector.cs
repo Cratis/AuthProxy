@@ -169,22 +169,21 @@ public class ClientCredentialsTokenProtector(
 
     static string Serialize(ClientCredentialsTokenPayload payload) => JsonSerializer.Serialize(payload, _serializerOptions);
 
-    bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload, out DateTimeOffset expiresAt)
+    bool TryUnprotect(ITimeLimitedDataProtector protector, ProtectedToken token, out ClientCredentialsTokenPayload payload, out DateTimeOffset expiresAt)
     {
         expiresAt = default;
+        payload = default!;
         try
         {
-            var protectedPayload = protector.Unprotect(token, out expiresAt);
-            if (timeProvider.GetUtcNow() >= expiresAt)
+            var protectedPayload = protector.Unprotect(token.Value, out expiresAt);
+            if (HasPassed(expiresAt))
             {
-                payload = default!;
                 return false;
             }
 
             var deserialized = JsonSerializer.Deserialize<ClientCredentialsTokenPayload>(protectedPayload, _serializerOptions);
             if (deserialized is null)
             {
-                payload = default!;
                 return false;
             }
 
@@ -198,19 +197,18 @@ public class ClientCredentialsTokenProtector(
         }
     }
 
-    bool TryUnprotectRefreshToken(string token, out ClientCredentialsTokenPayload payload)
+    bool TryUnprotectRefreshToken(ProtectedToken token, out ClientCredentialsTokenPayload payload)
     {
         payload = default!;
         try
         {
-            var content = JsonSerializer.Deserialize<ClientCredentialsRefreshTokenContent>(_refreshProtector.Unprotect(token), _serializerOptions);
+            var content = JsonSerializer.Deserialize<ClientCredentialsRefreshTokenContent>(_refreshProtector.Unprotect(token.Value), _serializerOptions);
             if (content?.ExpiresAt is not { } expiresAt || content.FamilyExpiresAt is not { } familyExpiresAt)
             {
                 return false;
             }
 
-            var now = timeProvider.GetUtcNow();
-            if (now >= expiresAt || now >= familyExpiresAt)
+            if (HasPassed(expiresAt) || HasPassed(familyExpiresAt))
             {
                 return false;
             }
@@ -227,14 +225,14 @@ public class ClientCredentialsTokenProtector(
         }
     }
 
-    bool TryUnprotectLegacyRefreshToken(string token, out ClientCredentialsTokenPayload payload)
+    bool TryUnprotectLegacyRefreshToken(ProtectedToken token, out ClientCredentialsTokenPayload payload)
     {
         payload = default!;
         try
         {
-            var unprotected = _legacyRefreshProtector.Unprotect(token, out var expiration);
+            var unprotected = _legacyRefreshProtector.Unprotect(token.Value, out var expiration);
             var deserialized = JsonSerializer.Deserialize<ClientCredentialsTokenPayload>(unprotected, _serializerOptions);
-            if (deserialized is null || timeProvider.GetUtcNow() >= expiration)
+            if (deserialized is null || HasPassed(expiration))
             {
                 return false;
             }
@@ -247,4 +245,6 @@ public class ClientCredentialsTokenProtector(
             return false;
         }
     }
+
+    bool HasPassed(DateTimeOffset deadline) => timeProvider.GetUtcNow() >= deadline;
 }
