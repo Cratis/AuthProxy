@@ -24,6 +24,8 @@ Without a gateway, every service re-implements the same boilerplate: an OIDC han
 - **Credential linking** — let an already signed-in user prove control of an additional identity-provider login and associate it with their existing account.
 - **Hardening and operations** — trusted-proxy policies for `X-Forwarded-*` headers, capability-based admission for deployments that should answer nothing to unknown callers, sign-in notifications, an opt-in private management listener with liveness/readiness endpoints, and overridable built-in HTML pages (provider selection, tenant selection, errors).
 
+Sender-constrained access tokens are not supported. Bearer routes and `Authentication:JwtBearer` reject any `cnf` claim (case-insensitive, regardless of value) with HTTP 401 `invalid_token`; introspection answers containing `cnf` are treated as inactive regardless of `token_type`. Unbound bearer tokens remain supported.
+
 There is no code to write: AuthProxy is configured entirely through the `Cratis:AuthProxy` section of `appsettings.json` (or `Cratis__AuthProxy__` environment variables) and runs as a container in front of your services.
 
 ## Quickstart

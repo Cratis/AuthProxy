@@ -14,9 +14,11 @@ gateway. Resource metadata bodies are served by the backend; AuthProxy only
 forwards their requests. PAT revocation and product-policy checks are likewise
 backend responsibilities.
 
-AuthProxy does not verify DPoP proofs. Until proof verification is implemented,
-it refuses every OAuth access token containing a `cnf.jkt` member with HTTP 401
-`invalid_token`, even when a DPoP header is present. The DPoP rejection vectors
-exercise this fail-closed behavior, not individual proof-validation algorithms.
-The `DPoP` authorization scheme remains unsupported. Ordinary unbound bearer
-tokens remain supported.
+AuthProxy does not verify sender-constraining proofs. Both bearer routes and
+`Authentication:JwtBearer` refuse every access token containing a `cnf` claim
+(case-insensitive, regardless of value) with HTTP 401 `invalid_token`, even when
+a DPoP header is present. Introspection answers containing `cnf` are treated as
+inactive regardless of `token_type`. The DPoP rejection vectors exercise this
+fail-closed behavior, not individual proof-validation algorithms. The `DPoP`
+authorization scheme remains unsupported. Ordinary unbound bearer tokens remain
+supported.

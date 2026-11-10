@@ -42,7 +42,10 @@ public abstract class given_a_published_vector_gate : given_a_credential_dispatc
             ["sub"] = "synthetic-subject",
             ["tid"] = "tenant-a",
         };
-        if (given.TryGetProperty("cnf", out var confirmation)) claims["cnf"] = confirmation.Clone();
+        foreach (var claim in given.EnumerateObject().Where(_ => string.Equals(_.Name, "cnf", StringComparison.OrdinalIgnoreCase)))
+        {
+            claims[claim.Name] = claim.Value.Clone();
+        }
         if (given.TryGetProperty("tokenScopes", out var scopes)) claims["scope"] = string.Join(' ', scopes.EnumerateArray().Select(_ => _.GetString()));
 
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor

@@ -30,6 +30,11 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     /// </summary>
     public const int MaximumTenantIdLength = Tenancy.TenantIdentifier.MaximumLength;
 
+    /// <summary>
+    /// The fixed refusal reason for access tokens carrying confirmation claims.
+    /// </summary>
+    internal const string SenderConstrainedTokenReason = "Sender-constrained access tokens are not supported.";
+
     const string BearerPrefix = "Bearer ";
     const string ScopeClaimType = "scope";
     const string SubjectClaimType = "sub";
@@ -113,6 +118,14 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         ReadBearerToken(request, out token) == TokenPresence.Present;
 
     /// <summary>
+    /// Determines whether a claim declares an unsupported sender constraint.
+    /// </summary>
+    /// <param name="claim">The access-token claim.</param>
+    /// <returns>Whether the claim is a confirmation claim, regardless of its value.</returns>
+    internal static bool IsSenderConstrained(Claim claim) =>
+        string.Equals(claim.Type, "cnf", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Validates the presented token; the traced body of <see cref="Validate"/>.
     /// </summary>
     /// <param name="request">The request.</param>
@@ -151,7 +164,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         // Proof verification is not supported. A sender-constrained token must never become an ordinary bearer token.
         if (claims.Any(IsSenderConstrained))
         {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "Sender-constrained access tokens are not supported.");
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, SenderConstrainedTokenReason);
         }
 
         var scopes = claims
@@ -220,25 +233,6 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         forwarded.AddRange(scopes.Select(_ => new Claim(BearerRouteClaims.Scope, _)));
 
         return new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role);
-    }
-
-    static bool IsSenderConstrained(Claim claim)
-    {
-        if (!string.Equals(claim.Type, "cnf", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        try
-        {
-            using var confirmation = JsonDocument.Parse(claim.Value);
-            return confirmation.RootElement.ValueKind == JsonValueKind.Object
-                && confirmation.RootElement.TryGetProperty("jkt", out _);
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
     }
 
     static TokenValidationParameters CreateParameters(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, IReadOnlyCollection<SecurityKey> keys) => new()

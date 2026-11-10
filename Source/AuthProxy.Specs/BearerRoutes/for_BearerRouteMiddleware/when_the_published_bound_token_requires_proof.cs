@@ -33,6 +33,32 @@ public class when_the_published_bound_token_requires_proof : given_a_published_v
     }
 
     [Theory]
+    [InlineData("""{"cnf":{"x5t#S256":"synthetic-certificate"}}""")]
+    [InlineData("""{"cnf":{"jwk":{}}}""")]
+    [InlineData("""{"cnf":"synthetic-binding"}""")]
+    [InlineData("""{"cnf":"{invalid-json"}""")]
+    [InlineData("""{"cnf":null}""")]
+    [InlineData("""{"cnf":7}""")]
+    [InlineData("""{"Cnf":{"jkt":"synthetic-key"}}""")]
+    public async Task should_refuse_any_confirmation_claim(string claims)
+    {
+        using var given = JsonDocument.Parse(claims);
+        var token = AccessToken(given.RootElement);
+        var context = Request(OAuthPath, "GET", $"Bearer {token}");
+        BearerRouteTable.TryMatch(context.Request.Path, Current, out var route).ShouldBeTrue();
+
+        var validation = await Validator.Validate(context.Request, route, CancellationToken.None);
+        await Middleware.InvokeAsync(context);
+
+        validation.Reason.ShouldEqual("Sender-constrained access tokens are not supported.");
+        AssertRefused(context, StatusCodes.Status401Unauthorized);
+        Challenge(context).ShouldContain("error=\"invalid_token\"");
+        Body(context).ShouldEqual(ErrorBody("unauthorized"));
+        Body(context).ShouldNotContain(token);
+        Challenge(context).ShouldNotContain(token);
+    }
+
+    [Theory]
     [InlineData("null")]
     [InlineData("\"\"")]
     [InlineData("7")]

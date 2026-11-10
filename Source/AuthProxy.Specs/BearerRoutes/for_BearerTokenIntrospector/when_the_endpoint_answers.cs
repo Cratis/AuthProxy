@@ -96,6 +96,20 @@ public class when_the_endpoint_answers : Specification
     [Fact] void should_not_put_anything_in_the_url() => _query.ShouldBeEmpty();
     [Fact] void should_not_log_the_token_or_the_secret() => (_allLogs.Contains(ScriptedIntrospection.Token, StringComparison.Ordinal) || _allLogs.Contains(ScriptedIntrospection.Secret, StringComparison.Ordinal)).ShouldBeFalse();
 
+    [Theory]
+    [InlineData("\"cnf\":{\"jkt\":\"synthetic-key\"}")]
+    [InlineData("\"cnf\":{\"x5t#S256\":\"synthetic-certificate\"},\"token_type\":\"Bearer\"")]
+    [InlineData("\"cnf\":{\"jwk\":{}},\"token_type\":\"DPoP\"")]
+    [InlineData("\"cnf\":\"synthetic-binding\",\"token_type\":null")]
+    [InlineData("\"cnf\":null,\"token_type\":\"Bearer\"")]
+    [InlineData("\"Cnf\":\"{invalid-json\"")]
+    public async Task should_treat_any_confirmation_as_inactive_regardless_of_token_type(string fields)
+    {
+        var verdict = await Ask("{\"active\":true," + fields + "}");
+
+        verdict.ShouldEqual(IntrospectionVerdict.Inactive);
+    }
+
     async Task<IntrospectionVerdict> Ask(string body, HttpStatusCode status = HttpStatusCode.OK)
     {
         var scripted = new ScriptedIntrospection(_ => Task.FromResult(ScriptedIntrospection.Json(body, status)));

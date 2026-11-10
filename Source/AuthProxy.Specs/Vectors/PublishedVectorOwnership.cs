@@ -5,6 +5,8 @@ namespace Cratis.AuthProxy.Vectors;
 
 public static class PublishedVectorOwnership
 {
+    const string EnvelopeStrippingCoverage = " Inbound envelope stripping by SpoofableHeaders.Strip is covered by for_SpoofableHeaders.when_stripping_forwarded_identity_v2_context_headers.";
+
     public static IReadOnlyDictionary<string, string> NotApplicable { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["oauth-only-resource-discovery"] = "The backend serves the metadata document; AuthProxy forwards it without constructing its body.",
@@ -21,10 +23,10 @@ public static class PublishedVectorOwnership
         ["authorization-requires-registered-resource"] = "Identity owns resource registration and authorization requests.",
         ["authorization-rejects-plain-pkce"] = "Identity validates PKCE on authorization requests.",
         ["authorization-requires-pkce"] = "Identity requires PKCE on authorization requests.",
-        ["unbound-envelope-plus-bearer-is-ambiguous"] = "Arc consumes AuthProxy identity envelopes and rejects unbound envelopes; AuthProxy produces envelopes, not callers from inbound envelopes.",
-        ["bound-envelope-builds-caller-from-bearer"] = "Arc constructs the backend caller from the verified bearer and AuthProxy envelope.",
-        ["envelope-kind-must-match-bearer"] = "Arc verifies the envelope credential kind against the bearer.",
-        ["revoked-pat-envelope-no-oauth-fallback"] = "Arc verifies PAT revocation and the forwarded envelope; AuthProxy does not verify PATs.",
-        ["envelope-subject-must-match-bearer"] = "Arc compares the forwarded envelope subject with the backend-verified bearer subject.",
+        ["unbound-envelope-plus-bearer-is-ambiguous"] = "Arc consumes AuthProxy identity envelopes and rejects unbound envelopes; AuthProxy produces envelopes, not callers from inbound envelopes." + EnvelopeStrippingCoverage,
+        ["bound-envelope-builds-caller-from-bearer"] = "Arc constructs the backend caller from the verified bearer and AuthProxy envelope." + EnvelopeStrippingCoverage,
+        ["envelope-kind-must-match-bearer"] = "Arc verifies the envelope credential kind against the bearer." + EnvelopeStrippingCoverage,
+        ["revoked-pat-envelope-no-oauth-fallback"] = "Arc verifies PAT revocation and the forwarded envelope; AuthProxy does not verify PATs." + EnvelopeStrippingCoverage,
+        ["envelope-subject-must-match-bearer"] = "Arc compares the forwarded envelope subject with the backend-verified bearer subject." + EnvelopeStrippingCoverage,
     };
 }

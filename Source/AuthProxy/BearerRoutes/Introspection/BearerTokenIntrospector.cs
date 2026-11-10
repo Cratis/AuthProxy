@@ -85,6 +85,11 @@ public sealed class BearerTokenIntrospector(
 
     static string? FindContradiction(JsonElement root, BearerTokenValidation validated, ResolvedBearerIssuer issuer)
     {
+        if (root.EnumerateObject().Any(_ => string.Equals(_.Name, "cnf", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "cnf";
+        }
+
         var principal = validated.Principal;
         var clientId = principal?.FindFirst(BearerRouteClaims.ClientId)?.Value;
         if (Differs(root, "sub", principal?.FindFirst(BearerRouteClaims.Subject)?.Value))
