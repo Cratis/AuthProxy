@@ -41,6 +41,6 @@ public static class TokenEndpoint
     static async Task<TokenResponse> PostAsync(HttpClient client, Dictionary<string, string> form)
     {
         var response = await client.PostAsync(WellKnownPaths.Token, new FormUrlEncodedContent(form));
-        return new TokenResponse(response.StatusCode, JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement);
+        return new TokenResponse(response.StatusCode, JsonElement.Parse(await response.Content.ReadAsStringAsync()));
     }
 }

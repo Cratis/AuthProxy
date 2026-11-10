@@ -16,7 +16,7 @@ public class when_there_is_no_tenant_and_no_secret : given.a_sender
     async Task Because()
     {
         _delivered = await _sender.Send(CreateRequest(), CancellationToken.None);
-        _body = JsonDocument.Parse(_handler.LastRequestBody!).RootElement;
+        _body = JsonElement.Parse(_handler.LastRequestBody!);
     }
 
     [Fact] void should_send_no_secret() => _handler.LastRequest!.Headers.Contains(Headers.SignInCallbackSecret).ShouldBeFalse();

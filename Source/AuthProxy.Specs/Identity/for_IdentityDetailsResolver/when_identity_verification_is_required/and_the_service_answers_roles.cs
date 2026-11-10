@@ -36,7 +36,7 @@ public class and_the_service_answers_roles : given.a_required_verification_resol
         var start = setCookie.IndexOf(Cookies.Identity + "=", StringComparison.Ordinal) + Cookies.Identity.Length + 1;
         var end = setCookie.IndexOf(';', start);
         var encoded = Uri.UnescapeDataString(end < 0 ? setCookie[start..] : setCookie[start..end]);
-        _cookie = JsonDocument.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(encoded))).RootElement.Clone();
+        _cookie = JsonElement.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(encoded)));
     }
 
     [Fact] void should_return_the_roles_of_the_session() => _result.Roles.ShouldContainOnly(_sessionRoles);
