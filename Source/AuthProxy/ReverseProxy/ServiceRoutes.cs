@@ -81,44 +81,12 @@ public static class ServiceRoutes
     {
         host = default;
         var trimmed = candidate?.Trim() ?? string.Empty;
-        if (trimmed.Length == 0 || trimmed.IndexOfAny(['/', '*', '?', '#', '@', ' ', '[', ']']) >= 0
-            || trimmed.Count(_ => _ == ':') > 1)
+        if (!IsHostDeclaration(trimmed))
         {
             return false;
         }
 
-        HostString parsed;
-        try
-        {
-            // Round-trip declarations through IDN mapping so compatibility characters, casing and
-            // normalization match the Unicode host ASP.NET decodes from the request's punycode.
-            // ASCII input is lower-cased first, as before, so punycode detection does not depend on letter case.
-            parsed = HostString.FromUriComponent(trimmed.All(char.IsAscii) ? trimmed.ToLowerInvariant() : trimmed);
-            var idn = new IdnMapping();
-
-            // Only Unicode declarations and punycode labels (in any letter case) go through the mapping. Other plain
-            // ASCII names, such as 'my--svc' or 'a-.example', are not IDN names and keep parsing as before.
-            var isPlainAscii = parsed.Host.All(char.IsAscii)
-                && !parsed.Host.Split('.').Any(label => label.StartsWith("xn--", StringComparison.OrdinalIgnoreCase));
-            var canonicalHost = isPlainAscii ? parsed.Host : idn.GetUnicode(idn.GetAscii(parsed.Host));
-
-            // Mapping can fold compatibility characters (fullwidth ':' '[' ']' and similar) into authority
-            // delimiters. A mapped host must stay a bare host name; the port only comes from the declaration.
-            if (canonicalHost.IndexOfAny([':', '/', '*', '?', '#', '@', ' ', '[', ']', '\\']) >= 0)
-            {
-                return false;
-            }
-
-            parsed = parsed.Port is { } port ? new HostString(canonicalHost, port) : new HostString(canonicalHost);
-        }
-        catch (ArgumentException)
-        {
-            // Invalid IDNs are unusable declarations, not startup exceptions outside validation.
-            return false;
-        }
-        if (Uri.CheckHostName(parsed.Host.Trim('[', ']')) == UriHostNameType.Unknown
-            || parsed.Port is <= 0 or > 65535
-            || (parsed.Port is null && trimmed.Contains(':')))
+        if (!TryNormalizeHost(trimmed, out var parsed) || !HasValidHostAndPort(parsed, trimmed))
         {
             return false;
         }
@@ -201,11 +169,7 @@ public static class ServiceRoutes
         // cluster is authoritative: independently comparing raw headers can authorize a different service.
         if (request.HttpContext.GetEndpoint()?.Metadata.GetMetadata<RouteModel>() is { } route)
         {
-            return config.Services
-                .Where(_ => string.Equals(route.Config.ClusterId, $"{_.Key.ToLowerInvariant()}-backend-cluster", StringComparison.Ordinal)
-                    || string.Equals(route.Config.ClusterId, $"{_.Key.ToLowerInvariant()}-frontend-cluster", StringComparison.Ordinal))
-                .Select(_ => new RoutedService(_.Key, _.Value))
-                .FirstOrDefault();
+            return FromSelectedRoute(route, config);
         }
 
         if (config.Services.Count == 1)
@@ -215,6 +179,63 @@ public static class ServiceRoutes
             return new(name, service);
         }
 
+        return ResolveDeclarations(request, config);
+    }
+
+    static bool IsHostDeclaration(string candidate) =>
+        candidate.Length > 0
+        && candidate.IndexOfAny(['/', '*', '?', '#', '@', ' ', '[', ']']) < 0
+        && candidate.Count(_ => _ == ':') <= 1;
+
+    static bool HasValidHostAndPort(HostString parsed, string declared) =>
+        Uri.CheckHostName(parsed.Host.Trim('[', ']')) != UriHostNameType.Unknown
+        && parsed.Port is not (<= 0 or > 65535)
+        && (parsed.Port is not null || !declared.Contains(':'));
+
+    static bool TryNormalizeHost(string trimmed, out HostString parsed)
+    {
+        parsed = default;
+        try
+        {
+            // Round-trip declarations through IDN mapping so compatibility characters, casing and
+            // normalization match the Unicode host ASP.NET decodes from the request's punycode.
+            // ASCII input is lower-cased first, as before, so punycode detection does not depend on letter case.
+            parsed = HostString.FromUriComponent(trimmed.All(char.IsAscii) ? trimmed.ToLowerInvariant() : trimmed);
+            var idn = new IdnMapping();
+
+            // Only Unicode declarations and punycode labels (in any letter case) go through the mapping. Other plain
+            // ASCII names, such as 'my--svc' or 'a-.example', are not IDN names and keep parsing as before.
+            var isPlainAscii = parsed.Host.All(char.IsAscii)
+                && !parsed.Host.Split('.').Any(label => label.StartsWith("xn--", StringComparison.OrdinalIgnoreCase));
+            var canonicalHost = isPlainAscii ? parsed.Host : idn.GetUnicode(idn.GetAscii(parsed.Host));
+
+            // Mapping can fold compatibility characters (fullwidth ':' '[' ']' and similar) into authority
+            // delimiters. A mapped host must stay a bare host name; the port only comes from the declaration.
+            if (canonicalHost.IndexOfAny([':', '/', '*', '?', '#', '@', ' ', '[', ']', '\\']) >= 0)
+            {
+                return false;
+            }
+
+            parsed = parsed.Port is { } port ? new HostString(canonicalHost, port) : new HostString(canonicalHost);
+        }
+        catch (ArgumentException)
+        {
+            // Invalid IDNs are unusable declarations, not startup exceptions outside validation.
+            return false;
+        }
+
+        return true;
+    }
+
+    static RoutedService? FromSelectedRoute(RouteModel route, C.AuthProxy config) =>
+        config.Services
+            .Where(_ => string.Equals(route.Config.ClusterId, $"{_.Key.ToLowerInvariant()}-backend-cluster", StringComparison.Ordinal)
+                || string.Equals(route.Config.ClusterId, $"{_.Key.ToLowerInvariant()}-frontend-cluster", StringComparison.Ordinal))
+            .Select(_ => new RoutedService(_.Key, _.Value))
+            .FirstOrDefault();
+
+    static RoutedService? ResolveDeclarations(HttpRequest request, C.AuthProxy config)
+    {
         var catchAll = CatchAllService(config);
 
         var services = config.Services
