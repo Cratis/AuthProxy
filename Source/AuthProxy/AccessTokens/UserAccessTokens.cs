@@ -261,7 +261,7 @@ public sealed class UserAccessTokens(
         var now = timeProvider.GetUtcNow();
         var lifetime = Lifetime(root);
         var renewAt = RenewalTime(now, lifetime);
-        await store.SetAccessToken(refresh.SessionId, refresh.Audience, new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
+        await store.SetAccessToken(new UserTokenAudience(refresh.SessionId, refresh.Audience), new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
     }
 
     async Task<UserAccessTokenResult> HandleRefreshRefusal(RefreshRequest refresh, HttpResponseMessage response, JsonElement root)
