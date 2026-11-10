@@ -88,15 +88,19 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
             identity.EmailVerifiedClaimType,
             identity.AssuranceClaimType,
         };
-        if (evidenceClaimTypes.Any(_ =>
-                !HasValidClaimTypeShape(_)
-                || _.Any(char.IsControl)
-                || CanonicalIdentityClaims.IsReserved(_))
-            || evidenceClaimTypes.Distinct(StringComparer.Ordinal).Count() != evidenceClaimTypes.Length)
+        if (evidenceClaimTypes.Any(IsInvalidEvidenceClaimType) || HasDuplicates(evidenceClaimTypes))
         {
             failures.Add("Canonical subject, email, email-verification, and assurance claim types must be distinct, nonempty, bounded, and outside the reserved Cratis namespace.");
         }
     }
+
+    static bool IsInvalidEvidenceClaimType(string claimType) =>
+        !HasValidClaimTypeShape(claimType)
+        || claimType.Any(char.IsControl)
+        || CanonicalIdentityClaims.IsReserved(claimType);
+
+    static bool HasDuplicates(string[] claimTypes) =>
+        claimTypes.Distinct(StringComparer.Ordinal).Count() != claimTypes.Length;
 
     static void ValidateIssuer(C.CanonicalIdentity identity, bool isOidc, List<string> failures)
     {
