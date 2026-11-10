@@ -10,17 +10,17 @@ namespace Cratis.AuthProxy.ReverseProxy;
 readonly record struct ServiceKey(string Value)
 {
     /// <summary>
+    /// Unwraps a service key to its text.
+    /// </summary>
+    /// <param name="key">The service key.</param>
+    public static implicit operator string(ServiceKey key) => key.Value;
+
+    /// <summary>
     /// Derives the key of a configured service name.
     /// </summary>
     /// <param name="serviceName">The configured service name.</param>
     /// <returns>The invariant lower-cased key.</returns>
     public static ServiceKey From(string serviceName) => new(serviceName.ToLowerInvariant());
-
-    /// <summary>
-    /// Unwraps a service key to its text.
-    /// </summary>
-    /// <param name="key">The service key.</param>
-    public static implicit operator string(ServiceKey key) => key.Value;
 
     /// <inheritdoc/>
     public override string ToString() => Value;
