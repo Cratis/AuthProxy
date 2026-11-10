@@ -117,6 +117,17 @@ public abstract class given_a_credential_dispatching_gate : Specification
             Substitute.For<ITenantResolver>(),
             Forwarder,
             TokenProtector,
-            Substitute.For<ILogger<BearerRouteMiddleware>>());
+            Substitute.For<ILogger<BearerRouteMiddleware>>(),
+            CreateProofVerifier());
+    }
+
+    Dpop.DpopEnforcement CreateProofVerifier()
+    {
+        var store = Substitute.For<Dpop.IDpopReplayStore>();
+        var seen = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+        store.CheckHealth(Arg.Any<CancellationToken>()).Returns(Dpop.DpopReplayResult.Accepted);
+        store.TryConsume(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(call => seen.TryAdd(string.Join('\0', call.ArgAt<string>(0), call.ArgAt<string>(1), call.ArgAt<string>(2)), true) ? Dpop.DpopReplayResult.Accepted : Dpop.DpopReplayResult.Replay);
+        return new(store, new EphemeralDataProtectionProvider(), TimeProvider.System, Substitute.For<ILogger<Dpop.DpopEnforcement>>(), Microsoft.Extensions.Options.Options.Create(Current));
     }
 }

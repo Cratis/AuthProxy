@@ -38,6 +38,8 @@
   href: telemetry.md
 - name: Services
   href: services.md
+- name: DPoP Proof Verification
+  href: dpop.md
 - name: Forwarded Identity Signing
   href: forwarded-identity-signing.md
 - name: Backend TLS

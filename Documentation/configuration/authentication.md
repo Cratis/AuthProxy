@@ -854,6 +854,15 @@ its target. Mapped `sub`, `preferred_username` and `name` must each have one usa
 refuse the token. Mapping into the route's tenant claim, or declaring targets differing only by case, is refused
 at startup.
 
+### Optional DPoP proofs
+
+OAuth-only routes can opt into [DPoP proof verification](dpop.md) with a trusted public origin and a
+fleet-shared Redis replay store. The default `Accept` mode keeps unbound Bearer tokens eligible; `Require`
+mode requires sender binding on every request. Opted-in bound tokens must use the DPoP authorization
+scheme and an ES256 proof. Other routes and `Authentication:JwtBearer` retain their existing rejection of
+sender-constrained tokens. Proof and nonce challenges differ from the ordinary Bearer responses below;
+see [the DPoP policy and operational requirements](dpop.md).
+
 ### Responses
 
 | Situation | Response |

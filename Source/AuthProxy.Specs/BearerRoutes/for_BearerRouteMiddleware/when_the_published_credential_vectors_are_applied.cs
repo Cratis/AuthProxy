@@ -31,14 +31,14 @@ public class when_the_published_credential_vectors_are_applied : given_a_publish
         ["unbound-client-does-not-require-dpop"] = Accepted,
         ["oauth-scopes-do-not-grant-product-roles"] = PolicyDenied,
         ["mcp-errors-never-redirect"] = Missing,
-        ["bound-token-requires-proof"] = BoundToken,
-        ["bound-token-requires-matching-key"] = BoundToken,
-        ["dpop-rejects-replayed-jti"] = BoundToken,
-        ["dpop-requires-matching-target"] = BoundToken,
-        ["dpop-requires-matching-token-hash"] = BoundToken,
+        ["bound-token-requires-proof"] = (vector, path) => BoundToken(vector, path, "bound-token-requires-proof"),
+        ["bound-token-requires-matching-key"] = (vector, path) => BoundToken(vector, path, "bound-token-requires-matching-key"),
+        ["dpop-rejects-replayed-jti"] = (vector, path) => BoundToken(vector, path, "dpop-rejects-replayed-jti"),
+        ["dpop-requires-matching-target"] = (vector, path) => BoundToken(vector, path, "dpop-requires-matching-target"),
+        ["dpop-requires-matching-token-hash"] = (vector, path) => BoundToken(vector, path, "dpop-requires-matching-token-hash"),
         ["unknown-bearer-rejected-before-verification"] = UnsupportedScheme,
-        ["dpop-requires-fresh-iat"] = BoundToken,
-        ["dpop-requires-matching-method"] = BoundToken,
+        ["dpop-requires-fresh-iat"] = (vector, path) => BoundToken(vector, path, "dpop-requires-fresh-iat"),
+        ["dpop-requires-matching-method"] = (vector, path) => BoundToken(vector, path, "dpop-requires-matching-method"),
         ["cookie-plus-bearer-is-ambiguous"] = Cookie,
         ["multiple-credentials-rejected"] = Multiple,
         ["query-credential-rejected"] = Query,
@@ -158,21 +158,32 @@ public class when_the_published_credential_vectors_are_applied : given_a_publish
         _ = AccessPolicy.Received(1).Evaluate(Arg.Any<ClaimsPrincipal>(), Current, "api", Arg.Any<C.BearerRoute>());
     }
 
-    async Task BoundToken(JsonElement vector, PathString path)
+    async Task BoundToken(JsonElement vector, PathString path, string id)
     {
-        vector.GetProperty("then").GetProperty("status").GetInt32().ShouldEqual(StatusCodes.Status401Unauthorized);
-        var context = Request(path.Value, "GET", $"Bearer {AccessToken(vector.GetProperty("given"))}");
-        if (vector.GetProperty("given").GetProperty("dpopHeaderPresent").GetBoolean())
+        using var proof = new PublishedDpopProof();
+        var policy = Current.Services["api"].BearerRoutes.Single(route => route.PathPrefix == path.Value);
+        policy.PersonalAccessTokens = null;
+        policy.Dpop = new() { PublicOrigin = "https://direct.example.test" };
+        var given = vector.GetProperty("given").EnumerateObject().ToDictionary(property => property.Name, property => (object)property.Value);
+        given["cnf"] = new { jkt = id == "bound-token-requires-matching-key" ? new string('A', 43) : proof.Jkt };
+        var token = AccessToken(JsonSerializer.SerializeToElement(given));
+        var missing = id == "bound-token-requires-proof";
+        var context = Request(path.Value, "GET", $"{(missing ? "Bearer" : "DPoP")} {token}");
+        if (!missing) context.Request.Headers["DPoP"] = proof.Sign(token, path.Value!, id);
+        if (id == "dpop-rejects-replayed-jti")
         {
-            // AuthProxy does not verify proofs: any header must still fail closed for this cnf.jkt token.
-            context.Request.Headers["DPoP"] = "synthetic-unsupported-proof";
+            var first = Request(path.Value, "GET", $"DPoP {token}");
+            first.Request.Headers["DPoP"] = context.Request.Headers["DPoP"];
+            await Middleware.InvokeAsync(first);
+            first.Response.StatusCode.ShouldEqual(StatusCodes.Status200OK);
+            Forwarder.ClearReceivedCalls();
+            Validator.ClearReceivedCalls();
         }
-
-        if (vector.GetProperty("when").TryGetProperty("requestMethod", out var method)) context.Request.Method = method.GetString();
         await Middleware.InvokeAsync(context);
-        AssertRefused(context, StatusCodes.Status401Unauthorized);
-        Challenge(context).ShouldContain("error=\"invalid_token\"");
-        Body(context).ShouldEqual(ErrorBody("unauthorized"));
+        AssertRefused(context, vector.GetProperty("then").GetProperty("status").GetInt32());
+        Challenge(context).ShouldContain("DPoP");
+        Challenge(context).ShouldContain("error=\"invalid_dpop_proof\"");
+        Body(context).ShouldEqual(ErrorBody("invalid_dpop_proof"));
         _ = Validator.Received(1).Validate(context.Request, Arg.Any<ResolvedBearerRoute>(), Arg.Any<CancellationToken>());
     }
 

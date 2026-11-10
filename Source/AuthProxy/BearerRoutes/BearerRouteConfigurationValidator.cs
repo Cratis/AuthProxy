@@ -54,6 +54,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             var location = new RouteLocation(at, serviceName);
             ValidateRoute(location, service, route, state);
             ValidateEnvironment(location, route, options.CredentialBinding, state.Failures);
+            Dpop.DpopConfiguration.Validate(route, options, at, state.Failures);
             ValidateServicePath(location, service, state.Failures);
             ValidateServiceOverlaps(location, route, options, state.Failures);
             ValidateIdentityVerification(location, route, options, state.Failures);

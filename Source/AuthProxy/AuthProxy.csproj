@@ -18,6 +18,7 @@
     <PackageReference Include="Microsoft.Identity.Web.Certificate" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" />
     <PackageReference Include="Yarp.ReverseProxy" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>

@@ -143,6 +143,9 @@ public class AuthProxy
     /// </summary>
     public CredentialBinding CredentialBinding { get; set; } = new();
 
+    /// <summary>Gets or sets the dedicated shared Redis replay-store settings for DPoP.</summary>
+    public Dpop Dpop { get; set; } = new();
+
     /// <summary>
     /// Gets or sets the <see cref="Tenants"/>.
     /// Tenants are keyed by tenant ID string.

@@ -64,7 +64,7 @@ public sealed class BearerTokenIntrospector(
     static bool TryReadInstant(JsonElement element, out DateTimeOffset instant)
     {
         instant = default;
-        if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var seconds) && seconds is > 0 and <= MaximumUnixSeconds)
+        if (TryReadSeconds(element, out var seconds) && seconds is > 0 and <= MaximumUnixSeconds)
         {
             instant = DateTimeOffset.FromUnixTimeSeconds(seconds);
             return true;
@@ -83,11 +83,24 @@ public sealed class BearerTokenIntrospector(
         return value.ValueKind != JsonValueKind.String || !string.Equals(value.GetString(), expected, comparison);
     }
 
+    static bool TryReadSeconds(JsonElement element, out long seconds)
+    {
+        seconds = default;
+        return element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out seconds);
+    }
+
+    static bool TryReadActive(JsonElement root, out JsonElement active)
+    {
+        active = default;
+        return root.ValueKind == JsonValueKind.Object && root.TryGetProperty("active", out active)
+            && active.ValueKind is JsonValueKind.True or JsonValueKind.False;
+    }
+
     static string? FindContradiction(JsonElement root, BearerTokenValidation validated, ResolvedBearerIssuer issuer)
     {
-        if (root.EnumerateObject().Any(_ => string.Equals(_.Name, "cnf", StringComparison.OrdinalIgnoreCase)))
+        if (Dpop.DpopIntrospection.Contradiction(root, validated) is { } constraintReason)
         {
-            return "cnf";
+            return constraintReason;
         }
 
         var principal = validated.Principal;
@@ -112,7 +125,7 @@ public sealed class BearerTokenIntrospector(
             return "azp";
         }
 
-        return Differs(root, "token_type", "Bearer", StringComparison.OrdinalIgnoreCase) ? "token_type" : null;
+        return null;
     }
 
     static TimeSpan Min(TimeSpan first, TimeSpan second) => first < second ? first : second;
@@ -206,9 +219,7 @@ public sealed class BearerTokenIntrospector(
 
     Answer Interpret(JsonElement root, BearerTokenValidation validated, ResolvedBearerIssuer issuer)
     {
-        if (root.ValueKind != JsonValueKind.Object
-            || !root.TryGetProperty("active", out var active)
-            || active.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        if (!TryReadActive(root, out var active))
         {
             logger.IntrospectionUnavailable(issuer.Issuer, "MalformedAnswer");
             return _unavailable;

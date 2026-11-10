@@ -59,6 +59,8 @@ public static class BearerRouteServiceCollectionExtensions
             // The endpoint cannot redirect AuthProxy, and the token is never replayed anywhere else.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
         builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.TryAddSingleton<Dpop.IDpopReplayStore, Dpop.RedisDpopReplayStore>();
+        builder.Services.AddSingleton<Dpop.DpopEnforcement>();
         builder.Services.AddSingleton<IntrospectionCache>();
         builder.Services.AddSingleton<IBearerTokenIntrospector, BearerTokenIntrospector>();
         builder.Services.AddSingleton<IBearerIssuerMetadata, BearerIssuerMetadata>();

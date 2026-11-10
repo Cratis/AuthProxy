@@ -161,4 +161,7 @@ public class BearerRoute
     /// <c language="text">/mcp</c>) cannot use <see cref="IntrospectionFailurePolicy.Accept"/>.
     /// </summary>
     public IntrospectionFailurePolicy IntrospectionUnavailable { get; set; } = IntrospectionFailurePolicy.Refuse;
+
+    /// <summary>Gets or sets the opt-in DPoP policy. Leave unset to continue refusing sender-constrained tokens.</summary>
+    public BearerRouteDpop? Dpop { get; set; }
 }

@@ -14,7 +14,7 @@ internal static class RequestAuthentication
     /// <returns>Whether the authorization headers contain a bearer scheme.</returns>
     internal static bool HasBearer(HttpRequest request) => request.Headers.Authorization
         .SelectMany(value => (value ?? string.Empty).Split(','))
-        .Any(value => string.Equals(value.Trim().Split([' ', '\t'], 2)[0], "Bearer", StringComparison.OrdinalIgnoreCase));
+        .Any(value => IsTokenScheme(value.Trim().Split([' ', '\t'], 2)[0]));
 
     /// <summary>Determines whether authentication material is ambiguous.</summary>
     /// <param name="context">The current context.</param>
@@ -42,4 +42,8 @@ internal static class RequestAuthentication
             .Get(CookieAuthenticationDefaults.AuthenticationScheme);
         return context.Request.Cookies.ContainsKey(options.Cookie.Name!);
     }
+
+    static bool IsTokenScheme(string scheme) =>
+        string.Equals(scheme, "Bearer", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(scheme, "DPoP", StringComparison.OrdinalIgnoreCase);
 }
