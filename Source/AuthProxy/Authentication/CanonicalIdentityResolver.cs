@@ -55,31 +55,12 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
         var provider = FindProvider(current, authenticationScheme);
         if (provider is null)
         {
-            if (isFreshAuthentication)
-            {
-                return CanonicalIdentityResolution.SanitizedLegacy(principal);
-            }
-
-            if (!HasReservedClaims(principal))
-            {
-                return CanonicalIdentityResolution.Legacy(principal);
-            }
-
-            return string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal)
-                ? ValidateEnrichedPrincipal(current, principal)
-                : CanonicalIdentityResolution.Failed();
+            return ResolveWithoutProvider(current, principal, authenticationScheme, isFreshAuthentication);
         }
 
         if (provider.Value.Identity is null)
         {
-            if (isFreshAuthentication)
-            {
-                return CanonicalIdentityResolution.SanitizedLegacy(principal);
-            }
-
-            return HasReservedClaims(principal)
-                ? CanonicalIdentityResolution.Failed()
-                : CanonicalIdentityResolution.Legacy(principal);
+            return ResolveLegacyProvider(principal, isFreshAuthentication);
         }
 
         if (principal is null)
@@ -87,19 +68,60 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
             return CanonicalIdentityResolution.Failed();
         }
 
-        if (!isFreshAuthentication && validatedIssuer is null && HasReservedClaims(principal))
+        if (IsEnrichedSession(principal, validatedIssuer, isFreshAuthentication))
         {
             return ValidateEnrichedPrincipal(current, principal);
         }
 
-        var identityConfiguration = provider.Value.Identity;
+        return ResolveProviderIdentity(principal, provider.Value, validatedIssuer);
+    }
+
+    static bool IsEnrichedSession(ClaimsPrincipal principal, string? validatedIssuer, bool isFreshAuthentication) =>
+        !isFreshAuthentication && validatedIssuer is null && HasReservedClaims(principal);
+
+    static CanonicalIdentityResolution ResolveWithoutProvider(
+        C.Authentication current,
+        ClaimsPrincipal? principal,
+        string? authenticationScheme,
+        bool isFreshAuthentication)
+    {
+        if (isFreshAuthentication)
+        {
+            return CanonicalIdentityResolution.SanitizedLegacy(principal);
+        }
+
+        if (!HasReservedClaims(principal))
+        {
+            return CanonicalIdentityResolution.Legacy(principal);
+        }
+
+        return string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal)
+            ? ValidateEnrichedPrincipal(current, principal)
+            : CanonicalIdentityResolution.Failed();
+    }
+
+    static CanonicalIdentityResolution ResolveLegacyProvider(ClaimsPrincipal? principal, bool isFreshAuthentication)
+    {
+        if (isFreshAuthentication)
+        {
+            return CanonicalIdentityResolution.SanitizedLegacy(principal);
+        }
+
+        return HasReservedClaims(principal)
+            ? CanonicalIdentityResolution.Failed()
+            : CanonicalIdentityResolution.Legacy(principal);
+    }
+
+    static CanonicalIdentityResolution ResolveProviderIdentity(ClaimsPrincipal principal, Provider provider, string? validatedIssuer)
+    {
+        var identityConfiguration = provider.Identity!;
         if (!TryGetSingleExactClaim(principal, identityConfiguration.SubjectClaimType, out var subject))
         {
             return CanonicalIdentityResolution.Failed();
         }
 
         string issuer;
-        if (provider.Value.IsOidc)
+        if (provider.IsOidc)
         {
             if (validatedIssuer is null
                 || !CanonicalIssuer.TryNormalize(validatedIssuer, out issuer))
@@ -122,11 +144,7 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
             .Where(_ => string.Equals(_.Type, claimType, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        if (claims.Length != 1
-            || !string.Equals(claims[0].Type, claimType, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(claims[0].Value)
-            || !string.Equals(claims[0].Value, claims[0].Value.Trim(), StringComparison.Ordinal)
-            || claims[0].Value.Length > 2048)
+        if (claims.Length != 1 || !IsExactClaimValue(claims[0], claimType))
         {
             value = string.Empty;
             return false;
@@ -135,6 +153,12 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
         value = claims[0].Value;
         return true;
     }
+
+    static bool IsExactClaimValue(Claim claim, string claimType) =>
+        string.Equals(claim.Type, claimType, StringComparison.Ordinal)
+        && !string.IsNullOrWhiteSpace(claim.Value)
+        && string.Equals(claim.Value, claim.Value.Trim(), StringComparison.Ordinal)
+        && claim.Value.Length <= 2048;
 
     static bool HasReservedClaims(ClaimsPrincipal? principal) =>
         principal?.Claims.Any(claim => CanonicalIdentityClaims.IsReserved(claim.Type)) == true;
@@ -174,23 +198,17 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
 
     static CanonicalIdentityResolution ValidateEnrichedPrincipal(C.Authentication current, ClaimsPrincipal? principal)
     {
-        var reservedClaims = principal?.Claims.Where(_ => CanonicalIdentityClaims.IsReserved(_.Type)).ToArray() ?? [];
-        if (principal is null
-            || reservedClaims.Length != CanonicalIdentityClaims.All.Length
-            || !TryGetSingleExactClaim(principal, CanonicalIdentityClaims.ProviderKey, out var providerKey)
-            || !TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Issuer, out var issuer)
-            || !TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Subject, out var subject)
-            || !CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
-            || !string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal))
+        var canonical = ReadEnrichedIdentity(principal);
+        if (canonical is null)
         {
             return CanonicalIdentityResolution.Failed();
         }
 
         var configuredOidc = current.OidcProviders
-            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, providerKey, StringComparison.Ordinal))
+            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
             .ToArray();
         var configuredOAuth = current.OAuthProviders
-            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, providerKey, StringComparison.Ordinal))
+            .Where(_ => string.Equals(_.CanonicalIdentity?.ProviderKey, canonical.ProviderKey, StringComparison.Ordinal))
             .ToArray();
 
         if (configuredOidc.Length + configuredOAuth.Length != 1)
@@ -198,15 +216,49 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
             return CanonicalIdentityResolution.Failed();
         }
 
-        if (configuredOAuth.Length == 1
-            && (!CanonicalIssuer.TryNormalize(configuredOAuth[0].CanonicalIdentity!.Issuer, out var expectedIssuer)
-                || !string.Equals(expectedIssuer, normalizedIssuer, StringComparison.Ordinal)))
+        if (configuredOAuth.Length == 1 && !HasExpectedOAuthIssuer(configuredOAuth[0].CanonicalIdentity!, canonical.NormalizedIssuer))
         {
             return CanonicalIdentityResolution.Failed();
         }
 
-        return CanonicalIdentityResolution.Success(new(providerKey, normalizedIssuer, subject), principal);
+        return CanonicalIdentityResolution.Success(canonical, principal!);
     }
+
+    static CanonicalFederatedIdentity? ReadEnrichedIdentity(ClaimsPrincipal? principal)
+    {
+        var reservedClaims = principal?.Claims.Where(_ => CanonicalIdentityClaims.IsReserved(_.Type)).ToArray() ?? [];
+        if (principal is null || reservedClaims.Length != CanonicalIdentityClaims.All.Length)
+        {
+            return null;
+        }
+
+        if (!TryGetSingleExactClaim(principal, CanonicalIdentityClaims.ProviderKey, out var providerKey))
+        {
+            return null;
+        }
+
+        if (!TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Issuer, out var issuer))
+        {
+            return null;
+        }
+
+        if (!TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Subject, out var subject))
+        {
+            return null;
+        }
+
+        if (!CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
+            || !string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return new(providerKey, normalizedIssuer, subject);
+    }
+
+    static bool HasExpectedOAuthIssuer(C.CanonicalIdentity identity, string normalizedIssuer) =>
+        CanonicalIssuer.TryNormalize(identity.Issuer, out var expectedIssuer)
+        && string.Equals(expectedIssuer, normalizedIssuer, StringComparison.Ordinal);
 
     readonly record struct Provider(C.CanonicalIdentity? Identity, bool IsOidc);
 }

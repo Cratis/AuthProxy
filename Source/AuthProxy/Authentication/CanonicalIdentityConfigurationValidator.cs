@@ -40,15 +40,7 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
         {
             ValidateScheme(provider.Name, provider.CanonicalIdentity, schemes, failures);
             ValidateIdentity(provider.CanonicalIdentity, false, keys, failures);
-            if (!string.IsNullOrWhiteSpace(provider.VerifiedEmailEndpoint)
-                && (!Uri.TryCreate(provider.VerifiedEmailEndpoint, UriKind.Absolute, out var endpoint)
-                    || (!string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                        && !(string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && endpoint.IsLoopback))
-                    || !string.IsNullOrEmpty(endpoint.UserInfo)
-                    || !string.IsNullOrEmpty(endpoint.Fragment)))
-            {
-                failures.Add("OAuth verified-email endpoints must be absolute HTTPS URLs, except for loopback development endpoints.");
-            }
+            ValidateVerifiedEmailEndpoint(provider.VerifiedEmailEndpoint, failures);
         }
 
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
@@ -73,22 +65,22 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
             return;
         }
 
-        if (identity.ProviderKey.Length is < 1 or > 64
-            || identity.ProviderKey[0] is not ((>= 'a' and <= 'z') or (>= '0' and <= '9'))
-            || identity.ProviderKey.Any(character => !(character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '.' or '_' or '-'))
-            || !keys.Add(identity.ProviderKey))
+        if (!IsValidProviderKey(identity.ProviderKey) || !keys.Add(identity.ProviderKey))
         {
             failures.Add("Canonical provider keys must be unique, lowercase, bounded ASCII identifiers.");
         }
 
-        if (string.IsNullOrWhiteSpace(identity.SubjectClaimType)
-            || !string.Equals(identity.SubjectClaimType, identity.SubjectClaimType.Trim(), StringComparison.Ordinal)
-            || identity.SubjectClaimType.Length > 256
-            || CanonicalIdentityClaims.IsReserved(identity.SubjectClaimType))
+        if (!HasValidClaimTypeShape(identity.SubjectClaimType) || CanonicalIdentityClaims.IsReserved(identity.SubjectClaimType))
         {
             failures.Add("Canonical subject claim types must be nonempty, bounded, and outside the reserved Cratis namespace.");
         }
 
+        ValidateEvidenceClaimTypes(identity, failures);
+        ValidateIssuer(identity, isOidc, failures);
+    }
+
+    static void ValidateEvidenceClaimTypes(C.CanonicalIdentity identity, List<string> failures)
+    {
         var evidenceClaimTypes = new[]
         {
             identity.SubjectClaimType,
@@ -97,16 +89,17 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
             identity.AssuranceClaimType,
         };
         if (evidenceClaimTypes.Any(_ =>
-                string.IsNullOrWhiteSpace(_)
-                || !string.Equals(_, _.Trim(), StringComparison.Ordinal)
-                || _.Length > 256
+                !HasValidClaimTypeShape(_)
                 || _.Any(char.IsControl)
                 || CanonicalIdentityClaims.IsReserved(_))
             || evidenceClaimTypes.Distinct(StringComparer.Ordinal).Count() != evidenceClaimTypes.Length)
         {
             failures.Add("Canonical subject, email, email-verification, and assurance claim types must be distinct, nonempty, bounded, and outside the reserved Cratis namespace.");
         }
+    }
 
+    static void ValidateIssuer(C.CanonicalIdentity identity, bool isOidc, List<string> failures)
+    {
         if (isOidc && identity.Issuer is not null)
         {
             failures.Add("Canonical OIDC providers obtain the issuer from the framework-validated token and cannot configure a literal issuer.");
@@ -117,4 +110,47 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
             failures.Add("Canonical OAuth providers require an absolute normalized HTTPS issuer, except for loopback development issuers.");
         }
     }
+
+    static bool IsValidProviderKey(string key)
+    {
+        if (key.Length is < 1 or > 64)
+        {
+            return false;
+        }
+
+        return (key[0] is (>= 'a' and <= 'z') or (>= '0' and <= '9'))
+            && key.All(character => character is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '.' or '_' or '-');
+    }
+
+    static bool HasValidClaimTypeShape(string claimType) =>
+        !string.IsNullOrWhiteSpace(claimType)
+        && string.Equals(claimType, claimType.Trim(), StringComparison.Ordinal)
+        && claimType.Length <= 256;
+
+    static void ValidateVerifiedEmailEndpoint(string endpoint, List<string> failures)
+    {
+        if (!string.IsNullOrWhiteSpace(endpoint) && !IsValidVerifiedEmailEndpoint(endpoint))
+        {
+            failures.Add("OAuth verified-email endpoints must be absolute HTTPS URLs, except for loopback development endpoints.");
+        }
+    }
+
+    static bool IsValidVerifiedEmailEndpoint(string candidate)
+    {
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var endpoint))
+        {
+            return false;
+        }
+
+        if (!IsPermittedEndpointScheme(endpoint))
+        {
+            return false;
+        }
+
+        return string.IsNullOrEmpty(endpoint.UserInfo) && string.IsNullOrEmpty(endpoint.Fragment);
+    }
+
+    static bool IsPermittedEndpointScheme(Uri endpoint) =>
+        string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+        || (string.Equals(endpoint.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && endpoint.IsLoopback);
 }
