@@ -23,8 +23,8 @@ sealed class CanonicalIdentityConfigurationValidator : IValidateOptions<C.Authen
     /// <returns>A successful result when every canonical contract is valid; otherwise, all detected configuration failures.</returns>
     public ValidateOptionsResult Validate(string? name, C.Authentication options)
     {
-        var failures = new List<string>();
-        var keys = new HashSet<string>(StringComparer.Ordinal);
+        List<string> failures = [];
+        HashSet<string> keys = [with(StringComparer.Ordinal)];
         var schemes = options.OidcProviders.Select(_ => OidcProviderScheme.FromName(_.Name))
             .Concat(options.OAuthProviders.Select(_ => OidcProviderScheme.FromName(_.Name)))
             .GroupBy(_ => _, StringComparer.Ordinal)

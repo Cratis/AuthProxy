@@ -111,6 +111,14 @@ public class TenantResolver(
         return new TenantResolutionResult(tenantId, strategy, subHostOptions.ParentHost);
     }
 
+    static bool IsNonBlankButUnusable(Type strategyType, string sourceIdentifier) =>
+        strategyType is Type.Route or Type.Claim
+        && !string.IsNullOrWhiteSpace(sourceIdentifier)
+        && !T.TenantIdentifier.IsUsable(sourceIdentifier);
+
+    static bool ResolvesDirectlyToTenantId(Type strategyType) =>
+        strategyType is Type.Specified or Type.Default or Type.SubHost or Type.Selection;
+
     bool HandleResolvedSourceIdentifier(
           Type strategyType,
           string sourceIdentifier,
@@ -136,16 +144,14 @@ public class TenantResolver(
     {
         tenantId = string.Empty;
 
-        if (strategyType is Type.Route or Type.Claim
-            && !string.IsNullOrWhiteSpace(sourceIdentifier)
-            && !T.TenantIdentifier.IsUsable(sourceIdentifier))
+        if (IsNonBlankButUnusable(strategyType, sourceIdentifier))
         {
             logger.UnusableTenantIdentifier(strategyType);
             return false;
         }
 
         // Specified, Default, and SubHost strategies return a fixed tenant ID directly.
-        if (strategyType is Type.Specified or Type.Default or Type.SubHost or Type.Selection)
+        if (ResolvesDirectlyToTenantId(strategyType))
         {
             if (!string.IsNullOrWhiteSpace(sourceIdentifier))
             {
@@ -163,28 +169,37 @@ public class TenantResolver(
     {
         result = new TenantResolutionResult(string.Empty, Type.None);
         var strategy = strategies.FirstOrDefault(s => s.Type == resolution.Strategy);
+        var request = new ResolutionRequest(context, resolution, current);
         return strategy switch
         {
-            T.ISourceIdentifierStrategyTyped<T.ClaimOptions> typed => TryResolveTyped(context, resolution, current, typed, out result),
-            T.ISourceIdentifierStrategyTyped<T.SpecifiedOptions> typed => TryResolveTyped(context, resolution, current, typed, out result),
-            T.ISourceIdentifierStrategyTyped<T.DefaultOptions> typed => TryResolveTyped(context, resolution, current, typed, out result),
-            T.ISourceIdentifierStrategyTyped<T.SelectionOptions> typed => TryResolveTyped(context, resolution, current, typed, out result),
-            T.ISourceIdentifierStrategyTyped<T.RouteOptions> typed => TryResolveTyped(context, resolution, current, typed, out result),
-            T.ISourceIdentifierStrategyTyped<T.SubHostOptions> typed => TryResolveTyped(context, resolution, current, typed, out result),
-            T.ISourceIdentifierStrategyTyped<object> => TryResolveHost(context, resolution, current, out result),
+            T.ISourceIdentifierStrategyTyped<T.ClaimOptions> typed => TryResolveTyped(in request, typed, out result),
+            T.ISourceIdentifierStrategyTyped<T.SpecifiedOptions> typed => TryResolveTyped(in request, typed, out result),
+            T.ISourceIdentifierStrategyTyped<T.DefaultOptions> typed => TryResolveTyped(in request, typed, out result),
+            _ => TryResolveFromRequest(strategy, in request, out result)
+        };
+    }
+
+    bool TryResolveFromRequest(T.ISourceIdentifierStrategy? strategy, in ResolutionRequest request, out TenantResolutionResult result)
+    {
+        result = new TenantResolutionResult(string.Empty, Type.None);
+        return strategy switch
+        {
+            T.ISourceIdentifierStrategyTyped<T.SelectionOptions> typed => TryResolveTyped(in request, typed, out result),
+            T.ISourceIdentifierStrategyTyped<T.RouteOptions> typed => TryResolveTyped(in request, typed, out result),
+            T.ISourceIdentifierStrategyTyped<T.SubHostOptions> typed => TryResolveTyped(in request, typed, out result),
+            T.ISourceIdentifierStrategyTyped<object> => TryResolveHost(in request, out result),
             _ => false
         };
     }
 
     bool TryResolveTyped<TOptions>(
-        HttpContext context,
-        C.TenantResolution resolution,
-        C.AuthProxy current,
+        in ResolutionRequest request,
         T.ISourceIdentifierStrategyTyped<TOptions> strategy,
         out TenantResolutionResult result)
         where TOptions : class, new()
     {
         result = new TenantResolutionResult(string.Empty, Type.None);
+        var (context, resolution, current) = request;
         var options = resolution.Options as TOptions ?? new TOptions();
         if (!strategy.TryResolveSourceIdentifier(context, options, out var sourceIdentifier))
         {
@@ -200,9 +215,10 @@ public class TenantResolver(
         return true;
     }
 
-    bool TryResolveHost(HttpContext context, C.TenantResolution resolution, C.AuthProxy current, out TenantResolutionResult result)
+    bool TryResolveHost(in ResolutionRequest request, out TenantResolutionResult result)
     {
         result = new TenantResolutionResult(string.Empty, Type.None);
+        var (context, resolution, current) = request;
         var sourceIdentifier = context.Request.Host.Host;
         if (string.IsNullOrEmpty(sourceIdentifier))
         {
@@ -217,4 +233,6 @@ public class TenantResolver(
         result = new TenantResolutionResult(tenantId, resolution.Strategy);
         return true;
     }
+
+    readonly record struct ResolutionRequest(HttpContext Context, C.TenantResolution Resolution, C.AuthProxy Current);
 }
