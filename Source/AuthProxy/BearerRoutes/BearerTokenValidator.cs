@@ -4,6 +4,7 @@
 using System.Buffers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.BearerRoutes.Dpop;
 using Cratis.AuthProxy.Telemetry;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -35,7 +36,6 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     /// </summary>
     internal const string SenderConstrainedTokenReason = "Sender-constrained access tokens are not supported.";
 
-    const string BearerPrefix = "Bearer ";
     const string ScopeClaimType = "scope";
     const string SubjectClaimType = "sub";
 
@@ -125,6 +125,55 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
     internal static bool IsSenderConstrained(Claim claim) =>
         string.Equals(claim.Type, "cnf", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Validates signed JWT identity, scope, tenant and sender evidence before per-request enforcement.</summary>
+    /// <param name="route">The selected route.</param>
+    /// <param name="issuer">The verified issuer.</param>
+    /// <param name="claims">The cryptographically verified claims.</param>
+    /// <returns>The signed-token verdict.</returns>
+    internal static BearerTokenValidation ValidateClaims(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims)
+    {
+        if (!DpopPresentation.TryConstraint(route, claims, out var senderConstraint))
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, SenderConstrainedTokenReason);
+        }
+
+        var scopes = claims
+            .Where(_ => string.Equals(_.Type, ScopeClaimType, StringComparison.Ordinal))
+            .SelectMany(_ => _.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        var missingScopes = RequiredScopes(route).Where(_ => !scopes.Contains(_, StringComparer.Ordinal)).ToArray();
+        if (missingScopes.Length > 0)
+        {
+            return BearerTokenValidation.Refused(
+                BearerTokenValidationStatus.InsufficientScope,
+                $"The token lacks the required scope(s) {string.Join(' ', missingScopes)}.") with { SenderConstraint = senderConstraint };
+        }
+
+        if (!TryGetSingleValue(claims, route.TenantClaimType, out var tenantId, trim: false) || !IsUsableTenantId(tenantId))
+        {
+            return BearerTokenValidation.Refused(
+                BearerTokenValidationStatus.MissingTenant,
+                $"The token carries no single usable '{route.TenantClaimType}' claim.");
+        }
+
+        string? environment = null;
+        if (route.Route.EnvironmentClaimType.Length > 0
+            && !TryGetSingleValue(claims, route.Route.EnvironmentClaimType, out environment, trim: false))
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.UnboundCredential, "The token carries no single usable environment constraint.");
+        }
+
+        var (identity, reason) = BuildIdentity(route, issuer, claims, scopes);
+        if (identity is null)
+        {
+            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason);
+        }
+
+        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer, SenderConstraint = senderConstraint };
+    }
+
     /// <summary>
     /// Validates the presented token; the traced body of <see cref="Validate"/>.
     /// </summary>
@@ -156,52 +205,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
             return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "The token's issuer is not accepted on this route.");
         }
 
-        return await ValidateSignedToken(token, route, issuer, cancellationToken);
-    }
-
-    static BearerTokenValidation ValidateClaims(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims)
-    {
-        // Proof verification is not supported. A sender-constrained token must never become an ordinary bearer token.
-        if (claims.Any(IsSenderConstrained))
-        {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, SenderConstrainedTokenReason);
-        }
-
-        var scopes = claims
-            .Where(_ => string.Equals(_.Type, ScopeClaimType, StringComparison.Ordinal))
-            .SelectMany(_ => _.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        var missingScopes = RequiredScopes(route).Where(_ => !scopes.Contains(_, StringComparer.Ordinal)).ToArray();
-        if (missingScopes.Length > 0)
-        {
-            return BearerTokenValidation.Refused(
-                BearerTokenValidationStatus.InsufficientScope,
-                $"The token lacks the required scope(s) {string.Join(' ', missingScopes)}.");
-        }
-
-        if (!TryGetSingleValue(claims, route.TenantClaimType, out var tenantId, trim: false) || !IsUsableTenantId(tenantId))
-        {
-            return BearerTokenValidation.Refused(
-                BearerTokenValidationStatus.MissingTenant,
-                $"The token carries no single usable '{route.TenantClaimType}' claim.");
-        }
-
-        string? environment = null;
-        if (route.Route.EnvironmentClaimType.Length > 0
-            && !TryGetSingleValue(claims, route.Route.EnvironmentClaimType, out environment, trim: false))
-        {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.UnboundCredential, "The token carries no single usable environment constraint.");
-        }
-
-        var (identity, reason) = BuildIdentity(route, issuer, claims, scopes);
-        if (identity is null)
-        {
-            return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason);
-        }
-
-        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer };
+        return DpopPresentation.Check(request, route, await ValidateSignedToken(token, route, issuer, cancellationToken));
     }
 
     static (ClaimsIdentity? Identity, string Reason) BuildIdentity(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims, string[] scopes)
@@ -269,12 +273,12 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         }
 
         // Another scheme is not a bearer token at all, which RFC 6750 answers with a bare challenge.
-        if (!value.StartsWith(BearerPrefix, StringComparison.OrdinalIgnoreCase))
+        if (!DpopPresentation.IsTokenScheme(value, out var prefixLength))
         {
             return TokenPresence.Absent;
         }
 
-        token = value[BearerPrefix.Length..];
+        token = value[prefixLength..];
         return token.Length > 0 && token.AsSpan().IndexOfAnyExcept(_tokenCharacters) < 0
             ? TokenPresence.Present
             : TokenPresence.Malformed;
@@ -293,7 +297,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
     static bool TryReadLenientBearerToken(string value, out string token)
     {
-        const string scheme = "Bearer";
+        var scheme = DpopPresentation.LenientScheme(value);
 
         token = string.Empty;
         var trimmed = value.AsSpan().Trim();

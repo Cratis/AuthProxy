@@ -23,6 +23,12 @@ public sealed record BearerTokenValidation(
     /// </summary>
     public string? Environment { get; init; }
 
+    /// <summary>Gets the token's validated sender constraint, before per-request proof verification.</summary>
+    public Dpop.DpopSenderConstraint? SenderConstraint { get; init; }
+
+    /// <summary>Gets the standard-base64 JSON sender evidence, only after proof and replay verification.</summary>
+    public string SenderBinding { get; init; } = "none";
+
     /// <summary>
     /// Gets the issuer that signed the accepted token.
     /// </summary>
@@ -32,6 +38,9 @@ public sealed record BearerTokenValidation(
     /// Gets a value indicating whether the token was accepted.
     /// </summary>
     public bool Succeeded => Status == BearerTokenValidationStatus.Succeeded;
+
+    /// <summary>Gets the fixed DPoP error for a rejected presentation, without untrusted descriptions.</summary>
+    internal string? DpopError { get; init; }
 
     /// <summary>
     /// Creates a successful result.

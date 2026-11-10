@@ -1,0 +1,93 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
+using C = Cratis.AuthProxy.Configuration;
+
+namespace Cratis.AuthProxy.BearerRoutes.Dpop;
+
+/// <summary>Uses atomic Redis time, coverage and SET NX checks without a local replay cache.</summary>
+/// <param name="options">The deployment's dedicated Redis settings.</param>
+/// <param name="clock">The local clock compared with Redis on every operation.</param>
+/// <param name="database">An optional database supplied by deterministic specifications.</param>
+internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimeProvider clock, IDatabase? database = null) : IDpopReplayStore, IDisposable
+{
+    /// <summary>The atomic Redis time, coverage, quarantine and SET NX operation; every key shares a cluster slot.</summary>
+    internal const string Script =
+        "local t = redis.call('TIME')\n" +
+        "local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)\n" +
+        "if math.abs(now - tonumber(ARGV[1])) > 30000 then return {3, now} end\n" +
+        "if redis.call('EXISTS', KEYS[1]) == 0 then\n" +
+        "redis.call('SET', KEYS[1], now, 'NX')\n" +
+        "end\n" +
+        "local coverage = tonumber(redis.call('GET', KEYS[1]))\n" +
+        "if not coverage or now - coverage < 390000 then return {3, now} end\n" +
+        "if ARGV[2] == '0' then return {1, now} end\n" +
+        "if redis.call('SET', KEYS[2], '1', 'NX', 'PX', 390000) then return {1, now} end\n" +
+        "return {2, now}";
+
+    readonly SemaphoreSlim _connect = new(1, 1);
+    ConnectionMultiplexer? _connection;
+
+    /// <inheritdoc/>
+    public Task<DpopReplayResult> CheckHealth(CancellationToken cancellationToken) => Execute(null, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task<DpopReplayResult> TryConsume(string origin, string jkt, string jti, CancellationToken cancellationToken) => Execute(DpopEncoding.Hash("resource\0" + origin + "\0" + jkt + "\0" + jti), cancellationToken);
+
+    /// <inheritdoc/>
+    public void Dispose()
+    {
+        _connection?.Dispose();
+        _connect.Dispose();
+    }
+
+    async Task<ConnectionMultiplexer> Connection(CancellationToken cancellationToken)
+    {
+        await _connect.WaitAsync(cancellationToken);
+        try
+        {
+            if (_connection is not null) return _connection;
+            var settings = ConfigurationOptions.Parse(options.Value.Dpop.ReplayStore.Redis.ConnectionString);
+            settings.AbortOnConnectFail = false;
+            settings.ConnectTimeout = 2000;
+            settings.AsyncTimeout = 2000;
+            _connection = await ConnectionMultiplexer.ConnectAsync(settings);
+            return _connection;
+        }
+        finally
+        {
+            _connect.Release();
+        }
+    }
+
+    async Task<DpopReplayResult> Execute(string? key, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var settings = options.Value.Dpop.ReplayStore.Redis;
+            if (string.IsNullOrWhiteSpace(settings.ConnectionString) || string.IsNullOrWhiteSpace(settings.KeyPrefix)) return DpopReplayResult.Unavailable;
+            var replayDatabase = database ?? (await Connection(cancellationToken)).GetDatabase();
+            if (database is null && _connection?.IsConnected != true) return DpopReplayResult.Unavailable;
+            var prefix = "{" + settings.KeyPrefix + "}:";
+            var local = clock.GetUtcNow().ToUnixTimeMilliseconds();
+            var operation = replayDatabase.ScriptEvaluateAsync(
+                Script,
+                [prefix + "coverage", prefix + (key ?? "health")],
+                [local, key is null ? "0" : "1"]);
+            var result = (RedisResult[]?)await operation.WaitAsync(cancellationToken);
+            if (result is not { Length: 2 } || Math.Abs((decimal)(long)result[1] - local) > 30000) return DpopReplayResult.Unavailable;
+            return (int)result[0] switch
+            {
+                1 => DpopReplayResult.Accepted,
+                2 => DpopReplayResult.Replay,
+                _ => DpopReplayResult.Unavailable,
+            };
+        }
+        catch (Exception exception) when (exception is RedisException or TimeoutException or ArgumentException or InvalidOperationException or OperationCanceledException or InvalidCastException)
+        {
+            return DpopReplayResult.Unavailable;
+        }
+    }
+}

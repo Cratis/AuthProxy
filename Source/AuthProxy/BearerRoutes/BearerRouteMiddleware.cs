@@ -25,6 +25,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="forwarder">The forwarder to the service backend.</param>
 /// <param name="tokenProtector">Recognizes access tokens AuthProxy issued through its client-credentials grant.</param>
 /// <param name="logger">The logger.</param>
+/// <param name="dpop">The opt-in per-request proof enforcement service.</param>
 /// <remarks>
 /// Placed after endpoint selection but ahead of static files, authentication and everything after them, so a
 /// request on a bearer route never reaches the cookie session, provider selection, tenant selection or reverse-proxy
@@ -63,7 +64,8 @@ public class BearerRouteMiddleware(
     ITenantResolver tenantResolver,
     IBearerRouteForwarder forwarder,
     ClientCredentialsTokenProtector tokenProtector,
-    ILogger<BearerRouteMiddleware> logger)
+    ILogger<BearerRouteMiddleware> logger,
+    Dpop.DpopEnforcement? dpop = null)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -133,7 +135,8 @@ public class BearerRouteMiddleware(
             return;
         }
 
-        if (!await TryHandleCredential(context, route, current))
+        if (Dpop.DpopPresentation.RefuseUnsupported(context, route)) return;
+        if (route.Route.Dpop is not null || !await TryHandleCredential(context, route, current))
         {
             await AuthenticateExternal(context, route, current);
         }
@@ -180,23 +183,35 @@ public class BearerRouteMiddleware(
 
     async Task AuthenticateExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
-        var validation = await validator.Validate(context.Request, route, context.RequestAborted);
+        var validation = await Dpop.DpopEnforcement.ValidateToken(dpop, validator, context, route);
+        if (validation is null) return;
         if (!validation.Succeeded)
         {
             logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
-            BearerChallenge.Write(context, validation, route);
+            Dpop.DpopChallenge.Write(context, validation, route);
             return;
         }
 
-        if (!await IsConfirmedActive(context, route, validation))
+        if (!await IsConfirmedActive(context, route, validation)
+            || !await MayForwardExternal(context, route, current, validation))
         {
             return;
         }
 
+        validation = await Dpop.DpopEnforcement.Verify(dpop, context, route, validation);
+        if (validation is null) return;
+
+        context.User = validation.Principal!;
+        Dpop.DpopEnforcement.PrepareForward(context, validation);
+        await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
+    }
+
+    async Task<bool> MayForwardExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current, BearerTokenValidation validation)
+    {
         if (BindingConflicts(context, current, route, validation))
         {
             BearerChallenge.Forbidden(context);
-            return;
+            return false;
         }
 
         var decision = accessPolicy.Evaluate(validation.Principal!, current, route.ServiceName, route.Route);
@@ -204,18 +219,13 @@ public class BearerRouteMiddleware(
         {
             logger.BearerAccessDenied(route.Prefix, route.ServiceName, decision.UnsatisfiedClaim);
             BearerChallenge.Forbidden(context);
-            return;
+            return false;
         }
 
-        if (!await tenantVerifier.VerifyAsync(validation.TenantId!))
-        {
-            logger.BearerTenantNotVerified(validation.TenantId!, RequestPathRedaction.Redact(context.Request.Path));
-            BearerChallenge.Forbidden(context);
-            return;
-        }
-
-        context.User = validation.Principal!;
-        await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
+        if (await tenantVerifier.VerifyAsync(validation.TenantId!)) return true;
+        logger.BearerTenantNotVerified(validation.TenantId!, RequestPathRedaction.Redact(context.Request.Path));
+        BearerChallenge.Forbidden(context);
+        return false;
     }
 
     bool TryRecognizeIssued(string token, ResolvedBearerRoute route, out IssuedBearerRouteCredential? credential)
@@ -276,7 +286,7 @@ public class BearerRouteMiddleware(
                 return true;
 
             case IntrospectionVerdict.Unavailable when route.Route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept
-                && !BearerRouteTable.IsMcpPrefix(route.Prefix):
+                && Dpop.DpopIntrospection.AllowsUnavailable(route):
                 logger.IntrospectionUnavailableAccepted(issuer.Issuer, route.Prefix, route.ServiceName);
                 return true;
 
@@ -287,7 +297,7 @@ public class BearerRouteMiddleware(
 
             default:
                 logger.BearerTokenRevoked(route.Prefix, route.ServiceName);
-                BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Revoked, "The issuer reports the token is not active."), route);
+                Dpop.DpopChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Revoked, "The issuer reports the token is not active."), route);
                 return false;
         }
     }
