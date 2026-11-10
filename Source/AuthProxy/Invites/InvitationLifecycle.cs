@@ -153,8 +153,8 @@ public sealed class InvitationLifecycle
             return null;
         }
 
-        if (!InviteCompletion.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
-            || !InviteCompletion.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
+        if (!InvitationClaimReader.TryGetSingleTokenClaim(inviteToken, JwtRegisteredClaimNames.Jti, out var invitationId)
+            || !InvitationClaimReader.TryGetSingleTokenClaim(inviteToken, invite.TenantClaim, out var tenantId)
             || !_completion.ResolvedTenantMatchesWhenPresent(context, tenantId))
         {
             return null;

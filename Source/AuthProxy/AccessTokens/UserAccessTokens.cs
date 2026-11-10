@@ -110,24 +110,32 @@ public sealed class UserAccessTokens(
     static bool TryReadBearerToken(JsonElement root, out string token)
     {
         token = string.Empty;
-        if (root.ValueKind != JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        var value = StringProperty(root, "access_token");
-        if (value is not { Length: > 0 })
-        {
-            return false;
-        }
-
-        if (!string.Equals(StringProperty(root, "token_type"), "Bearer", StringComparison.OrdinalIgnoreCase))
+        var value = root.ValueKind == JsonValueKind.Object ? StringProperty(root, "access_token") : null;
+        if (value is not { Length: > 0 }
+            || !string.Equals(StringProperty(root, "token_type"), "Bearer", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
         token = value;
         return true;
+    }
+
+    static DateTimeOffset RenewalTime(DateTimeOffset now, TimeSpan lifetime) =>
+        now + lifetime - (lifetime > RenewalMargin * 2 ? RenewalMargin : lifetime / 2);
+
+    static void AddScopeAndResource(Dictionary<string, string> form, C.ServiceAccessToken accessToken)
+    {
+        var scopes = string.Join(' ', accessToken.Scopes.Select(_ => _.Trim()).Where(_ => _.Length > 0));
+        if (scopes.Length > 0)
+        {
+            form["scope"] = scopes;
+        }
+
+        if (!string.IsNullOrWhiteSpace(accessToken.Resource))
+        {
+            form["resource"] = accessToken.Resource.Trim();
+        }
     }
 
     async Task<UserAccessTokenResult> RefreshUnderLock(string sessionId, string audience, C.ServiceAccessToken accessToken)
@@ -230,21 +238,30 @@ public sealed class UserAccessTokens(
             return UserAccessTokenResult.Failed(UserAccessTokenFailure.ProviderUnavailable);
         }
 
-        var session = refresh.Session;
-        if (StringProperty(root, "refresh_token") is { Length: > 0 } rotated && rotated != session.RefreshToken)
-        {
-            await store.Update(refresh.SessionId, session with { RefreshToken = rotated }, CancellationToken.None);
-        }
-
-        var now = timeProvider.GetUtcNow();
-        var lifetime = Lifetime(root);
-        var renewAt = now + lifetime - (lifetime > RenewalMargin * 2 ? RenewalMargin : lifetime / 2);
-        await store.SetAccessToken(refresh.SessionId, refresh.Audience, new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
+        await StoreRotatedRefreshToken(refresh, root);
+        await CacheAccessToken(refresh, root, token);
 
         // A logout during redemption must also prevent this request from forwarding the new token.
         return await store.Get(refresh.SessionId, CancellationToken.None) is null
             ? UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken)
             : UserAccessTokenResult.Success(token);
+    }
+
+    async Task StoreRotatedRefreshToken(RefreshRequest refresh, JsonElement root)
+    {
+        var session = refresh.Session;
+        if (StringProperty(root, "refresh_token") is { Length: > 0 } rotated && rotated != session.RefreshToken)
+        {
+            await store.Update(refresh.SessionId, session with { RefreshToken = rotated }, CancellationToken.None);
+        }
+    }
+
+    async Task CacheAccessToken(RefreshRequest refresh, JsonElement root, string token)
+    {
+        var now = timeProvider.GetUtcNow();
+        var lifetime = Lifetime(root);
+        var renewAt = RenewalTime(now, lifetime);
+        await store.SetAccessToken(refresh.SessionId, refresh.Audience, new CachedUserAccessToken(token, now + lifetime, renewAt), renewAt, CancellationToken.None);
     }
 
     async Task<UserAccessTokenResult> HandleRefreshRefusal(RefreshRequest refresh, HttpResponseMessage response, JsonElement root)
@@ -274,16 +291,7 @@ public sealed class UserAccessTokens(
             ["client_id"] = options.ClientId!,
         };
 
-        var scopes = string.Join(' ', accessToken.Scopes.Select(_ => _.Trim()).Where(_ => _.Length > 0));
-        if (scopes.Length > 0)
-        {
-            form["scope"] = scopes;
-        }
-
-        if (!string.IsNullOrWhiteSpace(accessToken.Resource))
-        {
-            form["resource"] = accessToken.Resource.Trim();
-        }
+        AddScopeAndResource(form, accessToken);
 
         if (provider.UsesClientAssertion)
         {

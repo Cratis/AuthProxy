@@ -141,21 +141,17 @@ internal sealed record IdentityAccountBinding
             return false;
         }
 
-        if (!TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.ProviderKey, out var providerKey)
-            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Issuer, out var issuer)
-            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Subject, out var subject))
+        if (!TryGetCanonicalClaims(reservedClaims, out var providerKey, out var issuer, out var subject))
         {
             return false;
         }
 
-        if (!CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
-            || !string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal))
+        if (!IsNormalizedIssuer(issuer, out var normalizedIssuer))
         {
             return false;
         }
 
-        if (!string.Equals(providerKey, principal.IdentityProvider, StringComparison.Ordinal)
-            || !string.Equals(subject, principal.UserId, StringComparison.Ordinal))
+        if (!NamesPrincipal(principal, providerKey, subject))
         {
             return false;
         }
@@ -163,6 +159,22 @@ internal sealed record IdentityAccountBinding
         binding = new(CanonicalKind, providerKey, normalizedIssuer, subject);
         return true;
     }
+
+    static bool TryGetCanonicalClaims(ClientPrincipalClaim[] reservedClaims, out string providerKey, out string issuer, out string subject)
+    {
+        issuer = subject = string.Empty;
+        return TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.ProviderKey, out providerKey)
+            && TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Issuer, out issuer)
+            && TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Subject, out subject);
+    }
+
+    static bool IsNormalizedIssuer(string issuer, out string normalizedIssuer) =>
+        CanonicalIssuer.TryNormalize(issuer, out normalizedIssuer)
+        && string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal);
+
+    static bool NamesPrincipal(ClientPrincipal principal, string providerKey, string subject) =>
+        string.Equals(providerKey, principal.IdentityProvider, StringComparison.Ordinal)
+        && string.Equals(subject, principal.UserId, StringComparison.Ordinal);
 
     static bool TryGetSingleExactClaim(IEnumerable<ClientPrincipalClaim> claims, string claimType, out string value)
     {
