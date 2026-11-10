@@ -10,6 +10,8 @@ public class when_the_service_authorizes_the_caller : given.a_caller_answered_by
     protected override Task<HttpResponseMessage> Respond(CancellationToken cancellationToken) =>
         Task.FromResult(Json(HttpStatusCode.OK, """{"IsAuthorized":true,"details":{"name":"n"}}"""));
 
+    async Task Because() => _outcome = await Call(CancellationToken.None);
+
     [Fact] void should_be_positive() => _outcome.Status.ShouldEqual(IdentityVerificationStatus.Positive);
     [Fact] void should_carry_the_details() => _outcome.Details["name"]!.GetValue<string>().ShouldEqual("n");
 }

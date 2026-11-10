@@ -15,6 +15,8 @@ public class when_the_service_does_not_answer_in_time : given.a_caller_answered_
         return Json(HttpStatusCode.OK, "{}");
     }
 
+    async Task Because() => _outcome = await Call(CancellationToken.None);
+
     [Fact] void should_be_indeterminate() => _outcome.Status.ShouldEqual(IdentityVerificationStatus.Indeterminate);
     [Fact] void should_explain_the_timeout() => _outcome.Reason.ShouldEqual(IdentityVerificationReason.TimedOut);
 }

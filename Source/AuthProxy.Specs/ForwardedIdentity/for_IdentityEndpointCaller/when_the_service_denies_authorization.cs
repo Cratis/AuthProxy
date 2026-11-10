@@ -10,6 +10,8 @@ public class when_the_service_denies_authorization : given.a_caller_answered_by_
     protected override Task<HttpResponseMessage> Respond(CancellationToken cancellationToken) =>
         Task.FromResult(Json(HttpStatusCode.OK, """{"isAuthorized":false,"isAuthenticated":true}"""));
 
+    async Task Because() => _outcome = await Call(CancellationToken.None);
+
     [Fact] void should_be_denied() => _outcome.Status.ShouldEqual(IdentityVerificationStatus.Denied);
     [Fact] void should_explain_the_denial() => _outcome.Reason.ShouldEqual(IdentityVerificationReason.NotAuthorized);
 }

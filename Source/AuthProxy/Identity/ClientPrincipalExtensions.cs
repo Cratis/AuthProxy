@@ -190,11 +190,17 @@ public static class ClientPrincipalExtensions
             .Concat(["anonymous", "authenticated"])
             .Distinct();
 
-    // The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
-    // get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
-    // own record of how the session was signed in and stays inside the proxy.
-    // A provider's own auth_time is never forwarded: the only one a receiver may see is the time AuthProxy
-    // validated and recorded for the session, carried inside the signed principal.
+    /// <summary>
+    /// The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
+    /// get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
+    /// own record of how the session was signed in and stays inside the proxy.
+    /// A provider's own auth_time is never forwarded: the only one a receiver may see is the time AuthProxy
+    /// validated and recorded for the session, carried inside the signed principal.
+    /// </summary>
+    /// <param name="user">The principal to forward.</param>
+    /// <param name="isCanonical">Whether the principal was resolved through a canonical identity.</param>
+    /// <param name="authenticationTime">The authentication time AuthProxy recorded for the session, if any.</param>
+    /// <returns>The claims a receiver may see.</returns>
     static IEnumerable<ClientPrincipalClaim> ResolveForwardedClaims(ClaimsPrincipal user, bool isCanonical, string? authenticationTime)
     {
         var claims = user.Claims

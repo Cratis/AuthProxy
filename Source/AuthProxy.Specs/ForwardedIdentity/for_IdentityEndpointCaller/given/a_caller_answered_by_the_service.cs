@@ -26,8 +26,6 @@ public class a_caller_answered_by_the_service : Specification
         _caller = new(clients, Substitute.For<ILogger<IdentityEndpointCaller>>(), signer);
     }
 
-    async Task Because() => _outcome = await Call(CancellationToken.None);
-
     protected Task<IdentityVerificationOutcome> Call(CancellationToken cancellationToken) =>
         _caller.Call(new("app", "https://backend.example", new() { UserId = "u" }, "tenant", "spec-caller", _timeout), cancellationToken);
 

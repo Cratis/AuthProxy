@@ -90,9 +90,15 @@ static class InviteCallbackCompletion
         };
     }
 
-    // Re-validate the capability exactly as the post-login exchange does before forwarding it. A
-    // capability that no longer validates is not answered here: the middleware already owns the
-    // expired/invalid answers, and the follow-up request reaches them unchanged.
+    /// <summary>
+    /// Re-validate the capability exactly as the post-login exchange does before forwarding it. A
+    /// capability that no longer validates is not answered here: the middleware already owns the
+    /// expired/invalid answers, and the follow-up request reaches them unchanged.
+    /// </summary>
+    /// <param name="context">The ticket-received context.</param>
+    /// <param name="logger">The logger to explain a refusal to.</param>
+    /// <param name="inviteToken">The pending invitation capability.</param>
+    /// <returns><see langword="true"/> when the capability is still valid.</returns>
     static async Task<bool> StillValidates(TicketReceivedContext context, ILogger logger, string inviteToken)
     {
         var httpContext = context.HttpContext;

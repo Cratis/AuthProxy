@@ -10,6 +10,8 @@ public class when_the_service_states_conflicting_verdicts : given.a_caller_answe
     protected override Task<HttpResponseMessage> Respond(CancellationToken cancellationToken) =>
         Task.FromResult(Json(HttpStatusCode.OK, """{"isAuthorized":true,"IsAuthenticated":false,"details":{"name":"n"}}"""));
 
+    async Task Because() => _outcome = await Call(CancellationToken.None);
+
     [Fact] void should_be_indeterminate() => _outcome.Status.ShouldEqual(IdentityVerificationStatus.Indeterminate);
     [Fact] void should_explain_the_conflict() => _outcome.Reason.ShouldEqual(IdentityVerificationReason.ConflictingVerdict);
     [Fact] void should_keep_the_details() => _outcome.Details["name"]!.GetValue<string>().ShouldEqual("n");

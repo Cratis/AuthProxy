@@ -89,32 +89,6 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
 
     static LogLevel FailureLevel(IdentityEndpointCall call) => call.DenialWillBeLogged ? LogLevel.Debug : LogLevel.Error;
 
-    async Task<IdentityVerificationOutcome> Exchange(HttpRequestMessage request, IdentityEndpointCall call, CancellationToken token)
-    {
-        var signing = signer.Sign(request, new(ForwardedIdentityFlow.IdentityDetails, call.ServiceName));
-        if (signing == ForwardedIdentitySigningOutcome.Refused)
-        {
-            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
-        }
-
-        using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
-        using var httpResponse = await client.SendAsync(request, token);
-
-        if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
-        {
-            logger.IdentityEndpointForbidden(call.ServiceName, call.LogIdentifier);
-            return IdentityVerificationOutcome.Denied(IdentityVerificationReason.Forbidden);
-        }
-
-        if (!httpResponse.IsSuccessStatusCode)
-        {
-            logger.IdentityEndpointUnsuccessful(call.ServiceName, (int)httpResponse.StatusCode, call.DenialWillBeLogged ? LogLevel.Debug : LogLevel.Warning);
-            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnsuccessfulStatusCode);
-        }
-
-        return await ReadSuccessfulResponse(httpResponse.Content, call.ServiceName, call.DenialWillBeLogged, token);
-    }
-
     /// <summary>
     /// Reads one boolean verdict property, ignoring the casing a service happens to serialize with.
     /// </summary>
@@ -147,6 +121,32 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
             (true, _) => IdentityVerificationOutcome.Positive(details),
             _ => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.NoVerdict, details)
         };
+    }
+
+    async Task<IdentityVerificationOutcome> Exchange(HttpRequestMessage request, IdentityEndpointCall call, CancellationToken token)
+    {
+        var signing = signer.Sign(request, new(ForwardedIdentityFlow.IdentityDetails, call.ServiceName));
+        if (signing == ForwardedIdentitySigningOutcome.Refused)
+        {
+            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
+        }
+
+        using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
+        using var httpResponse = await client.SendAsync(request, token);
+
+        if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
+        {
+            logger.IdentityEndpointForbidden(call.ServiceName, call.LogIdentifier);
+            return IdentityVerificationOutcome.Denied(IdentityVerificationReason.Forbidden);
+        }
+
+        if (!httpResponse.IsSuccessStatusCode)
+        {
+            logger.IdentityEndpointUnsuccessful(call.ServiceName, (int)httpResponse.StatusCode, call.DenialWillBeLogged ? LogLevel.Debug : LogLevel.Warning);
+            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnsuccessfulStatusCode);
+        }
+
+        return await ReadSuccessfulResponse(httpResponse.Content, call.ServiceName, call.DenialWillBeLogged, token);
     }
 
     bool TryAddOnBehalfHeaders(HttpRequestMessage request, string serviceName, OnBehalfContext? onBehalf)
