@@ -70,14 +70,20 @@ public static class TenantAuthenticationState
             return false;
         }
 
-        var returnUrl = NormalizeReturnUrl(currentReturnUri ?? properties.RedirectUri ?? "/");
-
         if (strategy != C.TenantSourceIdentifierResolverType.SubHost)
         {
             return false;
         }
 
-        return TryBuildSubHostRedirect(context, properties, tenantId, returnUrl, out redirectUri);
+        var returnUrl = NormalizeReturnUrl(currentReturnUri ?? properties.RedirectUri ?? "/");
+        var subHostRedirect = BuildSubHostRedirect(context.Request, properties, new HostLabel(tenantId), returnUrl);
+        if (subHostRedirect is null)
+        {
+            return false;
+        }
+
+        redirectUri = subHostRedirect;
+        return true;
     }
 
     /// <summary>
@@ -114,15 +120,17 @@ public static class TenantAuthenticationState
             return returnUrl;
         }
 
-        if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absoluteUri))
-        {
-            return absoluteUri.Scheme == Uri.UriSchemeHttp || absoluteUri.Scheme == Uri.UriSchemeHttps
-                ? RelativeRedirect.Resolve($"{absoluteUri.AbsolutePath}{absoluteUri.Query}")
-                : RelativeRedirect.ApplicationRoot;
-        }
-
-        return RelativeRedirect.Resolve($"/{returnUrl}");
+        return Uri.TryCreate(returnUrl, UriKind.Absolute, out var absoluteUri)
+            ? ReduceAbsoluteUrl(absoluteUri)
+            : RelativeRedirect.Resolve($"/{returnUrl}");
     }
+
+    static string ReduceAbsoluteUrl(Uri absoluteUri) =>
+        IsHttpScheme(absoluteUri)
+            ? RelativeRedirect.Resolve($"{absoluteUri.AbsolutePath}{absoluteUri.Query}")
+            : RelativeRedirect.ApplicationRoot;
+
+    static bool IsHttpScheme(Uri uri) => uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
 
     static bool TryReadTenantMetadata(AuthenticationProperties properties, out string tenantId, out C.TenantSourceIdentifierResolverType strategy)
     {
@@ -143,24 +151,21 @@ public static class TenantAuthenticationState
         return true;
     }
 
-    static bool TryBuildSubHostRedirect(HttpContext context, AuthenticationProperties properties, string tenantId, string returnUrl, out string redirectUri)
+    static string? BuildSubHostRedirect(HttpRequest request, AuthenticationProperties properties, HostLabel tenant, string returnUrl)
     {
-        redirectUri = string.Empty;
         if (!properties.Items.TryGetValue(SubHostParentHostStateKey, out var parentHost)
             || string.IsNullOrWhiteSpace(parentHost))
         {
-            return false;
+            return null;
         }
 
         var normalizedParentHost = parentHost.Trim().TrimStart('.');
-        if (!IsValidHostLabel(tenantId) || string.IsNullOrWhiteSpace(normalizedParentHost))
+        if (!tenant.IsValid || string.IsNullOrWhiteSpace(normalizedParentHost))
         {
-            return false;
+            return null;
         }
 
-        var targetHost = $"{tenantId}.{normalizedParentHost}";
-        redirectUri = BuildAbsoluteRedirectUri(context.Request, targetHost, returnUrl);
-        return true;
+        return BuildAbsoluteRedirectUri(request, tenant.Under(normalizedParentHost), returnUrl);
     }
 
     static AuthenticationProperties BuildChallengeProperties(HttpContext context, ITenantResolver tenantResolver, string redirectUri)
@@ -201,28 +206,5 @@ public static class TenantAuthenticationState
         };
 
         return builder.Uri.ToString();
-    }
-
-    static bool IsValidHostLabel(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        if (value.StartsWith('-') || value.EndsWith('-'))
-        {
-            return false;
-        }
-
-        foreach (var character in value)
-        {
-            if (!char.IsLetterOrDigit(character) && character != '-')
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 }
