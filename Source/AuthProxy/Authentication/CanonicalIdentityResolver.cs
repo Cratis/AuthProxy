@@ -232,29 +232,27 @@ public sealed class CanonicalIdentityResolver(IOptionsMonitor<C.Authentication> 
             return null;
         }
 
-        if (!TryGetSingleExactClaim(principal, CanonicalIdentityClaims.ProviderKey, out var providerKey))
+        if (!TryGetCanonicalClaims(principal, out var providerKey, out var issuer, out var subject)
+            || !IsNormalizedIssuer(issuer))
         {
             return null;
         }
 
-        if (!TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Issuer, out var issuer))
-        {
-            return null;
-        }
-
-        if (!TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Subject, out var subject))
-        {
-            return null;
-        }
-
-        if (!CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
-            || !string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        return new(providerKey, normalizedIssuer, subject);
+        return new(providerKey, issuer, subject);
     }
+
+    static bool TryGetCanonicalClaims(ClaimsPrincipal principal, out string providerKey, out string issuer, out string subject)
+    {
+        issuer = string.Empty;
+        subject = string.Empty;
+        return TryGetSingleExactClaim(principal, CanonicalIdentityClaims.ProviderKey, out providerKey)
+            && TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Issuer, out issuer)
+            && TryGetSingleExactClaim(principal, CanonicalIdentityClaims.Subject, out subject);
+    }
+
+    static bool IsNormalizedIssuer(string issuer) =>
+        CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
+        && string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal);
 
     static bool HasExpectedOAuthIssuer(C.CanonicalIdentity identity, string normalizedIssuer) =>
         CanonicalIssuer.TryNormalize(identity.Issuer, out var expectedIssuer)
