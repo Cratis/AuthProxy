@@ -52,17 +52,7 @@ public class TenantSelectionMiddleware(
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.User.Identity?.IsAuthenticated != true
-
-            // An on-behalf session acts in the one tenant its grant was confirmed for. Offering the actor a choice
-            // would be offering them the represented user's other tenants, which nobody granted.
-            || context.TryGetOnBehalf(out _))
-        {
-            await next(context);
-            return;
-        }
-
-        if (!TryGetSelectionOptions(config.CurrentValue, out var selectionOptions))
+        if (!AppliesTenantSelection(context, out var selectionOptions))
         {
             await next(context);
             return;
@@ -149,6 +139,17 @@ public class TenantSelectionMiddleware(
         context.Response.StatusCode = StatusCodes.Status302Found;
         context.Response.Headers.Location = RelativeRedirect.Resolve(context.GetPathAndQuery());
         return true;
+    }
+
+    bool AppliesTenantSelection(HttpContext context, out Tenancy.SelectionOptions selectionOptions)
+    {
+        selectionOptions = new();
+
+        // An on-behalf session acts in the one tenant its grant was confirmed for. Offering the actor a choice
+        // would be offering them the represented user's other tenants, which nobody granted.
+        return context.User.Identity?.IsAuthenticated == true
+            && !context.TryGetOnBehalf(out _)
+            && TryGetSelectionOptions(config.CurrentValue, out selectionOptions);
     }
 
     async Task OfferTenantSelection(HttpContext context, TenantOptionsResult tenantOptionsResult)
