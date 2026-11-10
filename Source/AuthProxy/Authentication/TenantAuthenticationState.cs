@@ -65,36 +65,19 @@ public static class TenantAuthenticationState
     {
         redirectUri = string.Empty;
 
-        if (!properties.Items.TryGetValue(TenantIdStateKey, out var tenantId)
-            || string.IsNullOrWhiteSpace(tenantId)
-            || !properties.Items.TryGetValue(StrategyStateKey, out var strategyText)
-            || !Enum.TryParse<C.TenantSourceIdentifierResolverType>(strategyText, true, out var strategy))
+        if (!TryReadTenantMetadata(properties, out var tenantId, out var strategy))
         {
             return false;
         }
 
         var returnUrl = NormalizeReturnUrl(currentReturnUri ?? properties.RedirectUri ?? "/");
 
-        if (strategy == C.TenantSourceIdentifierResolverType.SubHost)
+        if (strategy != C.TenantSourceIdentifierResolverType.SubHost)
         {
-            if (!properties.Items.TryGetValue(SubHostParentHostStateKey, out var parentHost)
-                || string.IsNullOrWhiteSpace(parentHost))
-            {
-                return false;
-            }
-
-            var normalizedParentHost = parentHost.Trim().TrimStart('.');
-            if (!IsValidHostLabel(tenantId) || string.IsNullOrWhiteSpace(normalizedParentHost))
-            {
-                return false;
-            }
-
-            var targetHost = $"{tenantId}.{normalizedParentHost}";
-            redirectUri = BuildAbsoluteRedirectUri(context.Request.Scheme, targetHost, returnUrl);
-            return true;
+            return false;
         }
 
-        return false;
+        return TryBuildSubHostRedirect(context, properties, tenantId, returnUrl, out redirectUri);
     }
 
     /// <summary>
@@ -141,6 +124,45 @@ public static class TenantAuthenticationState
         return RelativeRedirect.Resolve($"/{returnUrl}");
     }
 
+    static bool TryReadTenantMetadata(AuthenticationProperties properties, out string tenantId, out C.TenantSourceIdentifierResolverType strategy)
+    {
+        tenantId = string.Empty;
+        strategy = default;
+        if (!properties.Items.TryGetValue(TenantIdStateKey, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (!properties.Items.TryGetValue(StrategyStateKey, out var strategyText)
+            || !Enum.TryParse(strategyText, true, out strategy))
+        {
+            return false;
+        }
+
+        tenantId = value;
+        return true;
+    }
+
+    static bool TryBuildSubHostRedirect(HttpContext context, AuthenticationProperties properties, string tenantId, string returnUrl, out string redirectUri)
+    {
+        redirectUri = string.Empty;
+        if (!properties.Items.TryGetValue(SubHostParentHostStateKey, out var parentHost)
+            || string.IsNullOrWhiteSpace(parentHost))
+        {
+            return false;
+        }
+
+        var normalizedParentHost = parentHost.Trim().TrimStart('.');
+        if (!IsValidHostLabel(tenantId) || string.IsNullOrWhiteSpace(normalizedParentHost))
+        {
+            return false;
+        }
+
+        var targetHost = $"{tenantId}.{normalizedParentHost}";
+        redirectUri = BuildAbsoluteRedirectUri(context.Request, targetHost, returnUrl);
+        return true;
+    }
+
     static AuthenticationProperties BuildChallengeProperties(HttpContext context, ITenantResolver tenantResolver, string redirectUri)
     {
         var properties = new AuthenticationProperties
@@ -166,13 +188,13 @@ public static class TenantAuthenticationState
         return properties;
     }
 
-    static string BuildAbsoluteRedirectUri(string scheme, string host, string returnUrl)
+    static string BuildAbsoluteRedirectUri(HttpRequest request, string host, string returnUrl)
     {
         var queryStart = returnUrl.IndexOf('?');
         var path = queryStart >= 0 ? returnUrl[..queryStart] : returnUrl;
         var query = queryStart >= 0 ? returnUrl[(queryStart + 1)..] : string.Empty;
 
-        var builder = new UriBuilder(scheme, host)
+        var builder = new UriBuilder(request.Scheme, host)
         {
             Path = string.IsNullOrWhiteSpace(path) ? "/" : path,
             Query = query,

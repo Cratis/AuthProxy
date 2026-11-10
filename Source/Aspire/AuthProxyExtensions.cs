@@ -750,12 +750,7 @@ public static partial class AuthProxyExtensions
             .WithEnvironment($"{prefix}__ClientId", clientId)
             .WithEnvironment($"{prefix}__ClientSecret", clientSecret);
 
-        var scopeList = scopes?.ToList() ?? [];
-        for (var i = 0; i < scopeList.Count; i++)
-        {
-            builder.WithEnvironment($"{prefix}__Scopes__{i}", scopeList[i]);
-        }
-
+        WriteProviderScopes(builder, prefix, scopes);
         return builder;
     }
 
@@ -839,27 +834,9 @@ public static partial class AuthProxyExtensions
             .WithEnvironment($"{prefix}__ClientId", clientId)
             .WithEnvironment($"{prefix}__ClientSecret", clientSecret);
 
-        var scopeList = scopes?.ToList() ?? [];
-        for (var i = 0; i < scopeList.Count; i++)
-        {
-            builder.WithEnvironment($"{prefix}__Scopes__{i}", scopeList[i]);
-        }
-
-        if (claimMappings is not null)
-        {
-            foreach (var (claimType, jsonField) in claimMappings)
-            {
-                builder.WithEnvironment($"{prefix}__ClaimMappings__{claimType}", jsonField);
-            }
-        }
-
-        if (authorizationParameters is not null)
-        {
-            foreach (var (parameter, value) in authorizationParameters)
-            {
-                builder.WithEnvironment($"{prefix}__AuthorizationParameters__{parameter}", value);
-            }
-        }
+        WriteProviderScopes(builder, prefix, scopes);
+        WriteProviderDictionary(builder, $"{prefix}__ClaimMappings", claimMappings);
+        WriteProviderDictionary(builder, $"{prefix}__AuthorizationParameters", authorizationParameters);
 
         return builder;
     }
@@ -1518,6 +1495,28 @@ public static partial class AuthProxyExtensions
         return builder.WithEnvironment(context =>
             context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl"] =
                 ReferenceExpression.Create($"{endpoint}{route}"));
+    }
+
+    static void WriteProviderScopes<T>(IResourceBuilder<T> builder, string prefix, IEnumerable<string>? scopes)
+        where T : IResourceWithEnvironment
+    {
+        var scopeList = scopes?.ToList() ?? [];
+        for (var i = 0; i < scopeList.Count; i++)
+        {
+            builder.WithEnvironment($"{prefix}__Scopes__{i}", scopeList[i]);
+        }
+    }
+
+    static void WriteProviderDictionary<T>(IResourceBuilder<T> builder, string prefix, IDictionary<string, string>? values)
+        where T : IResourceWithEnvironment
+    {
+        if (values is not null)
+        {
+            foreach (var (key, value) in values)
+            {
+                builder.WithEnvironment($"{prefix}__{key}", value);
+            }
+        }
     }
 
     static IResourceBuilder<T> AddTenantResolution<T>(IResourceBuilder<T> builder, string strategy)

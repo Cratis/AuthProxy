@@ -95,49 +95,68 @@ internal sealed record IdentityAccountBinding
             .Where(claim => claim.Type.StartsWith(ReservedClaimPrefix, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
-        if (reservedClaims.Length == 0)
-        {
-            // A legacy binding is used as a shared memory-cache and per-account lock key in
-            // IdentityDetailsResolver, so an unidentifiable user identifier must never become a reusable
-            // one: an empty, whitespace-only, or untrimmed value is not a stable identity, and two
-            // different principals that both fail to supply a real one would otherwise collide on the same
-            // key and be handed each other's cached identity result. Mirroring the canonical guard above
-            // (TryGetSingleExactClaim), this fails closed rather than silently trimming - TryCreate returns
-            // false, the resolver sees no reusable binding, and the request resolves fresh against the
-            // identity endpoints every time instead of ever reading from or writing to the shared cache.
-            if (string.IsNullOrWhiteSpace(principal.UserId)
-                || !string.Equals(principal.UserId, principal.UserId.Trim(), StringComparison.Ordinal))
-            {
-                binding = null!;
-                return false;
-            }
+        return reservedClaims.Length == 0
+            ? TryCreateLegacy(principal, configuredProviderCount, out binding)
+            : TryCreateCanonical(principal, reservedClaims, out binding);
+    }
 
-            // The same user identifier may be issued by more than one identity provider, so the provider is
-            // part of the binding. A browser session names it by the scheme it signed in with, because the identity
-            // provider of an OIDC session is the same for every scheme. Without one, the identifier only names an
-            // account when a single provider exists.
-            var provider = principal.AccountProvider ?? principal.IdentityProvider;
-            var hasProvider = !string.IsNullOrWhiteSpace(provider);
-            if (!hasProvider && configuredProviderCount > 1)
-            {
-                binding = null!;
-                return false;
-            }
-
-            binding = new(LegacyKind, hasProvider ? provider : string.Empty, string.Empty, principal.UserId);
-            return true;
-        }
-
-        if (reservedClaims.Length != CanonicalIdentityClaims.All.Length
-            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.ProviderKey, out var providerKey)
-            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Issuer, out var issuer)
-            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Subject, out var subject)
-            || !CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
-            || !string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal)
-            || !string.Equals(providerKey, principal.IdentityProvider, StringComparison.Ordinal)
-            || !string.Equals(subject, principal.UserId, StringComparison.Ordinal))
+    static bool TryCreateLegacy(ClientPrincipal principal, int configuredProviderCount, out IdentityAccountBinding binding)
+    {
+        // A legacy binding is used as a shared memory-cache and per-account lock key in
+        // IdentityDetailsResolver, so an unidentifiable user identifier must never become a reusable
+        // one: an empty, whitespace-only, or untrimmed value is not a stable identity, and two
+        // different principals that both fail to supply a real one would otherwise collide on the same
+        // key and be handed each other's cached identity result. Mirroring the canonical guard above
+        // (TryGetSingleExactClaim), this fails closed rather than silently trimming - TryCreate returns
+        // false, the resolver sees no reusable binding, and the request resolves fresh against the
+        // identity endpoints every time instead of ever reading from or writing to the shared cache.
+        if (string.IsNullOrWhiteSpace(principal.UserId)
+            || !string.Equals(principal.UserId, principal.UserId.Trim(), StringComparison.Ordinal))
         {
             binding = null!;
+            return false;
+        }
+
+        // The same user identifier may be issued by more than one identity provider, so the provider is
+        // part of the binding. A browser session names it by the scheme it signed in with, because the identity
+        // provider of an OIDC session is the same for every scheme. Without one, the identifier only names an
+        // account when a single provider exists.
+        var provider = principal.AccountProvider ?? principal.IdentityProvider;
+        var hasProvider = !string.IsNullOrWhiteSpace(provider);
+        if (!hasProvider && configuredProviderCount > 1)
+        {
+            binding = null!;
+            return false;
+        }
+
+        binding = new(LegacyKind, hasProvider ? provider : string.Empty, string.Empty, principal.UserId);
+        return true;
+    }
+
+    static bool TryCreateCanonical(ClientPrincipal principal, ClientPrincipalClaim[] reservedClaims, out IdentityAccountBinding binding)
+    {
+        binding = null!;
+        if (reservedClaims.Length != CanonicalIdentityClaims.All.Length)
+        {
+            return false;
+        }
+
+        if (!TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.ProviderKey, out var providerKey)
+            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Issuer, out var issuer)
+            || !TryGetSingleExactClaim(reservedClaims, CanonicalIdentityClaims.Subject, out var subject))
+        {
+            return false;
+        }
+
+        if (!CanonicalIssuer.TryNormalize(issuer, out var normalizedIssuer)
+            || !string.Equals(issuer, normalizedIssuer, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!string.Equals(providerKey, principal.IdentityProvider, StringComparison.Ordinal)
+            || !string.Equals(subject, principal.UserId, StringComparison.Ordinal))
+        {
             return false;
         }
 
@@ -148,11 +167,13 @@ internal sealed record IdentityAccountBinding
     static bool TryGetSingleExactClaim(IEnumerable<ClientPrincipalClaim> claims, string claimType, out string value)
     {
         var matches = claims.Where(claim => string.Equals(claim.Type, claimType, StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (matches.Length != 1
-            || !string.Equals(matches[0].Type, claimType, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(matches[0].Value)
-            || !string.Equals(matches[0].Value, matches[0].Value.Trim(), StringComparison.Ordinal)
-            || matches[0].Value.Length > 2048)
+        if (matches.Length != 1 || !string.Equals(matches[0].Type, claimType, StringComparison.Ordinal))
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        if (!IsExactClaimValue(matches[0].Value))
         {
             value = string.Empty;
             return false;
@@ -161,4 +182,9 @@ internal sealed record IdentityAccountBinding
         value = matches[0].Value;
         return true;
     }
+
+    static bool IsExactClaimValue(string value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && string.Equals(value, value.Trim(), StringComparison.Ordinal)
+        && value.Length <= 2048;
 }

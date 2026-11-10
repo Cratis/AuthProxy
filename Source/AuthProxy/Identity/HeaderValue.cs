@@ -147,15 +147,13 @@ public static class HeaderValue
 
             if (character == '%')
             {
-                if (index + 2 >= encoded.Length
-                    || !TryParseHexDigit(encoded[index + 1], out var high)
-                    || !TryParseHexDigit(encoded[index + 2], out var low))
+                if (!TryReadEscapedOctet(encoded, index, out var octet))
                 {
                     decoded = original;
                     return false;
                 }
 
-                octets[count++] = (byte)((high << 4) | low);
+                octets[count++] = octet;
                 index += 2;
             }
             else if (character < 0x80)
@@ -177,6 +175,24 @@ public static class HeaderValue
         }
 
         decoded = new string(characters, 0, written);
+        return true;
+    }
+
+    static bool TryReadEscapedOctet(ReadOnlySpan<char> encoded, int index, out byte octet)
+    {
+        octet = 0;
+        if (index + 2 >= encoded.Length)
+        {
+            return false;
+        }
+
+        if (!TryParseHexDigit(encoded[index + 1], out var high)
+            || !TryParseHexDigit(encoded[index + 2], out var low))
+        {
+            return false;
+        }
+
+        octet = (byte)((high << 4) | low);
         return true;
     }
 

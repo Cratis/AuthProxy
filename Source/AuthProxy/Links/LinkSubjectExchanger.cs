@@ -51,8 +51,7 @@ public class LinkSubjectExchanger(
             return LinkExchangeResult.Failed;
         }
 
-        if (!properties.Items.TryGetValue(LinkMiddleware.LinkTokenPropertyKey, out var linkToken)
-            || string.IsNullOrWhiteSpace(linkToken))
+        if (!TryReadLinkToken(properties, out var linkToken))
         {
             logger.LinkTokenMissing();
             return LinkExchangeResult.Failed;
@@ -60,27 +59,14 @@ public class LinkSubjectExchanger(
 
         var canonicalResolution = canonicalIdentityResolver?.Resolve(principal, scheme ?? principal?.Identity?.AuthenticationType)
             ?? CanonicalIdentityResolution.SanitizedLegacy(principal);
-        if (canonicalResolution.IsConfigured && (!canonicalResolution.Succeeded || canonicalResolution.Identity is null))
+        if (!HasUsableIdentity(canonicalResolution))
         {
             return LinkExchangeResult.Failed;
         }
 
-        var subject = canonicalResolution.Identity?.Subject
-            ?? principal?.FindFirst("sub")?.Value
-            ?? principal?.FindFirst("oid")?.Value
-            ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? principal?.FindFirst("id")?.Value
-            ?? string.Empty;
+        var subject = SubjectOf(canonicalResolution, principal);
 
-        // The scheme names the provider that was actually challenged — authoritative over anything sniffed
-        // from claims, which for some providers bottoms out in the meaningless "AuthenticationTypes.Federation".
-        var identityProvider = canonicalResolution.Identity?.ProviderKey
-            ?? OidcProviderScheme.NameFromScheme(config.CurrentValue.Authentication, scheme)
-            ?? principal?.FindFirst("iss")?.Value
-            ?? principal?.FindFirst("identity_provider")?.Value
-            ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
-            ?? principal?.Identity?.AuthenticationType
-            ?? string.Empty;
+        var identityProvider = IdentityProviderOf(canonicalResolution, principal, scheme);
 
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -101,6 +87,39 @@ public class LinkSubjectExchanger(
             })
             : JsonContent.Create(new { subject, identityProvider });
 
+        return await Send(client, request, exchangeUrl);
+    }
+
+    static bool TryReadLinkToken(AuthenticationProperties properties, out string? linkToken) =>
+        properties.Items.TryGetValue(LinkMiddleware.LinkTokenPropertyKey, out linkToken)
+        && !string.IsNullOrWhiteSpace(linkToken);
+
+    static bool HasUsableIdentity(CanonicalIdentityResolution resolution) =>
+        !resolution.IsConfigured || (resolution.Succeeded && resolution.Identity is not null);
+
+    static string SubjectOf(CanonicalIdentityResolution resolution, ClaimsPrincipal? principal) =>
+        resolution.Identity?.Subject
+        ?? principal?.FindFirst("sub")?.Value
+        ?? principal?.FindFirst("oid")?.Value
+        ?? principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? principal?.FindFirst("id")?.Value
+        ?? string.Empty;
+
+    string IdentityProviderOf(CanonicalIdentityResolution resolution, ClaimsPrincipal? principal, string? scheme)
+    {
+        // The scheme names the provider that was actually challenged — authoritative over anything sniffed
+        // from claims, which for some providers bottoms out in the meaningless "AuthenticationTypes.Federation".
+        return resolution.Identity?.ProviderKey
+            ?? OidcProviderScheme.NameFromScheme(config.CurrentValue.Authentication, scheme)
+            ?? principal?.FindFirst("iss")?.Value
+            ?? principal?.FindFirst("identity_provider")?.Value
+            ?? principal?.FindFirst("http://schemas.microsoft.com/accesscontrolservice/2010/07/claims/identityprovider")?.Value
+            ?? principal?.Identity?.AuthenticationType
+            ?? string.Empty;
+    }
+
+    async Task<LinkExchangeResult> Send(HttpClient client, HttpRequestMessage request, string exchangeUrl)
+    {
         HttpResponseMessage response;
         try
         {

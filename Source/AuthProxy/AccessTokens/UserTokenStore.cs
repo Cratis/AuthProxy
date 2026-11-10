@@ -98,7 +98,7 @@ public sealed class UserTokenStore(
 
     /// <inheritdoc/>
     public Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken) =>
-        SetAudienceEntry(sessionId, audience, AccessTokenKey(sessionId, audience), token, renewAt, cancellationToken);
+        SetAudienceEntry(new AudienceEntry(sessionId, audience, AccessTokenKey(sessionId, audience), renewAt), token, cancellationToken);
 
     /// <inheritdoc/>
     public async Task<bool> IsRefreshRejected(string sessionId, string audience, CancellationToken cancellationToken) =>
@@ -108,7 +108,7 @@ public sealed class UserTokenStore(
 
     /// <inheritdoc/>
     public Task SetRefreshRejected(string sessionId, string audience, DateTimeOffset retryAt, CancellationToken cancellationToken) =>
-        SetAudienceEntry(sessionId, audience, RefreshRejectionKey(sessionId, audience), new RefreshRejection(retryAt), retryAt, cancellationToken);
+        SetAudienceEntry(new AudienceEntry(sessionId, audience, RefreshRejectionKey(sessionId, audience), retryAt), new RefreshRejection(retryAt), cancellationToken);
 
     static string SessionKey(string sessionId) => $"{KeyPrefix}{Hash(sessionId)}";
 
@@ -124,8 +124,10 @@ public sealed class UserTokenStore(
     /// <returns>The derived key.</returns>
     static string Hash(string value) => WebEncoders.Base64UrlEncode(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
-    async Task SetAudienceEntry<T>(string sessionId, string audience, string key, T value, DateTimeOffset expiresAt, CancellationToken cancellationToken)
+    async Task SetAudienceEntry<T>(AudienceEntry entry, T value, CancellationToken cancellationToken)
     {
+        var sessionId = entry.SessionId;
+        var audience = entry.Audience;
         var mutationLock = MutationLock(sessionId);
         await mutationLock.WaitAsync(cancellationToken);
         try
@@ -142,9 +144,9 @@ public sealed class UserTokenStore(
                 await Write(SessionKey(sessionId), stored with { Audiences = [.. stored.Audiences, audience] }, SessionEntryOptions(stored.ExpiresAt), cancellationToken);
             }
 
-            var expiry = stored.ExpiresAt is { } sessionExpiry && sessionExpiry < expiresAt ? sessionExpiry : expiresAt;
+            var expiry = stored.ExpiresAt is { } sessionExpiry && sessionExpiry < entry.ExpiresAt ? sessionExpiry : entry.ExpiresAt;
             await Write(
-                key,
+                entry.Key,
                 value,
                 new DistributedCacheEntryOptions { AbsoluteExpiration = expiry },
                 cancellationToken);
@@ -193,6 +195,8 @@ public sealed class UserTokenStore(
             return null;
         }
     }
+
+    sealed record AudienceEntry(string SessionId, string Audience, string Key, DateTimeOffset ExpiresAt);
 
     sealed record StoredSession(string Scheme, string RefreshToken, string[] Audiences, DateTimeOffset? ExpiresAt);
 

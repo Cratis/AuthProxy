@@ -44,9 +44,13 @@ public class AccessTokenForwardingMiddleware(
     {
         var proxy = context.Features.Get<IReverseProxyFeature>();
         if (proxy is null
-            || proxy.Route.Config.AuthorizationPolicy == MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy
-            || !TryGetAccessToken(proxy, out var serviceName, out var accessToken)
-            || !IsSessionRequest(context))
+            || proxy.Route.Config.AuthorizationPolicy == MicroserviceReverseProxyConfigProvider.AnonymousAuthorizationPolicy)
+        {
+            await next(context);
+            return;
+        }
+
+        if (!TryGetAccessToken(proxy, out var serviceName, out var accessToken) || !IsSessionRequest(context))
         {
             await next(context);
             return;
@@ -72,9 +76,7 @@ public class AccessTokenForwardingMiddleware(
 
         accessToken.DestinationBinding = proxy.Cluster.Config.Metadata![MicroserviceReverseProxyConfigProvider.DestinationMetadataKey];
 
-        var result = UserTokenSessions.Of(context) is { } sessionId
-            ? await tokens.GetFor(sessionId, accessToken, context.RequestAborted)
-            : UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken);
+        var result = await GetToken(context, tokens, accessToken);
 
         if (!result.Succeeded)
         {
@@ -94,11 +96,18 @@ public class AccessTokenForwardingMiddleware(
         accessToken = default!;
 
         var metadata = proxy.Cluster.Config.Metadata;
-        if (metadata is null
-            || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.ServiceMetadataKey, out var key)
-            || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.EndpointMetadataKey, out var endpoint)
-            || endpoint != MicroserviceReverseProxyConfigProvider.BackendEndpoint
-            || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.AccessTokenMetadataKey, out var policy))
+        if (metadata is null || !metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.ServiceMetadataKey, out var key))
+        {
+            return false;
+        }
+
+        if (!metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.EndpointMetadataKey, out var endpoint)
+            || endpoint != MicroserviceReverseProxyConfigProvider.BackendEndpoint)
+        {
+            return false;
+        }
+
+        if (!metadata.TryGetValue(MicroserviceReverseProxyConfigProvider.AccessTokenMetadataKey, out var policy))
         {
             return false;
         }
@@ -107,6 +116,11 @@ public class AccessTokenForwardingMiddleware(
         accessToken = JsonSerializer.Deserialize<C.ServiceAccessToken>(policy)!;
         return true;
     }
+
+    static async Task<UserAccessTokenResult> GetToken(HttpContext context, IUserAccessTokens tokens, C.ServiceAccessToken accessToken) =>
+        UserTokenSessions.Of(context) is { } sessionId
+            ? await tokens.GetFor(sessionId, accessToken, context.RequestAborted)
+            : UserAccessTokenResult.Failed(UserAccessTokenFailure.NoRefreshToken);
 
     static bool HasBoundDestinations(IReverseProxyFeature proxy) =>
         proxy.Cluster.Config.Metadata!.TryGetValue(MicroserviceReverseProxyConfigProvider.DestinationMetadataKey, out var destinationId)

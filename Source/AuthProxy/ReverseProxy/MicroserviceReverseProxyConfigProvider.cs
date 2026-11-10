@@ -187,37 +187,40 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
         // declares hosts or a path prefix asked to be reached only through them, so it gets no catch-all.
         if (catchAll is not null)
         {
-            var (name, ms) = (catchAll, services[catchAll]);
-            var key = name.ToLowerInvariant();
-
-            if (ms.Frontend is not null)
-            {
-                routes.Add(new RouteConfig
-                {
-                    RouteId = $"{key}-frontend-catchall-default",
-                    Metadata = ServiceMetadata(name),
-                    ClusterId = FrontendClusterId(key),
-                    AuthorizationPolicy = "default",
-                    Match = new RouteMatch { Path = "/{**catch-all}" },
-                    Order = 100,
-                });
-            }
-            else if (ms.Backend is not null)
-            {
-                routes.Add(new RouteConfig
-                {
-                    RouteId = $"{key}-backend-catchall-default",
-                    Metadata = ServiceMetadata(name),
-                    ClusterId = BackendClusterId(key),
-                    AuthorizationPolicy = "default",
-                    Match = new RouteMatch { Path = "/{**catch-all}" },
-                    Order = 100,
-                });
-            }
+            routes.AddRange(DefaultRoutes(catchAll, services[catchAll]));
         }
 
         routes.AddRange(IdentityEndpointRoutes(routes).ToArray());
         return routes;
+    }
+
+    static IEnumerable<RouteConfig> DefaultRoutes(string name, C.Service service)
+    {
+        var key = name.ToLowerInvariant();
+        if (service.Frontend is not null)
+        {
+            yield return new RouteConfig
+            {
+                RouteId = $"{key}-frontend-catchall-default",
+                Metadata = ServiceMetadata(name),
+                ClusterId = FrontendClusterId(key),
+                AuthorizationPolicy = "default",
+                Match = new RouteMatch { Path = "/{**catch-all}" },
+                Order = 100,
+            };
+        }
+        else if (service.Backend is not null)
+        {
+            yield return new RouteConfig
+            {
+                RouteId = $"{key}-backend-catchall-default",
+                Metadata = ServiceMetadata(name),
+                ClusterId = BackendClusterId(key),
+                AuthorizationPolicy = "default",
+                Match = new RouteMatch { Path = "/{**catch-all}" },
+                Order = 100,
+            };
+        }
     }
 
     static IEnumerable<RouteConfig> IdentityEndpointRoutes(IEnumerable<RouteConfig> routes)
@@ -309,22 +312,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             // Mirror the authenticated split: /api goes to the backend, anything else to the frontend,
             // falling back to whichever endpoint the service actually declares.
-            var prefix = ServiceRoutes.PathPrefixOf(service);
-            var relativePath = new PathString(path);
-            if (prefix is not null && relativePath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase, out var remaining))
-            {
-                relativePath = remaining;
-            }
-
-            var prefersBackend = relativePath.StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);
-            var clusterId = (prefersBackend, service.Backend, service.Frontend) switch
-            {
-                (true, not null, _) => BackendClusterId(microserviceKey),
-                (false, _, not null) => FrontendClusterId(microserviceKey),
-                (_, not null, null) => BackendClusterId(microserviceKey),
-                (_, null, not null) => FrontendClusterId(microserviceKey),
-                _ => null,
-            };
+            var clusterId = AnonymousClusterId(service, microserviceKey, path, out var prefix);
 
             // A service entry does not have to declare an endpoint — the lobby's registration service is
             // configured that way — and one with nothing to forward to produces no route. Claiming only
@@ -345,9 +333,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
             // An anonymous path below a stripped prefix is forwarded the way the rest of the prefix is, so the
             // service sees one consistent path shape whether or not the caller has a session.
-            var stripsPrefix = service.StripPathPrefix
-                && prefix is not null
-                && new PathString(path).StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase);
+            var stripPrefix = AnonymousStripPrefix(service, prefix, path);
 
             yield return new RouteConfig
             {
@@ -356,12 +342,37 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                 AuthorizationPolicy = AnonymousAuthorizationPolicy,
                 Match = new RouteMatch { Path = $"{path}/{{**catch-all}}" },
                 Order = 0,
-                Metadata = RouteMetadata(serviceName, stripsPrefix ? prefix : null, passing.Contains(path)),
+                Metadata = RouteMetadata(serviceName, stripPrefix, passing.Contains(path)),
             };
 
             index++;
         }
     }
+
+    static string? AnonymousClusterId(C.Service service, string microserviceKey, string path, out string? prefix)
+    {
+        prefix = ServiceRoutes.PathPrefixOf(service);
+        var relativePath = new PathString(path);
+        if (prefix is not null && relativePath.StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase, out var remaining))
+        {
+            relativePath = remaining;
+        }
+
+        var prefersBackend = relativePath.StartsWithSegments(ApiPathPrefix, StringComparison.OrdinalIgnoreCase);
+        return (prefersBackend, service.Backend, service.Frontend) switch
+        {
+            (true, not null, _) => BackendClusterId(microserviceKey),
+            (false, _, not null) => FrontendClusterId(microserviceKey),
+            (_, not null, null) => BackendClusterId(microserviceKey),
+            (_, null, not null) => FrontendClusterId(microserviceKey),
+            _ => null,
+        };
+    }
+
+    static string? AnonymousStripPrefix(C.Service service, string? prefix, string path) =>
+        service.StripPathPrefix && prefix is not null && new PathString(path).StartsWithSegments(prefix, StringComparison.OrdinalIgnoreCase)
+            ? prefix
+            : null;
 
     /// <summary>
     /// Builds the routes for a service's declared <see cref="C.Service.PathPrefix"/>.
@@ -387,15 +398,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
 
         if (service.Backend is not null)
         {
-            yield return new RouteConfig
-            {
-                RouteId = $"{microserviceKey}-prefix-api",
-                ClusterId = BackendClusterId(microserviceKey),
-                AuthorizationPolicy = "default",
-                Match = new RouteMatch { Path = $"{prefix}{ApiPathPrefix}/{{**catch-all}}", Hosts = onHosts ? hosts : null },
-                Order = onHosts ? HostAndPrefixApiOrder : PrefixApiOrder,
-                Metadata = metadata,
-            };
+            yield return PrefixApiRoute(microserviceKey, prefix, hosts, metadata);
         }
 
         if (CatchAllClusterId(microserviceKey, service) is { } clusterId)
@@ -411,6 +414,16 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             };
         }
     }
+
+    static RouteConfig PrefixApiRoute(string microserviceKey, string prefix, string[] hosts, Dictionary<string, string> metadata) => new()
+    {
+        RouteId = $"{microserviceKey}-prefix-api",
+        ClusterId = BackendClusterId(microserviceKey),
+        AuthorizationPolicy = "default",
+        Match = new RouteMatch { Path = $"{prefix}{ApiPathPrefix}/{{**catch-all}}", Hosts = hosts.Length > 0 ? hosts : null },
+        Order = hosts.Length > 0 ? HostAndPrefixApiOrder : PrefixApiOrder,
+        Metadata = metadata,
+    };
 
     /// <summary>
     /// Builds the routes for a service's declared <see cref="C.Service.Hosts"/>, when it declares no path prefix.
@@ -599,7 +612,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
                     Metadata = metadata,
                 };
                 clusters.Add(ms.Backend.StickyRouting is { Enabled: true } sticky
-                    ? Stick(cluster, key, destinationId, ms.Backend, sticky)
+                    ? Stick(cluster, new StickyBackend(key, destinationId, ms.Backend, sticky))
                     : cluster);
             }
 
@@ -626,23 +639,20 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
     /// data-protected affinity cookie, and replicas that fail are taken out of rotation.
     /// </summary>
     /// <param name="cluster">The non-sticky backend cluster.</param>
-    /// <param name="key">The lower-cased service key.</param>
-    /// <param name="destinationId">The id of the configured destination.</param>
-    /// <param name="backend">The backend endpoint.</param>
-    /// <param name="sticky">The sticky routing settings.</param>
+    /// <param name="backend">The backend's service, destination and sticky routing settings.</param>
     /// <returns>The sticky cluster.</returns>
-    static ClusterConfig Stick(ClusterConfig cluster, string key, string destinationId, C.ServiceEndpoint backend, C.StickyRouting sticky) => cluster with
+    static ClusterConfig Stick(ClusterConfig cluster, StickyBackend backend) => cluster with
     {
         Destinations = new Dictionary<string, DestinationConfig>
         {
-            [destinationId] = new()
+            [backend.DestinationId] = new()
             {
-                Address = backend.BaseUrl,
+                Address = backend.Endpoint.BaseUrl,
                 Metadata = new Dictionary<string, string>
                 {
-                    [ServiceMetadataKey] = key,
-                    [ReplicaHostMetadataKey] = ReplicaHostOf(backend, sticky),
-                    [ReplicaRefreshMetadataKey] = sticky.RefreshInterval.ToString("c", CultureInfo.InvariantCulture),
+                    [ServiceMetadataKey] = backend.ServiceKey,
+                    [ReplicaHostMetadataKey] = ReplicaHostOf(backend.Endpoint, backend.Settings),
+                    [ReplicaRefreshMetadataKey] = backend.Settings.RefreshInterval.ToString("c", CultureInfo.InvariantCulture),
                 },
             },
         },
@@ -651,7 +661,7 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             Enabled = true,
             Policy = "Cookie",
             FailurePolicy = "Redistribute",
-            AffinityKeyName = Cookies.AffinityFor(key),
+            AffinityKeyName = Cookies.AffinityFor(backend.ServiceKey),
             Cookie = new SessionAffinityCookieConfig
             {
                 Path = "/",
@@ -800,4 +810,6 @@ public class MicroserviceReverseProxyConfigProvider : IProxyConfigProvider, IDis
             _inner.Update(routes, clusters);
         }
     }
+
+    sealed record StickyBackend(string ServiceKey, string DestinationId, C.ServiceEndpoint Endpoint, C.StickyRouting Settings);
 }

@@ -195,7 +195,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
             return BearerTokenValidation.Refused(BearerTokenValidationStatus.UnboundCredential, "The token carries no single usable environment constraint.");
         }
 
-        var identity = BuildIdentity(route, issuer, claims, scopes, out var reason);
+        var (identity, reason) = BuildIdentity(route, issuer, claims, scopes);
         if (identity is null)
         {
             return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason);
@@ -204,23 +204,22 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer };
     }
 
-    static ClaimsIdentity? BuildIdentity(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims, string[] scopes, out string reason)
+    static (ClaimsIdentity? Identity, string Reason) BuildIdentity(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims, string[] scopes)
     {
-        reason = "The token carries no single subject.";
+        const string reason = "The token carries no single subject.";
         if (!TryGetSingleValue(claims, SubjectClaimType, out var subject))
         {
-            return null;
+            return (null, reason);
         }
 
         if (!TryBuildForwardedClaims(route, claims, out var forwarded, out var missingSource))
         {
-            reason = $"The token carries no '{missingSource}' claim for a configured claim mapping.";
-            return null;
+            return (null, $"The token carries no '{missingSource}' claim for a configured claim mapping.");
         }
 
         if (!TryGetSingleValue(forwarded, SubjectClaimType, out _))
         {
-            return null;
+            return (null, reason);
         }
 
         forwarded.Add(new Claim(BearerRouteClaims.Issuer, issuer.Issuer));
@@ -232,7 +231,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
         forwarded.AddRange(scopes.Select(_ => new Claim(BearerRouteClaims.Scope, _)));
 
-        return new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role);
+        return (new ClaimsIdentity(forwarded, route.IdentityProvider, "name", ClaimTypes.Role), reason);
     }
 
     static TokenValidationParameters CreateParameters(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, IReadOnlyCollection<SecurityKey> keys) => new()
@@ -298,8 +297,12 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
         token = string.Empty;
         var trimmed = value.AsSpan().Trim();
-        if (trimmed.Length <= scheme.Length
-            || !trimmed.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)
+        if (trimmed.Length <= scheme.Length)
+        {
+            return false;
+        }
+
+        if (!trimmed.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)
             || !char.IsWhiteSpace(trimmed[scheme.Length]))
         {
             return false;
@@ -361,7 +364,7 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
                 .Select(_ => _.Value)
                 .Where(_ => !string.IsNullOrWhiteSpace(_))
                 .ToArray();
-            if (values.Length == 0 || (IsSingleValueIdentityClaim(target) && values.Length != 1))
+            if (HasUnusableMappingValues(target, values))
             {
                 missingSource = source;
                 return false;
@@ -373,6 +376,16 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
         }
 
         return true;
+    }
+
+    static bool HasUnusableMappingValues(string target, string[] values)
+    {
+        if (values.Length == 0)
+        {
+            return true;
+        }
+
+        return IsSingleValueIdentityClaim(target) && values.Length != 1;
     }
 
     async Task<BearerTokenValidation> ValidateSignedToken(string token, ResolvedBearerRoute route, ResolvedBearerIssuer issuer, CancellationToken cancellationToken)

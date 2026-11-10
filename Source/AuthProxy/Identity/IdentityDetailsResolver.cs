@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using Cratis.Arc.Identity;
@@ -144,7 +145,7 @@ public class IdentityDetailsResolver(
         var cachePurpose = CacheKeyPurpose + JsonSerializer.Serialize(requiredServices);
         var cacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(cachePurpose, account, tenantId) : null;
 
-        if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out IdentityProviderResult? cached) && cached is not null)
+        if (TryGetCachedIdentity(mayReuseResult, cacheKey, out var cached))
         {
             WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
             logger.IdentityDetailsCacheHit(logIdentifier);
@@ -163,18 +164,7 @@ public class IdentityDetailsResolver(
         // up on this semaphore behind a verifier that accepts connections and stops answering, each turn
         // costs up to the verification timeout, and a client that gave up long ago keeps its place in the
         // queue. One page load's worth of assets is minutes of proxy work on that arithmetic.
-        bool tookItsTurn;
-        IdentityVerificationReason missedTurn;
-        try
-        {
-            tookItsTurn = await semaphore.WaitAsync(QueueBudget(current), context.RequestAborted);
-            missedTurn = IdentityVerificationReason.TimedOut;
-        }
-        catch (OperationCanceledException)
-        {
-            tookItsTurn = false;
-            missedTurn = IdentityVerificationReason.Canceled;
-        }
+        var (tookItsTurn, missedTurn) = await WaitForTurn(semaphore, current, context);
 
         if (!tookItsTurn)
         {
@@ -198,7 +188,7 @@ public class IdentityDetailsResolver(
         try
         {
             // Double-check inside the lock — another request may have populated the cache while we waited.
-            if (mayReuseResult && cacheKey is not null && memoryCache.TryGetValue(cacheKey, out cached) && cached is not null)
+            if (TryGetCachedIdentity(mayReuseResult, cacheKey, out cached))
             {
                 WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
                 logger.IdentityDetailsCacheHit(logIdentifier);
@@ -211,7 +201,7 @@ public class IdentityDetailsResolver(
             var mergedDetails = new JsonObject();
             var verifiedRequiredServices = new List<string>();
 
-            foreach (var (name, service) in current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && (onBehalf is null || current.OnBehalf?.Permits(_.Key) == true)))
+            foreach (var (name, service) in ParticipatingServices(current, onBehalf))
             {
                 logger.CallingIdentityEndpointWithPrincipal(name, logIdentifier);
                 var mode = service.IdentityVerification;
@@ -237,17 +227,14 @@ public class IdentityDetailsResolver(
                     verifiedRequiredServices.Add(name);
                 }
 
-                foreach (var property in outcome.Details)
-                {
-                    mergedDetails[property.Key] = property.Value?.DeepClone();
-                }
+                MergeDetails(mergedDetails, outcome.Details);
             }
 
             var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
             WriteIdentityState(context, identityResult, principal, tenantId, verifiedRequiredServices, session.EmitIdentityDetailsCookie);
             logger.IdentityDetailsCookieWritten(logIdentifier);
-            if (onBehalf is null && cacheKey is not null && session.IdentityResultCacheDuration > TimeSpan.Zero
-                && verifiedRequiredServices.Order(StringComparer.Ordinal).SequenceEqual(requiredServices, StringComparer.Ordinal))
+            if (onBehalf is null && cacheKey is not null
+                && HasCacheableServiceSet(session, verifiedRequiredServices, requiredServices))
             {
                 memoryCache.Set(cacheKey, identityResult, session.IdentityResultCacheDuration);
             }
@@ -388,6 +375,45 @@ public class IdentityDetailsResolver(
         JsonValueKind.String => string.Equals(name.GetString(), expectedName, StringComparison.Ordinal),
         _ => false
     };
+
+    static async Task<(bool TookItsTurn, IdentityVerificationReason MissedTurn)> WaitForTurn(SemaphoreSlim semaphore, C.AuthProxy current, HttpContext context)
+    {
+        try
+        {
+            var tookItsTurn = await semaphore.WaitAsync(QueueBudget(current), context.RequestAborted);
+            return (tookItsTurn, IdentityVerificationReason.TimedOut);
+        }
+        catch (OperationCanceledException)
+        {
+            return (false, IdentityVerificationReason.Canceled);
+        }
+    }
+
+    static IEnumerable<KeyValuePair<string, C.Service>> ParticipatingServices(C.AuthProxy current, OnBehalfContext? onBehalf) =>
+        current.Services.Where(_ => _.Value.ParticipatesInIdentityResolution && (onBehalf is null || current.OnBehalf?.Permits(_.Key) == true));
+
+    static void MergeDetails(JsonObject mergedDetails, JsonObject details)
+    {
+        foreach (var property in details)
+        {
+            mergedDetails[property.Key] = property.Value?.DeepClone();
+        }
+    }
+
+    static bool HasCacheableServiceSet(C.Session session, IReadOnlyCollection<string> verifiedRequiredServices, IReadOnlyCollection<string> requiredServices) =>
+        session.IdentityResultCacheDuration > TimeSpan.Zero
+        && verifiedRequiredServices.Order(StringComparer.Ordinal).SequenceEqual(requiredServices, StringComparer.Ordinal);
+
+    bool TryGetCachedIdentity(bool mayReuseResult, IdentityAccountTenantKey? cacheKey, [NotNullWhen(true)] out IdentityProviderResult? cached)
+    {
+        cached = null;
+        if (!mayReuseResult || cacheKey is null)
+        {
+            return false;
+        }
+
+        return memoryCache.TryGetValue(cacheKey, out cached) && cached is not null;
+    }
 
     IdentityProviderResult BuildAuthorizedResult(ClientPrincipal principal, object? details) =>
         new(

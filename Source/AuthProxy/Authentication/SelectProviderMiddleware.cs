@@ -56,23 +56,13 @@ public class SelectProviderMiddleware(
             return;
         }
 
-        if ((context.User.Identity?.IsAuthenticated == true
-                && !(context.Request.Path == WellKnownPaths.LoginPage && FreshAuthenticationChallenge.Requested(context)))
-            || context.IsInvitation()
-            || context.IsRegistration()
-            || context.IsLoginChallenge()
-            || context.IsProviders()
-            || context.IsToken()
-            || context.IsAnonymousPath(proxyConfig.CurrentValue)
-            || context.HasPendingInvitation())
+        if (BypassesProviderSelection(context))
         {
             await next(context);
             return;
         }
 
-        var inviteConfig = proxyConfig.CurrentValue.Invite;
-        if (inviteConfig?.RedirectToLobbyWhenTenantUnresolved == true
-            && !string.IsNullOrWhiteSpace(inviteConfig.Lobby?.Frontend?.BaseUrl))
+        if (RequiresInvitation())
         {
             await errorPageProvider.WriteErrorPageAsync(
                 context,
@@ -112,37 +102,16 @@ public class SelectProviderMiddleware(
         // page instead shows the reason and leaves the retry to the person.
         if (providers.Count > 1 || HasSignInFailureReason(context))
         {
-            var providersJson = JsonSerializer.Serialize(providers, _serializerOptions);
-            context.Response.Cookies.Append(Cookies.Providers, providersJson, new CookieOptions
-            {
-                HttpOnly = false,
-                SameSite = SameSiteMode.Lax,
-                Secure = context.Request.IsHttps,
-                MaxAge = TimeSpan.FromMinutes(15),
-            });
-
-            // A sign-in page rendered inside somebody's frame is clickjacking bait — selection pages are
-            // never embeddable, unlike the credential-link pages whose embedding is configured explicitly.
-            FrameEmbedding.Deny(context);
-            await errorPageProvider.WriteErrorPageAsync(
-                context,
-                WellKnownPageNames.SelectProvider,
-                StatusCodes.Status200OK);
+            await ShowProviders(context, providers);
             return;
         }
 
-        var scheme = OidcProviderScheme.FromName(providers[0].Name);
-        var returnUrl = ResolveReturnUrl(context);
-        if (SignInCallbackHost.TryBuildLoginBounce(context, proxyConfig.CurrentValue, scheme, returnUrl, out var bounce))
-        {
-            context.Response.Redirect(bounce);
-            return;
-        }
-
-        var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl, proxyConfig.CurrentValue);
-        FreshAuthenticationChallenge.Apply(context, properties);
-        await context.ChallengeAsync(scheme, properties);
+        await ChallengeProvider(context, providers[0]);
     }
+
+    static bool HasUsableSession(HttpContext context) =>
+        context.User.Identity?.IsAuthenticated == true
+        && !(context.Request.Path == WellKnownPaths.LoginPage && FreshAuthenticationChallenge.Requested(context));
 
     /// <summary>
     /// Resolves where the caller should land after signing in.
@@ -180,6 +149,58 @@ public class SelectProviderMiddleware(
     static bool HasSignInFailureReason(HttpContext context) =>
         context.Request.Path.StartsWithSegments(WellKnownPaths.LoginPage)
         && context.Request.Query.ContainsKey(SignInFailureReason.QueryKey);
+
+    bool BypassesProviderSelection(HttpContext context) =>
+        HasUsableSession(context)
+        || context.IsInvitation()
+        || context.IsRegistration()
+        || context.IsLoginChallenge()
+        || context.IsProviders()
+        || context.IsToken()
+        || context.IsAnonymousPath(proxyConfig.CurrentValue)
+        || context.HasPendingInvitation();
+
+    bool RequiresInvitation()
+    {
+        var inviteConfig = proxyConfig.CurrentValue.Invite;
+        return inviteConfig?.RedirectToLobbyWhenTenantUnresolved == true
+            && !string.IsNullOrWhiteSpace(inviteConfig.Lobby?.Frontend?.BaseUrl);
+    }
+
+    async Task ShowProviders(HttpContext context, List<OidcProviderInfo> providers)
+    {
+        var providersJson = JsonSerializer.Serialize(providers, _serializerOptions);
+        context.Response.Cookies.Append(Cookies.Providers, providersJson, new CookieOptions
+        {
+            HttpOnly = false,
+            SameSite = SameSiteMode.Lax,
+            Secure = context.Request.IsHttps,
+            MaxAge = TimeSpan.FromMinutes(15),
+        });
+
+        // A sign-in page rendered inside somebody's frame is clickjacking bait — selection pages are
+        // never embeddable, unlike the credential-link pages whose embedding is configured explicitly.
+        FrameEmbedding.Deny(context);
+        await errorPageProvider.WriteErrorPageAsync(
+            context,
+            WellKnownPageNames.SelectProvider,
+            StatusCodes.Status200OK);
+    }
+
+    async Task ChallengeProvider(HttpContext context, OidcProviderInfo provider)
+    {
+        var scheme = OidcProviderScheme.FromName(provider.Name);
+        var returnUrl = ResolveReturnUrl(context);
+        if (SignInCallbackHost.TryBuildLoginBounce(context, proxyConfig.CurrentValue, scheme, returnUrl, out var bounce))
+        {
+            context.Response.Redirect(bounce);
+            return;
+        }
+
+        var properties = TenantAuthenticationState.CreateChallengeProperties(context, tenantResolver, returnUrl, proxyConfig.CurrentValue);
+        FreshAuthenticationChallenge.Apply(context, properties);
+        await context.ChallengeAsync(scheme, properties);
+    }
 
     /// <summary>
     /// Refuses a caller that no page can answer, naming a credential it could come back with.

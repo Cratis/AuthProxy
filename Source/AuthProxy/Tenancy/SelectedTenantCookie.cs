@@ -88,15 +88,26 @@ public sealed class SelectedTenantCookie(IDataProtectionProvider dataProtectionP
             return SelectedTenantCookieValue.Invalid;
         }
 
+        return ReadBoundCookie(value, account);
+    }
+
+    static bool MatchesAccount(SelectedTenantCookiePayload payload, IdentityAccountBinding account)
+    {
+        var providerMatches = string.Equals(payload.Kind, account.Kind, StringComparison.Ordinal)
+            && string.Equals(payload.ProviderKey, account.ProviderKey, StringComparison.Ordinal);
+        return providerMatches
+            && string.Equals(payload.Issuer, account.Issuer, StringComparison.Ordinal)
+            && string.Equals(payload.Subject, account.Subject, StringComparison.Ordinal);
+    }
+
+    SelectedTenantCookieValue ReadBoundCookie(string value, IdentityAccountBinding account)
+    {
         try
         {
             var payload = JsonSerializer.Deserialize<SelectedTenantCookiePayload>(_protector.Unprotect(value[1..]));
             if (payload is null
                 || !TenantIdentifier.IsUsable(payload.TenantId)
-                || !string.Equals(payload.Kind, account.Kind, StringComparison.Ordinal)
-                || !string.Equals(payload.ProviderKey, account.ProviderKey, StringComparison.Ordinal)
-                || !string.Equals(payload.Issuer, account.Issuer, StringComparison.Ordinal)
-                || !string.Equals(payload.Subject, account.Subject, StringComparison.Ordinal))
+                || !MatchesAccount(payload, account))
             {
                 return SelectedTenantCookieValue.Invalid;
             }

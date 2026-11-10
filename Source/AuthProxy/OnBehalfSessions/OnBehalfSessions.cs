@@ -60,65 +60,22 @@ public sealed class OnBehalfSessions(
             return new(OnBehalfStartStatus.Unauthenticated);
         }
 
-        if (!IsValid(request.Tenant) || !IsValid(request.Subject) || !IsValid(request.Issue)
-            || string.Equals(request.Subject, actor.UserId, StringComparison.Ordinal))
+        if (!IsValidStart(request, actor))
         {
             return new(OnBehalfStartStatus.Invalid);
         }
 
-        var decision = AccessPolicy.Evaluate(context.User, settings.ActorAuthorization.RequiredClaims);
-        if (!settings.ActorAuthorization.HasRequirements || !decision.IsGranted)
+        if (!CanAct(context, settings))
         {
-            logger.ActorNotPermitted(decision.UnsatisfiedClaim);
             return new(OnBehalfStartStatus.Forbidden);
         }
 
-        if (cookies.TryRead(context, out var existing) && !ledger.HasEnded(existing.SessionId, out _) && existing.ExpiresAt > ledger.Now)
+        if (!await CanStartSession(context, actor))
         {
-            if (existing.Actor.Is(actor))
-            {
-                return new(OnBehalfStartStatus.Conflict);
-            }
-
-            // A session somebody else left behind on this browser is not this actor's to keep or to be blocked by. It
-            // ends, and the application hears so, before this actor's own session starts.
-            await EndSession(context, existing, OnBehalfSessionEndReason.ActorChanged);
+            return new(OnBehalfStartStatus.Conflict);
         }
 
-        var now = ledger.Now;
-        var session = new OnBehalfSession(
-            AttestationSigner.CreateOpaqueValue(),
-            OnBehalfActor.From(actor),
-            request.Tenant!,
-            request.Subject!,
-            request.Issue!,
-            now,
-            now.Add(settings.MaximumLifetime));
-
-        var grant = await grants.Check(session, actor, context.RequestAborted);
-        if (grant.Status is OnBehalfGrantStatus.NotLive or OnBehalfGrantStatus.Expired)
-        {
-            return new(OnBehalfStartStatus.NotGranted);
-        }
-
-        if (!grant.IsLive)
-        {
-            return new(OnBehalfStartStatus.Unavailable);
-        }
-
-        // A session the application has not recorded as started is a session nobody can account for, so a start it did
-        // not acknowledge is not issued at all.
-        if (!await notifier.Started(session, grant, context.RequestAborted))
-        {
-            logger.SessionStartNotAcknowledged();
-            return new(OnBehalfStartStatus.Unavailable);
-        }
-
-        ledger.Remember(session.SessionId, grant, FreshUntil(session, grant, settings));
-        ExpireIdentityState(context);
-        cookies.Write(context, session);
-        logger.SessionStarted(session.SessionId);
-        return new(OnBehalfStartStatus.Started, session, grant);
+        return await StartGrantedSession(context, request, settings, actor);
     }
 
     /// <inheritdoc/>
@@ -158,37 +115,7 @@ public sealed class OnBehalfSessions(
             return await Ended(context, session, OnBehalfSessionEndReason.LifetimeExceeded);
         }
 
-        if (!ledger.TryGetGrant(session.SessionId, out var grant))
-        {
-            try
-            {
-                grant = await Recheck(session, actor!, settings).WaitAsync(context.RequestAborted);
-            }
-            catch (OperationCanceledException)
-            {
-                return OnBehalfResolution.Unavailable;
-            }
-
-            switch (grant.Status)
-            {
-                case OnBehalfGrantStatus.NotLive:
-                    return await Ended(context, session, OnBehalfSessionEndReason.GrantNotLive);
-                case OnBehalfGrantStatus.Expired:
-                    return await Ended(context, session, OnBehalfSessionEndReason.GrantExpired);
-                case OnBehalfGrantStatus.Indeterminate:
-                    return OnBehalfResolution.Unavailable;
-            }
-        }
-
-        // The assertion is issued per request, once its service, method and path are known; a session whose assertions
-        // could not be signed is refused here rather than at forwarding.
-        if (!attestations.CanSign)
-        {
-            logger.AssertionCouldNotBeSigned();
-            return OnBehalfResolution.Unavailable;
-        }
-
-        return new(OnBehalfResolutionStatus.Active, new OnBehalfContext(session, grant.Principal!, actor!.ToBase64(), attestations));
+        return await ResolveGrant(context, session, actor!, settings);
     }
 
     /// <inheritdoc/>
@@ -223,11 +150,123 @@ public sealed class OnBehalfSessions(
         context.Response.Cookies.Delete(Cookies.IdentityAuthorization);
     }
 
+    static bool IsValidStart(OnBehalfStartRequest request, ClientPrincipal actor) =>
+        IsValid(request.Tenant) && IsValid(request.Subject) && IsValid(request.Issue)
+        && !string.Equals(request.Subject, actor.UserId, StringComparison.Ordinal);
+
     static bool IsValid(string? value) =>
         !string.IsNullOrWhiteSpace(value)
         && value.Length <= MaximumValueLength
         && string.Equals(value, value.Trim(), StringComparison.Ordinal)
         && !value.Any(char.IsControl);
+
+    async Task<OnBehalfStartResult> StartGrantedSession(HttpContext context, OnBehalfStartRequest request, C.OnBehalf settings, ClientPrincipal actor)
+    {
+        var now = ledger.Now;
+        var session = new OnBehalfSession(
+            AttestationSigner.CreateOpaqueValue(),
+            OnBehalfActor.From(actor),
+            request.Tenant!,
+            request.Subject!,
+            request.Issue!,
+            now,
+            now.Add(settings.MaximumLifetime));
+
+        var grant = await grants.Check(session, actor, context.RequestAborted);
+        if (grant.Status is OnBehalfGrantStatus.NotLive or OnBehalfGrantStatus.Expired)
+        {
+            return new(OnBehalfStartStatus.NotGranted);
+        }
+
+        if (!grant.IsLive)
+        {
+            return new(OnBehalfStartStatus.Unavailable);
+        }
+
+        // A session the application has not recorded as started is a session nobody can account for, so a start it did
+        // not acknowledge is not issued at all.
+        if (!await notifier.Started(session, grant, context.RequestAborted))
+        {
+            logger.SessionStartNotAcknowledged();
+            return new(OnBehalfStartStatus.Unavailable);
+        }
+
+        ledger.Remember(session.SessionId, grant, FreshUntil(session, grant, settings));
+        ExpireIdentityState(context);
+        cookies.Write(context, session);
+        logger.SessionStarted(session.SessionId);
+        return new(OnBehalfStartStatus.Started, session, grant);
+    }
+
+    async Task<OnBehalfResolution> ResolveGrant(HttpContext context, OnBehalfSession session, ClientPrincipal actor, C.OnBehalf settings)
+    {
+        if (!ledger.TryGetGrant(session.SessionId, out var grant))
+        {
+            try
+            {
+                grant = await Recheck(session, actor!, settings).WaitAsync(context.RequestAborted);
+            }
+            catch (OperationCanceledException)
+            {
+                return OnBehalfResolution.Unavailable;
+            }
+
+            switch (grant.Status)
+            {
+                case OnBehalfGrantStatus.NotLive:
+                    return await Ended(context, session, OnBehalfSessionEndReason.GrantNotLive);
+                case OnBehalfGrantStatus.Expired:
+                    return await Ended(context, session, OnBehalfSessionEndReason.GrantExpired);
+                case OnBehalfGrantStatus.Indeterminate:
+                    return OnBehalfResolution.Unavailable;
+            }
+        }
+
+        // The assertion is issued per request, once its service, method and path are known; a session whose assertions
+        // could not be signed is refused here rather than at forwarding.
+        if (!attestations.CanSign)
+        {
+            logger.AssertionCouldNotBeSigned();
+            return OnBehalfResolution.Unavailable;
+        }
+
+        return new(OnBehalfResolutionStatus.Active, new OnBehalfContext(session, grant.Principal!, actor!.ToBase64(), attestations));
+    }
+
+    bool CanAct(HttpContext context, C.OnBehalf settings)
+    {
+        var decision = AccessPolicy.Evaluate(context.User, settings.ActorAuthorization.RequiredClaims);
+        if (!settings.ActorAuthorization.HasRequirements || !decision.IsGranted)
+        {
+            logger.ActorNotPermitted(decision.UnsatisfiedClaim);
+            return false;
+        }
+
+        return true;
+    }
+
+    async Task<bool> CanStartSession(HttpContext context, ClientPrincipal actor)
+    {
+        if (!cookies.TryRead(context, out var existing) || ledger.HasEnded(existing.SessionId, out _))
+        {
+            return true;
+        }
+
+        if (existing.ExpiresAt <= ledger.Now)
+        {
+            return true;
+        }
+
+        if (existing.Actor.Is(actor))
+        {
+            return false;
+        }
+
+        // A session somebody else left behind on this browser is not this actor's to keep or to be blocked by. It
+        // ends, and the application hears so, before this actor's own session starts.
+        await EndSession(context, existing, OnBehalfSessionEndReason.ActorChanged);
+        return true;
+    }
 
     /// <summary>
     /// Works out how long a live answer is trusted: the earliest of the re-check interval, the grant's own validity

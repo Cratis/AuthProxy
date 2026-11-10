@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Collections.Concurrent;
+using System.Security.Cryptography.X509Certificates;
 using Microsoft.Identity.Abstractions;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Web;
@@ -45,51 +46,16 @@ public sealed class OidcClientAssertions(
         {
             var description = state.Description;
             var now = timeProvider.GetUtcNow();
-            if (description.Certificate is null && state.NextCertificateReload != default)
-            {
-                // An expiry-triggered reload can return no certificate or fail. Throttle those retries too.
-                if (now < state.NextCertificateReload)
-                {
-                    throw new OidcClientCredentialUnavailable(
-                        $"The {credential.Source} client credential of OIDC provider '{provider.Name}' could not be loaded.");
-                }
-
-                state.NextCertificateReload = now.AddMinutes(1);
-            }
+            ThrottleCertificateReload(state, provider, credential, now);
 
             await Load(description, provider);
             now = timeProvider.GetUtcNow();
             var certificate = description.Certificate;
-            if (certificate is not null && certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime && now >= state.NextCertificateReload)
-            {
-                // Serialize reload and signing so resetting/disposal cannot invalidate another request's key.
-                // An unchanged expired file or thumbprint must not cause a load and warning on every sign-in.
-                state.NextCertificateReload = now.AddMinutes(1);
-                logger.ClientCertificateExpired(provider.Name);
-                loader.ResetCredentials([description]);
-                try
-                {
-                    await Load(description, provider);
-                }
-                finally
-                {
-                    if (!ReferenceEquals(certificate, description.Certificate))
-                    {
-                        certificate.Dispose();
-                    }
-                }
-
-                certificate = description.Certificate;
-            }
+            certificate = await ReloadExpiredCertificate(state, provider, certificate, now);
 
             if (certificate is not null)
             {
-                if (certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime)
-                {
-                    throw new OidcClientCredentialUnavailable($"The client certificate of OIDC provider '{provider.Name}' has expired.");
-                }
-
-                return CertificateClientAssertion.Create(certificate, provider.ClientId, audience, now);
+                return SignCertificate(certificate, provider, audience, now);
             }
 
             if (description.CachedValue is ClientAssertionProviderBase assertionProvider)
@@ -120,6 +86,66 @@ public sealed class OidcClientAssertions(
         {
             state.Semaphore.Release();
         }
+    }
+
+    static string SignCertificate(X509Certificate2 certificate, C.OidcProvider provider, string audience, DateTimeOffset now)
+    {
+        if (certificate.NotAfter.ToUniversalTime() <= now.UtcDateTime)
+        {
+            throw new OidcClientCredentialUnavailable($"The client certificate of OIDC provider '{provider.Name}' has expired.");
+        }
+
+        return CertificateClientAssertion.Create(certificate, provider.ClientId, audience, now);
+    }
+
+    static void ThrottleCertificateReload(CredentialState state, C.OidcProvider provider, C.OidcClientCredential credential, DateTimeOffset now)
+    {
+        if (state.Description.Certificate is not null || state.NextCertificateReload == default)
+        {
+            return;
+        }
+
+        // An expiry-triggered reload can return no certificate or fail. Throttle those retries too.
+        if (now < state.NextCertificateReload)
+        {
+            throw new OidcClientCredentialUnavailable(
+                $"The {credential.Source} client credential of OIDC provider '{provider.Name}' could not be loaded.");
+        }
+
+        state.NextCertificateReload = now.AddMinutes(1);
+    }
+
+    async Task<X509Certificate2?> ReloadExpiredCertificate(CredentialState state, C.OidcProvider provider, X509Certificate2? certificate, DateTimeOffset now)
+    {
+        if (certificate is null || certificate.NotAfter.ToUniversalTime() > now.UtcDateTime)
+        {
+            return certificate;
+        }
+
+        if (now < state.NextCertificateReload)
+        {
+            return certificate;
+        }
+
+        // Serialize reload and signing so resetting/disposal cannot invalidate another request's key.
+        // An unchanged expired file or thumbprint must not cause a load and warning on every sign-in.
+        state.NextCertificateReload = now.AddMinutes(1);
+        logger.ClientCertificateExpired(provider.Name);
+        var description = state.Description;
+        loader.ResetCredentials([description]);
+        try
+        {
+            await Load(description, provider);
+        }
+        finally
+        {
+            if (!ReferenceEquals(certificate, description.Certificate))
+            {
+                certificate.Dispose();
+            }
+        }
+
+        return description.Certificate;
     }
 
     async Task Load(CredentialDescription description, C.OidcProvider provider)

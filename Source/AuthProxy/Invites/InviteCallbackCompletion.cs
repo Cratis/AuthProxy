@@ -52,10 +52,7 @@ static class InviteCallbackCompletion
     {
         var httpContext = context.HttpContext;
         var properties = context.Properties;
-        if (properties is null
-            || context.Principal is null
-            || !httpContext.TryGetPendingInvitationToken(out var inviteToken)
-            || !InvitationAuthenticationState.WasEstablishedFor(properties, inviteToken))
+        if (!TryGetOwnInvitation(context, properties, out var inviteToken))
         {
             // Not this invitation's own challenge coming back - including the known deployments where the
             // capability binding does not survive the provider round-trip. Nothing is exchanged here; the
@@ -78,7 +75,7 @@ static class InviteCallbackCompletion
         }
 
         var completion = services.GetRequiredService<IInviteCompletion>();
-        var exchangeResult = await completion.ExchangeForTicket(httpContext, inviteToken, context.Principal, properties);
+        var exchangeResult = await completion.ExchangeForTicket(httpContext, inviteToken, context.Principal!, properties!);
         return exchangeResult switch
         {
             InviteExchangeResult.Success => CompleteSuccessfully(context, completion, inviteToken, logger),
@@ -87,6 +84,18 @@ static class InviteCallbackCompletion
             InviteExchangeResult.EmailUnavailable => await AnswerWithPage(context, logger, exchangeResult, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden),
             _ => await AnswerFailure(context, logger),
         };
+    }
+
+    static bool TryGetOwnInvitation(TicketReceivedContext context, AuthenticationProperties? properties, out string inviteToken)
+    {
+        inviteToken = string.Empty;
+        if (properties is null || context.Principal is null)
+        {
+            return false;
+        }
+
+        return context.HttpContext.TryGetPendingInvitationToken(out inviteToken)
+            && InvitationAuthenticationState.WasEstablishedFor(properties, inviteToken);
     }
 
     static InviteCallbackCompletionResult CompleteSuccessfully(

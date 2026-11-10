@@ -83,6 +83,30 @@ public static class AllowedOrigins
             yield return Key(self);
         }
 
+        foreach (var origin in EnumerateConfiguredOrigins(authProxyConfig))
+        {
+            yield return origin;
+        }
+
+        // The hosts one proxy serves are where a person is moved between once a callback host is configured, and
+        // only then. The origin is built with the scheme the request arrived on, so a request that came in over
+        // HTTPS never allows the same host over HTTP, and a host declared without a port is the default port only.
+        if (!SignInCallbackHost.IsConfigured(authProxyConfig))
+        {
+            yield break;
+        }
+
+        foreach (var host in authProxyConfig.Services.Values.SelectMany(ServiceRoutes.HostsOf))
+        {
+            if (Uri.TryCreate($"{context.Request.Scheme}://{host.Value}", UriKind.Absolute, out var served))
+            {
+                yield return Key(served);
+            }
+        }
+    }
+
+    static IEnumerable<string> EnumerateConfiguredOrigins(C.AuthProxy authProxyConfig)
+    {
         // Reuse the configured service frontends as permitted destinations.
         foreach (var service in authProxyConfig.Services.Values)
         {
@@ -106,30 +130,17 @@ public static class AllowedOrigins
                 yield return configuredOrigin;
             }
         }
-
-        // The hosts one proxy serves are where a person is moved between once a callback host is configured, and
-        // only then. The origin is built with the scheme the request arrived on, so a request that came in over
-        // HTTPS never allows the same host over HTTP, and a host declared without a port is the default port only.
-        if (!SignInCallbackHost.IsConfigured(authProxyConfig))
-        {
-            yield break;
-        }
-
-        foreach (var host in authProxyConfig.Services.Values.SelectMany(ServiceRoutes.HostsOf))
-        {
-            if (Uri.TryCreate($"{context.Request.Scheme}://{host.Value}", UriKind.Absolute, out var served))
-            {
-                yield return Key(served);
-            }
-        }
     }
 
     static bool TryGetOrigin(string? url, out string origin)
     {
         origin = string.Empty;
-        if (string.IsNullOrWhiteSpace(url)
-            || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
         {
             return false;
         }

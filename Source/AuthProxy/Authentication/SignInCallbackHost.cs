@@ -74,12 +74,12 @@ public static class SignInCallbackHost
     public static bool TryBuildLoginBounce(HttpContext context, C.AuthProxy config, string scheme, string? returnUrl, out string location)
     {
         location = string.Empty;
-        if (!TryGet(config, out var host)
-            || IsCallbackHost(context, host)
-            || context.Request.Query.ContainsKey(BouncedQueryKey)
-            || context.HasPendingInvitation()
-            || context.HasPendingRegistration()
-            || context.Request.Cookies.ContainsKey(Cookies.InvitationEntryState))
+        if (!TryGet(config, out var host) || IsCallbackHost(context, host))
+        {
+            return false;
+        }
+
+        if (KeepsHandshakeHere(context))
         {
             return false;
         }
@@ -120,6 +120,12 @@ public static class SignInCallbackHost
         location = QueryHelpers.AddQueryString($"{context.Request.Scheme}://{host.Value}{WellKnownPaths.Logout}", query);
         return true;
     }
+
+    static bool KeepsHandshakeHere(HttpContext context) =>
+        context.Request.Query.ContainsKey(BouncedQueryKey)
+        || context.HasPendingInvitation()
+        || context.HasPendingRegistration()
+        || context.Request.Cookies.ContainsKey(Cookies.InvitationEntryState);
 
     static bool TryGet(C.AuthProxy config, out HostString host)
     {

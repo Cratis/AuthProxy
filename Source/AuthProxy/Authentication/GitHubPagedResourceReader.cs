@@ -151,9 +151,7 @@ internal static class GitHubPagedResourceReader
                 continue;
             }
 
-            if (Uri.TryCreate(segments[0].Trim().Trim('<', '>'), UriKind.Absolute, out var next)
-                && string.Equals(next.Scheme, origin.Scheme, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(next.Authority, origin.Authority, StringComparison.OrdinalIgnoreCase))
+            if (Uri.TryCreate(segments[0].Trim().Trim('<', '>'), UriKind.Absolute, out var next) && IsSameOrigin(next, origin))
             {
                 return next;
             }
@@ -161,4 +159,8 @@ internal static class GitHubPagedResourceReader
 
         return null;
     }
+
+    static bool IsSameOrigin(Uri next, Uri origin) =>
+        string.Equals(next.Scheme, origin.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(next.Authority, origin.Authority, StringComparison.OrdinalIgnoreCase);
 }

@@ -95,7 +95,7 @@ public class ClientCredentialsTokenProtector(
             familyExpiresAt);
 
         return new ClientCredentialsIssuedTokens(
-            _protector.Protect(Serialize(service, clientId, tenant), accessExpiresAt),
+            _protector.Protect(Serialize(new ClientCredentialsTokenPayload(service.Name, service.RoutePrefix, clientId, tenant)), accessExpiresAt),
             (int)Math.Max(0, (accessExpiresAt - now).TotalSeconds),
             _refreshProtector.Protect(JsonSerializer.Serialize(refreshContent, _serializerOptions)));
     }
@@ -167,10 +167,7 @@ public class ClientCredentialsTokenProtector(
 
     static DateTimeOffset Earliest(DateTimeOffset first, DateTimeOffset second) => first <= second ? first : second;
 
-    static string Serialize(ConfiguredClientCredentialsService service, string clientId, string? tenant) =>
-        JsonSerializer.Serialize(
-            new ClientCredentialsTokenPayload(service.Name, service.RoutePrefix, clientId, tenant),
-            _serializerOptions);
+    static string Serialize(ClientCredentialsTokenPayload payload) => JsonSerializer.Serialize(payload, _serializerOptions);
 
     bool TryUnprotect(ITimeLimitedDataProtector protector, string token, out ClientCredentialsTokenPayload payload, out DateTimeOffset expiresAt)
     {

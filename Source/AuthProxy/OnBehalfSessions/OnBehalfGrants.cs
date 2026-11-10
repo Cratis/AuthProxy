@@ -78,26 +78,7 @@ public sealed class OnBehalfGrants(
         {
             using var client = httpClientFactory.CreateClient();
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, bounded.Token);
-            if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
-            {
-                logger.GrantNotLive((int)response.StatusCode);
-                return OnBehalfGrant.NotLive;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.GrantCheckUnsuccessful((int)response.StatusCode);
-                return OnBehalfGrant.Indeterminate;
-            }
-
-            if (response.Content.Headers.ContentLength > MaximumResponseLength)
-            {
-                logger.GrantCheckAnswerUnreadable();
-                return OnBehalfGrant.Indeterminate;
-            }
-
-            var body = await ReadBounded(response, bounded.Token);
-            return body is null ? Unreadable() : Read(body, session);
+            return await ReadResponse(response, session, bounded.Token);
         }
         catch (Exception exception) when (exception is HttpRequestException or OperationCanceledException or IOException)
         {
@@ -161,6 +142,38 @@ public sealed class OnBehalfGrants(
             && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out instant);
     }
 
+    static bool TryReadValidity(JsonObject parsed, out DateTimeOffset validUntil)
+    {
+        validUntil = default;
+        return ReadProperty(parsed, "validUntil") is JsonValue validUntilValue
+            && validUntilValue.TryGetValue<string>(out var validUntilText)
+            && TryReadInstant(validUntilText, out validUntil);
+    }
+
+    async Task<OnBehalfGrant> ReadResponse(HttpResponseMessage response, OnBehalfSession session, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Forbidden)
+        {
+            logger.GrantNotLive((int)response.StatusCode);
+            return OnBehalfGrant.NotLive;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.GrantCheckUnsuccessful((int)response.StatusCode);
+            return OnBehalfGrant.Indeterminate;
+        }
+
+        if (response.Content.Headers.ContentLength > MaximumResponseLength)
+        {
+            logger.GrantCheckAnswerUnreadable();
+            return OnBehalfGrant.Indeterminate;
+        }
+
+        var body = await ReadBounded(response, cancellationToken);
+        return body is null ? Unreadable() : Read(body, session);
+    }
+
     OnBehalfGrant Unreadable()
     {
         logger.GrantCheckAnswerUnreadable();
@@ -179,6 +192,11 @@ public sealed class OnBehalfGrants(
             return Unreadable();
         }
 
+        return ReadVerdict(parsed, session);
+    }
+
+    OnBehalfGrant ReadVerdict(JsonObject parsed, OnBehalfSession session)
+    {
         // Only a JSON boolean is a verdict. Inferring one from a string or a number would be guessing at whether
         // somebody may act as another person.
         var live = ReadBoolean(parsed, "live");
@@ -188,15 +206,26 @@ public sealed class OnBehalfGrants(
             return OnBehalfGrant.NotLive;
         }
 
-        if (live is not true
-            || ReadProperty(parsed, "validUntil") is not JsonValue validUntilValue
-            || !validUntilValue.TryGetValue<string>(out var validUntilText)
-            || !TryReadInstant(validUntilText, out var validUntil)
-            || ReadProperty(parsed, "principal") is not JsonObject principalNode)
+        return live is true ? ReadLiveGrant(parsed, session) : Unreadable();
+    }
+
+    OnBehalfGrant ReadLiveGrant(JsonObject parsed, OnBehalfSession session)
+    {
+        if (!TryReadValidity(parsed, out var validUntil))
         {
             return Unreadable();
         }
 
+        if (ReadProperty(parsed, "principal") is not JsonObject principalNode)
+        {
+            return Unreadable();
+        }
+
+        return ReadPrincipalGrant(principalNode, session, validUntil);
+    }
+
+    OnBehalfGrant ReadPrincipalGrant(JsonObject principalNode, OnBehalfSession session, DateTimeOffset validUntil)
+    {
         ClientPrincipal? principal;
         try
         {

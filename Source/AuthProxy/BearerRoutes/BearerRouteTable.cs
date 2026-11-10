@@ -102,10 +102,7 @@ public static class BearerRouteTable
     public static bool IsUnambiguous(PathString path)
     {
         var value = path.Value ?? string.Empty;
-        if (value.Contains('%', StringComparison.Ordinal)
-            || value.Contains('\\', StringComparison.Ordinal)
-            || value.Contains(';', StringComparison.Ordinal)
-            || value.Contains("//", StringComparison.Ordinal))
+        if (ContainsAmbiguousCharacters(value))
         {
             return false;
         }
@@ -181,17 +178,8 @@ public static class BearerRouteTable
             return false;
         }
 
-        string metadataAddress;
-        if (string.IsNullOrWhiteSpace(issuer.MetadataAddress))
-        {
-            metadataAddress = $"{issuerUri.GetLeftPart(UriPartial.Authority)}{AuthorizationServerMetadataPath}{issuerUri.AbsolutePath.TrimEnd('/')}";
-        }
-        else if (TryParseAuthorityUri(issuer.MetadataAddress, out var metadataUri, out var metadataIsLoopbackHttp)
-            && (!metadataIsLoopbackHttp || isLoopbackHttp))
-        {
-            metadataAddress = metadataUri.AbsoluteUri;
-        }
-        else
+        var metadataAddress = ResolveMetadataAddress(issuer, issuerUri, isLoopbackHttp);
+        if (metadataAddress is null)
         {
             return false;
         }
@@ -225,10 +213,13 @@ public static class BearerRouteTable
     {
         isLoopbackHttp = false;
         if (string.IsNullOrWhiteSpace(candidate)
-            || !Uri.TryCreate(candidate.Trim(), UriKind.Absolute, out uri!)
-            || !string.IsNullOrEmpty(uri.Query)
-            || !string.IsNullOrEmpty(uri.Fragment)
-            || !string.IsNullOrEmpty(uri.UserInfo))
+            || !Uri.TryCreate(candidate.Trim(), UriKind.Absolute, out uri!))
+        {
+            uri = default!;
+            return false;
+        }
+
+        if (HasAuthorityDecorations(uri))
         {
             uri = default!;
             return false;
@@ -255,46 +246,21 @@ public static class BearerRouteTable
 
         var tokens = route.PersonalAccessTokens;
         if (AnonymousPathPolicy.Evaluate(route.PathPrefix, out var prefix) != AnonymousPathRejection.None
-            || (route.Issuers.Count == 0 && tokens is null)
-            || (route.Issuers.Count > 0 && route.Audiences.All(string.IsNullOrWhiteSpace))
-            || (tokens is not null && !PersonalAccessTokenClassifier.IsValidResourceKey(tokens.ResourceKey)))
+            || !HasUsableTokenConfiguration(route, tokens))
         {
             return false;
         }
 
-        var issuers = new List<ResolvedBearerIssuer>();
-        foreach (var issuer in route.Issuers)
+        var issuers = ResolveIssuers(route);
+        if (issuers is null)
         {
-            if (!TryResolveIssuer(issuer, out var resolvedIssuer))
-            {
-                return false;
-            }
-
-            issuers.Add(resolvedIssuer);
+            return false;
         }
 
-        Uri? metadataUrl = null;
-        string? metadataPath = null;
-        if (issuers.Count == 0)
+        var metadata = ResolveResourceMetadata(route, prefix, issuers.Count > 0);
+        if (metadata is null)
         {
-            // No OAuth metadata to serve: the well-known path of the resource is answered with a not-found by the
-            // gate, so it is not proxied to the backend as an unauthenticated browser path.
-            if (!string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
-            {
-                return false;
-            }
-
-            metadataPath = ProtectedResourceMetadataPath + prefix;
-        }
-        else if (!string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
-        {
-            if (!TryParseAuthorityUri(route.ResourceMetadataUrl, out metadataUrl, out _)
-                || AnonymousPathPolicy.Evaluate(metadataUrl.AbsolutePath, out var normalizedMetadataPath) != AnonymousPathRejection.None)
-            {
-                return false;
-            }
-
-            metadataPath = normalizedMetadataPath;
+            return false;
         }
 
         var profile = (issuers.Count, tokens) switch
@@ -304,8 +270,90 @@ public static class BearerRouteTable
             _ => BearerProfile.OAuthOnly,
         };
 
-        resolved = new ResolvedBearerRoute(serviceName, backendBaseUrl, prefix, issuers, route, metadataUrl, metadataPath, profile, tokens?.ResourceKey);
+        resolved = new ResolvedBearerRoute(serviceName, backendBaseUrl, prefix, issuers, route, metadata.Url, metadata.Path, profile, tokens?.ResourceKey);
         return true;
+    }
+
+    static bool ContainsAmbiguousCharacters(string value) =>
+        value.Contains('%', StringComparison.Ordinal)
+        || value.Contains('\\', StringComparison.Ordinal)
+        || value.Contains(';', StringComparison.Ordinal)
+        || value.Contains("//", StringComparison.Ordinal);
+
+    static bool HasAuthorityDecorations(Uri uri) =>
+        !string.IsNullOrEmpty(uri.Query)
+        || !string.IsNullOrEmpty(uri.Fragment)
+        || !string.IsNullOrEmpty(uri.UserInfo);
+
+    static string? ResolveMetadataAddress(C.BearerIssuer issuer, Uri issuerUri, bool isLoopbackHttp)
+    {
+        if (string.IsNullOrWhiteSpace(issuer.MetadataAddress))
+        {
+            return $"{issuerUri.GetLeftPart(UriPartial.Authority)}{AuthorizationServerMetadataPath}{issuerUri.AbsolutePath.TrimEnd('/')}";
+        }
+
+        if (!TryParseAuthorityUri(issuer.MetadataAddress, out var metadataUri, out var metadataIsLoopbackHttp))
+        {
+            return null;
+        }
+
+        return metadataIsLoopbackHttp && !isLoopbackHttp ? null : metadataUri.AbsoluteUri;
+    }
+
+    static bool HasUsableTokenConfiguration(C.BearerRoute route, C.BearerRoutePersonalAccessTokens? tokens)
+    {
+        if (route.Issuers.Count == 0 && tokens is null)
+        {
+            return false;
+        }
+
+        if (route.Issuers.Count > 0 && route.Audiences.All(string.IsNullOrWhiteSpace))
+        {
+            return false;
+        }
+
+        return tokens is null || PersonalAccessTokenClassifier.IsValidResourceKey(tokens.ResourceKey);
+    }
+
+    static List<ResolvedBearerIssuer>? ResolveIssuers(C.BearerRoute route)
+    {
+        var issuers = new List<ResolvedBearerIssuer>();
+        foreach (var issuer in route.Issuers)
+        {
+            if (!TryResolveIssuer(issuer, out var resolvedIssuer))
+            {
+                return null;
+            }
+
+            issuers.Add(resolvedIssuer);
+        }
+
+        return issuers;
+    }
+
+    static ResourceMetadata? ResolveResourceMetadata(C.BearerRoute route, string prefix, bool hasIssuers)
+    {
+        if (!hasIssuers)
+        {
+            // No OAuth metadata to serve: the well-known path of the resource is answered with a not-found by the
+            // gate, so it is not proxied to the backend as an unauthenticated browser path.
+            return string.IsNullOrWhiteSpace(route.ResourceMetadataUrl)
+                ? new(null, ProtectedResourceMetadataPath + prefix)
+                : null;
+        }
+
+        if (string.IsNullOrWhiteSpace(route.ResourceMetadataUrl))
+        {
+            return new(null, null);
+        }
+
+        if (!TryParseAuthorityUri(route.ResourceMetadataUrl, out var metadataUrl, out _)
+            || AnonymousPathPolicy.Evaluate(metadataUrl.AbsolutePath, out var metadataPath) != AnonymousPathRejection.None)
+        {
+            return null;
+        }
+
+        return new(metadataUrl, metadataPath);
     }
 
     static Resolution Resolve(C.AuthProxy config) => _resolved.GetValue(config, Create);
@@ -324,6 +372,8 @@ public static class BearerRouteTable
 
         return new Resolution(routes, issuers);
     }
+
+    sealed record ResourceMetadata(Uri? Url, string? Path);
 
     sealed record Resolution(ResolvedBearerRoute[] Routes, HashSet<string> Issuers);
 }

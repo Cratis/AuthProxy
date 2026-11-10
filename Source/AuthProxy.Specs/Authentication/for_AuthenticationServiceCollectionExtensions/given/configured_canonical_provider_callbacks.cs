@@ -28,6 +28,12 @@ public class configured_canonical_provider_callbacks : Specification
     void Establish()
     {
         var builder = WebApplication.CreateBuilder();
+        ConfigureProviders(builder);
+        ConfigureCanonicalIdentity(builder);
+    }
+
+    static void ConfigureProviders(WebApplicationBuilder builder)
+    {
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"{C.Authentication.SectionKey}:OidcProviders:0:Name"] = "Microsoft",
@@ -50,7 +56,10 @@ public class configured_canonical_provider_callbacks : Specification
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:SubjectClaimType"] = "id",
             [$"{C.Authentication.SectionKey}:OAuthProviders:0:CanonicalIdentity:Issuer"] = "https://github.example.com"
         });
+    }
 
+    void ConfigureCanonicalIdentity(WebApplicationBuilder builder)
+    {
         _rootConfiguration = new C.AuthProxy
         {
             Authentication = new C.Authentication

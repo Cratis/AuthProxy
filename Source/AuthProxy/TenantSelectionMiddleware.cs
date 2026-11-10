@@ -96,76 +96,7 @@ public class TenantSelectionMiddleware(
         }
 
         var tenantOptionsResult = await GetTenantOptions(context, selectionOptions);
-        if (!tenantOptionsResult.HasIdentity)
-        {
-            await HandleInvalidSession(context);
-            return;
-        }
-
-        if (!tenantOptionsResult.Succeeded)
-        {
-            context.Response.Headers.CacheControl = "no-store";
-            if (context.IsDocumentNavigation())
-            {
-                await errorPageProvider.WriteErrorPageAsync(
-                    context,
-                    WellKnownPageNames.ServiceUnavailable,
-                    StatusCodes.Status503ServiceUnavailable);
-                return;
-            }
-
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            return;
-        }
-
-        var tenantOptions = tenantOptionsResult.Tenants;
-        if (tenantOptions.Count == 0)
-        {
-            await next(context);
-            return;
-        }
-
-        if (tenantOptions.Count == 1)
-        {
-            if (!selectedTenantCookie.TryWrite(context, tenantOptions[0].Id))
-            {
-                await HandleInvalidSession(context);
-                return;
-            }
-
-            context.Response.Cookies.Delete(Cookies.Tenants);
-            MarkTenantAsRevalidated(context, tenantOptions[0].Id);
-            context.Response.StatusCode = StatusCodes.Status302Found;
-            context.Response.Headers.Location = context.GetPathAndQuery();
-            return;
-        }
-
-        // The chooser is a page, and a page can only be delivered with a success status. To a caller that
-        // is not navigating that reads as the data it asked for, arriving intact — the same silent success
-        // the provider-selection page produces, reached here by an already-signed-in frontend. It is
-        // refused with 403 rather than 401 because the caller is authenticated: a 401 would send a
-        // frontend back through a login it has already completed.
-        if (!context.IsDocumentNavigation())
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return;
-        }
-
-        // Written as a session cookie so that, once a multi-tenant user has selected a tenant, the
-        // tenant list remains available to the application's toolbar switcher for the rest of the
-        // browser session. It is intentionally not deleted on selection.
-        var tenantsJson = JsonSerializer.Serialize(tenantOptions, _serializerOptions);
-        context.Response.Cookies.Append(Cookies.Tenants, tenantsJson, new CookieOptions
-        {
-            HttpOnly = false,
-            SameSite = SameSiteMode.Lax,
-            Secure = context.Request.IsHttps,
-        });
-
-        await errorPageProvider.WriteErrorPageAsync(
-            context,
-            WellKnownPageNames.SelectTenant,
-            StatusCodes.Status200OK);
+        await OfferTenantSelection(context, tenantOptionsResult);
     }
 
     /// <summary>Resolves the configured selection endpoint and its per-flow signing settings.</summary>
@@ -197,6 +128,102 @@ public class TenantSelectionMiddleware(
 
     static bool CanWriteSelectionCookie(TenantResolutionResult? resolved) =>
         resolved is null || resolved.Strategy is C.TenantSourceIdentifierResolverType.Host or C.TenantSourceIdentifierResolverType.SubHost;
+
+    static bool RevokeTenant(HttpContext context, bool exempt, TenantResolutionResult? resolvedTenant)
+    {
+        // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
+        // replay the request without it so the regular selection flow takes over.
+        Tenancy.SelectedTenantCookie.Delete(context);
+        context.Response.Cookies.Delete(Cookies.Tenants);
+        if (exempt)
+        {
+            return false;
+        }
+
+        if (resolvedTenant is not null)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return true;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status302Found;
+        context.Response.Headers.Location = context.GetPathAndQuery();
+        return true;
+    }
+
+    async Task OfferTenantSelection(HttpContext context, TenantOptionsResult tenantOptionsResult)
+    {
+        if (!tenantOptionsResult.HasIdentity)
+        {
+            await HandleInvalidSession(context);
+            return;
+        }
+
+        if (!tenantOptionsResult.Succeeded)
+        {
+            await RejectUnconfirmed(context);
+            return;
+        }
+
+        var tenantOptions = tenantOptionsResult.Tenants;
+        if (tenantOptions.Count == 0)
+        {
+            await next(context);
+            return;
+        }
+
+        if (tenantOptions.Count == 1)
+        {
+            await SelectOnlyTenant(context, tenantOptions[0]);
+            return;
+        }
+
+        await ShowTenantChooser(context, tenantOptions);
+    }
+
+    async Task SelectOnlyTenant(HttpContext context, TenantOption tenant)
+    {
+        if (!selectedTenantCookie.TryWrite(context, tenant.Id))
+        {
+            await HandleInvalidSession(context);
+            return;
+        }
+
+        context.Response.Cookies.Delete(Cookies.Tenants);
+        MarkTenantAsRevalidated(context, tenant.Id);
+        context.Response.StatusCode = StatusCodes.Status302Found;
+        context.Response.Headers.Location = context.GetPathAndQuery();
+    }
+
+    async Task ShowTenantChooser(HttpContext context, IReadOnlyList<TenantOption> tenantOptions)
+    {
+        // The chooser is a page, and a page can only be delivered with a success status. To a caller that
+        // is not navigating that reads as the data it asked for, arriving intact — the same silent success
+        // the provider-selection page produces, reached here by an already-signed-in frontend. It is
+        // refused with 403 rather than 401 because the caller is authenticated: a 401 would send a
+        // frontend back through a login it has already completed.
+        if (!context.IsDocumentNavigation())
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            return;
+        }
+
+        // Written as a session cookie so that, once a multi-tenant user has selected a tenant, the
+        // tenant list remains available to the application's toolbar switcher for the rest of the
+        // browser session. It is intentionally not deleted on selection.
+        var tenantsJson = JsonSerializer.Serialize(tenantOptions, _serializerOptions);
+        context.Response.Cookies.Append(Cookies.Tenants, tenantsJson, new CookieOptions
+        {
+            HttpOnly = false,
+            SameSite = SameSiteMode.Lax,
+            Secure = context.Request.IsHttps,
+        });
+
+        await errorPageProvider.WriteErrorPageAsync(
+            context,
+            WellKnownPageNames.SelectTenant,
+            StatusCodes.Status200OK);
+    }
 
     TenantResolutionResult? TenantToConfirm(HttpContext context, C.AuthProxy current, bool exempt)
     {
@@ -303,31 +330,15 @@ public class TenantSelectionMiddleware(
     /// <returns><see langword="true"/> when a response was written and the request ends here; otherwise <see langword="false"/>.</returns>
     async Task<bool> ConfirmSelectedTenant(HttpContext context, Tenancy.SelectionOptions selectionOptions, bool exempt, TenantResolutionResult? resolvedTenant = null)
     {
-        var cookie = selectedTenantCookie.Read(context);
-        if (cookie.State == Tenancy.SelectedTenantCookieState.None && resolvedTenant is null)
+        if (!TryGetConfirmationCookie(context, resolvedTenant, out var cookie))
         {
             return false;
         }
 
-        if (cookie.State == Tenancy.SelectedTenantCookieState.Invalid)
+        var confirmation = CreateConfirmation(context, cookie, resolvedTenant);
+        if (confirmation.Reusable)
         {
-            logger.SelectedTenantCookieRejected();
-            Tenancy.SelectedTenantCookie.Delete(context);
-            if (resolvedTenant is null) return false;
-        }
-
-        var tenantId = resolvedTenant?.TenantId ?? cookie.TenantId;
-        var principal = context.BuildClientPrincipal();
-        var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), config.CurrentValue.Authentication.TotalProviderCount, out var account);
-        var cached = hasBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, tenantId), out _);
-        var legacy = cookie.State != Tenancy.SelectedTenantCookieState.Bound
-            || !CredentialTarget.MatchesTenant(cookie.TenantId, tenantId);
-        var interval = config.CurrentValue.Session.TenantRevalidationInterval;
-        var reissue = legacy && CanWriteSelectionCookie(resolvedTenant);
-
-        if (cached || (!legacy && interval <= TimeSpan.Zero))
-        {
-            Confirm(context, tenantId, reissue);
+            Confirm(context, confirmation.TenantId, confirmation.Reissue);
             return false;
         }
 
@@ -345,39 +356,53 @@ public class TenantSelectionMiddleware(
 
         if (!result.Succeeded)
         {
-            ForgetConfirmation(hasBinding, account, tenantId);
+            ForgetConfirmation(confirmation);
 
             logger.SelectedTenantNotConfirmed();
             return !exempt && await RejectUnconfirmed(context);
         }
 
-        if (!result.Tenants.Any(_ => string.Equals(_.Id, tenantId, StringComparison.OrdinalIgnoreCase)))
+        if (!result.Tenants.Any(_ => string.Equals(_.Id, confirmation.TenantId, StringComparison.OrdinalIgnoreCase)))
         {
-            ForgetConfirmation(hasBinding, account, tenantId);
-
-            // The user is no longer entitled to the selected tenant. Drop the stale tenant context and
-            // replay the request without it so the regular selection flow takes over.
-            Tenancy.SelectedTenantCookie.Delete(context);
-            context.Response.Cookies.Delete(Cookies.Tenants);
-            if (exempt)
-            {
-                return false;
-            }
-
-            if (resolvedTenant is not null)
-            {
-                context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                return true;
-            }
-
-            context.Response.StatusCode = StatusCodes.Status302Found;
-            context.Response.Headers.Location = context.GetPathAndQuery();
-            return true;
+            ForgetConfirmation(confirmation);
+            return RevokeTenant(context, exempt, resolvedTenant);
         }
 
-        MarkTenantAsRevalidated(context, tenantId);
-        Confirm(context, tenantId, reissue);
+        MarkTenantAsRevalidated(context, confirmation.TenantId);
+        Confirm(context, confirmation.TenantId, confirmation.Reissue);
         return false;
+    }
+
+    bool TryGetConfirmationCookie(HttpContext context, TenantResolutionResult? resolvedTenant, out SelectedTenantCookieValue cookie)
+    {
+        cookie = selectedTenantCookie.Read(context);
+        if (cookie.State == Tenancy.SelectedTenantCookieState.None && resolvedTenant is null)
+        {
+            return false;
+        }
+
+        if (cookie.State == Tenancy.SelectedTenantCookieState.Invalid)
+        {
+            logger.SelectedTenantCookieRejected();
+            Tenancy.SelectedTenantCookie.Delete(context);
+            if (resolvedTenant is null) return false;
+        }
+
+        return true;
+    }
+
+    TenantConfirmation CreateConfirmation(HttpContext context, SelectedTenantCookieValue cookie, TenantResolutionResult? resolvedTenant)
+    {
+        var tenantId = resolvedTenant?.TenantId ?? cookie.TenantId;
+        var principal = context.BuildClientPrincipal();
+        var hasBinding = IdentityAccountBinding.TryCreate(principal ?? new(), config.CurrentValue.Authentication.TotalProviderCount, out var account);
+        var cached = hasBinding && memoryCache.TryGetValue(RevalidationCacheKey(account, tenantId), out _);
+        var legacy = cookie.State != Tenancy.SelectedTenantCookieState.Bound
+            || !CredentialTarget.MatchesTenant(cookie.TenantId, tenantId);
+        var interval = config.CurrentValue.Session.TenantRevalidationInterval;
+        var reissue = legacy && CanWriteSelectionCookie(resolvedTenant);
+        var reusable = cached || (!legacy && interval <= TimeSpan.Zero);
+        return new(tenantId, account, hasBinding, reissue, reusable);
     }
 
     async Task<bool> RejectUnconfirmed(HttpContext context)
@@ -428,11 +453,11 @@ public class TenantSelectionMiddleware(
         memoryCache.Set(RevalidationCacheKey(account, tenantId), true, interval);
     }
 
-    void ForgetConfirmation(bool hasBinding, IdentityAccountBinding account, string tenantId)
+    void ForgetConfirmation(TenantConfirmation confirmation)
     {
-        if (hasBinding)
+        if (confirmation.HasBinding)
         {
-            memoryCache.Remove(RevalidationCacheKey(account, tenantId));
+            memoryCache.Remove(RevalidationCacheKey(confirmation.Account, confirmation.TenantId));
         }
     }
 
@@ -457,24 +482,32 @@ public class TenantSelectionMiddleware(
         using var request = new HttpRequestMessage(HttpMethod.Get, selectionOptions.TenantsEndpoint);
         request.SetMicrosoftIdentityHeaders(principal);
 
-        HttpResponseMessage response;
+        var response = await SendTenantRequest(request);
+        return response is null ? TenantOptionsResult.Unavailable : await ReadTenantResponse(response);
+    }
+
+    async Task<HttpResponseMessage?> SendTenantRequest(HttpRequestMessage request)
+    {
         try
         {
             var signing = signer.Sign(request, new(ForwardedIdentityFlow.TenantList, null));
             if (signing == ForwardedIdentitySigningOutcome.Refused)
             {
                 logger.TenantIdentityNotSigned();
-                return TenantOptionsResult.Unavailable;
+                return null;
             }
             using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
-            response = await client.SendAsync(request);
+            return await client.SendAsync(request);
         }
         catch (Exception exception)
         {
             logger.TenantEndpointUnavailable(exception.GetType().Name);
-            return TenantOptionsResult.Unavailable;
+            return null;
         }
+    }
 
+    async Task<TenantOptionsResult> ReadTenantResponse(HttpResponseMessage response)
+    {
         if (response.StatusCode == System.Net.HttpStatusCode.Forbidden || response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
             // An authoritative answer: the user is not entitled to any tenant at all. Reporting it as an
@@ -491,9 +524,14 @@ public class TenantSelectionMiddleware(
             return TenantOptionsResult.Unavailable;
         }
 
+        return await ReadTenantList(response.Content);
+    }
+
+    async Task<TenantOptionsResult> ReadTenantList(HttpContent content)
+    {
         try
         {
-            var json = await response.Content.ReadAsStringAsync();
+            var json = await content.ReadAsStringAsync();
             if (string.IsNullOrWhiteSpace(json))
             {
                 return new(Succeeded: true, []);
@@ -513,6 +551,8 @@ public class TenantSelectionMiddleware(
             return TenantOptionsResult.Unavailable;
         }
     }
+
+    sealed record TenantConfirmation(string TenantId, IdentityAccountBinding Account, bool HasBinding, bool Reissue, bool Reusable);
 
     sealed record TenantOption(
         [property: System.Text.Json.Serialization.JsonPropertyName("id")] string Id,

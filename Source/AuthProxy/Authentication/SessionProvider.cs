@@ -55,18 +55,24 @@ internal static class SessionProvider
     internal static bool TryRead(ClaimsPrincipal principal, AuthenticationProperties? properties, out string scheme)
     {
         var claims = principal.Claims.Where(_ => _.Type.StartsWith("urn:cratis:session:provider", StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (claims.Length == 1
-            && IsWellFormed(claims[0])
-            && properties is not null
-            && properties.Items.TryGetValue(MarkerStateKey, out var marker)
-            && string.Equals(marker, claims[0].Value, StringComparison.Ordinal))
+        scheme = string.Empty;
+        if (claims.Length != 1 || !IsWellFormed(claims[0]))
         {
-            scheme = claims[0].Value;
-            return true;
+            return false;
         }
 
-        scheme = string.Empty;
-        return false;
+        if (properties is null || !properties.Items.TryGetValue(MarkerStateKey, out var marker))
+        {
+            return false;
+        }
+
+        if (!string.Equals(marker, claims[0].Value, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        scheme = claims[0].Value;
+        return true;
     }
 
     /// <summary>
