@@ -66,64 +66,9 @@ public class TenancyMiddleware(
 
             tenantId = onBehalf.Session.Tenant;
         }
-        else if (!tenantResolver.TryResolve(context, out tenantId))
+        else if (!tenantResolver.TryResolve(context, out tenantId) && await HandleUnresolvedTenant(context))
         {
-            // If a lobby is configured, redirect users without a resolved tenant to the lobby
-            // frontend – unless this is an invite path (handled by InviteMiddleware) or the
-            // user already has a pending invite cookie (so the Phase 2 exchange can proceed).
-            var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
-            var shouldRedirectToLobby = config.CurrentValue.Invite?.RedirectToLobbyWhenTenantUnresolved == true;
-            var isInvitePath = context.IsInvitation();
-            var isRegistrationPath = context.IsRegistration();
-            var hasPendingInviteCookie = context.HasPendingInvitation();
-            var hasPendingRegistrationCookie = context.HasPendingRegistration();
-            var isAuthPath = context.IsAuthenticationUI();
-
-            // A caller on a declared anonymous path has no session to resolve a tenant from, so treat it
-            // like the other tenant-less paths below. Without this, declaring a path anonymous would move
-            // the refusal from SelectProviderMiddleware to here instead of removing it.
-            var isAnonymousPath = context.IsAnonymousPath(config.CurrentValue);
-
-            if (shouldRedirectToLobby
-                && !string.IsNullOrWhiteSpace(lobbyUrl)
-                && !isInvitePath
-                && !isRegistrationPath
-                && !isAuthPath
-                && !isAnonymousPath
-                && !hasPendingInviteCookie
-                && !hasPendingRegistrationCookie)
-            {
-                logger.RedirectingToLobby(context.Request.Path);
-                context.Response.Redirect(lobbyUrl);
-                return;
-            }
-
-            if (config.CurrentValue.TenantResolutions.Count > 0
-                && !isAuthPath
-                && !isInvitePath
-                && !isRegistrationPath
-                && !isAnonymousPath
-                && !hasPendingInviteCookie
-                && !hasPendingRegistrationCookie)
-            {
-                logger.CouldNotResolveTenant(context.Request.Path);
-
-                // An authenticated user with no resolvable tenant is signed in but not associated
-                // with any organization. Serve a specific 403 page explaining this rather than a
-                // bare 401, which a frontend would otherwise treat as "not signed in" and loop back
-                // to the login flow.
-                if (context.User.Identity?.IsAuthenticated == true)
-                {
-                    await errorPageProvider.WriteErrorPageAsync(
-                        context,
-                        WellKnownPageNames.NoOrganization,
-                        StatusCodes.Status403Forbidden);
-                    return;
-                }
-
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                return;
-            }
+            return;
         }
 
         // 3. Verify the resolved tenant exists (when verification is configured).
@@ -144,6 +89,58 @@ public class TenancyMiddleware(
         context.Items[TenantIdItemKey] = tenantId;
 
         await next(context);
+    }
+
+    async Task<bool> HandleUnresolvedTenant(HttpContext context)
+    {
+        // If a lobby is configured, redirect users without a resolved tenant to the lobby
+        // frontend – unless this is an invite path (handled by InviteMiddleware) or the
+        // user already has a pending invite cookie (so the Phase 2 exchange can proceed).
+        var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+        var shouldRedirectToLobby = config.CurrentValue.Invite?.RedirectToLobbyWhenTenantUnresolved == true;
+        var isInvitePath = context.IsInvitation();
+        var isRegistrationPath = context.IsRegistration();
+        var hasPendingInviteCookie = context.HasPendingInvitation();
+        var hasPendingRegistrationCookie = context.HasPendingRegistration();
+        var isAuthPath = context.IsAuthenticationUI();
+
+        // A caller on a declared anonymous path has no session to resolve a tenant from, so treat it
+        // like the other tenant-less paths below. Without this, declaring a path anonymous would move
+        // the refusal from SelectProviderMiddleware to here instead of removing it.
+        var isAnonymousPath = context.IsAnonymousPath(config.CurrentValue);
+        var pending = hasPendingInviteCookie || hasPendingRegistrationCookie;
+        var tenantlessPath = isInvitePath || isRegistrationPath || isAuthPath || isAnonymousPath;
+        var exempt = tenantlessPath || pending;
+
+        if (shouldRedirectToLobby && !string.IsNullOrWhiteSpace(lobbyUrl) && !exempt)
+        {
+            logger.RedirectingToLobby(context.Request.Path);
+            context.Response.Redirect(lobbyUrl);
+            return true;
+        }
+
+        if (config.CurrentValue.TenantResolutions.Count == 0 || exempt)
+        {
+            return false;
+        }
+
+        logger.CouldNotResolveTenant(context.Request.Path);
+
+        // An authenticated user with no resolvable tenant is signed in but not associated
+        // with any organization. Serve a specific 403 page explaining this rather than a
+        // bare 401, which a frontend would otherwise treat as "not signed in" and loop back
+        // to the login flow.
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.NoOrganization,
+                StatusCodes.Status403Forbidden);
+            return true;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return true;
     }
 
     /// <summary>
