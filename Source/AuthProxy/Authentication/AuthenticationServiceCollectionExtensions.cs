@@ -116,6 +116,12 @@ public static class AuthenticationServiceCollectionExtensions
                 {
                     await existing(context);
                     if (context.Result?.Succeeded == false) return;
+                    if (context.Principal?.Claims.Any(BearerTokenValidator.IsSenderConstrained) == true)
+                    {
+                        context.Fail(BearerTokenValidator.SenderConstrainedTokenReason);
+                        return;
+                    }
+
                     var config = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.Authentication>>();
                     ExternalTokenTenantBinding.Apply(context, config.CurrentValue.ExternalTokenTenantBinding);
                 };
