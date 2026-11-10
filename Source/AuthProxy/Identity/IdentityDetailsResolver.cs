@@ -96,66 +96,22 @@ public class IdentityDetailsResolver(
     /// <returns>The identity provider result.</returns>
     internal async Task<IdentityProviderResult> ResolveIdentity(HttpContext context, ClientPrincipal principal, string tenantId, Activity? activity = null)
     {
-        // When a pending invite is in-flight the cookie and memory caches must be bypassed so that
-        // the enriched principal (which carries the invite claims jti/invite_type) is always sent to
-        // the identity endpoint. A stale .cratis-identity cookie from a previous session would
-        // otherwise shadow the invite claims and cause the Lobby to return the wrong flow type.
-        var current = config.CurrentValue;
-        var session = current.Session;
-        var hasPendingInvite = context.HasPendingInvitation();
+        var state = BeginResolution(context, principal, tenantId, activity);
 
-        // Every exit path, the sealed fast path included, must retire a legacy copy of the readable cookie.
-        RetireLegacyIdentityCookie(context, session);
-
-        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, current.Authentication.TotalProviderCount, out var account);
-        var logIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account";
-
-        // Every short-circuit below is a remembered answer standing in for asking again, so where the answer
-        // is an authorization decision a deployment must be able to switch the memory off and have it
-        // actually be off. A zero re-validation interval is documented as "no bound", and honoring that
-        // literally means nothing may be sealed — so nothing may be believed either.
-        var requiredServices = IdentityVerificationServices.Required(current);
-        var verificationRequired = requiredServices.Length > 0;
-        var mayReuseRecord = !hasPendingInvite
-            && (!verificationRequired || session.IdentityRevalidationInterval > TimeSpan.Zero);
-
-        // An on-behalf session neither reuses nor leaves behind a remembered result: one remembered from the user's own
-        // sign-in would skip asking the application with the actor named, and one remembered from the session would
-        // later stand in for the user's own sign-in. The services asked during a session are also only those the
-        // session may reach, so a result from it never stands for the full set.
-        var onBehalf = context.TryGetOnBehalf(out var active) ? active : null;
-        var mayReuseResult = !hasPendingInvite && onBehalf is null && session.IdentityResultCacheDuration > TimeSpan.Zero;
-
-        // Skipping the identity endpoints means skipping the authorization answer they carry, so what
-        // permits the skip has to be something the caller could not have written. The readable
-        // .cratis-identity cookie is not that — it is non-HTTP-only by design and its value was never
-        // examined here, so sending any value for it used to be enough to be treated as authorized, for as
-        // long as the caller chose to keep sending it. The sealed record is checked instead, and it is
-        // checked against this principal and this tenant.
-        // The readable cookie can only cause more checking, never less, so it stays non-evidence.
-        var canReuseRecord = mayReuseRecord && !ReadableIdentityNamesAnotherCaller(context, principal);
-        if (canReuseRecord && authorizationCache.IsAuthorized(context, principal, tenantId))
+        if (SealedRecordAdmits(state))
         {
             AuthProxyTelemetry.IdentityCacheLookup(true);
             return BuildAuthorizedResult(principal, details: null);
         }
 
-        // A remembered result proves only the Required service set it was produced under. A mode change
-        // must ask the newly Required services, never seal an earlier BestEffort admission as verification.
-        var cachePurpose = CacheKeyPurpose + JsonSerializer.Serialize(requiredServices);
-        var cacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(cachePurpose, account, tenantId) : null;
-
-        if (TryGetCachedIdentity(mayReuseResult, cacheKey, out var cached))
+        if (TryServeCachedIdentity(state, out var cached))
         {
-            WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
-            logger.IdentityDetailsCacheHit(logIdentifier);
-            AuthProxyTelemetry.IdentityCacheLookup(true);
             return cached;
         }
 
         SemaphoreSlim? ownedSemaphore = null;
-        var semaphore = cacheKey is not null
-            ? _resolverLocks.GetOrAdd(cacheKey, _ => new SemaphoreSlim(1, 1))
+        var semaphore = state.CacheKey is not null
+            ? _resolverLocks.GetOrAdd(state.CacheKey, _ => new SemaphoreSlim(1, 1))
             : ownedSemaphore = new SemaphoreSlim(1, 1);
 
         // The wait for a turn has to be bounded by the same two things the call itself is bounded by: the
@@ -164,82 +120,17 @@ public class IdentityDetailsResolver(
         // up on this semaphore behind a verifier that accepts connections and stops answering, each turn
         // costs up to the verification timeout, and a client that gave up long ago keeps its place in the
         // queue. One page load's worth of assets is minutes of proxy work on that arithmetic.
-        var (tookItsTurn, missedTurn) = await WaitForTurn(semaphore, current, context);
+        var (tookItsTurn, missedTurn) = await WaitForTurn(semaphore, state.Config, context);
 
         if (!tookItsTurn)
         {
             ownedSemaphore?.Dispose();
-
-            // A caller that went away is an ordinary event and says nothing about the deployment. Running out
-            // of budget while waiting is the operator's signal that the identity endpoints are the queue.
-            if (missedTurn == IdentityVerificationReason.TimedOut && !verificationRequired)
-            {
-                logger.IdentityResolutionQueueExhausted(logIdentifier);
-            }
-
-            // Never reaching the call establishes precisely what a call that never answers establishes, so
-            // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
-            // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
-            return verificationRequired
-                ? Deny(context, cacheKey, ResolutionQueueLabel, missedTurn, requiredServices: requiredServices, activity: activity)
-                : BuildAuthorizedResult(principal, details: null);
+            return ResolveMissedTurn(state, missedTurn);
         }
 
         try
         {
-            // Double-check inside the lock — another request may have populated the cache while we waited.
-            if (TryGetCachedIdentity(mayReuseResult, cacheKey, out cached))
-            {
-                WriteIdentityState(context, cached, principal, tenantId, requiredServices, session.EmitIdentityDetailsCookie);
-                logger.IdentityDetailsCacheHit(logIdentifier);
-                AuthProxyTelemetry.IdentityCacheLookup(true);
-                return cached;
-            }
-
-            AuthProxyTelemetry.IdentityCacheLookup(false);
-            var enrichedPrincipal = principalEnrichers.Aggregate(principal, (p, enricher) => enricher.Enrich(context, p));
-            var mergedDetails = new JsonObject();
-            var verifiedRequiredServices = new List<string>();
-
-            foreach (var (name, service) in ParticipatingServices(current, onBehalf))
-            {
-                logger.CallingIdentityEndpointWithPrincipal(name, logIdentifier);
-                var mode = service.IdentityVerification;
-
-                var outcome = await _endpointCaller.Call(
-                    name,
-                    service.Backend!.BaseUrl,
-                    enrichedPrincipal,
-                    tenantId,
-                    logIdentifier,
-                    service.EffectiveIdentityVerificationTimeout,
-                    context.RequestAborted,
-                    denialWillBeLogged: mode == C.IdentityVerificationMode.Required,
-                    onBehalf: onBehalf);
-
-                if (!Admits(outcome, mode))
-                {
-                    return Deny(context, cacheKey, name, outcome.Reason, mode == C.IdentityVerificationMode.Required, activity: activity);
-                }
-
-                if (mode == C.IdentityVerificationMode.Required)
-                {
-                    verifiedRequiredServices.Add(name);
-                }
-
-                MergeDetails(mergedDetails, outcome.Details);
-            }
-
-            var identityResult = BuildAuthorizedResult(principal, mergedDetails.Count > 0 ? mergedDetails : null);
-            WriteIdentityState(context, identityResult, principal, tenantId, verifiedRequiredServices, session.EmitIdentityDetailsCookie);
-            logger.IdentityDetailsCookieWritten(logIdentifier);
-            if (onBehalf is null && cacheKey is not null
-                && HasCacheableServiceSet(session, verifiedRequiredServices, requiredServices))
-            {
-                memoryCache.Set(cacheKey, identityResult, session.IdentityResultCacheDuration);
-            }
-
-            return identityResult;
+            return await ResolveWithTurn(state);
         }
         finally
         {
@@ -247,6 +138,11 @@ public class IdentityDetailsResolver(
             ownedSemaphore?.Dispose();
         }
     }
+
+    static bool MayRemember(ResolutionState state, IReadOnlyCollection<string> verifiedRequiredServices) =>
+        state.OnBehalf is null
+        && state.CacheKey is not null
+        && HasCacheableServiceSet(state.Session, verifiedRequiredServices, state.RequiredServices);
 
     /// <summary>
     /// Determines whether an outcome lets the request continue under a service's configured mode.
@@ -404,6 +300,179 @@ public class IdentityDetailsResolver(
         session.IdentityResultCacheDuration > TimeSpan.Zero
         && verifiedRequiredServices.Order(StringComparer.Ordinal).SequenceEqual(requiredServices, StringComparer.Ordinal);
 
+    /// <summary>
+    /// Resolves the identity while holding the account's turn at the identity endpoints.
+    /// </summary>
+    /// <param name="state">What is known about the request being resolved.</param>
+    /// <returns>The identity provider result.</returns>
+    async Task<IdentityProviderResult> ResolveWithTurn(ResolutionState state)
+    {
+        // Double-check inside the lock — another request may have populated the cache while we waited.
+        if (TryServeCachedIdentity(state, out var cached))
+        {
+            return cached;
+        }
+
+        AuthProxyTelemetry.IdentityCacheLookup(false);
+        var enrichedPrincipal = principalEnrichers.Aggregate(state.Principal, (p, enricher) => enricher.Enrich(state.Context, p));
+        var mergedDetails = new JsonObject();
+        List<string> verifiedRequiredServices = [];
+
+        var denied = await AskServices(state, enrichedPrincipal, mergedDetails, verifiedRequiredServices);
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        var identityResult = BuildAuthorizedResult(state.Principal, mergedDetails.Count > 0 ? mergedDetails : null);
+        WriteIdentityState(state, identityResult, verifiedRequiredServices);
+        logger.IdentityDetailsCookieWritten(state.LogIdentifier);
+        if (MayRemember(state, verifiedRequiredServices))
+        {
+            memoryCache.Set(state.CacheKey!, identityResult, state.Session.IdentityResultCacheDuration);
+        }
+
+        return identityResult;
+    }
+
+    /// <summary>
+    /// Asks every participating service for identity details, merging what they answer.
+    /// </summary>
+    /// <param name="state">What is known about the request being resolved.</param>
+    /// <param name="enrichedPrincipal">The principal as the enrichers left it.</param>
+    /// <param name="mergedDetails">Receives the details every admitting service returned.</param>
+    /// <param name="verifiedRequiredServices">Receives the names of the Required services that admitted.</param>
+    /// <returns>The unauthorized result when a service refused; otherwise <see langword="null"/>.</returns>
+    async Task<IdentityProviderResult?> AskServices(ResolutionState state, ClientPrincipal enrichedPrincipal, JsonObject mergedDetails, List<string> verifiedRequiredServices)
+    {
+        foreach (var (name, service) in ParticipatingServices(state.Config, state.OnBehalf))
+        {
+            logger.CallingIdentityEndpointWithPrincipal(name, state.LogIdentifier);
+            var mode = service.IdentityVerification;
+            var required = mode == C.IdentityVerificationMode.Required;
+
+            var outcome = await _endpointCaller.Call(
+                name,
+                service.Backend!.BaseUrl,
+                enrichedPrincipal,
+                state.TenantId,
+                state.LogIdentifier,
+                service.EffectiveIdentityVerificationTimeout,
+                state.Context.RequestAborted,
+                denialWillBeLogged: required,
+                onBehalf: state.OnBehalf);
+
+            if (!Admits(outcome, mode))
+            {
+                return DenyService(state, name, outcome.Reason, required);
+            }
+
+            if (required)
+            {
+                verifiedRequiredServices.Add(name);
+            }
+
+            MergeDetails(mergedDetails, outcome.Details);
+        }
+
+        return null;
+    }
+
+    ResolutionState BeginResolution(HttpContext context, ClientPrincipal principal, string tenantId, Activity? activity)
+    {
+        // When a pending invite is in-flight the cookie and memory caches must be bypassed so that
+        // the enriched principal (which carries the invite claims jti/invite_type) is always sent to
+        // the identity endpoint. A stale .cratis-identity cookie from a previous session would
+        // otherwise shadow the invite claims and cause the Lobby to return the wrong flow type.
+        var current = config.CurrentValue;
+        var session = current.Session;
+        var hasPendingInvite = context.HasPendingInvitation();
+
+        // Every exit path, the sealed fast path included, must retire a legacy copy of the readable cookie.
+        RetireLegacyIdentityCookie(context, session);
+
+        var hasReusableBinding = IdentityAccountBinding.TryCreate(principal, current.Authentication.TotalProviderCount, out var account);
+        var requiredServices = IdentityVerificationServices.Required(current);
+
+        // An on-behalf session neither reuses nor leaves behind a remembered result: one remembered from the user's own
+        // sign-in would skip asking the application with the actor named, and one remembered from the session would
+        // later stand in for the user's own sign-in. The services asked during a session are also only those the
+        // session may reach, so a result from it never stands for the full set.
+        var onBehalf = context.TryGetOnBehalf(out var active) ? active : null;
+
+        // A remembered result proves only the Required service set it was produced under. A mode change
+        // must ask the newly Required services, never seal an earlier BestEffort admission as verification.
+        var cachePurpose = CacheKeyPurpose + JsonSerializer.Serialize(requiredServices);
+
+        return new ResolutionState
+        {
+            Context = context,
+            Principal = principal,
+            TenantId = tenantId,
+            Config = current,
+            CacheKey = hasReusableBinding ? IdentityAccountTenantKey.Create(cachePurpose, account, tenantId) : null,
+            LogIdentifier = hasReusableBinding ? account.GetLogIdentifier() : "invalid-canonical-account",
+            HasPendingInvite = hasPendingInvite,
+            MayReuseResult = !hasPendingInvite && onBehalf is null && session.IdentityResultCacheDuration > TimeSpan.Zero,
+            OnBehalf = onBehalf,
+            RequiredServices = requiredServices,
+            Activity = activity
+        };
+    }
+
+    bool SealedRecordAdmits(ResolutionState state)
+    {
+        var session = state.Session;
+
+        // Every short-circuit is a remembered answer standing in for asking again, so where the answer
+        // is an authorization decision a deployment must be able to switch the memory off and have it
+        // actually be off. A zero re-validation interval is documented as "no bound", and honoring that
+        // literally means nothing may be sealed — so nothing may be believed either.
+        var mayReuseRecord = !state.HasPendingInvite
+            && (!state.VerificationRequired || session.IdentityRevalidationInterval > TimeSpan.Zero);
+
+        // Skipping the identity endpoints means skipping the authorization answer they carry, so what
+        // permits the skip has to be something the caller could not have written. The readable
+        // .cratis-identity cookie is not that — it is non-HTTP-only by design and its value was never
+        // examined here, so sending any value for it used to be enough to be treated as authorized, for as
+        // long as the caller chose to keep sending it. The sealed record is checked instead, and it is
+        // checked against this principal and this tenant.
+        // The readable cookie can only cause more checking, never less, so it stays non-evidence.
+        return mayReuseRecord
+            && !ReadableIdentityNamesAnotherCaller(state.Context, state.Principal)
+            && authorizationCache.IsAuthorized(state.Context, state.Principal, state.TenantId);
+    }
+
+    IdentityProviderResult ResolveMissedTurn(ResolutionState state, IdentityVerificationReason missedTurn)
+    {
+        // A caller that went away is an ordinary event and says nothing about the deployment. Running out
+        // of budget while waiting is the operator's signal that the identity endpoints are the queue.
+        if (missedTurn == IdentityVerificationReason.TimedOut && !state.VerificationRequired)
+        {
+            logger.IdentityResolutionQueueExhausted(state.LogIdentifier);
+        }
+
+        // Never reaching the call establishes precisely what a call that never answers establishes, so
+        // the two ways of missing a turn are worth what their call-level equivalents are worth: nothing
+        // under Required, and no extra details otherwise. Nothing is sealed on this path either way.
+        return state.VerificationRequired
+            ? DenyUnreached(state, missedTurn)
+            : BuildAuthorizedResult(state.Principal, details: null);
+    }
+
+    bool TryServeCachedIdentity(ResolutionState state, [NotNullWhen(true)] out IdentityProviderResult? cached)
+    {
+        if (!TryGetCachedIdentity(state.MayReuseResult, state.CacheKey, out cached))
+        {
+            return false;
+        }
+
+        WriteIdentityState(state, cached, state.RequiredServices);
+        logger.IdentityDetailsCacheHit(state.LogIdentifier);
+        AuthProxyTelemetry.IdentityCacheLookup(true);
+        return true;
+    }
+
     bool TryGetCachedIdentity(bool mayReuseResult, IdentityAccountTenantKey? cacheKey, [NotNullWhen(true)] out IdentityProviderResult? cached)
     {
         cached = null;
@@ -425,31 +494,18 @@ public class IdentityDetailsResolver(
             details!);
 
     /// <summary>
-    /// Refuses the request and erases every trace of an earlier positive.
+    /// Refuses the request because a service refused, or could not be verified, and erases every trace of an earlier positive.
     /// </summary>
-    /// <param name="context">The current <see cref="HttpContext"/>.</param>
-    /// <param name="cacheKey">The in-memory result key for this caller, when there is one.</param>
+    /// <param name="state">What is known about the request being resolved.</param>
     /// <param name="serviceName">The service that refused, or that could not be verified.</param>
     /// <param name="reason">The bounded code explaining the refusal.</param>
     /// <param name="required">Whether the refusing service requires verification.</param>
-    /// <param name="requiredServices">Required services when resolution never reached an endpoint.</param>
-    /// <param name="activity">The identity span to tag as denied.</param>
     /// <returns>The unauthorized result.</returns>
-    /// <remarks>
-    /// Refusing without erasing would be nearly useless: an earlier success leaves a sealed record, a
-    /// readable cookie and an in-memory result behind, and any one of them lets the very next request skip
-    /// the question that was just answered no. All three go together, and they go on every refusal — the
-    /// released code cleared none of them, and <c language="text">Clear</c> had no caller at all.
-    /// </remarks>
-    IdentityProviderResult Deny(HttpContext context, IdentityAccountTenantKey? cacheKey, string serviceName, IdentityVerificationReason reason, bool required = false, IEnumerable<string>? requiredServices = null, Activity? activity = null)
+    IdentityProviderResult DenyService(ResolutionState state, string serviceName, IdentityVerificationReason reason, bool required)
     {
         if (reason == IdentityVerificationReason.Canceled)
         {
             logger.IdentityVerificationCanceled(serviceName);
-        }
-        else if (requiredServices is not null)
-        {
-            logger.RequiredIdentityResolutionDenied(requiredServices, reason.ToString());
         }
         else if (required)
         {
@@ -460,29 +516,68 @@ public class IdentityDetailsResolver(
             logger.IdentityVerificationDenied(serviceName, reason);
         }
 
-        AuthProxyTelemetry.IdentityDenied(reason);
-        AuthProxyTelemetry.IdentityResolved(activity, false);
-        authorizationCache.Clear(context);
-        ExpireIdentityCookie(context);
-        if (cacheKey is not null)
+        return Refuse(state, reason);
+    }
+
+    /// <summary>
+    /// Refuses the request because resolution never reached an endpoint, and erases every trace of an earlier positive.
+    /// </summary>
+    /// <param name="state">What is known about the request being resolved.</param>
+    /// <param name="reason">The bounded code explaining the refusal.</param>
+    /// <returns>The unauthorized result.</returns>
+    IdentityProviderResult DenyUnreached(ResolutionState state, IdentityVerificationReason reason)
+    {
+        if (reason == IdentityVerificationReason.Canceled)
         {
-            memoryCache.Remove(cacheKey);
+            logger.IdentityVerificationCanceled(ResolutionQueueLabel);
+        }
+        else
+        {
+            logger.RequiredIdentityResolutionDenied(state.RequiredServices, reason.ToString());
         }
 
-        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Refuse(state, reason);
+    }
+
+    /// <summary>
+    /// Records the refusal and erases every trace of an earlier positive.
+    /// </summary>
+    /// <param name="state">What is known about the request being resolved.</param>
+    /// <param name="reason">The bounded code explaining the refusal.</param>
+    /// <returns>The unauthorized result.</returns>
+    /// <remarks>
+    /// Refusing without erasing would be nearly useless: an earlier success leaves a sealed record, a
+    /// readable cookie and an in-memory result behind, and any one of them lets the very next request skip
+    /// the question that was just answered no. All three go together, and they go on every refusal — the
+    /// released code cleared none of them, and <c language="text">Clear</c> had no caller at all.
+    /// </remarks>
+    IdentityProviderResult Refuse(ResolutionState state, IdentityVerificationReason reason)
+    {
+        AuthProxyTelemetry.IdentityDenied(reason);
+        AuthProxyTelemetry.IdentityResolved(state.Activity, false);
+        authorizationCache.Clear(state.Context);
+        ExpireIdentityCookie(state.Context);
+        if (state.CacheKey is not null)
+        {
+            memoryCache.Remove(state.CacheKey);
+        }
+
+        state.Context.Response.StatusCode = StatusCodes.Status403Forbidden;
 
         return IdentityProviderResult.Unauthorized;
     }
 
-    void WriteIdentityState(HttpContext context, IdentityProviderResult result, ClientPrincipal principal, string tenantId, IReadOnlyCollection<string> verifiedRequiredServices, bool emitReadableCookie)
+    void WriteIdentityState(ResolutionState state, IdentityProviderResult result, IReadOnlyCollection<string> verifiedRequiredServices)
     {
+        var context = state.Context;
+
         // Two cookies, deliberately: the readable one the frontend renders from (optional, see
         // Session.EmitIdentityDetailsCookie), and the sealed record
         // that is allowed to skip this resolution next time. They are written together so the authorized
         // outcome and the proof of it can never drift apart.
-        authorizationCache.Record(context, principal, tenantId, verifiedRequiredServices);
+        authorizationCache.Record(context, state.Principal, state.TenantId, verifiedRequiredServices);
 
-        if (!emitReadableCookie)
+        if (!state.Session.EmitIdentityDetailsCookie)
         {
             return;
         }
@@ -513,5 +608,50 @@ public class IdentityDetailsResolver(
             Secure = context.Request.IsHttps,
             MaxAge = revalidationInterval > TimeSpan.Zero ? revalidationInterval : null,
         });
+    }
+
+    /// <summary>
+    /// What is known about one request being resolved, shared by the phases of the resolution.
+    /// </summary>
+    sealed class ResolutionState
+    {
+        /// <summary>Gets the current <see cref="HttpContext"/>.</summary>
+        public required HttpContext Context { get; init; }
+
+        /// <summary>Gets the caller.</summary>
+        public required ClientPrincipal Principal { get; init; }
+
+        /// <summary>Gets the tenant.</summary>
+        public required string TenantId { get; init; }
+
+        /// <summary>Gets the configuration snapshot the request is resolved against.</summary>
+        public required C.AuthProxy Config { get; init; }
+
+        /// <summary>Gets the in-memory result key for this caller, when there is one.</summary>
+        public required IdentityAccountTenantKey? CacheKey { get; init; }
+
+        /// <summary>Gets the identifier the caller is logged under.</summary>
+        public required string LogIdentifier { get; init; }
+
+        /// <summary>Gets a value indicating whether an invitation is pending for the request.</summary>
+        public required bool HasPendingInvite { get; init; }
+
+        /// <summary>Gets a value indicating whether a remembered in-memory result may stand in for resolving.</summary>
+        public required bool MayReuseResult { get; init; }
+
+        /// <summary>Gets the on-behalf session the request runs under, when there is one.</summary>
+        public required OnBehalfContext? OnBehalf { get; init; }
+
+        /// <summary>Gets the services whose verification is Required.</summary>
+        public required string[] RequiredServices { get; init; }
+
+        /// <summary>Gets the identity span, tagged when the caller is refused.</summary>
+        public required Activity? Activity { get; init; }
+
+        /// <summary>Gets the session settings of the configuration snapshot in use.</summary>
+        public C.Session Session => Config.Session;
+
+        /// <summary>Gets a value indicating whether any service requires verification.</summary>
+        public bool VerificationRequired => RequiredServices.Length > 0;
     }
 }
