@@ -1,0 +1,13 @@
+// Copyright (c) Cratis. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+namespace Cratis.AuthProxy.ForwardedIdentity.for_IdentityEndpointCaller;
+
+public class when_the_transport_fails : given.a_caller_answered_by_the_service
+{
+    protected override Task<HttpResponseMessage> Respond(CancellationToken cancellationToken) =>
+        throw new HttpRequestException("connection refused");
+
+    [Fact] void should_be_indeterminate() => _outcome.Status.ShouldEqual(IdentityVerificationStatus.Indeterminate);
+    [Fact] void should_explain_the_transport_failure() => _outcome.Reason.ShouldEqual(IdentityVerificationReason.TransportFailure);
+}

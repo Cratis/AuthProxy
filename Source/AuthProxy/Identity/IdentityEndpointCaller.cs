@@ -28,93 +28,91 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
     /// <summary>
     /// Calls a service's identity endpoint and reports the outcome.
     /// </summary>
-    /// <param name="serviceName">The configured name of the service being called.</param>
-    /// <param name="baseUrl">The service's backend base URL.</param>
-    /// <param name="principal">The enriched principal to present to the service.</param>
-    /// <param name="tenantId">The tenant the caller is acting in.</param>
-    /// <param name="logIdentifier">The non-identifying label used when logging about this caller.</param>
-    /// <param name="timeout">How long to wait for an answer. Non-positive leaves the wait unbounded.</param>
+    /// <param name="call">The call to make.</param>
     /// <param name="cancellationToken">The caller's own request lifetime.</param>
-    /// <param name="denialWillBeLogged">Whether the resolver will log failures as Required denials.</param>
-    /// <param name="onBehalf">The active on-behalf session the call is made for, if any.</param>
     /// <returns>What the service established, and the details it supplied.</returns>
     /// <remarks>
     /// Nothing here throws. Every way the call can fail is a fact about the service, and a fact is what the
     /// resolver needs in order to apply the configured mode to it — an exception escaping would force the
     /// decision to be made in an exception handler, which is exactly how the failure direction was lost.
     /// </remarks>
-    public async Task<IdentityVerificationOutcome> Call(
-        string serviceName,
-        string baseUrl,
-        ClientPrincipal principal,
-        string tenantId,
-        string logIdentifier,
-        TimeSpan timeout,
-        CancellationToken cancellationToken,
-        bool denialWillBeLogged = false,
-        OnBehalfContext? onBehalf = null)
+    public async Task<IdentityVerificationOutcome> Call(IdentityEndpointCall call, CancellationToken cancellationToken)
     {
-        var url = baseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
-        logger.CallingIdentityEndpoint(url, serviceName);
+        var url = call.BaseUrl.TrimEnd('/') + WellKnownPaths.IdentityDetails;
+        logger.CallingIdentityEndpoint(url, call.ServiceName);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.SetMicrosoftIdentityHeaders(principal);
-        var tenant = HeaderValue.ToTransportValue(tenantId);
-        request.Headers.Add(Headers.TenantId, tenant);
-        request.Headers.Add(Headers.LegacyTenantId, tenant);
+        using var request = BuildRequest(url, call);
 
         // During an on-behalf session the principal is the represented user. The call says so exactly as a forwarded
         // request does, so the application can tell support access from the user's own sign-in here too.
-        if (!TryAddOnBehalfHeaders(request, serviceName, onBehalf))
+        if (!TryAddOnBehalfHeaders(request, call.ServiceName, call.OnBehalf))
         {
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.OnBehalfAssertionUnavailable);
         }
 
-        using var timeoutSource = timeout > TimeSpan.Zero
+        using var timeoutSource = call.Timeout > TimeSpan.Zero
             ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
             : null;
-        timeoutSource?.CancelAfter(timeout);
+        timeoutSource?.CancelAfter(call.Timeout);
         var token = timeoutSource?.Token ?? cancellationToken;
 
         try
         {
-            var signing = signer.Sign(request, new(ForwardedIdentityFlow.IdentityDetails, serviceName));
-            if (signing == ForwardedIdentitySigningOutcome.Refused)
-            {
-                return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
-            }
-            using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
-            using var httpResponse = await client.SendAsync(request, token);
-
-            if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
-            {
-                logger.IdentityEndpointForbidden(serviceName, logIdentifier);
-                return IdentityVerificationOutcome.Denied(IdentityVerificationReason.Forbidden);
-            }
-
-            if (!httpResponse.IsSuccessStatusCode)
-            {
-                logger.IdentityEndpointUnsuccessful(serviceName, (int)httpResponse.StatusCode, denialWillBeLogged ? LogLevel.Debug : LogLevel.Warning);
-                return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnsuccessfulStatusCode);
-            }
-
-            return await ReadSuccessfulResponse(httpResponse.Content, serviceName, denialWillBeLogged, token);
+            return await Exchange(request, call, token);
         }
         catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName, LogLevel.Debug);
+            logger.ErrorCallingIdentityEndpoint(ex, call.ServiceName, LogLevel.Debug);
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.Canceled);
         }
         catch (OperationCanceledException ex)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName, denialWillBeLogged ? LogLevel.Debug : LogLevel.Error);
+            logger.ErrorCallingIdentityEndpoint(ex, call.ServiceName, FailureLevel(call));
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.TimedOut);
         }
         catch (Exception ex)
         {
-            logger.ErrorCallingIdentityEndpoint(ex, serviceName, denialWillBeLogged ? LogLevel.Debug : LogLevel.Error);
+            logger.ErrorCallingIdentityEndpoint(ex, call.ServiceName, FailureLevel(call));
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.TransportFailure);
         }
+    }
+
+    static HttpRequestMessage BuildRequest(string url, IdentityEndpointCall call)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.SetMicrosoftIdentityHeaders(call.Principal);
+        var tenant = HeaderValue.ToTransportValue(call.TenantId);
+        request.Headers.Add(Headers.TenantId, tenant);
+        request.Headers.Add(Headers.LegacyTenantId, tenant);
+        return request;
+    }
+
+    static LogLevel FailureLevel(IdentityEndpointCall call) => call.DenialWillBeLogged ? LogLevel.Debug : LogLevel.Error;
+
+    async Task<IdentityVerificationOutcome> Exchange(HttpRequestMessage request, IdentityEndpointCall call, CancellationToken token)
+    {
+        var signing = signer.Sign(request, new(ForwardedIdentityFlow.IdentityDetails, call.ServiceName));
+        if (signing == ForwardedIdentitySigningOutcome.Refused)
+        {
+            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ForwardedIdentityNotSigned);
+        }
+
+        using var client = signing == ForwardedIdentitySigningOutcome.SignatureCreated ? httpClientFactory.CreateClient(ForwardedIdentityServiceCollectionExtensions.HttpClientName) : httpClientFactory.CreateClient();
+        using var httpResponse = await client.SendAsync(request, token);
+
+        if (httpResponse.StatusCode == HttpStatusCode.Forbidden)
+        {
+            logger.IdentityEndpointForbidden(call.ServiceName, call.LogIdentifier);
+            return IdentityVerificationOutcome.Denied(IdentityVerificationReason.Forbidden);
+        }
+
+        if (!httpResponse.IsSuccessStatusCode)
+        {
+            logger.IdentityEndpointUnsuccessful(call.ServiceName, (int)httpResponse.StatusCode, call.DenialWillBeLogged ? LogLevel.Debug : LogLevel.Warning);
+            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnsuccessfulStatusCode);
+        }
+
+        return await ReadSuccessfulResponse(httpResponse.Content, call.ServiceName, call.DenialWillBeLogged, token);
     }
 
     /// <summary>

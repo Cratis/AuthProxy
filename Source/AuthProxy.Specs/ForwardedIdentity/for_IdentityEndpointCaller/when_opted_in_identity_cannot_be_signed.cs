@@ -17,7 +17,7 @@ public class when_opted_in_identity_cannot_be_signed : Specification
         _caller = new(_clients, Substitute.For<ILogger<IdentityEndpointCaller>>(), signer);
     }
 
-    async Task Because() => _outcome = await _caller.Call("app", "https://backend.example", new() { UserId = "u" }, "tenant", "spec-caller", TimeSpan.Zero, CancellationToken.None);
+    async Task Because() => _outcome = await _caller.Call(new("app", "https://backend.example", new() { UserId = "u" }, "tenant", "spec-caller", TimeSpan.Zero), CancellationToken.None);
 
     [Fact] void should_not_create_a_transport_client() => _clients.DidNotReceive().CreateClient(Arg.Any<string>());
     [Fact] void should_return_a_typed_unavailable_reason() => _outcome.Reason.ShouldEqual(IdentityVerificationReason.ForwardedIdentityNotSigned);
