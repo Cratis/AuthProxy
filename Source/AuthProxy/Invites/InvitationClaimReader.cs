@@ -24,7 +24,7 @@ static class InvitationClaimReader
     /// <param name="claimType">The claim type to look up.</param>
     /// <param name="value">The single exact claim value when accepted.</param>
     /// <returns><see langword="true"/> when the claim occurs exactly once with an acceptable value; otherwise <see langword="false"/>.</returns>
-    internal static bool TryGetSingleTokenClaim(string token, string claimType, out string value)
+    internal static bool TryGetSingleTokenClaim(string token, ClaimType claimType, out string value)
     {
         try
         {
@@ -44,7 +44,7 @@ static class InvitationClaimReader
     /// <param name="claimType">The claim type to look up.</param>
     /// <param name="value">The single exact claim value when accepted.</param>
     /// <returns><see langword="true"/> when the claim occurs exactly once with an acceptable value; otherwise <see langword="false"/>.</returns>
-    internal static bool TryGetSingleExactClaim(ClaimsPrincipal principal, string claimType, out string value) =>
+    internal static bool TryGetSingleExactClaim(ClaimsPrincipal principal, ClaimType claimType, out string value) =>
         TryGetSingleExactClaim(principal.Claims, claimType, out value);
 
     /// <summary>
@@ -98,16 +98,16 @@ static class InvitationClaimReader
         ?? principal.Identity?.AuthenticationType
         ?? string.Empty;
 
-    static bool TryGetSingleExactClaim(IEnumerable<Claim> claims, string claimType, out string value)
+    static bool TryGetSingleExactClaim(IEnumerable<Claim> claims, ClaimType claimType, out string value)
     {
-        var matches = claims.Where(_ => string.Equals(_.Type, claimType, StringComparison.Ordinal)).ToArray();
+        var matches = claims.Where(_ => string.Equals(_.Type, claimType.Value, StringComparison.Ordinal)).ToArray();
         var accepted = matches.Length == 1 && IsExactClaimValue(matches[0].Value);
         value = accepted ? matches[0].Value : string.Empty;
         return accepted;
     }
 
-    static string? FirstClaimValue(ClaimsPrincipal principal, params string[] claimTypes) =>
-        claimTypes.Select(principal.FindFirst).FirstOrDefault(_ => _ is not null)?.Value;
+    static string? FirstClaimValue(ClaimsPrincipal principal, params ClaimType[] claimTypes) =>
+        claimTypes.Select(_ => principal.FindFirst(_.Value)).FirstOrDefault(_ => _ is not null)?.Value;
 
     static bool? ReadEmailVerified(ClaimsPrincipal principal) =>
         bool.TryParse(principal.FindFirst("email_verified")?.Value, out var verified) ? verified : null;
