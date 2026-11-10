@@ -65,17 +65,9 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
 
         // During an on-behalf session the principal is the represented user. The call says so exactly as a forwarded
         // request does, so the application can tell support access from the user's own sign-in here too.
-        if (onBehalf is not null)
+        if (!TryAddOnBehalfHeaders(request, serviceName, onBehalf))
         {
-            var forward = new OnBehalfForward(serviceName, HttpMethod.Get, request.RequestUri!.AbsolutePath);
-            if (!onBehalf.TryIssueAssertion(forward, request.Headers.GetValues(Headers.Principal).Single(), out var assertion))
-            {
-                logger.OnBehalfAssertionUnavailable(serviceName);
-                return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.OnBehalfAssertionUnavailable);
-            }
-
-            request.Headers.Add(Headers.OnBehalfActor, onBehalf.ActorHeader);
-            request.Headers.Add(Headers.OnBehalfAssertion, assertion);
+            return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.OnBehalfAssertionUnavailable);
         }
 
         using var timeoutSource = timeout > TimeSpan.Zero
@@ -106,11 +98,7 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
                 return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnsuccessfulStatusCode);
             }
 
-            var body = await httpResponse.Content.ReadAsStringAsync(token);
-
-            return string.IsNullOrWhiteSpace(body)
-                ? IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.EmptyResponse)
-                : ReadOutcome(body, serviceName, denialWillBeLogged);
+            return await ReadSuccessfulResponse(httpResponse.Content, serviceName, denialWillBeLogged, token);
         }
         catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
         {
@@ -145,6 +133,51 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
             ? verdict
             : null;
 
+    static IdentityVerificationOutcome CreateOutcome(JsonObject parsed)
+    {
+        // Preserved exactly as released: a service may answer the full identity envelope, or the bare
+        // details object. Anything that is not an envelope is details, and details alone say nothing about
+        // whether the caller may be here.
+        var details = parsed["details"]?.AsObject() ?? parsed;
+        var authorized = ReadVerdict(parsed, "isAuthorized");
+        var authenticated = ReadVerdict(parsed, "isAuthenticated");
+
+        return (authorized, authenticated) switch
+        {
+            (false, _) => IdentityVerificationOutcome.Denied(IdentityVerificationReason.NotAuthorized, details),
+            (true, false) => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ConflictingVerdict, details),
+            (true, _) => IdentityVerificationOutcome.Positive(details),
+            _ => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.NoVerdict, details)
+        };
+    }
+
+    bool TryAddOnBehalfHeaders(HttpRequestMessage request, string serviceName, OnBehalfContext? onBehalf)
+    {
+        if (onBehalf is null)
+        {
+            return true;
+        }
+
+        var forward = new OnBehalfForward(serviceName, HttpMethod.Get, request.RequestUri!.AbsolutePath);
+        if (!onBehalf.TryIssueAssertion(forward, request.Headers.GetValues(Headers.Principal).Single(), out var assertion))
+        {
+            logger.OnBehalfAssertionUnavailable(serviceName);
+            return false;
+        }
+
+        request.Headers.Add(Headers.OnBehalfActor, onBehalf.ActorHeader);
+        request.Headers.Add(Headers.OnBehalfAssertion, assertion);
+        return true;
+    }
+
+    async Task<IdentityVerificationOutcome> ReadSuccessfulResponse(HttpContent content, string serviceName, bool denialWillBeLogged, CancellationToken token)
+    {
+        var body = await content.ReadAsStringAsync(token);
+        return string.IsNullOrWhiteSpace(body)
+            ? IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.EmptyResponse)
+            : ReadOutcome(body, serviceName, denialWillBeLogged);
+    }
+
     /// <summary>
     /// Reads a successful response body into an outcome.
     /// </summary>
@@ -165,19 +198,6 @@ public class IdentityEndpointCaller(IHttpClientFactory httpClientFactory, ILogge
             return IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.UnreadableResponse);
         }
 
-        // Preserved exactly as released: a service may answer the full identity envelope, or the bare
-        // details object. Anything that is not an envelope is details, and details alone say nothing about
-        // whether the caller may be here.
-        var details = parsed["details"]?.AsObject() ?? parsed;
-        var authorized = ReadVerdict(parsed, "isAuthorized");
-        var authenticated = ReadVerdict(parsed, "isAuthenticated");
-
-        return (authorized, authenticated) switch
-        {
-            (false, _) => IdentityVerificationOutcome.Denied(IdentityVerificationReason.NotAuthorized, details),
-            (true, false) => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.ConflictingVerdict, details),
-            (true, _) => IdentityVerificationOutcome.Positive(details),
-            _ => IdentityVerificationOutcome.Indeterminate(IdentityVerificationReason.NoVerdict, details)
-        };
+        return CreateOutcome(parsed);
     }
 }

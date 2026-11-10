@@ -96,10 +96,7 @@ public static class ClientPrincipalExtensions
 
         // Only a browser session records the authentication time AuthProxy observed; read it before the principal is
         // replaced by a canonical one, which carries no session metadata.
-        var authenticationTime = string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal)
-            && SessionAuthenticationTime.TryRead(user, properties, out var sessionTime)
-                ? sessionTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)
-                : null;
+        var authenticationTime = ResolveAuthenticationTime(user, properties, authenticationScheme);
 
         var canonicalResolution = context.RequestServices is { } requestServices
             ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)
@@ -116,19 +113,8 @@ public static class ClientPrincipalExtensions
 
         var identity = user.Identity!;
 
-        var userId = canonicalResolution?.Identity?.Subject
-            ?? user.FindFirst("oid")?.Value
-            ?? user.FindFirst("sub")?.Value
-            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? string.Empty;
-
-        var userDetails = user.FindFirst("preferred_username")?.Value
-            ?? user.FindFirst("email")?.Value
-            ?? user.FindFirst(ClaimTypes.Email)?.Value
-            ?? user.FindFirst("name")?.Value
-            ?? user.FindFirst(ClaimTypes.Name)?.Value
-            ?? user.Identity?.Name
-            ?? string.Empty;
+        var userId = ResolveUserId(user, canonicalResolution?.Identity);
+        var userDetails = ResolveUserDetails(user);
 
         var isCanonical = canonicalResolution?.IsConfigured == true && canonicalResolution.Succeeded;
         var roles = user.Claims
@@ -214,6 +200,28 @@ public static class ClientPrincipalExtensions
             requestMessage.Headers.Add(Headers.PrincipalNameExtended, userDetails);
         }
     }
+
+    static string? ResolveAuthenticationTime(ClaimsPrincipal user, AuthenticationProperties? properties, string? authenticationScheme) =>
+        string.Equals(authenticationScheme, CookieAuthenticationDefaults.AuthenticationScheme, StringComparison.Ordinal)
+        && SessionAuthenticationTime.TryRead(user, properties, out var sessionTime)
+            ? sessionTime.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)
+            : null;
+
+    static string ResolveUserId(ClaimsPrincipal user, CanonicalFederatedIdentity? identity) =>
+        identity?.Subject
+        ?? user.FindFirst("oid")?.Value
+        ?? user.FindFirst("sub")?.Value
+        ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+        ?? string.Empty;
+
+    static string ResolveUserDetails(ClaimsPrincipal user) =>
+        user.FindFirst("preferred_username")?.Value
+        ?? user.FindFirst("email")?.Value
+        ?? user.FindFirst(ClaimTypes.Email)?.Value
+        ?? user.FindFirst("name")?.Value
+        ?? user.FindFirst(ClaimTypes.Name)?.Value
+        ?? user.Identity?.Name
+        ?? string.Empty;
 
     static bool IsAuthenticationTime(string claimType) =>
         string.Equals(claimType, AuthenticationTimeClaim, StringComparison.OrdinalIgnoreCase);
