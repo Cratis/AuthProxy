@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Diagnostics.CodeAnalysis;
 using Cratis.AuthProxy.ErrorPages;
 using Cratis.AuthProxy.OnBehalfSessions;
 using Cratis.AuthProxy.Tenancy;
@@ -93,11 +94,29 @@ public class TenancyMiddleware(
 
     async Task<bool> HandleUnresolvedTenant(HttpContext context)
     {
+        var exempt = IsExemptFromTenantResolution(context);
+
         // If a lobby is configured, redirect users without a resolved tenant to the lobby
         // frontend – unless this is an invite path (handled by InviteMiddleware) or the
         // user already has a pending invite cookie (so the Phase 2 exchange can proceed).
-        var lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
-        var shouldRedirectToLobby = config.CurrentValue.Invite?.RedirectToLobbyWhenTenantUnresolved == true;
+        if (!exempt && TryGetLobbyRedirect(out var lobbyUrl))
+        {
+            logger.RedirectingToLobby(context.Request.Path);
+            context.Response.Redirect(lobbyUrl);
+            return true;
+        }
+
+        if (config.CurrentValue.TenantResolutions.Count == 0 || exempt)
+        {
+            return false;
+        }
+
+        await RefuseUnresolvedTenant(context);
+        return true;
+    }
+
+    bool IsExemptFromTenantResolution(HttpContext context)
+    {
         var isInvitePath = context.IsInvitation();
         var isRegistrationPath = context.IsRegistration();
         var hasPendingInviteCookie = context.HasPendingInvitation();
@@ -110,20 +129,18 @@ public class TenancyMiddleware(
         var isAnonymousPath = context.IsAnonymousPath(config.CurrentValue);
         var pending = hasPendingInviteCookie || hasPendingRegistrationCookie;
         var tenantlessPath = isInvitePath || isRegistrationPath || isAuthPath || isAnonymousPath;
-        var exempt = tenantlessPath || pending;
+        return tenantlessPath || pending;
+    }
 
-        if (shouldRedirectToLobby && !string.IsNullOrWhiteSpace(lobbyUrl) && !exempt)
-        {
-            logger.RedirectingToLobby(context.Request.Path);
-            context.Response.Redirect(lobbyUrl);
-            return true;
-        }
+    bool TryGetLobbyRedirect([NotNullWhen(true)] out string? lobbyUrl)
+    {
+        lobbyUrl = config.CurrentValue.Invite?.Lobby?.Frontend?.BaseUrl;
+        var shouldRedirectToLobby = config.CurrentValue.Invite?.RedirectToLobbyWhenTenantUnresolved == true;
+        return shouldRedirectToLobby && !string.IsNullOrWhiteSpace(lobbyUrl);
+    }
 
-        if (config.CurrentValue.TenantResolutions.Count == 0 || exempt)
-        {
-            return false;
-        }
-
+    async Task RefuseUnresolvedTenant(HttpContext context)
+    {
         logger.CouldNotResolveTenant(context.Request.Path);
 
         // An authenticated user with no resolvable tenant is signed in but not associated
@@ -136,11 +153,10 @@ public class TenancyMiddleware(
                 context,
                 WellKnownPageNames.NoOrganization,
                 StatusCodes.Status403Forbidden);
-            return true;
+            return;
         }
 
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-        return true;
     }
 
     /// <summary>
