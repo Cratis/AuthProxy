@@ -147,7 +147,7 @@ public class TenantSelectionMiddleware(
         }
 
         context.Response.StatusCode = StatusCodes.Status302Found;
-        context.Response.Headers.Location = context.GetPathAndQuery();
+        context.Response.Headers.Location = RelativeRedirect.Resolve(context.GetPathAndQuery());
         return true;
     }
 
@@ -192,7 +192,7 @@ public class TenantSelectionMiddleware(
         context.Response.Cookies.Delete(Cookies.Tenants);
         MarkTenantAsRevalidated(context, tenant.Id);
         context.Response.StatusCode = StatusCodes.Status302Found;
-        context.Response.Headers.Location = context.GetPathAndQuery();
+        context.Response.Headers.Location = RelativeRedirect.Resolve(context.GetPathAndQuery());
     }
 
     async Task ShowTenantChooser(HttpContext context, IReadOnlyList<TenantOption> tenantOptions)
