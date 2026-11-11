@@ -50,6 +50,10 @@ public class and_the_matching_tenant_return_url_completion_is_replayed(CallbackA
             _replay.Headers.Location?.ToString().StartsWith(CallbackAuthProxyFactory.LobbyUrl, StringComparison.Ordinal) ?? false);
 
     [Fact]
+    public void should_send_the_person_to_the_application_instead_of_a_blank_not_found() =>
+        Assert.Equal("/", _replay.Headers.Location?.ToString());
+
+    [Fact]
     public void should_clear_the_stale_pending_invitation_cookie()
     {
         _replay.Headers.TryGetValues("Set-Cookie", out var cookies);

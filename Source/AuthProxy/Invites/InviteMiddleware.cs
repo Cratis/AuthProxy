@@ -465,7 +465,7 @@ public class InviteMiddleware(
         InviteTokenValidationResult validationResult) => outcome switch
         {
             PendingInvitationOutcome.Rejected => RejectPendingInvitation(context, validationResult),
-            PendingInvitationOutcome.AlreadyCompleted => ContinueCompletedInvitation(context, inviteToken),
+            PendingInvitationOutcome.AlreadyCompleted => ContinueCompletedInvitation(context, inviteToken, leaveInvitationUrl: context.IsInvitation()),
             _ => CompleteInvitation(context, inviteToken)
         };
 
@@ -497,7 +497,7 @@ public class InviteMiddleware(
         if (context.User.Identity?.IsAuthenticated == true
             && WasInvitationCompletedByThisSession(context, token))
         {
-            await ContinueCompletedInvitation(context, token);
+            await ContinueCompletedInvitation(context, token, leaveInvitationUrl: true);
             return;
         }
 
@@ -667,14 +667,22 @@ public class InviteMiddleware(
     /// </summary>
     /// <param name="context">The current <see cref="HttpContext"/>.</param>
     /// <param name="inviteToken">The already-completed invitation capability.</param>
+    /// <param name="leaveInvitationUrl">Whether the request is for the invitation link itself, which has nowhere to go once it is completed.</param>
     /// <returns>A <see cref="Task"/> that represents the asynchronous operation.</returns>
-    async Task ContinueCompletedInvitation(HttpContext context, string inviteToken)
+    async Task ContinueCompletedInvitation(HttpContext context, string inviteToken, bool leaveInvitationUrl = false)
     {
         PendingInvitationCookies.Delete(context);
 
         if (invitations.TryResolveLobbyRedirect(context, inviteToken, out var lobbyRedirectUrl))
         {
             context.Items[LobbyRedirectUrlItemKey] = lobbyRedirectUrl;
+        }
+        else if (leaveInvitationUrl)
+        {
+            // The request is for the invitation link itself, and nothing downstream answers an /invite/{token} path: forwarding
+            // it ended in an empty 404 for a person who simply opened their link a second time. Take them to the application.
+            context.Response.Redirect("/");
+            return;
         }
 
         await next(context);
