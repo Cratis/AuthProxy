@@ -1,15 +1,13 @@
 name: Azure Documentation Specs
 
+# Called from pull-requests.yml; the PR triggers and path filters live there.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: azure-docs-specs-${{ github.ref }}
   cancel-in-progress: true
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "Documentation/azure/**"
-      - ".github/workflows/azure-docs-specs.yml"
+  workflow_call:
   push:
     branches:
       - main
