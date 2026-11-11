@@ -57,7 +57,7 @@ public class when_a_sign_in_starts_on_a_host_other_than_the_callback_host(FixedC
 
     [Fact]
     public void should_issue_a_session_valid_for_the_whole_domain() =>
-        Assert.Contains(SessionCookieHarness.SetCookies(_handshake!.Callback!), _ => SessionCookieHarness.IsSettingOf(_, harness.CookieName) && SessionCookieHarness.HasDomain(_));
+        Assert.Contains(SessionCookieHarness.SetCookies(_handshake!.Callback!), _ => SessionCookieHarness.IsSettingOf(new() { Header = _, Name = harness.CookieName }) && SessionCookieHarness.HasDomain(_));
 
     [Fact]
     public void should_honor_that_session_on_the_original_host() =>

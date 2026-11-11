@@ -17,7 +17,7 @@ public class when_a_session_is_ended_on_another_host(SessionCookieHarness harnes
     public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
-        var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost));
+        var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost }));
 
         _logout = await client.SendAsync(SessionCookieHarness.Request(SessionCookieHarness.OperationsHost, WellKnownPaths.Logout, session));
     }
@@ -32,11 +32,11 @@ public class when_a_session_is_ended_on_another_host(SessionCookieHarness harnes
     public void should_delete_the_session_cookie_for_the_whole_domain() =>
         Assert.Contains(
             SessionCookieHarness.SetCookies(_logout!),
-            _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && _.Contains($"domain={SessionCookieHarness.Domain}", StringComparison.OrdinalIgnoreCase));
+            _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && _.Contains($"domain={SessionCookieHarness.Domain}", StringComparison.OrdinalIgnoreCase));
 
     [Fact]
     public void should_also_delete_a_host_only_copy_left_by_an_earlier_deployment() =>
         Assert.Contains(
             SessionCookieHarness.SetCookies(_logout!),
-            _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && !SessionCookieHarness.HasDomain(_));
+            _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && !SessionCookieHarness.HasDomain(_));
 }

@@ -39,7 +39,7 @@ public class when_a_bearer_token_is_presented_off_its_routes_with_unusual_format
         _control = await client.SendAsync(BearerRouteHarness.WithToken(
             HttpMethod.Get,
             Path,
-            harness.Issuer.Token(issuer: JwtBearerAlongsideBearerRoutesHarness.OtherIssuer)));
+            harness.Issuer.Token(new StubIssuer.TokenRequest { Issuer = JwtBearerAlongsideBearerRoutesHarness.OtherIssuer })));
 
         harness.Origin.Clear();
         var token = harness.Issuer.Token();

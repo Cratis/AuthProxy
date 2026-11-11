@@ -128,18 +128,15 @@ public sealed class StubIssuer : IAsyncDisposable
     /// Signs an access token with the published key.
     /// </summary>
     /// <param name="claims">The claims, which replace the defaults of <see cref="DefaultClaims"/> they name.</param>
-    /// <param name="audience">The audience.</param>
-    /// <param name="expires">When the token expires. Defaults to fifteen minutes from now.</param>
-    /// <param name="issuer">The issuer to name. Defaults to this issuer.</param>
-    /// <param name="without">Default claims to leave out.</param>
     /// <returns>The signed token.</returns>
-    public string Token(
-        IDictionary<string, object>? claims = null,
-        string audience = BearerRouteHarness.Audience,
-        DateTime? expires = null,
-        string? issuer = null,
-        params string[] without) =>
-        Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, new(claims, audience, expires, issuer, without));
+    public string Token(IDictionary<string, object>? claims = null) => Token(new TokenRequest { Claims = claims });
+
+    /// <summary>
+    /// Signs an access token with the published key using the requested claims and token settings.
+    /// </summary>
+    /// <param name="request">The claims, audience, issuer, and lifetime to use.</param>
+    /// <returns>The signed token.</returns>
+    public string Token(TokenRequest request) => Sign(new RsaSecurityKey(_rsa) { KeyId = _keyId }, request);
 
     /// <summary>
     /// Replaces the published signing key and its identifier.
@@ -227,19 +224,54 @@ public sealed class StubIssuer : IAsyncDisposable
         _rsa.Dispose();
     }
 
-    sealed record TokenRequest(
-        IDictionary<string, object>? Claims,
-        string Audience,
-        DateTime? Expires,
-        string? Issuer,
-        string[] Without)
+    /// <summary>
+    /// Describes the claims and signing settings of an access token issued for a spec.
+    /// </summary>
+    public sealed record TokenRequest
     {
-        public static TokenRequest Default { get; } = new(null, BearerRouteHarness.Audience, null, null, []);
+        /// <summary>
+        /// Gets the default token settings.
+        /// </summary>
+        public static TokenRequest Default { get; } = new();
 
+        /// <summary>
+        /// Gets the claims that replace the defaults they name.
+        /// </summary>
+        public IDictionary<string, object>? Claims { get; init; }
+
+        /// <summary>
+        /// Gets the audience.
+        /// </summary>
+        public string Audience { get; init; } = BearerRouteHarness.Audience;
+
+        /// <summary>
+        /// Gets the expiry, or null for fifteen minutes from now.
+        /// </summary>
+        public DateTime? Expires { get; init; }
+
+        /// <summary>
+        /// Gets the issuer identifier, or null for this issuer.
+        /// </summary>
+        public string? Issuer { get; init; }
+
+        /// <summary>
+        /// Gets the default claims to omit.
+        /// </summary>
+        public string[] Without { get; init; } = [];
+
+        /// <summary>
+        /// Gets the callback that reshapes the token descriptor before signing.
+        /// </summary>
         public Action<SecurityTokenDescriptor>? Shape { get; init; }
 
+        /// <summary>
+        /// Gets whether the handler fills in lifetimes the descriptor leaves unset.
+        /// </summary>
         public bool SetDefaultTimes { get; init; } = true;
 
+        /// <summary>
+        /// Gets the signing algorithm.
+        /// </summary>
         public string Algorithm { get; init; } = SecurityAlgorithms.RsaSha256;
     }
 

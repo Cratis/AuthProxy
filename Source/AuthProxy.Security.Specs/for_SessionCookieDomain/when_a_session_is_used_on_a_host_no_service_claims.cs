@@ -17,7 +17,7 @@ public class when_a_session_is_used_on_a_host_no_service_claims(SessionCookieHar
     public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
-        var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost, withOperationsClaim: true));
+        var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost, WithOperationsClaim = true }));
 
         harness.ClearOrigins();
         _response = await client.SendAsync(SessionCookieHarness.Request("undeclared.example.test", "/api/users", session));

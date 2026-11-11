@@ -17,7 +17,7 @@ public class when_bearer_configuration_has_surrounding_whitespace
             BearerRouteHarness.WithToken(
                 HttpMethod.Get,
                 "/mcp/trimmed-configuration",
-                harness.Issuer.Token(new Dictionary<string, object> { ["tenant"] = BearerRouteHarness.TenantId }, without: ["tid"])),
+                harness.Issuer.Token(new StubIssuer.TokenRequest { Claims = new Dictionary<string, object> { ["tenant"] = BearerRouteHarness.TenantId }, Without = ["tid"] })),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -33,7 +33,7 @@ public class when_bearer_configuration_has_surrounding_whitespace
             BearerRouteHarness.WithToken(
                 HttpMethod.Get,
                 "/mcp/padded-token-issuer",
-                harness.Issuer.Token(issuer: $" {harness.Issuer.Issuer} ")),
+                harness.Issuer.Token(new StubIssuer.TokenRequest { Issuer = $" {harness.Issuer.Issuer} " })),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);

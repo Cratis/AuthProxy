@@ -19,26 +19,26 @@ public class when_a_browser_holds_a_host_only_copy_of_the_session(SessionCookieH
     public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
-        var shared = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost)).Single();
+        var shared = SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost })).Single();
 
         // The copy an earlier deployment issued is a real session of its own, from the same keys.
-        var stale = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost)).Single();
+        var stale = SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost })).Single();
 
         _requestWithBothCopies = await client.SendAsync(SessionCookieHarness.Request(SessionCookieHarness.ChronicleHost, "/api/events", shared, stale));
         _requestSetCookies = SessionCookieHarness.SetCookies(_requestWithBothCopies);
 
-        _signInSetCookies = SessionCookieHarness.SetCookies(await harness.SignIn(client, SessionCookieHarness.ConsoleHost, withOperationsClaim: false, stale));
+        _signInSetCookies = SessionCookieHarness.SetCookies(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost, WithOperationsClaim = false, Cookies = [stale] }));
     }
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
     public void should_delete_the_host_only_copy_when_the_cookie_arrives_twice() =>
-        Assert.Contains(_requestSetCookies, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && !SessionCookieHarness.HasDomain(_));
+        Assert.Contains(_requestSetCookies, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && !SessionCookieHarness.HasDomain(_));
 
     [Fact]
     public void should_never_delete_the_shared_cookie_while_cleaning_up() =>
-        Assert.DoesNotContain(_requestSetCookies, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && SessionCookieHarness.HasDomain(_));
+        Assert.DoesNotContain(_requestSetCookies, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && SessionCookieHarness.HasDomain(_));
 
     [Fact]
     public void should_still_serve_the_request() =>
@@ -46,16 +46,16 @@ public class when_a_browser_holds_a_host_only_copy_of_the_session(SessionCookieH
 
     [Fact]
     public void should_delete_the_host_only_copy_when_a_new_session_is_issued() =>
-        Assert.Contains(_signInSetCookies, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && !SessionCookieHarness.HasDomain(_));
+        Assert.Contains(_signInSetCookies, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && !SessionCookieHarness.HasDomain(_));
 
     [Fact]
     public void should_issue_the_new_session_for_the_whole_domain() =>
-        Assert.Contains(_signInSetCookies, _ => SessionCookieHarness.IsSettingOf(_, harness.CookieName) && SessionCookieHarness.HasDomain(_));
+        Assert.Contains(_signInSetCookies, _ => SessionCookieHarness.IsSettingOf(new() { Header = _, Name = harness.CookieName }) && SessionCookieHarness.HasDomain(_));
 
     [Fact]
     public void should_delete_the_host_only_copy_after_the_new_session_is_written() =>
         Assert.True(
-            IndexOf(_signInSetCookies, _ => SessionCookieHarness.IsSettingOf(_, harness.CookieName)) < IndexOf(_signInSetCookies, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && !SessionCookieHarness.HasDomain(_)),
+            IndexOf(_signInSetCookies, _ => SessionCookieHarness.IsSettingOf(new() { Header = _, Name = harness.CookieName })) < IndexOf(_signInSetCookies, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && !SessionCookieHarness.HasDomain(_)),
             "A deletion that came first could be applied after the new cookie and take it with it.");
 
     static int IndexOf(IReadOnlyList<string> values, Func<string, bool> predicate)

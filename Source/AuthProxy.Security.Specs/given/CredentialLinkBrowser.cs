@@ -94,7 +94,7 @@ public sealed partial class CredentialLinkBrowser(SessionCookieHarness harness)
     /// <param name="client">The client to use.</param>
     /// <returns>The session cookies.</returns>
     public async Task<string[]> SignIn(HttpClient client) =>
-        SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost));
+        SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost }));
 
     [GeneratedRegex("name=\"__cratis_antiforgery\" value=\"(?<token>[^\"]*)\"", RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
     private static partial Regex FormTokenPattern { get; }

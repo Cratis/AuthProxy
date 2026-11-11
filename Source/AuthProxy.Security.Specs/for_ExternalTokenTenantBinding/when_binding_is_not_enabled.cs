@@ -17,7 +17,7 @@ public class when_binding_is_not_enabled(LegacyExternalTokenHarness harness)
         harness.Origin.Clear();
         var claims = new Dictionary<string, object>();
         if (tenant is not null) claims["tid"] = tenant;
-        var token = harness.Issuer.Token(claims, without: tenant is null ? ["tid"] : []);
+        var token = harness.Issuer.Token(new StubIssuer.TokenRequest { Claims = claims, Without = tenant is null ? ["tid"] : [] });
         using var request = BearerRouteHarness.WithToken(HttpMethod.Get, "/private/legacy", token);
         request.Headers.Host = "a.direct.example.test";
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);

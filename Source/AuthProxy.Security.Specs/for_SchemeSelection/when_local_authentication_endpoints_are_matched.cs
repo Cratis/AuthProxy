@@ -21,7 +21,7 @@ public class when_local_authentication_endpoints_are_matched
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
-        Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(value, harness.CookieName));
+        Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(new() { Header = value, Name = harness.CookieName }));
     }
 
     [Theory]

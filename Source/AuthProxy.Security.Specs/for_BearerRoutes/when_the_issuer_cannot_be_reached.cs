@@ -25,7 +25,7 @@ public class when_the_issuer_cannot_be_reached(BearerRouteHarness harness) : IAs
         _response = await client.SendAsync(BearerRouteHarness.WithToken(
             HttpMethod.Get,
             Path,
-            harness.Issuer.Token(issuer: BearerRouteHarness.UnreachableIssuer)));
+            harness.Issuer.Token(new StubIssuer.TokenRequest { Issuer = BearerRouteHarness.UnreachableIssuer })));
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 

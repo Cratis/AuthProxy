@@ -20,7 +20,7 @@ public class when_the_token_has_no_tenant(BearerRouteHarness harness) : IAsyncLi
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
 
-        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(without: "tid")));
+        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(new StubIssuer.TokenRequest { Without = ["tid"] })));
     }
 
     public ValueTask DisposeAsync()

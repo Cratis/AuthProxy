@@ -121,21 +121,19 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
     /// <summary>
     /// Gets whether a <c language="text">Set-Cookie</c> value expires the named cookie.
     /// </summary>
-    /// <param name="setCookie">The raw header value.</param>
-    /// <param name="name">The cookie name.</param>
+    /// <param name="cookie">The raw header value and cookie name to match.</param>
     /// <returns><see langword="true"/> when it is a deletion of the cookie.</returns>
-    public static bool IsDeletionOf(string setCookie, string name) =>
-        setCookie.StartsWith($"{name}=;", StringComparison.Ordinal)
-        && setCookie.Contains("expires=", StringComparison.OrdinalIgnoreCase);
+    public static bool IsDeletionOf(CookieSelection cookie) =>
+        cookie.Header.StartsWith($"{cookie.Name}=;", StringComparison.Ordinal)
+        && cookie.Header.Contains("expires=", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Gets whether a <c language="text">Set-Cookie</c> value sets the named cookie to a value.
     /// </summary>
-    /// <param name="setCookie">The raw header value.</param>
-    /// <param name="name">The cookie name.</param>
+    /// <param name="cookie">The raw header value and cookie name to match.</param>
     /// <returns><see langword="true"/> when it sets the cookie.</returns>
-    public static bool IsSettingOf(string setCookie, string name) =>
-        setCookie.StartsWith($"{name}=", StringComparison.Ordinal) && !IsDeletionOf(setCookie, name);
+    public static bool IsSettingOf(CookieSelection cookie) =>
+        cookie.Header.StartsWith($"{cookie.Name}=", StringComparison.Ordinal) && !IsDeletionOf(cookie);
 
     /// <summary>
     /// Gets whether a <c language="text">Set-Cookie</c> value carries a <c language="text">Domain</c> attribute.
@@ -167,12 +165,10 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
     /// Signs a caller in on a host and returns the response, whose <c language="text">Set-Cookie</c> headers are the session.
     /// </summary>
     /// <param name="client">The client to use.</param>
-    /// <param name="host">The host to sign in on.</param>
-    /// <param name="withOperationsClaim">Whether the caller carries the claim the operations service requires.</param>
-    /// <param name="cookies">Cookies the browser already holds.</param>
+    /// <param name="signIn">The browser host, existing cookies, and requested operations claim.</param>
     /// <returns>The sign-in response.</returns>
-    public Task<HttpResponseMessage> SignIn(HttpClient client, string host, bool withOperationsClaim = false, params string[] cookies) =>
-        client.SendAsync(Request(host, $"{SignInPath}?{OperationsQueryKey}={withOperationsClaim}", cookies));
+    public Task<HttpResponseMessage> SignIn(HttpClient client, SignInRequest signIn) =>
+        client.SendAsync(Request(signIn.Host, $"{SignInPath}?{OperationsQueryKey}={signIn.WithOperationsClaim}", signIn.Cookies));
 
     /// <summary>
     /// Takes the reusable <c language="text">name=value</c> pairs a response set, skipping deletions.
@@ -286,6 +282,43 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
                     ProviderScheme,
                     options => options.Backchannel = new HttpClient(new FakeIdentityProvider()) { Timeout = TimeSpan.FromSeconds(10) });
             });
+    }
+
+    /// <summary>
+    /// Describes the browser state and identity claim for a sign-in.
+    /// </summary>
+    public sealed record SignInRequest
+    {
+        /// <summary>
+        /// Gets the host to sign in on.
+        /// </summary>
+        public required string Host { get; init; }
+
+        /// <summary>
+        /// Gets whether the caller carries the claim the operations service requires.
+        /// </summary>
+        public bool WithOperationsClaim { get; init; }
+
+        /// <summary>
+        /// Gets the cookies the browser already holds.
+        /// </summary>
+        public string[] Cookies { get; init; } = [];
+    }
+
+    /// <summary>
+    /// Selects a named cookie within a raw Set-Cookie field without normalizing the field.
+    /// </summary>
+    public sealed record CookieSelection
+    {
+        /// <summary>
+        /// Gets the raw Set-Cookie field value.
+        /// </summary>
+        public required string Header { get; init; }
+
+        /// <summary>
+        /// Gets the cookie name to match.
+        /// </summary>
+        public required string Name { get; init; }
     }
 
     /// <summary>

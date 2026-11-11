@@ -64,7 +64,7 @@ public class when_registration_uses_provider_selection(SessionCookieHarness harn
         using var completion = await client.SendAsync(completionRequest, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Found, completion.StatusCode);
         Assert.StartsWith(RegistrationDestination, completion.Headers.Location!.ToString(), StringComparison.Ordinal);
-        Assert.Contains(SessionCookieHarness.SetCookies(completion), cookie => SessionCookieHarness.IsDeletionOf(cookie, Cookies.Registration));
+        Assert.Contains(SessionCookieHarness.SetCookies(completion), cookie => SessionCookieHarness.IsDeletionOf(new() { Header = cookie, Name = Cookies.Registration }));
         Assert.DoesNotContain(harness.ConsoleOrigin.Received, request => request.Path == RecordingBackend.TenantsPath);
     }
 
@@ -115,8 +115,8 @@ public class when_registration_uses_provider_selection(SessionCookieHarness harn
         using var challenge = await client.SendAsync(challengeRequest, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
         var abandoned = page ?? challenge;
-        Assert.Contains(SessionCookieHarness.SetCookies(abandoned), cookie => SessionCookieHarness.IsDeletionOf(cookie, pendingCookie));
-        Assert.Contains(SessionCookieHarness.SetCookies(abandoned), cookie => SessionCookieHarness.IsDeletionOf(cookie, Cookies.InvitationEntryState));
+        Assert.Contains(SessionCookieHarness.SetCookies(abandoned), cookie => SessionCookieHarness.IsDeletionOf(new() { Header = cookie, Name = pendingCookie }));
+        Assert.Contains(SessionCookieHarness.SetCookies(abandoned), cookie => SessionCookieHarness.IsDeletionOf(new() { Header = cookie, Name = Cookies.InvitationEntryState }));
         Assert.StartsWith(SessionCookieHarness.ProviderAuthorizationEndpoint, challenge.Headers.Location.ToString(), StringComparison.Ordinal);
         var state = QueryHelpers.ParseQuery(challenge.Headers.Location.Query)["state"].ToString();
         using var callbackRequest = SessionCookieHarness.Request(

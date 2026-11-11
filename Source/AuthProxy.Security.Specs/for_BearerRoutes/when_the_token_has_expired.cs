@@ -20,7 +20,7 @@ public class when_the_token_has_expired(BearerRouteHarness harness) : IAsyncLife
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
 
-        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(expires: DateTime.UtcNow.AddMinutes(-10))));
+        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(new StubIssuer.TokenRequest { Expires = DateTime.UtcNow.AddMinutes(-10) })));
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 

@@ -17,7 +17,7 @@ public class when_the_sign_out_target_cannot_be_trusted(FixedCallbackHostHarness
     public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
-        var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost));
+        var session = SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost }));
 
         foreach (var target in new[]
         {

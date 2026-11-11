@@ -41,7 +41,7 @@ public class when_introspection_is_asked(IntrospectionHarness harness) : IAsyncL
         (await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, McpPath, harness.Issuer.TokenSignedByAnotherKey()))).Dispose();
         _callsForForeignToken = harness.Endpoint.Captured.Count;
 
-        (await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, McpPath, harness.Issuer.Token(expires: DateTime.UtcNow.AddHours(-1))))).Dispose();
+        (await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, McpPath, harness.Issuer.Token(new StubIssuer.TokenRequest { Expires = DateTime.UtcNow.AddHours(-1) })))).Dispose();
         _callsForExpiredToken = harness.Endpoint.Captured.Count;
 
         (await client.GetAsync(McpPath)).Dispose();
