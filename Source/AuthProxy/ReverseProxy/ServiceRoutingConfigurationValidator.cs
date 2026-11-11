@@ -20,8 +20,8 @@ public class ServiceRoutingConfigurationValidator : IValidateOptions<C.AuthProxy
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
-        var declared = new List<(string Name, string? Prefix, HostString[] Hosts)>();
+        List<string> failures = [];
+        List<(string Name, string? Prefix, HostString[] Hosts)> declared = [];
 
         foreach (var (serviceName, service) in options.Services)
         {
@@ -66,7 +66,7 @@ public class ServiceRoutingConfigurationValidator : IValidateOptions<C.AuthProxy
 
     static List<HostString> ParseHosts(string serviceName, C.Service service, List<string> failures)
     {
-        var hosts = new List<HostString>();
+        List<HostString> hosts = [];
         foreach (var entry in service.Hosts)
         {
             if (ServiceRoutes.TryParseHost(entry, out var host))

@@ -37,7 +37,7 @@ public class ManagementConfigurationValidator(ListenerAddresses listeners) : IVa
             return ValidateOptionsResult.Success;
         }
 
-        var failures = new List<string>();
+        List<string> failures = [];
 
         AddFailureForPort(options.Management, failures);
         AddFailureForUnrootedPath(options.Management.LivePath, nameof(C.Management.LivePath), failures);

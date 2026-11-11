@@ -27,7 +27,7 @@ sealed class InvitationAttestationConfigurationValidator : IValidateOptions<C.Au
             return ValidateOptionsResult.Success;
         }
 
-        var failures = new List<string>();
+        List<string> failures = [];
         AttestationConfigurationValidation.ValidateAbsoluteEndpoint(invite!.StageUrl, "Invite.StageUrl", failures);
         AttestationConfigurationValidation.ValidateAbsoluteEndpoint(invite.ExchangeUrl, "Invite.ExchangeUrl", failures);
         AttestationConfigurationValidation.ValidateBoundedValue(attestation.Issuer, "Invite.Attestation.Issuer", failures);

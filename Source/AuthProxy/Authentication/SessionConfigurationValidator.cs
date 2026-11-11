@@ -23,7 +23,7 @@ public class SessionConfigurationValidator : IValidateOptions<C.AuthProxy>
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
         var domain = SessionCookie.DomainOf(options.Session);
 
         ValidateCookieName(options.Session, domain, failures);

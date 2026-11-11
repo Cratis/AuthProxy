@@ -33,7 +33,7 @@ sealed class SignInAttestationConfigurationValidator : IValidateOptions<C.AuthPr
                 : ValidateOptionsResult.Success;
         }
 
-        var failures = new List<string>();
+        List<string> failures = [];
         AttestationConfigurationValidation.ValidateAbsoluteEndpoint(signIn!.NotifyUrl, "SignIn.NotifyUrl", failures);
         if (Uri.TryCreate(signIn.NotifyUrl, UriKind.Absolute, out var notifyUrl) && !string.IsNullOrEmpty(notifyUrl.Query))
         {

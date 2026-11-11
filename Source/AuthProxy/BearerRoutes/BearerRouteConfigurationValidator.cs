@@ -29,7 +29,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
         var prefixes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var metadataPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var anonymousPaths = options.Services.Values.SelectMany(AnonymousPaths.For).ToArray();

@@ -25,7 +25,7 @@ public class ActivityTimeoutConfigurationValidator : IValidateOptions<C.AuthProx
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
 
         Check($"{C.AuthProxy.SectionKey}:{nameof(C.AuthProxy.ActivityTimeout)}", options.ActivityTimeout, failures);
 

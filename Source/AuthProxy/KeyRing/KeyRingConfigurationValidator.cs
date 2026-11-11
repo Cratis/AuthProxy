@@ -32,7 +32,7 @@ public class KeyRingConfigurationValidator : IValidateOptions<C.AuthProxy>
     /// <returns>One message per problem; empty when the configuration is usable.</returns>
     internal static List<string> Check(C.DataProtection settings, string? keysPath)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
         var store = $"{C.DataProtection.SectionKey}:{nameof(C.DataProtection.Store)}";
 
         if (!Enum.IsDefined(settings.Store))

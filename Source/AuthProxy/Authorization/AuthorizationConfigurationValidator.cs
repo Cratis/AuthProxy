@@ -25,7 +25,7 @@ public class AuthorizationConfigurationValidator : IValidateOptions<C.AuthProxy>
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
 
         AddFailureForBlankClaims(options.Authorization, "Cratis:AuthProxy:Authorization", failures);
 

@@ -17,7 +17,7 @@ sealed class ExternalTokenTenantBindingConfigurationValidator(IConfiguration con
         var settings = options.ExternalTokenTenantBinding;
         if (!settings.Require) return ValidateOptionsResult.Success;
 
-        var failures = new List<string>();
+        List<string> failures = [];
         if (!configuration.GetSection($"{C.Authentication.SectionKey}:JwtBearer").Exists())
         {
             failures.Add("External token tenant binding requires a configured JWT Bearer handler.");

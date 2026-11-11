@@ -33,7 +33,7 @@ sealed class OnBehalfConfigurationValidator : IValidateOptions<C.AuthProxy>
             return ValidateOptionsResult.Success;
         }
 
-        var failures = new List<string>();
+        List<string> failures = [];
         ValidateService(options, onBehalf, failures);
         ValidatePermittedServices(options, onBehalf, failures);
         ValidateIdentityVerification(options, onBehalf, failures);
