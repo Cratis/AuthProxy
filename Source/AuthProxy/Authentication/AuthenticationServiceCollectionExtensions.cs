@@ -88,44 +88,11 @@ public static class AuthenticationServiceCollectionExtensions
         RegisterOidcProviders(authBuilder, authConfig.OidcProviders);
         RegisterOAuthProviders(authBuilder, authConfig.OAuthProviders);
 
-        builder.Services.AddSingleton<IProviderClaimsEnricher, GitHubMembershipClaimsEnricher>();
-        builder.Services.AddSingleton<ClientCredentialsServiceResolver>();
-        builder.Services.AddSingleton<ClientCredentialsVerifier>();
-        builder.Services.AddSingleton<ClientCredentialsTokenProtector>();
-        builder.Services.AddSingleton<ClientCredentialsGrantService>();
-        builder.Services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
-        builder.Services.AddSingleton<ICanonicalIdentityResolver, CanonicalIdentityResolver>();
-        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
-        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
-        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
-        builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
-        builder.Services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
-        builder.Services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
-        builder.Services.TryAddSingleton(TimeProvider.System);
-        builder.Services.TryAddSingleton<ICredentialsLoader>(services => new DefaultCredentialsLoader(services.GetRequiredService<ILogger<DefaultCredentialsLoader>>()));
-        builder.Services.TryAddSingleton<IOidcClientAssertions, OidcClientAssertions>();
-        builder.Services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
+        RegisterIngressAuthenticationServices(builder.Services);
 
         if (jwtSection.Exists())
         {
-            authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => ConfigureJwtBearerOptions(options, jwtSection));
-            builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
-            {
-                var existing = options.Events.OnTokenValidated;
-                options.Events.OnTokenValidated = async context =>
-                {
-                    await existing(context);
-                    if (context.Result?.Succeeded == false) return;
-                    if (context.Principal?.Claims.Any(BearerTokenValidator.IsSenderConstrained) == true)
-                    {
-                        context.Fail(BearerTokenValidator.SenderConstrainedTokenReason);
-                        return;
-                    }
-
-                    var config = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.Authentication>>();
-                    ExternalTokenTenantBinding.Apply(context, config.CurrentValue.ExternalTokenTenantBinding);
-                };
-            });
+            RegisterJwtBearer(builder.Services, authBuilder, jwtSection);
         }
 
         builder.Services.AddAuthorizationBuilder()
@@ -134,6 +101,49 @@ public static class AuthenticationServiceCollectionExtensions
                 .Build());
 
         return builder;
+    }
+
+    static void RegisterIngressAuthenticationServices(IServiceCollection services)
+    {
+        services.AddSingleton<IProviderClaimsEnricher, GitHubMembershipClaimsEnricher>();
+        services.AddSingleton<ClientCredentialsServiceResolver>();
+        services.AddSingleton<ClientCredentialsVerifier>();
+        services.AddSingleton<ClientCredentialsTokenProtector>();
+        services.AddSingleton<ClientCredentialsGrantService>();
+        services.AddSingleton<IEndSessionEndpointResolver, EndSessionEndpointResolver>();
+        services.AddSingleton<ICanonicalIdentityResolver, CanonicalIdentityResolver>();
+        services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
+        services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<ICredentialsLoader>(serviceProvider => new DefaultCredentialsLoader(serviceProvider.GetRequiredService<ILogger<DefaultCredentialsLoader>>()));
+        services.TryAddSingleton<IOidcClientAssertions, OidcClientAssertions>();
+        services.AddHttpClient(nameof(ClientCredentialsVerifier), client => client.Timeout = TimeSpan.FromSeconds(10));
+    }
+
+    static void RegisterJwtBearer(IServiceCollection services, AuthenticationBuilder authBuilder, IConfigurationSection jwtSection)
+    {
+        authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => ConfigureJwtBearerOptions(options, jwtSection));
+        services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+        {
+            var existing = options.Events.OnTokenValidated;
+            options.Events.OnTokenValidated = async context =>
+            {
+                await existing(context);
+                if (context.Result?.Succeeded == false) return;
+                if (context.Principal?.Claims.Any(BearerTokenValidator.IsSenderConstrained) == true)
+                {
+                    context.Fail(BearerTokenValidator.SenderConstrainedTokenReason);
+                    return;
+                }
+
+                var config = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.Authentication>>();
+                ExternalTokenTenantBinding.Apply(context, config.CurrentValue.ExternalTokenTenantBinding);
+            };
+        });
     }
 
     static string ResolveAuthenticationScheme(HttpContext context, bool hasJwtBearer)
