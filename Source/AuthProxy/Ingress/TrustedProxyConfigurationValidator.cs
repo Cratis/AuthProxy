@@ -25,11 +25,10 @@ public class TrustedProxyConfigurationValidator : IValidateOptions<C.Ingress>
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.Ingress options)
     {
-        var failures = options.TrustedProxies
+        List<string> failures = [.. options.TrustedProxies
             .Select((entry, index) => (Entry: entry, Index: index))
             .Where(_ => TrustedProxyAddress.Resolve(_.Entry) is null)
-            .Select(_ => $"{C.Ingress.SectionKey}:TrustedProxies:{_.Index} is '{_.Entry}', which is not an IP address or a CIDR range. Write a peer as '10.0.0.7' or '2001:db8::1', and a range as '10.0.0.0/8' or '2001:db8::/32'.")
-            .ToList();
+            .Select(_ => $"{C.Ingress.SectionKey}:TrustedProxies:{_.Index} is '{_.Entry}', which is not an IP address or a CIDR range. Write a peer as '10.0.0.7' or '2001:db8::1', and a range as '10.0.0.0/8' or '2001:db8::/32'.")];
 
         return failures.Count > 0
             ? ValidateOptionsResult.Fail(failures)
