@@ -257,7 +257,7 @@ public sealed class StubIssuer : IAsyncDisposable
         /// <summary>
         /// Gets the default claims to omit.
         /// </summary>
-        public string[] Without { get; init; } = [];
+        public IReadOnlyList<string> Without { get; init; } = [];
 
         /// <summary>
         /// Gets the callback that reshapes the token descriptor before signing.

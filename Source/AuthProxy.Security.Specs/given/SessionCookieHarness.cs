@@ -168,7 +168,7 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
     /// <param name="signIn">The browser host, existing cookies, and requested operations claim.</param>
     /// <returns>The sign-in response.</returns>
     public Task<HttpResponseMessage> SignIn(HttpClient client, SignInRequest signIn) =>
-        client.SendAsync(Request(signIn.Host, $"{SignInPath}?{OperationsQueryKey}={signIn.WithOperationsClaim}", signIn.Cookies));
+        client.SendAsync(Request(signIn.Host, $"{SignInPath}?{OperationsQueryKey}={signIn.WithOperationsClaim}", [.. signIn.Cookies]));
 
     /// <summary>
     /// Takes the reusable <c language="text">name=value</c> pairs a response set, skipping deletions.
@@ -302,7 +302,7 @@ public class SessionCookieHarness : WebApplicationFactory<Program>
         /// <summary>
         /// Gets the cookies the browser already holds.
         /// </summary>
-        public string[] Cookies { get; init; } = [];
+        public IReadOnlyList<string> Cookies { get; init; } = [];
     }
 
     /// <summary>
