@@ -15,7 +15,7 @@ namespace Cratis.AuthProxy.BackendHops;
 /// <param name="logger">The redacted material logger.</param>
 internal sealed class BackendTlsMaterialSource(IOptionsMonitor<C.AuthProxy> config, TimeProvider timeProvider, ILogger<BackendTlsMaterialSource> logger) : IBackendTlsMaterialSource
 {
-    readonly object _gate = new();
+    readonly Lock _gate = new();
     volatile BackendTlsMaterial? _current;
 
     /// <inheritdoc/>
