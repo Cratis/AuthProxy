@@ -10,7 +10,9 @@ ARG VERSION
 
 RUN echo Version = ${VERSION}
 
-RUN apt-get update \
+# The package mirrors are reached over IPv4 with retries: name lookups for them failed intermittently on the build runners.
+RUN printf 'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\n' > /etc/apt/apt.conf.d/99network \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
