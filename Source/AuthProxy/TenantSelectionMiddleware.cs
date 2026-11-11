@@ -79,7 +79,7 @@ public class TenantSelectionMiddleware(
             return;
         }
 
-        if (exempt || tenantResolver.TryResolve(context, out TenantResolutionResult _))
+        if (ResolvesWithoutSelection(context, exempt))
         {
             await next(context);
             return;
@@ -140,6 +140,9 @@ public class TenantSelectionMiddleware(
         context.Response.Headers.Location = RelativeRedirect.Resolve(context.GetPathAndQuery());
         return true;
     }
+
+    bool ResolvesWithoutSelection(HttpContext context, bool exempt) =>
+        exempt || tenantResolver.TryResolve(context, out TenantResolutionResult _);
 
     bool AppliesTenantSelection(HttpContext context, out Tenancy.SelectionOptions selectionOptions)
     {

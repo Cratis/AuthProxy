@@ -143,6 +143,20 @@ public static class IngressExtensions
     /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>
     public static WebApplication UseIngress(this WebApplication app)
     {
+        app.LogStartupWarnings();
+        app.UseRequestBoundary();
+        app.UseStaticContent();
+        app.UseCallerAuthentication();
+        app.UseIdentityPipeline();
+
+        app.MapIngressEndpoints();
+        app.UseReverseProxy();
+
+        return app;
+    }
+
+    static void LogStartupWarnings(this WebApplication app)
+    {
         var trustedProxyPolicy = app.Services.GetRequiredService<ITrustedProxyPolicy>();
         if (trustedProxyPolicy.TrustsNoOne)
         {
@@ -170,7 +184,10 @@ public static class IngressExtensions
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.Mode)}",
                 $"{C.Ingress.SectionKey}:{nameof(C.Ingress.TrustedProxies)}");
         }
+    }
 
+    static void UseRequestBoundary(this WebApplication app)
+    {
         app.UseSearchIndexingHeaders();
 
         // The explicit opt-in opens only this exact GET/HEAD path, before admission and authentication.
@@ -205,7 +222,10 @@ public static class IngressExtensions
         // Still ahead of the pages, static files and authentication: a bearer route is answered here,
         // but a selected passthrough route leaves its backend-owned Authorization header untouched.
         app.UseMiddleware<BearerRouteMiddleware>();
+    }
 
+    static void UseStaticContent(this WebApplication app)
+    {
         // Static files skip requests with an endpoint. Temporarily hide the selected endpoint so the YARP
         // catch-all cannot swallow bundled assets, then restore it on a miss without routing a second time.
         // The captured disposition remains available throughout, including while serving a static file.
@@ -228,6 +248,10 @@ public static class IngressExtensions
             AnonymousPaths.RestoreSelectedEndpoint(context);
             return next(context);
         });
+    }
+
+    static void UseCallerAuthentication(this WebApplication app)
+    {
         app.UseAuthentication();
         app.UseMiddleware<BearerRouteAuthenticationMiddleware>();
 
@@ -249,7 +273,10 @@ public static class IngressExtensions
         app.UseAuthorization();
         app.UseMiddleware<AccessControlMiddleware>();
         app.UseMiddleware<FreshAuthenticationMiddleware>();
+    }
 
+    static void UseIdentityPipeline(this WebApplication app)
+    {
         // Passthrough routes derive no identity or tenant. The same captured endpoint disposition that
         // bypassed bearer inspection also bypasses membership lookup, impersonation and identity resolution.
         app.UseWhen(context => !AnonymousPaths.PassesCallerAuthorization(context), identityApp =>
@@ -269,11 +296,6 @@ public static class IngressExtensions
             identityApp.UseMiddleware<InviteRedirectMiddleware>();
             identityApp.UseMiddleware<IdentityForwardingGuardMiddleware>();
         });
-
-        app.MapIngressEndpoints();
-        app.UseReverseProxy();
-
-        return app;
     }
 
     static void WarnAboutUnscopedKeyRing(this WebApplication app)
