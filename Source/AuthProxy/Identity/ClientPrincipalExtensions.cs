@@ -98,52 +98,26 @@ public static class ClientPrincipalExtensions
         // replaced by a canonical one, which carries no session metadata.
         var authenticationTime = ResolveAuthenticationTime(user, properties, authenticationScheme);
 
-        var canonicalResolution = context.RequestServices is { } requestServices
-            ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)
-            : null;
+        var canonicalResolution = ResolveCanonicalIdentity(context, user, authenticationScheme);
         if (canonicalResolution?.IsConfigured == true)
         {
-            if (!canonicalResolution.Succeeded || canonicalResolution.Identity is null || canonicalResolution.Principal is null)
+            if (!HasCanonicalIdentityAndPrincipal(canonicalResolution))
             {
                 return null;
             }
 
-            user = canonicalResolution.Principal;
+            user = canonicalResolution.Principal!;
         }
-
-        var identity = user.Identity!;
-
-        var userId = ResolveUserId(user, canonicalResolution?.Identity);
-        var userDetails = ResolveUserDetails(user);
 
         var isCanonical = canonicalResolution?.IsConfigured == true && canonicalResolution.Succeeded;
-        var roles = user.Claims
-            .Where(claim => IsRoleClaim(claim.Type, isCanonical))
-            .Select(c => c.Value)
-            .Concat(["anonymous", "authenticated"])
-            .Distinct();
-
-        // The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
-        // get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
-        // own record of how the session was signed in and stays inside the proxy.
-        var claims = user.Claims
-            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !IsReservedSessionMetadata(c.Type) && !IsAuthenticationTime(c.Type))
-            .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
-
-        // A provider's own auth_time is never forwarded: the only one a receiver may see is the time AuthProxy
-        // validated and recorded for the session, carried inside the signed principal.
-        if (authenticationTime is not null)
-        {
-            claims = claims.Append(new ClientPrincipalClaim { Type = AuthenticationTimeClaim, Value = authenticationTime });
-        }
 
         return new ClientPrincipal
         {
-            IdentityProvider = canonicalResolution?.Identity?.ProviderKey ?? identity.AuthenticationType ?? "unknown",
-            UserId = userId,
-            UserDetails = userDetails,
-            UserRoles = roles,
-            Claims = claims,
+            IdentityProvider = canonicalResolution?.Identity?.ProviderKey ?? user.Identity!.AuthenticationType ?? "unknown",
+            UserId = ResolveUserId(user, canonicalResolution?.Identity),
+            UserDetails = ResolveUserDetails(user),
+            UserRoles = ResolveRoles(user, isCanonical),
+            Claims = ResolveForwardedClaims(user, isCanonical, authenticationTime),
             AccountProvider = GetAccountProvider(user, properties, authenticationScheme, isCanonical),
         };
     }
@@ -199,6 +173,43 @@ public static class ClientPrincipalExtensions
         {
             requestMessage.Headers.Add(Headers.PrincipalNameExtended, userDetails);
         }
+    }
+
+    static CanonicalIdentityResolution? ResolveCanonicalIdentity(HttpContext context, ClaimsPrincipal user, string? authenticationScheme) =>
+        context.RequestServices is { } requestServices
+            ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)
+            : null;
+
+    static bool HasCanonicalIdentityAndPrincipal(CanonicalIdentityResolution resolution) =>
+        resolution.Succeeded && resolution.Identity is not null && resolution.Principal is not null;
+
+    static IEnumerable<string> ResolveRoles(ClaimsPrincipal user, bool isCanonical) =>
+        user.Claims
+            .Where(claim => IsRoleClaim(claim.Type, isCanonical))
+            .Select(c => c.Value)
+            .Concat(["anonymous", "authenticated"])
+            .Distinct();
+
+    /// <summary>
+    /// The bearer-route namespace means "authenticated on a bearer route". A browser session's provider does not
+    /// get to say that, so its claims in that namespace are never forwarded. The session namespace is AuthProxy's
+    /// own record of how the session was signed in and stays inside the proxy.
+    /// A provider's own auth_time is never forwarded: the only one a receiver may see is the time AuthProxy
+    /// validated and recorded for the session, carried inside the signed principal.
+    /// </summary>
+    /// <param name="user">The principal to forward.</param>
+    /// <param name="isCanonical">Whether the principal was resolved through a canonical identity.</param>
+    /// <param name="authenticationTime">The authentication time AuthProxy recorded for the session, if any.</param>
+    /// <returns>The claims a receiver may see.</returns>
+    static IEnumerable<ClientPrincipalClaim> ResolveForwardedClaims(ClaimsPrincipal user, bool isCanonical, string? authenticationTime)
+    {
+        var claims = user.Claims
+            .Where(c => !IsRoleClaim(c.Type, isCanonical) && !IsReservedSessionMetadata(c.Type) && !IsAuthenticationTime(c.Type))
+            .Select(c => new ClientPrincipalClaim { Type = c.Type, Value = c.Value });
+
+        return authenticationTime is null
+            ? claims
+            : claims.Append(new ClientPrincipalClaim { Type = AuthenticationTimeClaim, Value = authenticationTime });
     }
 
     static string? ResolveAuthenticationTime(ClaimsPrincipal user, AuthenticationProperties? properties, string? authenticationScheme) =>

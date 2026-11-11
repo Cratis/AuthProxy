@@ -14,7 +14,7 @@ public class when_an_absolute_session_is_updated : given.a_user_token_store
         var sessionId = await _store.Create(new("workforce", "refresh-token"), CancellationToken.None);
         _time.Advance(TimeSpan.FromHours(11));
         await _store.Update(sessionId, new("workforce", "rotated-token"), CancellationToken.None);
-        await _store.SetAccessToken(sessionId, "audience", new("access-token", _time.GetUtcNow().AddHours(2), _time.GetUtcNow().AddHours(1.5)), _time.GetUtcNow().AddHours(1.5), CancellationToken.None);
+        await _store.SetAccessToken(new(sessionId, "audience"), new("access-token", _time.GetUtcNow().AddHours(2), _time.GetUtcNow().AddHours(1.5)), _time.GetUtcNow().AddHours(1.5), CancellationToken.None);
         _before = await _store.Get(sessionId, CancellationToken.None);
         _time.Advance(TimeSpan.FromHours(1));
         _after = await _store.Get(sessionId, CancellationToken.None);

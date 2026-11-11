@@ -71,8 +71,10 @@ public class when_a_passthrough_route_receives_a_bearer_token(PassthroughAuthent
         SecurityHarness.UniqueUser("passthrough"),
         BearerRouteHarness.TenantId);
 
-    string JwtToken(string audience = BearerRouteHarness.Audience, string? issuer = null) => harness.Issuer.Token(
-        claims: new Dictionary<string, object> { ["sub"] = SecurityHarness.UniqueUser("passthrough") },
-        audience: audience,
-        issuer: issuer);
+    string JwtToken(string audience = BearerRouteHarness.Audience, string? issuer = null) => harness.Issuer.Token(new StubIssuer.TokenRequest
+    {
+        Claims = new Dictionary<string, object> { ["sub"] = SecurityHarness.UniqueUser("passthrough") },
+        Audience = audience,
+        Issuer = issuer,
+    });
 }

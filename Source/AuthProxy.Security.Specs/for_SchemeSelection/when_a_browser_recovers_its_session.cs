@@ -32,13 +32,13 @@ public class when_a_browser_recovers_its_session
         Assert.Null(response.Headers.Location);
         var deletions = SessionCookieHarness.SetCookies(response);
         var domain = sharedDomain ? SharedSessionSelectionHarness.SessionDomain : string.Empty;
-        Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(value, C.Session.DefaultCookieName)
+        Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(new() { Header = value, Name = C.Session.DefaultCookieName })
             && SetCookieHeaderValue.Parse(value).Domain.ToString() == domain);
         Assert.All(deletions, value => AssertSessionCookieAttributes(value, sharedDomain));
         if (!sharedDomain) Assert.All(deletions, value => Assert.False(SessionCookieHarness.HasDomain(value)));
         if (expired)
         {
-            Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(value, $"{C.Session.DefaultCookieName}C1")
+            Assert.Contains(deletions, value => SessionCookieHarness.IsDeletionOf(new() { Header = value, Name = $"{C.Session.DefaultCookieName}C1" })
                 && SetCookieHeaderValue.Parse(value).Domain.ToString() == domain);
         }
 
@@ -62,7 +62,7 @@ public class when_a_browser_recovers_its_session
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
-        Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(value, C.Session.DefaultCookieName));
+        Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(new() { Header = value, Name = C.Session.DefaultCookieName }));
         Assert.Empty(harness.Origin.Received);
     }
 
@@ -77,7 +77,7 @@ public class when_a_browser_recovers_its_session
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(value, C.Session.DefaultCookieName));
+        Assert.Contains(SessionCookieHarness.SetCookies(response), value => SessionCookieHarness.IsDeletionOf(new() { Header = value, Name = C.Session.DefaultCookieName }));
         Assert.Empty(harness.Origin.Received);
     }
 

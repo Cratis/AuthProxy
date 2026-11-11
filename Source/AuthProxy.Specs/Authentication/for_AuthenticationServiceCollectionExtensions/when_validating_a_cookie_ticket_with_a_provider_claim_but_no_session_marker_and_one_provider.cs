@@ -15,7 +15,7 @@ public class when_validating_a_cookie_ticket_with_a_provider_claim_but_no_sessio
 
     async Task Because()
     {
-        UseAuthentication(InitialAuthentication(subjectClaimType: "sub"));
+        UseAuthentication(InitialAuthentication(new() { SubjectClaimType = "sub" }));
         var principal = LegacyPrincipal("microsoft");
         _result = await Validate(principal, new AuthenticationProperties());
     }

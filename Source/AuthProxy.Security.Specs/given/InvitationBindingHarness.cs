@@ -134,7 +134,7 @@ public class InvitationBindingHarness : SessionCookieHarness
 
     AuthenticationProperties? ReadTicketProperties(HttpResponseMessage callback)
     {
-        var session = SetCookies(callback).FirstOrDefault(_ => IsSettingOf(_, CookieName));
+        var session = SetCookies(callback).FirstOrDefault(_ => IsSettingOf(new() { Header = _, Name = CookieName }));
         if (session is null)
         {
             return null;

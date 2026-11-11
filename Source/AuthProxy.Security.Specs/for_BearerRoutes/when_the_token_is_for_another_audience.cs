@@ -20,7 +20,7 @@ public class when_the_token_is_for_another_audience(BearerRouteHarness harness) 
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
 
-        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(audience: "studio-api")));
+        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(new StubIssuer.TokenRequest { Audience = "studio-api" })));
     }
 
     public ValueTask DisposeAsync()

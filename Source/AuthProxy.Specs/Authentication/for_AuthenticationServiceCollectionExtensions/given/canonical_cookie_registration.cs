@@ -186,80 +186,105 @@ public class canonical_cookie_registration : Specification
     /// </summary>
     protected void UseInvalidAuthentication() => _authenticationIsInvalid = true;
 
-    protected static C.Authentication InitialAuthentication(
-        string name = "Microsoft",
-        string authority = "https://login.example.com/common/v2.0",
-        string clientId = "registration-client",
-        string providerKey = ProviderKey,
-        string subjectClaimType = "oid") => new()
+    /// <summary>
+    /// The values of the configured OIDC registration; set only what a specification changes.
+    /// </summary>
+    protected sealed record OidcRegistration
+    {
+        public string Name { get; init; } = "Microsoft";
+
+        public string Authority { get; init; } = "https://login.example.com/common/v2.0";
+
+        public string ClientId { get; init; } = "registration-client";
+
+        public string ProviderKey { get; init; } = canonical_cookie_registration.ProviderKey;
+
+        public string SubjectClaimType { get; init; } = "oid";
+    }
+
+    /// <summary>
+    /// The values of the configured OAuth registration; set only what a specification changes.
+    /// </summary>
+    protected sealed record OAuthRegistration
+    {
+        public string AuthorizationEndpoint { get; init; } = "https://oauth.example.com/authorize";
+
+        public string TokenEndpoint { get; init; } = "https://oauth.example.com/token";
+
+        public string UserInformationEndpoint { get; init; } = "https://oauth.example.com/user";
+
+        public string SubjectJsonField { get; init; } = "id";
+
+        public string AuthorizationParameterValue { get; init; } = "select_account";
+
+        public bool ReverseClaimMappingOrder { get; init; }
+
+        public bool ReverseAuthorizationParameterOrder { get; init; }
+    }
+
+    protected static C.Authentication InitialAuthentication(OidcRegistration? registration = null)
+    {
+        registration ??= new();
+        return new()
         {
             OidcProviders =
             [
                 new C.OidcProvider
                 {
-                    Name = name,
-                    Authority = authority,
-                    ClientId = clientId,
+                    Name = registration.Name,
+                    Authority = registration.Authority,
+                    ClientId = registration.ClientId,
                     ClientSecret = ClientSecret,
                     CanonicalIdentity = new C.CanonicalIdentity
                     {
-                        ProviderKey = providerKey,
-                        SubjectClaimType = subjectClaimType
+                        ProviderKey = registration.ProviderKey,
+                        SubjectClaimType = registration.SubjectClaimType
                     }
                 }
             ]
         };
+    }
 
     /// <summary>
     /// Creates the mutable current OAuth registration used to revalidate a ticket against cached named handler options.
     /// </summary>
-    /// <param name="authorizationEndpoint">The configured authorization endpoint.</param>
-    /// <param name="tokenEndpoint">The configured token endpoint.</param>
-    /// <param name="userInformationEndpoint">The configured user-information endpoint.</param>
-    /// <param name="subjectJsonField">The user-information JSON field mapped to the canonical subject claim.</param>
-    /// <param name="authorizationParameterValue">The configured account-selection policy.</param>
-    /// <param name="reverseClaimMappingOrder">Whether to insert the unchanged claim mappings in reverse order.</param>
-    /// <param name="reverseAuthorizationParameterOrder">Whether to insert unchanged authorization parameters in reverse order.</param>
+    /// <param name="registration">The registration values; defaults to the startup registration.</param>
     /// <returns>The current authentication registration.</returns>
-    protected static C.Authentication OAuthAuthentication(
-        string authorizationEndpoint = "https://oauth.example.com/authorize",
-        string tokenEndpoint = "https://oauth.example.com/token",
-        string userInformationEndpoint = "https://oauth.example.com/user",
-        string subjectJsonField = "id",
-        string authorizationParameterValue = "select_account",
-        bool reverseClaimMappingOrder = false,
-        bool reverseAuthorizationParameterOrder = false) => new()
+    protected static C.Authentication OAuthAuthentication(OAuthRegistration? registration = null)
+    {
+        registration ??= new();
+        return new()
         {
             OAuthProviders =
         [
             new C.OAuthProvider
             {
                 Name = "GitHub",
-                AuthorizationEndpoint = authorizationEndpoint,
-                TokenEndpoint = tokenEndpoint,
-                UserInformationEndpoint = userInformationEndpoint,
+                AuthorizationEndpoint = registration.AuthorizationEndpoint,
+                TokenEndpoint = registration.TokenEndpoint,
+                UserInformationEndpoint = registration.UserInformationEndpoint,
                 ClientId = "registration-client",
                 ClientSecret = ClientSecret,
-                ClaimMappings = reverseClaimMappingOrder
+                ClaimMappings = registration.ReverseClaimMappingOrder
                     ? new Dictionary<string, string>
                     {
                         ["name"] = "login",
-                        ["sub"] = subjectJsonField
+                        ["sub"] = registration.SubjectJsonField
                     }
                     : new Dictionary<string, string>
                     {
-                        ["sub"] = subjectJsonField,
+                        ["sub"] = registration.SubjectJsonField,
                         ["name"] = "login"
                     },
-                AuthorizationParameters = reverseAuthorizationParameterOrder
+                AuthorizationParameters = registration.ReverseAuthorizationParameterOrder
                     ? new Dictionary<string, string>
                     {
                         ["audience"] = "workforce",
-                        ["prompt"] = authorizationParameterValue
+                        ["prompt"] = registration.AuthorizationParameterValue
                     }
                     : new Dictionary<string, string>
                     {
-                        ["prompt"] = authorizationParameterValue,
+                        ["prompt"] = registration.AuthorizationParameterValue,
                         ["audience"] = "workforce"
                     },
                 CanonicalIdentity = new C.CanonicalIdentity
@@ -271,6 +296,7 @@ public class canonical_cookie_registration : Specification
             }
         ]
         };
+    }
 
     protected static ClaimsPrincipal CanonicalPrincipal(string issuer = "https://issuer.example.com/tenant-a") =>
         new(new ClaimsIdentity(

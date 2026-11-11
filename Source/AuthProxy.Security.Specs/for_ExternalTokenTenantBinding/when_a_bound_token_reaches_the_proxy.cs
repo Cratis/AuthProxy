@@ -21,7 +21,7 @@ public class when_a_bound_token_reaches_the_proxy(ExternalTokenBindingHarness ha
     {
         var claims = new Dictionary<string, object>();
         if (tenant is not null) claims["tid"] = tenant;
-        var token = harness.Issuer.Token(claims, without: tenant is null ? ["tid"] : []);
+        var token = harness.Issuer.Token(new StubIssuer.TokenRequest { Claims = claims, Without = tenant is null ? ["tid"] : [] });
         await Refused(token, "/private/missing-tenant", "a.direct.example.test", HttpStatusCode.Unauthorized);
     }
 

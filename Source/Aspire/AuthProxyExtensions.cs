@@ -68,10 +68,7 @@ public static partial class AuthProxyExtensions
         where T : IResourceWithEnvironment
     {
         GetOrCreateAnnotation(builder.Resource).ServiceBackends[serviceName] = serviceResource.Resource;
-        var endpoint = serviceResource.GetEndpoint(endpointName);
-        builder.WithEnvironment(context =>
-            context.EnvironmentVariables[$"{ConfigPrefix}__Services__{serviceName}__Backend__BaseUrl"] =
-                ReferenceExpression.Create($"{endpoint}/"));
+        WithEndpointUrl(builder, $"{ConfigPrefix}__Services__{serviceName}__Backend__BaseUrl", serviceResource, endpointName, "/");
 
         if (resolveIdentityDetails.HasValue)
         {
@@ -240,10 +237,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        var endpoint = serviceResource.GetEndpoint(endpointName);
-        return builder.WithEnvironment(context =>
-            context.EnvironmentVariables[$"{ConfigPrefix}__Services__{serviceName}__Frontend__BaseUrl"] =
-                ReferenceExpression.Create($"{endpoint}/"));
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Services__{serviceName}__Frontend__BaseUrl", serviceResource, endpointName, "/");
     }
 
     /// <summary>
@@ -275,18 +269,7 @@ public static partial class AuthProxyExtensions
         params string[] hosts)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        annotation.ServiceHostCounts.TryGetValue(serviceName, out var index);
-
-        foreach (var host in hosts)
-        {
-            builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__Hosts__{index}", host);
-            index++;
-        }
-
-        annotation.ServiceHostCounts[serviceName] = index;
-
-        return builder;
+        return AppendIndexedValues(builder, GetOrCreateAnnotation(builder.Resource).ServiceHostCounts, serviceName, "Hosts", hosts);
     }
 
     /// <summary>
@@ -423,18 +406,7 @@ public static partial class AuthProxyExtensions
         params string[] paths)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        annotation.AnonymousPathCounts.TryGetValue(serviceName, out var index);
-
-        foreach (var path in paths)
-        {
-            builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__AnonymousPaths__{index}", path);
-            index++;
-        }
-
-        annotation.AnonymousPathCounts[serviceName] = index;
-
-        return builder;
+        return AppendIndexedValues(builder, GetOrCreateAnnotation(builder.Resource).AnonymousPathCounts, serviceName, "AnonymousPaths", paths);
     }
 
     /// <summary>
@@ -942,17 +914,9 @@ public static partial class AuthProxyExtensions
         string? claimType = null)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        var idx = annotation.TenantResolutionCount++;
-        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
-
-        builder.WithEnvironment($"{prefix}__Strategy", "Claim");
-        if (!string.IsNullOrEmpty(claimType))
-        {
-            builder.WithEnvironment($"{prefix}__Options__ClaimType", claimType);
-        }
-
-        return builder;
+        return string.IsNullOrEmpty(claimType)
+            ? AddTenantResolution(builder, "Claim")
+            : AddTenantResolution(builder, "Claim", "ClaimType", claimType);
     }
 
     /// <summary>
@@ -971,13 +935,7 @@ public static partial class AuthProxyExtensions
         string pattern)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        var idx = annotation.TenantResolutionCount++;
-        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
-
-        return builder
-            .WithEnvironment($"{prefix}__Strategy", "Route")
-            .WithEnvironment($"{prefix}__Options__Pattern", pattern);
+        return AddTenantResolution(builder, "Route", "Pattern", pattern);
     }
 
     /// <summary>
@@ -993,13 +951,7 @@ public static partial class AuthProxyExtensions
         string tenantId)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        var idx = annotation.TenantResolutionCount++;
-        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
-
-        return builder
-            .WithEnvironment($"{prefix}__Strategy", "Specified")
-            .WithEnvironment($"{prefix}__Options__TenantId", tenantId);
+        return AddTenantResolution(builder, "Specified", "TenantId", tenantId);
     }
 
     /// <summary>
@@ -1015,13 +967,7 @@ public static partial class AuthProxyExtensions
         string tenantId)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        var idx = annotation.TenantResolutionCount++;
-        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
-
-        return builder
-            .WithEnvironment($"{prefix}__Strategy", "Default")
-            .WithEnvironment($"{prefix}__Options__TenantId", tenantId);
+        return AddTenantResolution(builder, "Default", "TenantId", tenantId);
     }
 
     /// <summary>
@@ -1041,17 +987,9 @@ public static partial class AuthProxyExtensions
         string? tenantsEndpoint = null)
         where T : IResourceWithEnvironment
     {
-        var annotation = GetOrCreateAnnotation(builder.Resource);
-        var idx = annotation.TenantResolutionCount++;
-        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
-
-        builder.WithEnvironment($"{prefix}__Strategy", "Selection");
-        if (!string.IsNullOrEmpty(tenantsEndpoint))
-        {
-            builder.WithEnvironment($"{prefix}__Options__TenantsEndpoint", tenantsEndpoint);
-        }
-
-        return builder;
+        return string.IsNullOrEmpty(tenantsEndpoint)
+            ? AddTenantResolution(builder, "Selection")
+            : AddTenantResolution(builder, "Selection", "TenantsEndpoint", tenantsEndpoint);
     }
 
     /// <summary>
@@ -1126,10 +1064,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        var endpoint = serviceResource.GetEndpoint(endpointName);
-        return builder.WithEnvironment(context =>
-            context.EnvironmentVariables[$"{ConfigPrefix}__TenantVerification__UrlTemplate"] =
-                ReferenceExpression.Create($"{endpoint}{routeTemplate}"));
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__TenantVerification__UrlTemplate", serviceResource, endpointName, routeTemplate);
     }
 
     /// <summary>
@@ -1173,27 +1108,7 @@ public static partial class AuthProxyExtensions
             .WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem)
             .WithEnvironment($"{prefix}__ExchangeUrl", exchangeUrl);
 
-        if (!string.IsNullOrEmpty(issuer))
-        {
-            builder.WithEnvironment($"{prefix}__Issuer", issuer);
-        }
-
-        if (!string.IsNullOrEmpty(audience))
-        {
-            builder.WithEnvironment($"{prefix}__Audience", audience);
-        }
-
-        if (!string.IsNullOrEmpty(tenantClaim))
-        {
-            builder.WithEnvironment($"{prefix}__TenantClaim", tenantClaim);
-        }
-
-        if (!string.IsNullOrEmpty(subjectAlreadyExistsUrl))
-        {
-            builder.WithEnvironment($"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
-        }
-
-        return builder;
+        return WithOptionalInviteSettings(builder, issuer, audience, tenantClaim, subjectAlreadyExistsUrl);
     }
 
     /// <summary>
@@ -1288,34 +1203,10 @@ public static partial class AuthProxyExtensions
     {
         const string prefix = $"{ConfigPrefix}__Invite";
 
-        var endpoint = exchangeServiceResource.GetEndpoint(exchangeEndpointName);
-        builder
-            .WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem)
-            .WithEnvironment(context =>
-                context.EnvironmentVariables[$"{prefix}__ExchangeUrl"] =
-                    ReferenceExpression.Create($"{endpoint}{exchangeRoute}"));
+        builder.WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem);
+        WithEndpointUrl(builder, $"{prefix}__ExchangeUrl", exchangeServiceResource, exchangeEndpointName, exchangeRoute);
 
-        if (!string.IsNullOrEmpty(issuer))
-        {
-            builder.WithEnvironment($"{prefix}__Issuer", issuer);
-        }
-
-        if (!string.IsNullOrEmpty(audience))
-        {
-            builder.WithEnvironment($"{prefix}__Audience", audience);
-        }
-
-        if (!string.IsNullOrEmpty(tenantClaim))
-        {
-            builder.WithEnvironment($"{prefix}__TenantClaim", tenantClaim);
-        }
-
-        if (!string.IsNullOrEmpty(subjectAlreadyExistsUrl))
-        {
-            builder.WithEnvironment($"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
-        }
-
-        return builder;
+        return WithOptionalInviteSettings(builder, issuer, audience, tenantClaim, subjectAlreadyExistsUrl);
     }
 
     /// <summary>
@@ -1409,12 +1300,7 @@ public static partial class AuthProxyExtensions
         var prefix = $"{ConfigPrefix}__Invite__ClaimsToForward__{idx}";
 
         builder.WithEnvironment($"{prefix}__FromClaimType", fromClaimType);
-        if (!string.IsNullOrEmpty(toClaimType))
-        {
-            builder.WithEnvironment($"{prefix}__ToClaimType", toClaimType);
-        }
-
-        return builder;
+        return WithOptionalEnvironment(builder, $"{prefix}__ToClaimType", toClaimType);
     }
 
     /// <summary>
@@ -1433,10 +1319,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        var endpoint = serviceResource.GetEndpoint(endpointName);
-        return builder.WithEnvironment(context =>
-            context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Frontend__BaseUrl"] =
-                ReferenceExpression.Create($"{endpoint}/"));
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Frontend__BaseUrl", serviceResource, endpointName, "/");
     }
 
     /// <summary>
@@ -1455,10 +1338,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        var endpoint = serviceResource.GetEndpoint(endpointName);
-        return builder.WithEnvironment(context =>
-            context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Backend__BaseUrl"] =
-                ReferenceExpression.Create($"{endpoint}/"));
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Backend__BaseUrl", serviceResource, endpointName, "/");
     }
 
     /// <summary>
@@ -1491,10 +1371,70 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl", serviceResource, endpointName, route);
+    }
+
+    static IResourceBuilder<T> WithEndpointUrl<T>(
+        IResourceBuilder<T> builder,
+        string key,
+        IResourceBuilder<IResourceWithEndpoints> serviceResource,
+        string endpointName,
+        string route)
+        where T : IResourceWithEnvironment
+    {
         var endpoint = serviceResource.GetEndpoint(endpointName);
         return builder.WithEnvironment(context =>
-            context.EnvironmentVariables[$"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl"] =
-                ReferenceExpression.Create($"{endpoint}{route}"));
+            context.EnvironmentVariables[key] = ReferenceExpression.Create($"{endpoint}{route}"));
+    }
+
+    static IResourceBuilder<T> WithOptionalEnvironment<T>(IResourceBuilder<T> builder, string key, string? value)
+        where T : IResourceWithEnvironment =>
+        string.IsNullOrEmpty(value) ? builder : builder.WithEnvironment(key, value);
+
+    static IResourceBuilder<T> WithOptionalInviteSettings<T>(
+        IResourceBuilder<T> builder,
+        string? issuer,
+        string? audience,
+        string? tenantClaim,
+        string? subjectAlreadyExistsUrl)
+        where T : IResourceWithEnvironment
+    {
+        const string prefix = $"{ConfigPrefix}__Invite";
+        WithOptionalEnvironment(builder, $"{prefix}__Issuer", issuer);
+        WithOptionalEnvironment(builder, $"{prefix}__Audience", audience);
+        WithOptionalEnvironment(builder, $"{prefix}__TenantClaim", tenantClaim);
+        return WithOptionalEnvironment(builder, $"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
+    }
+
+    static IResourceBuilder<T> AppendIndexedValues<T>(
+        IResourceBuilder<T> builder,
+        Dictionary<string, int> counts,
+        string serviceName,
+        string setting,
+        string[] values)
+        where T : IResourceWithEnvironment
+    {
+        counts.TryGetValue(serviceName, out var index);
+
+        foreach (var value in values)
+        {
+            builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__{setting}__{index}", value);
+            index++;
+        }
+
+        counts[serviceName] = index;
+
+        return builder;
+    }
+
+    static IResourceBuilder<T> AddTenantResolution<T>(IResourceBuilder<T> builder, string strategy, string optionName, string value)
+        where T : IResourceWithEnvironment
+    {
+        var idx = GetOrCreateAnnotation(builder.Resource).TenantResolutionCount++;
+        var prefix = $"{ConfigPrefix}__TenantResolutions__{idx}";
+        return builder
+            .WithEnvironment($"{prefix}__Strategy", strategy)
+            .WithEnvironment($"{prefix}__Options__{optionName}", value);
     }
 
     static void WriteProviderScopes<T>(IResourceBuilder<T> builder, string prefix, IEnumerable<string>? scopes)

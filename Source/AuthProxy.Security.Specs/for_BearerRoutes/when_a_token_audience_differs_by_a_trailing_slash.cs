@@ -20,7 +20,7 @@ public class when_a_token_audience_differs_by_a_trailing_slash
         const string path = "/mcp/exact-audience";
         await using var harness = new ExactAudienceHarness(configuredAudience, includeTokenAudience ? tokenAudience : null);
         using var client = harness.CreateBearerClient();
-        using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(audience: tokenAudience));
+        using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new StubIssuer.TokenRequest { Audience = tokenAudience }));
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, response.StatusCode);

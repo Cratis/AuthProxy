@@ -24,7 +24,7 @@ public class when_identity_headers_are_spoofed_on_a_bearer_route(BearerRouteHarn
         _forgedPrincipal = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(
             /*lang=json,strict*/ """{"userId":"attacker","userRoles":["Administrator"]}"""));
 
-        var request = BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(without: "azp"));
+        var request = BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(new StubIssuer.TokenRequest { Without = ["azp"] }));
         request.Headers.TryAddWithoutValidation(Headers.Principal, _forgedPrincipal);
         request.Headers.TryAddWithoutValidation(Headers.PrincipalId, "attacker");
         request.Headers.TryAddWithoutValidation(Headers.PrincipalName, "attacker");

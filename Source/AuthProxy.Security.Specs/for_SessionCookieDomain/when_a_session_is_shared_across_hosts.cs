@@ -28,7 +28,7 @@ public class when_a_session_is_shared_across_hosts(SessionCookieHarness harness)
     {
         using var client = harness.CreateSecurityClient();
 
-        var signedIn = await harness.SignIn(client, SessionCookieHarness.ConsoleHost);
+        var signedIn = await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost });
         _signInSetCookies = SessionCookieHarness.SetCookies(signedIn);
         var session = SessionCookieHarness.SessionFrom(signedIn);
 
@@ -43,7 +43,7 @@ public class when_a_session_is_shared_across_hosts(SessionCookieHarness harness)
         _operationsSawTheUnqualifiedCaller = harness.OperationsOrigin.ReceivedAnythingFor("/api/users");
 
         harness.ClearOrigins();
-        var qualified = SessionCookieHarness.SessionFrom(await harness.SignIn(client, SessionCookieHarness.ConsoleHost, withOperationsClaim: true));
+        var qualified = SessionCookieHarness.SessionFrom(await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost, WithOperationsClaim = true }));
         _operationsWithTheClaim = await client.SendAsync(SessionCookieHarness.Request(SessionCookieHarness.OperationsHost, "/api/users", qualified));
         _operationsSawTheQualifiedCaller = harness.OperationsOrigin.ReceivedAnythingFor("/api/users");
 
@@ -57,7 +57,7 @@ public class when_a_session_is_shared_across_hosts(SessionCookieHarness harness)
     [Fact]
     public void should_scope_the_session_cookie_to_the_parent_domain() =>
         Assert.True(
-            _signInSetCookies.Any(_ => SessionCookieHarness.IsSettingOf(_, harness.CookieName) && _.Contains($"domain={SessionCookieHarness.Domain}", StringComparison.OrdinalIgnoreCase)),
+            _signInSetCookies.Any(_ => SessionCookieHarness.IsSettingOf(new() { Header = _, Name = harness.CookieName }) && _.Contains($"domain={SessionCookieHarness.Domain}", StringComparison.OrdinalIgnoreCase)),
             string.Join(" || ", _signInSetCookies.Select(_ => _[_.IndexOf(';')..])));
 
     [Fact]

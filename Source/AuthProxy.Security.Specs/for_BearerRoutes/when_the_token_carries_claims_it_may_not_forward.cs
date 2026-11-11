@@ -25,8 +25,9 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
 
-        var token = harness.Issuer.Token(
-            new Dictionary<string, object>
+        var token = harness.Issuer.Token(new StubIssuer.TokenRequest
+        {
+            Claims = new Dictionary<string, object>
             {
                 ["roles"] = new[] { "Administrator" },
                 ["role"] = "Administrator",
@@ -36,7 +37,8 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
                 ["urn:cratis:bearer:client-id"] = "trusted-client",
                 ["urn:cratis:identity:subject"] = "someone-else",
             },
-            without: ["azp", "client_id"]);
+            Without = ["azp", "client_id"],
+        });
 
         var request = BearerRouteHarness.WithToken(HttpMethod.Get, Path, token);
         request.Headers.TryAddWithoutValidation(Headers.TokenClientId, "trusted-client");

@@ -20,7 +20,7 @@ public class when_no_session_cookie_domain_is_configured(HostOnlySessionCookieHa
     public async ValueTask InitializeAsync()
     {
         using var client = harness.CreateSecurityClient();
-        var signedIn = await harness.SignIn(client, SessionCookieHarness.ConsoleHost);
+        var signedIn = await harness.SignIn(client, new() { Host = SessionCookieHarness.ConsoleHost });
         _signIn = SessionCookieHarness.SetCookies(signedIn);
         var session = SessionCookieHarness.SessionFrom(signedIn);
 
@@ -38,7 +38,7 @@ public class when_no_session_cookie_domain_is_configured(HostOnlySessionCookieHa
 
     [Fact]
     public void should_issue_the_session_cookie_under_the_default_name() =>
-        Assert.Contains(_signIn, _ => SessionCookieHarness.IsSettingOf(_, ".Cratis.AuthProxy.Auth.v2"));
+        Assert.Contains(_signIn, _ => SessionCookieHarness.IsSettingOf(new() { Header = _, Name = ".Cratis.AuthProxy.Auth.v2" }));
 
     [Fact]
     public void should_issue_the_session_cookie_without_a_domain() =>
@@ -54,13 +54,13 @@ public class when_no_session_cookie_domain_is_configured(HostOnlySessionCookieHa
 
     [Fact]
     public void should_not_delete_anything_because_a_cookie_was_sent_twice() =>
-        Assert.DoesNotContain(_requestWithTheCookieTwice, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName));
+        Assert.DoesNotContain(_requestWithTheCookieTwice, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }));
 
     [Fact]
     public void should_delete_the_session_cookie_on_logout_without_a_domain() =>
-        Assert.Contains(_logout, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName) && !SessionCookieHarness.HasDomain(_));
+        Assert.Contains(_logout, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }) && !SessionCookieHarness.HasDomain(_));
 
     [Fact]
     public void should_delete_the_session_cookie_exactly_once_on_logout() =>
-        Assert.Single(_logout, _ => SessionCookieHarness.IsDeletionOf(_, harness.CookieName));
+        Assert.Single(_logout, _ => SessionCookieHarness.IsDeletionOf(new() { Header = _, Name = harness.CookieName }));
 }

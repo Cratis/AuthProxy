@@ -58,13 +58,12 @@ public interface IUserTokenStore
     /// <summary>
     /// Caches an access token for a session and audience until it is due for renewal.
     /// </summary>
-    /// <param name="sessionId">The session identifier.</param>
-    /// <param name="audience">The audience key.</param>
+    /// <param name="audience">The session and audience key the token is cached for.</param>
     /// <param name="token">The token.</param>
     /// <param name="renewAt">When the token must no longer be handed out.</param>
     /// <param name="cancellationToken">The <see cref="CancellationToken"/> for the operation.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-    Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken);
+    Task SetAccessToken(UserTokenAudience audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets whether a refresh for this session and audience was recently rejected.

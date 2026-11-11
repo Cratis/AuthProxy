@@ -17,24 +17,22 @@ public class when_validating_a_canonical_oauth_cookie_ticket_after_its_registrat
     {
         var properties = await IssueCanonicalOAuthTicket();
 
-        UseAuthentication(OAuthAuthentication(
-            reverseClaimMappingOrder: true,
-            reverseAuthorizationParameterOrder: true));
+        UseAuthentication(OAuthAuthentication(new() { ReverseClaimMappingOrder = true, ReverseAuthorizationParameterOrder = true }));
         _outcomes["unchanged"] = await Validate(CanonicalOAuthPrincipal(), properties);
 
-        UseAuthentication(OAuthAuthentication(subjectJsonField: "login"));
+        UseAuthentication(OAuthAuthentication(new() { SubjectJsonField = "login" }));
         _outcomes["claim mapping"] = await Validate(CanonicalOAuthPrincipal(), properties);
 
-        UseAuthentication(OAuthAuthentication(authorizationEndpoint: "https://changed.example.com/authorize"));
+        UseAuthentication(OAuthAuthentication(new() { AuthorizationEndpoint = "https://changed.example.com/authorize" }));
         _outcomes["authorization endpoint"] = await Validate(CanonicalOAuthPrincipal(), properties);
 
-        UseAuthentication(OAuthAuthentication(tokenEndpoint: "https://changed.example.com/token"));
+        UseAuthentication(OAuthAuthentication(new() { TokenEndpoint = "https://changed.example.com/token" }));
         _outcomes["token endpoint"] = await Validate(CanonicalOAuthPrincipal(), properties);
 
-        UseAuthentication(OAuthAuthentication(userInformationEndpoint: "https://changed.example.com/user"));
+        UseAuthentication(OAuthAuthentication(new() { UserInformationEndpoint = "https://changed.example.com/user" }));
         _outcomes["user-information endpoint"] = await Validate(CanonicalOAuthPrincipal(), properties);
 
-        UseAuthentication(OAuthAuthentication(authorizationParameterValue: "consent"));
+        UseAuthentication(OAuthAuthentication(new() { AuthorizationParameterValue = "consent" }));
         _outcomes["configured authorization parameter"] = await Validate(CanonicalOAuthPrincipal(), properties);
 
         UseAuthentication(OAuthAuthentication());

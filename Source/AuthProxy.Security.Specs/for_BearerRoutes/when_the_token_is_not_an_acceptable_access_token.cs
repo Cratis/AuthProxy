@@ -40,7 +40,7 @@ public class when_the_token_is_not_an_acceptable_access_token(BearerRouteHarness
             new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(64)),
             JwtConstants.DirectKeyUseAlg,
             SecurityAlgorithms.Aes256CbcHmacSha512)));
-        _withoutMappedSource = await Send(client, harness.Issuer.Token(without: "github_id"));
+        _withoutMappedSource = await Send(client, harness.Issuer.Token(new StubIssuer.TokenRequest { Without = ["github_id"] }));
         _twoTenants = await Send(client, harness.Issuer.Token(new Dictionary<string, object> { ["tid"] = new[] { BearerRouteHarness.TenantId, "33333333-3333-3333-3333-333333333333" } }));
         _unusableTenant = await Send(client, harness.Issuer.Token(new Dictionary<string, object> { ["tid"] = "../other tenant" }));
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);

@@ -66,7 +66,7 @@ public class when_the_address_names_another_tenant(AddressedBearerRouteHarness h
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
         const string path = "/mcp/case-variant-audience";
-        using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(claims: new Dictionary<string, object> { ["tid"] = "tenant-a", ["env"] = "staging" }, audience: "DIRECT-API"));
+        using var request = BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token(new StubIssuer.TokenRequest { Claims = new Dictionary<string, object> { ["tid"] = "tenant-a", ["env"] = "staging" }, Audience = "DIRECT-API" }));
         request.Headers.Host = "a.direct.example.test";
         using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);

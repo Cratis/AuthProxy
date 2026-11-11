@@ -20,7 +20,7 @@ public class when_the_token_is_from_another_issuer(BearerRouteHarness harness) :
         using var client = harness.CreateBearerClient();
         harness.Origin.Clear();
 
-        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(issuer: "https://attacker.example.test/")));
+        _response = await client.SendAsync(BearerRouteHarness.WithToken(HttpMethod.Get, Path, harness.Issuer.Token(new StubIssuer.TokenRequest { Issuer = "https://attacker.example.test/" })));
         _forwarded = harness.Origin.ReceivedAnythingFor(Path);
     }
 

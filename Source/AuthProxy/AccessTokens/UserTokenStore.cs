@@ -78,8 +78,9 @@ public sealed class UserTokenStore(
             var stored = await Read<StoredSession>(SessionKey(sessionId), cancellationToken);
             foreach (var audience in stored?.Audiences ?? [])
             {
-                await cache.RemoveAsync(AccessTokenKey(sessionId, audience), cancellationToken);
-                await cache.RemoveAsync(RefreshRejectionKey(sessionId, audience), cancellationToken);
+                var audienceKey = new UserTokenAudience(sessionId, audience);
+                await cache.RemoveAsync(AccessTokenKey(audienceKey), cancellationToken);
+                await cache.RemoveAsync(RefreshRejectionKey(audienceKey), cancellationToken);
             }
 
             await cache.RemoveAsync(SessionKey(sessionId), cancellationToken);
@@ -93,28 +94,28 @@ public sealed class UserTokenStore(
     /// <inheritdoc/>
     public async Task<CachedUserAccessToken?> GetAccessToken(string sessionId, string audience, CancellationToken cancellationToken) =>
         await Get(sessionId, cancellationToken) is not null
-            ? await Read<CachedUserAccessToken>(AccessTokenKey(sessionId, audience), cancellationToken)
+            ? await Read<CachedUserAccessToken>(AccessTokenKey(new(sessionId, audience)), cancellationToken)
             : null;
 
     /// <inheritdoc/>
-    public Task SetAccessToken(string sessionId, string audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken) =>
-        SetAudienceEntry(new AudienceEntry(sessionId, audience, AccessTokenKey(sessionId, audience), renewAt), token, cancellationToken);
+    public Task SetAccessToken(UserTokenAudience audience, CachedUserAccessToken token, DateTimeOffset renewAt, CancellationToken cancellationToken) =>
+        SetAudienceEntry(new AudienceEntry(audience.SessionId, audience.Audience, AccessTokenKey(audience), renewAt), token, cancellationToken);
 
     /// <inheritdoc/>
     public async Task<bool> IsRefreshRejected(string sessionId, string audience, CancellationToken cancellationToken) =>
         await Get(sessionId, cancellationToken) is not null
-        && await Read<RefreshRejection>(RefreshRejectionKey(sessionId, audience), cancellationToken) is { } rejection
+        && await Read<RefreshRejection>(RefreshRejectionKey(new(sessionId, audience)), cancellationToken) is { } rejection
         && rejection.RetryAt > timeProvider.GetUtcNow();
 
     /// <inheritdoc/>
     public Task SetRefreshRejected(string sessionId, string audience, DateTimeOffset retryAt, CancellationToken cancellationToken) =>
-        SetAudienceEntry(new AudienceEntry(sessionId, audience, RefreshRejectionKey(sessionId, audience), retryAt), new RefreshRejection(retryAt), cancellationToken);
+        SetAudienceEntry(new AudienceEntry(sessionId, audience, RefreshRejectionKey(new(sessionId, audience)), retryAt), new RefreshRejection(retryAt), cancellationToken);
 
     static string SessionKey(string sessionId) => $"{KeyPrefix}{Hash(sessionId)}";
 
-    static string AccessTokenKey(string sessionId, string audience) => $"{KeyPrefix}{Hash(sessionId)}:{audience}";
+    static string AccessTokenKey(UserTokenAudience audience) => $"{KeyPrefix}{Hash(audience.SessionId)}:{audience.Audience}";
 
-    static string RefreshRejectionKey(string sessionId, string audience) => $"{AccessTokenKey(sessionId, audience)}:rejected";
+    static string RefreshRejectionKey(UserTokenAudience audience) => $"{AccessTokenKey(audience)}:rejected";
 
     /// <summary>
     /// Derives the cache key from the identifier rather than using it, so a cache that can be listed does not hand

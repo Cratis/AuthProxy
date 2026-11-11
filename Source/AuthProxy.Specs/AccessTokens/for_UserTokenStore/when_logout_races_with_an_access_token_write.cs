@@ -21,7 +21,7 @@ public class when_logout_races_with_an_access_token_write : given.a_user_token_s
                 await finish.Task.WaitAsync(TimeSpan.FromSeconds(5), TimeProvider.System);
             }
         };
-        var write = _store.SetAccessToken(sessionId, "audience", new("access-token", _time.GetUtcNow().AddHours(1), _time.GetUtcNow().AddMinutes(59)), _time.GetUtcNow().AddMinutes(59), CancellationToken.None);
+        var write = _store.SetAccessToken(new(sessionId, "audience"), new("access-token", _time.GetUtcNow().AddHours(1), _time.GetUtcNow().AddMinutes(59)), _time.GetUtcNow().AddMinutes(59), CancellationToken.None);
         await writing.Task.WaitAsync(TimeSpan.FromSeconds(5), TimeProvider.System);
         var logout = _store.Remove(sessionId, CancellationToken.None);
         finish.SetResult();

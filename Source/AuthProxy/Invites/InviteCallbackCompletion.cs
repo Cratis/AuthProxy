@@ -63,27 +63,54 @@ static class InviteCallbackCompletion
         var services = httpContext.RequestServices;
         var logger = GetLogger(httpContext);
 
-        // Re-validate the capability exactly as the post-login exchange does before forwarding it. A
-        // capability that no longer validates is not answered here: the middleware already owns the
-        // expired/invalid answers, and the follow-up request reaches them unchanged.
-        var tokenValidator = services.GetRequiredService<IInviteTokenValidator>();
-        var validationResult = await tokenValidator.ValidateDetailed(inviteToken, httpContext.RequestAborted);
-        if (validationResult != InviteTokenValidationResult.Valid)
+        if (!await StillValidates(context, logger, inviteToken))
         {
-            logger.InvitationCallbackTokenNoLongerValidates(context.Scheme.Name, validationResult);
             return InviteCallbackCompletionResult.NotCompleted;
         }
 
         var completion = services.GetRequiredService<IInviteCompletion>();
         var exchangeResult = await completion.ExchangeForTicket(httpContext, inviteToken, context.Principal!, properties!);
+        return await AnswerExchange(context, completion, inviteToken, exchangeResult);
+    }
+
+    static async Task<InviteCallbackCompletionResult> AnswerExchange(
+        TicketReceivedContext context,
+        IInviteCompletion completion,
+        string inviteToken,
+        InviteExchangeResult exchangeResult)
+    {
+        var logger = GetLogger(context.HttpContext);
         return exchangeResult switch
         {
             InviteExchangeResult.Success => CompleteSuccessfully(context, completion, inviteToken, logger),
             InviteExchangeResult.DuplicateSubject => await AnswerDuplicateSubject(context, logger),
-            InviteExchangeResult.EmailMismatch => await AnswerWithPage(context, logger, exchangeResult, WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden),
-            InviteExchangeResult.EmailUnavailable => await AnswerWithPage(context, logger, exchangeResult, WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden),
+            InviteExchangeResult.EmailMismatch => await AnswerWithPage(context, logger, exchangeResult, new(WellKnownPageNames.InvitationEmailMismatch, StatusCodes.Status403Forbidden)),
+            InviteExchangeResult.EmailUnavailable => await AnswerWithPage(context, logger, exchangeResult, new(WellKnownPageNames.InvitationEmailUnavailable, StatusCodes.Status403Forbidden)),
             _ => await AnswerFailure(context, logger),
         };
+    }
+
+    /// <summary>
+    /// Re-validate the capability exactly as the post-login exchange does before forwarding it. A
+    /// capability that no longer validates is not answered here: the middleware already owns the
+    /// expired/invalid answers, and the follow-up request reaches them unchanged.
+    /// </summary>
+    /// <param name="context">The ticket-received context.</param>
+    /// <param name="logger">The logger to explain a refusal to.</param>
+    /// <param name="inviteToken">The pending invitation capability.</param>
+    /// <returns><see langword="true"/> when the capability is still valid.</returns>
+    static async Task<bool> StillValidates(TicketReceivedContext context, ILogger logger, string inviteToken)
+    {
+        var httpContext = context.HttpContext;
+        var tokenValidator = httpContext.RequestServices.GetRequiredService<IInviteTokenValidator>();
+        var validationResult = await tokenValidator.ValidateDetailed(inviteToken, httpContext.RequestAborted);
+        if (validationResult == InviteTokenValidationResult.Valid)
+        {
+            return true;
+        }
+
+        logger.InvitationCallbackTokenNoLongerValidates(context.Scheme.Name, validationResult);
+        return false;
     }
 
     static bool TryGetOwnInvitation(TicketReceivedContext context, AuthenticationProperties? properties, out string inviteToken)
@@ -137,19 +164,18 @@ static class InviteCallbackCompletion
             return InviteCallbackCompletionResult.CompletedWithRedirect;
         }
 
-        return await WritePage(context, WellKnownPageNames.InvitationSubjectAlreadyExists, StatusCodes.Status409Conflict);
+        return await WritePage(context, new(WellKnownPageNames.InvitationSubjectAlreadyExists, StatusCodes.Status409Conflict));
     }
 
     static async Task<InviteCallbackCompletionResult> AnswerWithPage(
         TicketReceivedContext context,
         ILogger logger,
         InviteExchangeResult exchangeResult,
-        string pageName,
-        int statusCode)
+        ErrorPage page)
     {
         logger.InvitationCallbackExchangeDidNotSucceed(context.Scheme.Name, exchangeResult);
         PendingInvitationCookies.Delete(context.HttpContext);
-        return await WritePage(context, pageName, statusCode);
+        return await WritePage(context, page);
     }
 
     static async Task<InviteCallbackCompletionResult> AnswerFailure(TicketReceivedContext context, ILogger logger)
@@ -157,7 +183,7 @@ static class InviteCallbackCompletion
         var config = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue;
         if (config.Invite?.Attestation is not null)
         {
-            return await AnswerWithPage(context, logger, InviteExchangeResult.Failed, WellKnownPageNames.InvitationInvalid, StatusCodes.Status403Forbidden);
+            return await AnswerWithPage(context, logger, InviteExchangeResult.Failed, new(WellKnownPageNames.InvitationInvalid, StatusCodes.Status403Forbidden));
         }
 
         // A legacy-protocol failure writes no page in the middleware - the request simply continues down
@@ -168,7 +194,7 @@ static class InviteCallbackCompletion
         return InviteCallbackCompletionResult.NotCompleted;
     }
 
-    static async Task<InviteCallbackCompletionResult> WritePage(TicketReceivedContext context, string pageName, int statusCode)
+    static async Task<InviteCallbackCompletionResult> WritePage(TicketReceivedContext context, ErrorPage page)
     {
         // The page replaces the handler's own sign-in-and-redirect, but the sign-in itself still happened -
         // the middleware writes this same page to an already-authenticated request, and the person did
@@ -177,11 +203,11 @@ static class InviteCallbackCompletion
         await context.HttpContext.SignInAsync(context.Options.SignInScheme, context.Principal!, context.Properties);
 
         var errorPageProvider = context.HttpContext.RequestServices.GetRequiredService<IErrorPageProvider>();
-        var isEmailMismatch = string.Equals(pageName, WellKnownPageNames.InvitationEmailMismatch, StringComparison.Ordinal);
-        var substitutions = isEmailMismatch || string.Equals(pageName, WellKnownPageNames.InvitationEmailUnavailable, StringComparison.Ordinal)
+        var isEmailMismatch = string.Equals(page.Name, WellKnownPageNames.InvitationEmailMismatch, StringComparison.Ordinal);
+        var substitutions = isEmailMismatch || string.Equals(page.Name, WellKnownPageNames.InvitationEmailUnavailable, StringComparison.Ordinal)
             ? InvitationPageEmails.ForRequest(context.HttpContext, includeAssertedEmail: isEmailMismatch)
             : null;
-        await errorPageProvider.WriteErrorPageAsync(context.HttpContext, pageName, statusCode, substitutions);
+        await errorPageProvider.WriteErrorPageAsync(context.HttpContext, page.Name, page.StatusCode, substitutions);
         context.HandleResponse();
         return InviteCallbackCompletionResult.ResponseHandled;
     }
@@ -190,4 +216,6 @@ static class InviteCallbackCompletion
         context.RequestServices
             .GetRequiredService<ILoggerFactory>()
             .CreateLogger(typeof(InviteCallbackCompletion).FullName!);
+
+    readonly record struct ErrorPage(string Name, int StatusCode);
 }

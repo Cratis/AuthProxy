@@ -352,15 +352,16 @@ public class IdentityDetailsResolver(
             var required = mode == C.IdentityVerificationMode.Required;
 
             var outcome = await _endpointCaller.Call(
-                name,
-                service.Backend!.BaseUrl,
-                enrichedPrincipal,
-                state.TenantId,
-                state.LogIdentifier,
-                service.EffectiveIdentityVerificationTimeout,
-                state.Context.RequestAborted,
-                denialWillBeLogged: required,
-                onBehalf: state.OnBehalf);
+                new IdentityEndpointCall(
+                    name,
+                    service.Backend!.BaseUrl,
+                    enrichedPrincipal,
+                    state.TenantId,
+                    state.LogIdentifier,
+                    service.EffectiveIdentityVerificationTimeout,
+                    DenialWillBeLogged: required,
+                    OnBehalf: state.OnBehalf),
+                state.Context.RequestAborted);
 
             if (!Admits(outcome, mode))
             {
