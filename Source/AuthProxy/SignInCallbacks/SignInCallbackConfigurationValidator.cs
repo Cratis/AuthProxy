@@ -19,7 +19,7 @@ sealed class SignInCallbackConfigurationValidator : IValidateOptions<C.AuthProxy
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
         foreach (var (serviceName, service) in options.Services)
         {
             if (service.SignInCallback is not { } callback)

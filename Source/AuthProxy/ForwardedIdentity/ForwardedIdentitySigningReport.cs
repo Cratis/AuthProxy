@@ -13,7 +13,7 @@ public static class ForwardedIdentitySigningReport
     /// <returns>The redacted diagnostic rows.</returns>
     public static IReadOnlyList<ForwardedIdentityFlowStatus> For(C.AuthProxy config)
     {
-        var rows = new List<ForwardedIdentityFlowStatus>();
+        List<ForwardedIdentityFlowStatus> rows = [];
         foreach (var (name, service) in config.Services)
         {
             if (service.Backend is not null || service.Frontend is not null) rows.Add(Row(ForwardedIdentityFlow.ProxiedRequest, name, service.ForwardedIdentity, service.Backend?.BaseUrl ?? service.Frontend?.BaseUrl, config));

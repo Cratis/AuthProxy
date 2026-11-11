@@ -15,7 +15,7 @@ internal sealed class BackendTlsConfigurationValidator(TimeProvider timeProvider
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
         if (!Enum.IsDefined(options.Profile)) failures.Add($"{C.AuthProxy.SectionKey}:Profile must be Default or LocalDevelopment.");
         if (options.BackendTls.ReloadInterval < C.BackendTls.MinimumReloadInterval)
         {

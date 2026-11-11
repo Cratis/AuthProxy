@@ -57,7 +57,7 @@ internal static class GitHubPagedResourceReader
         ILogger logger,
         CancellationToken cancellationToken)
     {
-        var values = new List<string>();
+        List<string> values = [];
         var next = WithPageSize(resource);
 
         try

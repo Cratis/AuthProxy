@@ -26,7 +26,7 @@ sealed class InviteConfigurationValidator : IValidateOptions<C.AuthProxy>
             return ValidateOptionsResult.Success;
         }
 
-        var failures = new List<string>();
+        List<string> failures = [];
         var destination = invite.MatchingTenantInvitationDestination;
 
         // Reject undefined enum values that may have been parsed from configuration.

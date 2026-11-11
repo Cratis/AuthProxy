@@ -12,7 +12,7 @@ public sealed class CredentialBindingConfigurationValidator : IValidateOptions<C
     /// <inheritdoc/>
     public ValidateOptionsResult Validate(string? name, C.AuthProxy options)
     {
-        var failures = new List<string>();
+        List<string> failures = [];
         ValidateIdentifier(nameof(C.CredentialBinding.Resource), options.CredentialBinding.Resource, failures);
         ValidateIdentifier(nameof(C.CredentialBinding.Environment), options.CredentialBinding.Environment, failures);
         return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);

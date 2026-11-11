@@ -66,7 +66,7 @@ public class TenantResolver(
     {
         context.Items.Remove(TenancyMiddleware.TenantVerificationUrlTemplateItemKey);
         var current = config.CurrentValue;
-        var results = new List<TenantResolutionResult>();
+        List<TenantResolutionResult> results = [];
         foreach (var resolution in current.TenantResolutions)
         {
             if (TryResolveWith(context, resolution, current, out var result))
