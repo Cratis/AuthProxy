@@ -11,7 +11,7 @@ public class when_checking_a_principal_that_does_not_prove_its_email : given.a_p
     bool _paddedVerification;
     bool _emptyVerification;
     bool _conflictingVerifications;
-    bool _repeatedVerifications;
+    bool _repeatedWithOneFalse;
 
     void Because()
     {
@@ -21,7 +21,7 @@ public class when_checking_a_principal_that_does_not_prove_its_email : given.a_p
         _paddedVerification = Satisfied(("email", "a@example.com"), ("email_verified", "true "));
         _emptyVerification = Satisfied(("email", "a@example.com"), ("email_verified", string.Empty));
         _conflictingVerifications = Satisfied(("email", "a@example.com"), ("email_verified", "true"), ("email_verified", "false"));
-        _repeatedVerifications = Satisfied(("email", "a@example.com"), ("email_verified", "true"), ("email_verified", "true"));
+        _repeatedWithOneFalse = Satisfied(("email", "a@example.com"), ("email_verified", "true"), ("email_verified", "true"), ("email_verified", "false"));
     }
 
     [Fact] void should_refuse_a_missing_verification() => _withoutVerification.ShouldBeFalse();
@@ -30,5 +30,5 @@ public class when_checking_a_principal_that_does_not_prove_its_email : given.a_p
     [Fact] void should_refuse_padded_text() => _paddedVerification.ShouldBeFalse();
     [Fact] void should_refuse_an_empty_value() => _emptyVerification.ShouldBeFalse();
     [Fact] void should_refuse_conflicting_verifications() => _conflictingVerifications.ShouldBeFalse();
-    [Fact] void should_refuse_ambiguous_repeated_verifications() => _repeatedVerifications.ShouldBeFalse();
+    [Fact] void should_refuse_repeated_verifications_when_one_is_false() => _repeatedWithOneFalse.ShouldBeFalse();
 }

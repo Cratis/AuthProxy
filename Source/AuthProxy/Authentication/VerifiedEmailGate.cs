@@ -17,7 +17,7 @@ internal static class VerifiedEmailGate
     internal const string DefaultEmailVerifiedClaimType = "email_verified";
 
     /// <summary>
-    /// Determines whether the principal has exactly one distinct e-mail address and a single, true verification claim.
+    /// Determines whether the principal has exactly one distinct e-mail address and only true verification claims.
     /// </summary>
     /// <param name="principal">The principal the provider callback produced.</param>
     /// <param name="emailClaimType">The claim type that carries the e-mail address.</param>
@@ -25,8 +25,9 @@ internal static class VerifiedEmailGate
     /// <param name="includeMappedEmail">Whether the inbound-mapped e-mail claim type counts as the same address.</param>
     /// <returns><see langword="true"/> when the requirement is met; otherwise <see langword="false"/>.</returns>
     /// <remarks>
-    /// Anything but exactly one claim whose value is <see langword="true"/> (case-insensitive, no surrounding whitespace) fails,
-    /// so a missing, conflicting or ambiguous answer never admits anybody.
+    /// Anything but at least one verification claim, every one of which is <see langword="true"/> (case-insensitive, no surrounding
+    /// whitespace) fails, so a missing or conflicting answer never admits anybody. The ID token and the user-info response may both
+    /// carry the flag, and a JSON boolean arrives from them with different casing, so agreeing duplicates are accepted.
     /// </remarks>
     internal static bool IsSatisfied(ClaimsPrincipal? principal, string emailClaimType, string emailVerifiedClaimType, bool includeMappedEmail)
     {
@@ -45,7 +46,7 @@ internal static class VerifiedEmailGate
 
         var verified = claims.Where(_ => _.Type == emailVerifiedClaimType).ToArray();
         return addresses == 1
-            && verified.Length == 1
-            && string.Equals(verified[0].Value, bool.TrueString, StringComparison.OrdinalIgnoreCase);
+            && verified.Length > 0
+            && verified.All(_ => string.Equals(_.Value, bool.TrueString, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -8,15 +8,18 @@ public class when_checking_a_principal_with_one_verified_email : given.a_princip
     bool _plain;
     bool _capitalized;
     bool _sameAddressInBothClaimTypes;
+    bool _agreeingVerificationsWithDifferentCasing;
 
     void Because()
     {
         _plain = Satisfied(("email", "a@example.com"), ("email_verified", "true"));
         _capitalized = Satisfied(("email", "a@example.com"), ("email_verified", "True"));
         _sameAddressInBothClaimTypes = Satisfied(("email", "a@example.com"), (ClaimTypes.Email, "A@example.com"), ("email_verified", "true"));
+        _agreeingVerificationsWithDifferentCasing = Satisfied(("email", "a@example.com"), ("email_verified", "true"), ("email_verified", "True"));
     }
 
     [Fact] void should_be_satisfied() => _plain.ShouldBeTrue();
     [Fact] void should_accept_the_text_a_json_boolean_produces() => _capitalized.ShouldBeTrue();
     [Fact] void should_treat_the_same_address_under_two_claim_types_as_one() => _sameAddressInBothClaimTypes.ShouldBeTrue();
+    [Fact] void should_accept_the_flag_from_the_id_token_and_the_user_info_response_when_they_agree() => _agreeingVerificationsWithDifferentCasing.ShouldBeTrue();
 }

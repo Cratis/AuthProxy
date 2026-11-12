@@ -14,10 +14,11 @@ namespace Cratis.AuthProxy.Authentication.for_AuthenticationServiceCollectionExt
 public class when_a_configured_oidc_callback_cannot_resolve_its_subject : configured_canonical_provider_callbacks
 {
     TicketReceivedContext _ticketContext;
+    DefaultHttpContext _context;
 
     async Task Because()
     {
-        var context = Context();
+        var context = _context = Context();
         var properties = new AuthenticationProperties();
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "wrong-subject-claim")], "microsoft"));
         var scheme = new AuthenticationScheme("microsoft", "microsoft", typeof(OpenIdConnectHandler));
@@ -30,6 +31,7 @@ public class when_a_configured_oidc_callback_cannot_resolve_its_subject : config
         await _oidcOptions.Events.OnTicketReceived(_ticketContext);
     }
 
-    [Fact] void should_fail_the_callback() => _ticketContext.Result.Failure.ShouldNotBeNull();
+    [Fact] void should_end_the_callback_as_a_handled_remote_failure() => _ticketContext.Result.Handled.ShouldBeTrue();
+    [Fact] void should_redirect_to_provider_selection_with_the_remote_failure_reason() => _context.Response.Headers.Location.ToString().ShouldContain("remote-failure");
     [Fact] void should_not_apply_an_enriched_principal() => _ticketContext.Principal!.FindFirst(CanonicalIdentityClaims.ProviderKey).ShouldBeNull();
 }

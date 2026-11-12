@@ -48,6 +48,22 @@ public static class RemoteAuthenticationFailureHandler
     }
 
     /// <summary>
+    /// Refuses a ticket the provider callback delivered, answering exactly like <see cref="HandleRemoteFailure"/>.
+    /// </summary>
+    /// <param name="context">The ticket-received context to refuse.</param>
+    /// <param name="message">Why the ticket is refused, for the log.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// Failing the context from the ticket-received event does not raise the remote-failure event and does not
+    /// stop the handler from signing in, so the refusal is answered here and the response is marked handled.
+    /// </remarks>
+    internal static Task RefuseTicket(TicketReceivedContext context, string message)
+    {
+        GetLogger(context.HttpContext).RemoteSignInFailed(context.Scheme.Name, message);
+        return Handle(context, context.Properties, SignInFailureReason.RemoteFailure);
+    }
+
+    /// <summary>
     /// Builds the provider-selection location a failed sign-in redirects to.
     /// </summary>
     /// <param name="reason">The failure reason to carry.</param>

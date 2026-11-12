@@ -640,7 +640,7 @@ public static class AuthenticationServiceCollectionExtensions
             context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
                 .CreateLogger(typeof(OidcProviderGating).FullName!)
                 .VerifiedEmailRequired(context.Scheme.Name);
-            context.Fail("Verified e-mail is required.");
+            await RemoteAuthenticationFailureHandler.RefuseTicket(context, "Verified e-mail is required.");
             return;
         }
 
@@ -648,7 +648,7 @@ public static class AuthenticationServiceCollectionExtensions
         var route = TicketReceivedPolicy.Route(canonicalResolution, context.Properties);
         if (route == TicketReceivedRoute.Fail)
         {
-            context.Fail("Canonical federated identity could not be resolved.");
+            await RemoteAuthenticationFailureHandler.RefuseTicket(context, "Canonical federated identity could not be resolved.");
             return;
         }
 
