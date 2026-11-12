@@ -115,8 +115,10 @@ public class BearerRouteMiddleware(
         || IsLoopbackRequest(context);
 
     /// <summary>
-    /// Requires both the effective peer and the host to be loopback: neither a forged Host header nor
-    /// a loopback ingress serving a public hostname may exempt a remote caller from HTTPS.
+    /// Requires both the effective peer and the host to be loopback: a remote caller's forged Host header
+    /// alone, or a loopback ingress serving a public hostname, does not earn the exemption. A loopback peer
+    /// that relays a client's Host header is part of the deployment's trust boundary, so deployments must not
+    /// run an untrusted local relay in front of the proxy.
     /// </summary>
     /// <param name="context">The request context after trusted forwarded-header processing.</param>
     /// <returns>Whether both the effective remote address and host are loopback.</returns>
