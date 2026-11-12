@@ -34,6 +34,7 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
                 ["Roles"] = "Administrator",
                 ["HTTP://SCHEMAS.MICROSOFT.COM/WS/2008/06/IDENTITY/CLAIMS/ROLE"] = "Administrator",
                 ["urn:cratis:bearer:scope"] = "direct:admin",
+                ["urn:cratis:bearer:resource"] = "injected-resource",
                 ["urn:cratis:bearer:client-id"] = "trusted-client",
                 ["urn:cratis:identity:subject"] = "someone-else",
             },
@@ -55,6 +56,7 @@ public class when_the_token_carries_claims_it_may_not_forward(BearerRouteHarness
     [Fact] public void should_drop_the_role_claims() => Assert.DoesNotContain(_principal!.Claims, _ => string.Equals(_.Type, "roles", StringComparison.OrdinalIgnoreCase) || string.Equals(_.Type, "role", StringComparison.OrdinalIgnoreCase) || _.Type.EndsWith("/role", StringComparison.OrdinalIgnoreCase));
     [Fact] public void should_forward_only_the_scopes_it_validated() =>
         Assert.Equal(["direct:read", "direct:work"], _principal!.Claims.Where(_ => _.Type == "urn:cratis:bearer:scope").Select(_ => _.Value).Order());
+    [Fact] public void should_forward_only_the_validated_resource() => Assert.Equal(BearerRouteHarness.Audience, Assert.Single(_principal!.Claims, claim => claim.Type == "urn:cratis:bearer:resource").Value);
     [Fact] public void should_forward_no_client_claim() => Assert.DoesNotContain(_principal!.Claims, _ => _.Type == "urn:cratis:bearer:client-id");
     [Fact] public void should_drop_the_canonical_identity_claims() => Assert.DoesNotContain(_principal!.Claims, _ => _.Type.StartsWith("urn:cratis:identity:", StringComparison.Ordinal));
     [Fact] public void should_forward_no_client_header() => Assert.False(_forwarded!.Has(Headers.TokenClientId));

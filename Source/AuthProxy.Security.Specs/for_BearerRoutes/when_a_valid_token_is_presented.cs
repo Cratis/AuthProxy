@@ -46,6 +46,8 @@ public class when_a_valid_token_is_presented(BearerRouteHarness harness) : IAsyn
     [Fact] public void should_forward_the_github_login_as_the_principal_name() => Assert.Equal(BearerRouteHarness.GitHubLogin, _forwarded!.Value(Headers.PrincipalName));
     [Fact] public void should_forward_the_tenant_from_the_token() => Assert.Equal(BearerRouteHarness.TenantId, _forwarded!.Value(Headers.TenantId));
     [Fact] public void should_ignore_the_specified_deployment_tenant() => Assert.NotEqual(BearerRouteHarness.SessionTenantId, _forwarded!.Value(Headers.TenantId));
+    [Fact] public void should_forward_the_exact_validated_resource() => Assert.Equal(BearerRouteHarness.Audience, Assert.Single(_principal!.Claims, claim => claim.Type == "urn:cratis:bearer:resource").Value);
+    [Fact] public void should_forward_the_effective_scheme() => Assert.Equal("https", _forwarded!.Value("X-Forwarded-Proto"));
     [Fact] public void should_forward_the_granted_scopes() => Assert.Equal("direct:read direct:work", _forwarded!.Value(Headers.TokenScope));
     [Fact] public void should_forward_the_client_the_token_was_issued_to() => Assert.Equal(BearerRouteHarness.ClientId, _forwarded!.Value(Headers.TokenClientId));
     [Fact] public void should_name_the_route_identity_provider() => Assert.Equal("github", _principal!.IdentityProvider);

@@ -47,6 +47,19 @@ The service block covers:
 
 A service whose frontend and backend verify proofs must provision the matching audience and key at both receivers, or be split into separately configured services. Anonymous requests without principal or on-behalf identity material remain unsigned; tenant or service selectors alone do not create an identity.
 
+## Bearer resource and scheme
+
+A validated access-token principal carries exactly one `urn:cratis:bearer:resource` claim: the configured
+resource audience that exactly matched its `aud`, before claim mappings. When several configured
+audiences match, the ordinal-first match wins. No trailing-slash normalization is applied. Token-supplied
+claims in this reserved namespace are stripped. The claim is inside the signed `x-ms-client-principal`
+when signing is enabled; it does not replace the envelope's configured backend `Audience`.
+
+Bearer forwards also replace `X-Forwarded-Proto` with the effective request scheme after trusted
+forwarded-header processing, never a caller-supplied value. This header is not itself part of the v1
+signed envelope; protect the backend hop and restrict backend ingress as described above. See the
+[bearer forwarding contract](authentication.md#https-is-required) for transport exemptions.
+
 ## Other identity back channels
 
 On-behalf grant checks and session notifications retain their per-call attestations, bound to purpose, method, target and body. They do not carry the v1 header envelope and are reported as attested, not envelope-signed. Their signed service's backend requires HTTPS outside `LocalDevelopment`, and their backend hosts receive the configured client certificate.

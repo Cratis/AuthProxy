@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Net;
 using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.BearerRoutes.Introspection;
@@ -108,6 +109,25 @@ public class BearerRouteMiddleware(
         await next(context);
     }
 
+    static bool AllowsTransport(HttpContext context, C.AuthProxy current) =>
+        context.Request.IsHttps
+        || current.Profile == C.DeploymentProfile.LocalDevelopment
+        || IsLoopbackRequest(context);
+
+    /// <summary>
+    /// Requires both the effective peer and the host to be loopback: a remote caller's forged Host header
+    /// alone, or a loopback ingress serving a public hostname, does not earn the exemption. A loopback peer
+    /// that relays a client's Host header is part of the deployment's trust boundary, so deployments must not
+    /// run an untrusted local relay in front of the proxy.
+    /// </summary>
+    /// <param name="context">The request context after trusted forwarded-header processing.</param>
+    /// <returns>Whether both the effective remote address and host are loopback.</returns>
+    static bool IsLoopbackRequest(HttpContext context) =>
+        context.Connection.RemoteIpAddress is { } peer
+        && IPAddress.IsLoopback(peer)
+        && Uri.TryCreate($"http://{context.Request.Host}/", UriKind.Absolute, out var uri)
+        && uri.IsLoopback;
+
     async Task ServeResourceMetadata(HttpContext context, ResolvedBearerRoute route)
     {
         // A route that accepts personal access tokens only has no OAuth metadata to serve, and nothing is
@@ -129,6 +149,12 @@ public class BearerRouteMiddleware(
 
     async Task Authenticate(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
+        if (!AllowsTransport(context, current))
+        {
+            BearerChallenge.HttpsRequired(context);
+            return;
+        }
+
         if (RequestAuthentication.HasBearer(context.Request) && RequestAuthentication.HasSession(context))
         {
             BearerChallenge.MultipleCredentials(context);

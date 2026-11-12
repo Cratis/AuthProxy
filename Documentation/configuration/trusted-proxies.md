@@ -34,6 +34,11 @@ genuinely encrypted session is protected as one.
 
 ---
 
+Bearer routes require HTTPS using the effective scheme after this boundary is applied. If TLS terminates
+at ingress, declare that ingress as trusted; otherwise bearer traffic arriving over HTTP is refused before
+credentials are evaluated. See [bearer-route HTTPS requirements](authentication.md#https-is-required) for
+the local-development and loopback exceptions and the startup warning.
+
 ## Declaring the boundary
 
 Name the peers directly in front of AuthProxy:

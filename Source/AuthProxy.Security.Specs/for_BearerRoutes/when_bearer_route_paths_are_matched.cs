@@ -81,6 +81,7 @@ public class when_bearer_route_paths_are_matched(BearerRouteHarness harness) : I
         var token = harness.Issuer.Token();
         return harness.Server.SendAsync(context =>
         {
+            context.Request.Scheme = "https";
             context.Request.Method = HttpMethods.Get;
             context.Request.Path = new PathString(path);
             context.Request.Headers.Authorization = $"Bearer {token}";

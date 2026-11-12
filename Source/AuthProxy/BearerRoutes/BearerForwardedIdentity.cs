@@ -53,6 +53,11 @@ public sealed record BearerForwardedIdentity(
             Claims = [.. user.Claims.Select(_ => new ClientPrincipalClaim { Type = _.Type, Value = _.Value })],
         };
 
+        if (validation.Resource is { } resource)
+        {
+            principal.Claims = [.. principal.Claims, new ClientPrincipalClaim { Type = BearerRouteClaims.Resource, Value = resource }];
+        }
+
         return new BearerForwardedIdentity(
             principal,
             validation.TenantId!,

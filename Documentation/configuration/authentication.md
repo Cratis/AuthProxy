@@ -909,15 +909,36 @@ A request accepted on a bearer route is forwarded to the service backend with:
 | `Tenant-ID` | The tenant from the token. |
 | `x-cratis-token-scope` | The granted scopes, space-separated. |
 | `x-cratis-token-client-id` | The client the token was issued to, from `azp` or else `client_id`. This is the client's *asserted* identity: a public client cannot prove which program is using it. |
+| `X-Forwarded-Proto` | The effective request scheme after trusted forwarded-header processing. Replaces every client-supplied value; normally `https`, or `http` only under an explicit transport exemption. |
 
 The principal also carries claims AuthProxy writes itself: `urn:cratis:bearer:issuer`, `urn:cratis:bearer:subject`
 (the token's own `sub`, kept when a mapping rewrites `sub`), `urn:cratis:bearer:client-id` and one
-`urn:cratis:bearer:scope` per scope. A token cannot supply any `urn:cratis:bearer:` or `urn:cratis:identity:`
+`urn:cratis:bearer:scope` per scope. Exactly one `urn:cratis:bearer:resource` claim records the configured
+resource audience that exactly matched the validated token's `aud`, before claim mappings. If several
+configured audiences match, AuthProxy chooses the ordinal-first match, independent of configuration or
+token order. Trailing slashes remain significant. With forwarded-identity signing enabled this claim is
+covered by the signed principal; it is distinct from the signing envelope's backend audience.
+A token cannot supply any `urn:cratis:bearer:` or `urn:cratis:identity:`
 claim, and role claims in the token are not forwarded: a token never grants a role.
 
 Every inbound copy of these headers is removed on every route, bearer or not. The `Cookie` header is not
 forwarded on a bearer route, and neither is `Authorization` unless the route sets `ForwardAuthorizationHeader`.
-Every other request header is passed through as for any proxied request; AuthProxy adds no `Service-ID`.
+Except for `X-Forwarded-Proto`, every other request header is passed through as for any proxied request;
+AuthProxy adds no `Service-ID`.
+
+### HTTPS is required
+
+Requests matching a bearer route prefix require HTTPS before AuthProxy reads or evaluates a credential.
+Plain HTTP receives `400` with `invalid_request`, no authentication challenge, and is never forwarded.
+The effective scheme is read after trusted forwarded-header processing: when TLS terminates at ingress,
+[trust that ingress proxy](trusted-proxies.md) or bearer traffic arriving over HTTP is refused.
+Startup warns when bearer routes are configured outside `LocalDevelopment` and ingress trusts no proxies.
+
+`Profile: LocalDevelopment` permits HTTP. A loopback request also permits HTTP only when **both** its
+effective remote IP address and its host are loopback (the host uses URI loopback semantics). A loopback
+Host header alone, or a loopback ingress serving a public host, cannot bypass HTTPS. The public
+protected-resource metadata endpoint is unchanged: it carries no authenticated identity and remains
+available over HTTP; this exception does not apply to requests matching the bearer route prefix.
 
 ### Identity verification is not applied
 

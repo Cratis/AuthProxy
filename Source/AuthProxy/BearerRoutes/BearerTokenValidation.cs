@@ -42,6 +42,9 @@ public sealed record BearerTokenValidation(
     /// <summary>Gets the fixed DPoP error for a rejected presentation, without untrusted descriptions.</summary>
     internal string? DpopError { get; init; }
 
+    /// <summary>Gets the exact matched audience before any forwarded claim mappings are applied.</summary>
+    internal string? Resource { get; init; }
+
     /// <summary>
     /// Creates a successful result.
     /// </summary>
