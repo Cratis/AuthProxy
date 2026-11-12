@@ -103,7 +103,7 @@ public static class UserTokenSessions
         if (context.HttpContext.Items.Remove(PendingSessionKey, out var pending) && pending is UserTokenSession session)
         {
             var store = context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>();
-            context.Properties.Items[PropertiesKey] = await store.Create(session, CancellationToken.None);
+            context.Properties.Items[PropertiesKey] = await store.Create(WithCookieRetention(context, session), CancellationToken.None);
         }
     }
 
@@ -131,6 +131,8 @@ public static class UserTokenSessions
             return;
         }
 
+        if (context.Properties.AllowRefresh == false) return;
+
         if (Of(context.HttpContext) is { } sessionId)
         {
             await context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>().Get(sessionId, context.HttpContext.RequestAborted);
@@ -151,6 +153,22 @@ public static class UserTokenSessions
 
         await context.HttpContext.RequestServices.GetRequiredService<IUserTokenStore>().Remove(sessionId, CancellationToken.None);
         context.HttpContext.Items.Remove(HttpContextItemKey);
+    }
+
+    static UserTokenSession WithCookieRetention(CookieSigningInContext context, UserTokenSession session)
+    {
+        if (context.Properties is not { IssuedUtc: { } issued, ExpiresUtc: { } expires })
+        {
+            return session;
+        }
+
+        var global = context.HttpContext.RequestServices.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Session;
+        var lifetime = global.Lifetime > TimeSpan.Zero ? global.Lifetime : C.Session.DefaultLifetime;
+        var sliding = context.Options.SlidingExpiration && context.Properties.AllowRefresh != false;
+        var span = expires - issued;
+        if (span <= TimeSpan.Zero) return session;
+        if ((span, sliding) == (lifetime, global.SlidingExpiration)) return session;
+        return session with { Lifetime = span, Sliding = sliding, ExpiresAt = sliding ? null : expires };
     }
 
     static bool HasPreviousCookie(CookieSigningInContext context) =>

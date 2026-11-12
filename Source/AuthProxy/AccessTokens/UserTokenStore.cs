@@ -3,6 +3,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using Cratis.AuthProxy.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Caching.Distributed;
@@ -39,15 +40,16 @@ public sealed class UserTokenStore(
     public async Task<string> Create(UserTokenSession session, CancellationToken cancellationToken)
     {
         var sessionId = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
-        var options = SessionEntryOptions();
-        await Write(SessionKey(sessionId), new StoredSession(session.Scheme, session.RefreshToken, [], options.AbsoluteExpiration), options, cancellationToken);
+        var stored = LimitRetention(new StoredSession(session.Scheme, session.RefreshToken, [], session.ExpiresAt, session.Lifetime, session.Sliding));
+        var options = SessionEntryOptions(stored);
+        await Write(SessionKey(sessionId), stored with { ExpiresAt = options.AbsoluteExpiration }, options, cancellationToken);
         return sessionId;
     }
 
     /// <inheritdoc/>
     public async Task<UserTokenSession?> Get(string sessionId, CancellationToken cancellationToken) =>
         await Read<StoredSession>(SessionKey(sessionId), cancellationToken) is { } stored
-            ? new UserTokenSession(stored.Scheme, stored.RefreshToken)
+            ? new UserTokenSession(stored.Scheme, stored.RefreshToken) { Lifetime = stored.Lifetime, Sliding = stored.Sliding, ExpiresAt = stored.Lifetime is null ? null : stored.ExpiresAt }
             : null;
 
     /// <inheritdoc/>
@@ -59,7 +61,7 @@ public sealed class UserTokenStore(
         {
             if (await Read<StoredSession>(SessionKey(sessionId), cancellationToken) is { } stored)
             {
-                await Write(SessionKey(sessionId), stored with { Scheme = session.Scheme, RefreshToken = session.RefreshToken }, SessionEntryOptions(stored.ExpiresAt), cancellationToken);
+                await Write(SessionKey(sessionId), stored with { Scheme = session.Scheme, RefreshToken = session.RefreshToken }, SessionEntryOptions(stored), cancellationToken);
             }
         }
         finally
@@ -142,7 +144,7 @@ public sealed class UserTokenStore(
 
             if (!stored.Audiences.Contains(audience, StringComparer.Ordinal))
             {
-                await Write(SessionKey(sessionId), stored with { Audiences = [.. stored.Audiences, audience] }, SessionEntryOptions(stored.ExpiresAt), cancellationToken);
+                await Write(SessionKey(sessionId), stored with { Audiences = [.. stored.Audiences, audience] }, SessionEntryOptions(stored), cancellationToken);
             }
 
             var expiry = stored.ExpiresAt is { } sessionExpiry && sessionExpiry < entry.ExpiresAt ? sessionExpiry : entry.ExpiresAt;
@@ -160,18 +162,35 @@ public sealed class UserTokenStore(
 
     SemaphoreSlim MutationLock(string sessionId) => _mutationLocks[(uint)StringComparer.Ordinal.GetHashCode(sessionId) % (uint)_mutationLocks.Length];
 
-    DistributedCacheEntryOptions SessionEntryOptions(DateTimeOffset? expiresAt = null)
+    StoredSession LimitRetention(StoredSession value)
     {
-        if (expiresAt is not null)
+        if (value.Lifetime is null && value.Sliding is null) return value;
+        var options = SessionEntryOptions(value with { ExpiresAt = null });
+        var expiry = options.AbsoluteExpiration;
+        if (value.ExpiresAt is { } earlier && earlier < expiry) expiry = earlier;
+        return value with
         {
-            return new DistributedCacheEntryOptions { AbsoluteExpiration = expiresAt };
+            Lifetime = options.SlidingExpiration ?? (options.AbsoluteExpiration - timeProvider.GetUtcNow()),
+            Sliding = options.SlidingExpiration is not null,
+            ExpiresAt = expiry
+        };
+    }
+
+    DistributedCacheEntryOptions SessionEntryOptions(StoredSession stored)
+    {
+        if (stored.ExpiresAt is not null)
+        {
+            return new DistributedCacheEntryOptions { AbsoluteExpiration = stored.ExpiresAt };
         }
 
-        var current = session.CurrentValue.Session;
-        var lifetime = current.Lifetime > TimeSpan.Zero ? current.Lifetime : C.Session.DefaultLifetime;
-        return current.SlidingExpiration
-            ? new DistributedCacheEntryOptions { SlidingExpiration = lifetime }
-            : new DistributedCacheEntryOptions { AbsoluteExpiration = timeProvider.GetUtcNow().Add(lifetime) };
+        var policy = SessionLifetimePolicy.Resolve(session.CurrentValue.Session, new C.ProviderSession
+        {
+            Lifetime = stored.Lifetime > TimeSpan.Zero ? stored.Lifetime : null,
+            SlidingExpiration = stored.Sliding
+        });
+        return policy.Sliding
+            ? new DistributedCacheEntryOptions { SlidingExpiration = policy.Lifetime }
+            : new DistributedCacheEntryOptions { AbsoluteExpiration = timeProvider.GetUtcNow().Add(policy.Lifetime) };
     }
 
     async Task Write<T>(string key, T value, DistributedCacheEntryOptions options, CancellationToken cancellationToken) =>
@@ -199,7 +218,7 @@ public sealed class UserTokenStore(
 
     sealed record AudienceEntry(string SessionId, string Audience, string Key, DateTimeOffset ExpiresAt);
 
-    sealed record StoredSession(string Scheme, string RefreshToken, string[] Audiences, DateTimeOffset? ExpiresAt);
+    sealed record StoredSession(string Scheme, string RefreshToken, string[] Audiences, DateTimeOffset? ExpiresAt, TimeSpan? Lifetime = null, bool? Sliding = null);
 
     sealed record RefreshRejection(DateTimeOffset RetryAt);
 }

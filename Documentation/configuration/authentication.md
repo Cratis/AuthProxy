@@ -125,6 +125,7 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | `ClientCredential` | `object` | Optional certificate or federated credential used instead of `ClientSecret`. See [Client credentials](#client-credentials-certificates-and-federated-credentials). |
 | `Scopes` | `string[]` | Additional scopes to request (beyond `openid`, `profile`, `email`). |
 | `ResponseMode` | `string` | How the provider returns the authorization code: `Query` (default) or `FormPost`. See below. |
+| `Session` | `object` | Optional [shorten-only browser-session policy](#per-provider-browser-session-lifetime). Omitted fields inherit the global policy. |
 
 #### Response mode and the handshake cookies
 
@@ -532,6 +533,7 @@ callback, correlation state, and PKCE values.
 | `ClientSecret` | `string` | OAuth 2.0 client secret. |
 | `Scopes` | `string[]` | Scopes to request. Adding `read:org` to a GitHub provider also adds organization and team claims to the session. |
 | `ClaimMappings` | `object` | Claim type → user-info JSON field name. |
+| `Session` | `object` | Optional [shorten-only browser-session policy](#per-provider-browser-session-lifetime), with the same `Lifetime` and `SlidingExpiration` fields as OIDC providers. |
 | `AuthorizationParameters` | `object` | Static authorization-request parameter → value. Framework-owned OAuth parameters are rejected at startup. |
 
 Configuring a provider decides *who can sign in*, which on a public provider is everybody. To decide who
@@ -595,6 +597,64 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 The authentication cookie itself carries no persistent `Expires` — the browser drops it when the session
 ends — and is `HttpOnly`, `SameSite=Lax`, and marked `Secure` whenever the site is served over HTTPS. It
 belongs to the one host that issued it unless you set `CookieDomain`.
+
+### Per-provider browser-session lifetime
+
+Use a provider's optional `Session` block when its browser sessions should end sooner than the
+global policy. This configuration excerpt keeps the Entra provider on the global 12-hour lifetime
+and gives a weaker custom OIDC provider a one-hour hard cap:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Session": { "Lifetime": "12:00:00", "SlidingExpiration": false },
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "EntraID",
+            "Authority": "https://login.microsoftonline.com/your-tenant-id/v2.0",
+            "ClientId": "your-entra-client-id",
+            "ClientSecret": "your-entra-client-secret"
+          },
+          {
+            "Name": "Custom",
+            "Authority": "https://id.example.com",
+            "ClientId": "your-custom-client-id",
+            "ClientSecret": "your-custom-client-secret",
+            "Session": { "Lifetime": "01:00:00", "SlidingExpiration": false }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+The same `Session` block works on an `OAuthProviders` entry. For environment-variable configuration,
+including Aspire's `WithEnvironment`, the second OIDC provider's lifetime key is
+`Cratis__AuthProxy__Authentication__OidcProviders__1__Session__Lifetime` with value `01:00:00`.
+
+| Provider `Session` property | Type | Default and constraints |
+| ---------------------------- | ------ | ----------------------- |
+| `Lifetime` | nullable `TimeSpan` | Null or omitted inherits the global lifetime. A configured value must be positive and no longer than the global lifetime; otherwise startup fails. Correct or remove that provider's value to start. A non-positive global lifetime uses its existing 12-hour fallback. |
+| `SlidingExpiration` | nullable `bool` | Null or omitted inherits the global setting. `false` disables renewal for this provider. `true` only permits renewal when global sliding expiration is also enabled. |
+
+Omitting the block preserves existing behavior. Provider settings can only shorten the global
+policy; they cannot extend its lifetime or enable globally disabled sliding expiration. Use
+`SlidingExpiration: false` for a hard cap. An earlier expiry already supplied by the provider is
+preserved. The cookie remains session-scoped, without a persistent browser expiration, and its
+HttpOnly, SameSite, Secure, name, and domain settings are unchanged.
+
+Values come only from deployment configuration, never from provider claims, headers, query
+parameters, or token contents. OIDC refresh-token retention follows the issued cookie's fixed
+deadline or shorter sliding span, including refresh-token rotation; OAuth token capture is unchanged.
+
+The policy applies on a new sign-in or reauthentication through that provider. Changing a provider's
+settings does not rewrite existing cookies or their token sessions; those keep their issued policy
+until they expire or the user signs in again. The global ceiling still limits token-retention rewrites. Linking a second identity does not change the primary session's policy.
+It does not affect bearer tokens or PATs. A shorter session is not proof of recent authentication:
+use [fresh-authentication rules](fresh-authentication.md) for sensitive operations.
 
 ### Sharing the session across hosts
 
