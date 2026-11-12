@@ -41,6 +41,6 @@ public class RouteSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<Rout
         }
 
         sourceIdentifier = group.Value;
-        return !string.IsNullOrEmpty(sourceIdentifier);
+        return !string.IsNullOrWhiteSpace(sourceIdentifier);
     }
 }

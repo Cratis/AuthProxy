@@ -27,7 +27,7 @@ public class ClaimSourceIdentifierStrategy : ISourceIdentifierStrategyTyped<Clai
 
         // Only the principal AuthProxy authenticated is read; a principal header sent by the caller is not.
         var claimValue = context.User.FindFirst(claimType)?.Value;
-        if (!string.IsNullOrEmpty(claimValue))
+        if (!string.IsNullOrWhiteSpace(claimValue))
         {
             sourceIdentifier = claimValue;
             return true;
