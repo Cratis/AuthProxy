@@ -19,8 +19,10 @@ fall back to another type. A bearer token accompanied by the session cookie also
 AuthProxy session cookie. Failed session cookies are expired in the `401` response, including host-only
 cookies. Local logout (`/.cratis/logout`), login selection, and provider sign-in remain reachable so the
 browser can clear or replace its session. These recovery exceptions apply only to matched local login
-and logout endpoints. Unmatched AuthProxy-reserved `/.cratis/` paths are not forwarded to services;
-`/.cratis/me` retains its explicitly matched, authenticated service identity route.
+and logout endpoints. Unmatched paths under AuthProxy's own `/.cratis/` endpoints (login, logout, providers, token, tenant
+selection, link and on-behalf) are not forwarded to services; `/.cratis/me` retains its explicitly matched,
+authenticated service identity route. Every other `/.cratis/` path, such as Arc's `/.cratis/queries` and
+`/.cratis/commands`, belongs to the service behind the proxy and is forwarded to it.
 Declared anonymous routes keep their existing behavior.
 See the [browser migration guidance](../upgrading/selected-tenant-and-upstream-headers.md#authentication-selection-behavior-change).
 

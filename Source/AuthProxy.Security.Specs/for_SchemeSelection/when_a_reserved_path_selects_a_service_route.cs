@@ -21,7 +21,6 @@ public class when_a_reserved_path_selects_a_service_route
             "/%252ecratis/login/provider/extra",
             "/.cratis%2flogin/provider/extra",
             "/.cratis/login/provider%2fextra",
-            "/.cratis/unknown",
         ];
         foreach (var path in paths)
         {
@@ -57,6 +56,24 @@ public class when_a_reserved_path_selects_a_service_route
 
         Assert.True(response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.NotFound);
         Assert.Empty(harness.Origin.Received);
+    }
+
+    [Theory]
+    [InlineData("/.cratis/queries/sse")]
+    [InlineData("/.cratis/queries/sse/subscribe")]
+    [InlineData("/.cratis/queries/ws")]
+    [InlineData("/.cratis/commands/some-command")]
+    [InlineData("/.cratis/unknown")]
+    public async Task should_forward_a_path_the_service_owns(string path)
+    {
+        await using var harness = new ReservedPathHarness();
+        using var client = harness.CreateSecurityClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", harness.JwtToken());
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(harness.Origin.ReceivedAnythingFor(path));
     }
 
     [Fact]
