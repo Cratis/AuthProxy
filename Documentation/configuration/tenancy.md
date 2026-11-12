@@ -217,6 +217,7 @@ A selected tenant that has not been confirmed within `Session.TenantRevalidation
 ## Tenant registry
 
 For `Host`, `Claim`, and `Route`, AuthProxy resolves a source identifier and then looks up the tenant ID in `Cratis:AuthProxy:Tenants`.
+Whitespace-only entries in a tenant's `SourceIdentifiers` or `Domains` are rejected at startup.
 
 ```json
 {
