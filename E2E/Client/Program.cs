@@ -22,9 +22,9 @@ string? token = null;
 await Step("unauthenticated query stream is refused", async cancellation =>
 {
     using var response = await http.GetAsync("/.cratis/queries/sse", HttpCompletionOption.ResponseHeadersRead, cancellation);
-    return response.StatusCode == HttpStatusCode.OK
-        ? throw new InvalidOperationException("an unauthenticated caller was served the query stream")
-        : $"status {(int)response.StatusCode}";
+    return response.StatusCode == HttpStatusCode.Unauthorized
+        ? $"status {(int)response.StatusCode}"
+        : throw new InvalidOperationException($"an unauthenticated caller got status {(int)response.StatusCode} for the query stream, expected 401");
 });
 
 await Step("client credentials are exchanged for a token", async cancellation =>
