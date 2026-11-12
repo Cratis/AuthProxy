@@ -15,6 +15,7 @@ public class when_a_binding_conflicts : Specification
     public async Task should_refuse_before_policy_verification_or_forwarding(string tenant, string environment, string target)
     {
         var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
         context.Request.Path = "/mcp";
         context.Request.Headers.Authorization = "Bearer test-placeholder";
         var current = new C.AuthProxy

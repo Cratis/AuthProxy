@@ -919,6 +919,20 @@ Every inbound copy of these headers is removed on every route, bearer or not. Th
 forwarded on a bearer route, and neither is `Authorization` unless the route sets `ForwardAuthorizationHeader`.
 Every other request header is passed through as for any proxied request; AuthProxy adds no `Service-ID`.
 
+### HTTPS is required
+
+Requests matching a bearer route prefix require HTTPS before AuthProxy reads or evaluates a credential.
+Plain HTTP receives `400` with `invalid_request`, no authentication challenge, and is never forwarded.
+The effective scheme is read after trusted forwarded-header processing: when TLS terminates at ingress,
+[trust that ingress proxy](trusted-proxies.md) or bearer traffic arriving over HTTP is refused.
+Startup warns when bearer routes are configured outside `LocalDevelopment` and ingress trusts no proxies.
+
+`Profile: LocalDevelopment` permits HTTP. A loopback request also permits HTTP only when **both** its
+effective remote IP address and its host are loopback (the host uses URI loopback semantics). A loopback
+Host header alone, or a loopback ingress serving a public host, cannot bypass HTTPS. The public
+protected-resource metadata endpoint is unchanged: it carries no authenticated identity and remains
+available over HTTP; this exception does not apply to requests matching the bearer route prefix.
+
 ### Identity verification is not applied
 
 A bearer route **never calls `/.cratis/me`**, whatever `IdentityVerification` says. That endpoint answers for

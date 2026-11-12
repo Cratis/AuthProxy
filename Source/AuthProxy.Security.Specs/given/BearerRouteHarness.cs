@@ -117,7 +117,7 @@ public class BearerRouteHarness : WebApplicationFactory<Program>
     /// </summary>
     /// <returns>A configured <see cref="HttpClient"/>.</returns>
     public HttpClient CreateBearerClient() =>
-        CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false, HandleCookies = false });
 
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)

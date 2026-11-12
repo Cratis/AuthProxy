@@ -33,6 +33,7 @@ public abstract class a_real_issued_token_pipeline : Specification
     {
         await using var scope = Services.CreateAsyncScope();
         var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        context.Request.Scheme = "https";
         context.Request.Method = HttpMethods.Get;
         context.Request.Path = path;
         context.Request.Host = new HostString(host);

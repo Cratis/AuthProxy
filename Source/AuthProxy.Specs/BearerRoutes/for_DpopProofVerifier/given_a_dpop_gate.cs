@@ -66,6 +66,7 @@ public class given_a_dpop_gate : given_a_signed_proof
     protected DefaultHttpContext Request(string? proof = null, string scheme = "DPoP")
     {
         var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
         context.Request.Method = "POST";
         context.Request.Path = "/oauth";
         context.Features.Get<IHttpRequestFeature>()!.RawTarget = "/oauth?not-signed=true";

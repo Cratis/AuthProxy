@@ -36,6 +36,7 @@ public abstract class given_a_credential_dispatching_gate : Specification
     protected static DefaultHttpContext Request(string path, string method = "GET", params string[] authorization)
     {
         var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
         context.Request.Method = method;
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();
