@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.Arc.Identity;
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.given;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -27,6 +28,7 @@ public class an_identity_middleware : Specification
     protected const string ProtectedPath = "/private";
 
     protected C.AuthProxy _config;
+    protected C.Authentication _authentication;
     protected C.Service _service;
     protected IIdentityDetailsResolver _resolver;
     protected IErrorPageProvider _errorPages;
@@ -47,9 +49,12 @@ public class an_identity_middleware : Specification
         {
             Services = new Dictionary<string, C.Service> { ["main"] = _service }
         };
+        _authentication = new C.Authentication();
 
         var options = Substitute.For<IOptionsMonitor<C.AuthProxy>>();
         options.CurrentValue.Returns(_ => _config);
+        var authenticationOptions = Substitute.For<IOptionsMonitor<C.Authentication>>();
+        authenticationOptions.CurrentValue.Returns(_ => _authentication);
 
         _resolver = Substitute.For<IIdentityDetailsResolver>();
         _resolver
@@ -82,6 +87,7 @@ public class an_identity_middleware : Specification
                 return Task.CompletedTask;
             },
             options,
+            authenticationOptions,
             _resolver,
             _errorPages,
             _logger);
@@ -93,6 +99,35 @@ public class an_identity_middleware : Specification
     /// <param name="tenantId">The tenant to record.</param>
     protected void ResolveTenant(string tenantId = TenantId) =>
         _context.Items[TenancyMiddleware.TenantIdItemKey] = tenantId;
+
+    /// <summary>
+    /// Registers an OIDC provider and makes the caller's session record it as the provider they signed in through.
+    /// </summary>
+    /// <param name="denialResponse">How the provider answers an identity denial.</param>
+    protected void SignedInThroughProvider(C.OidcDenialResponse denialResponse)
+    {
+        _authentication.OidcProviders = [new C.OidcProvider { Name = "Microsoft", DenialResponse = denialResponse }];
+        var scheme = OidcProviderScheme.FromName("Microsoft");
+        var identity = new ClaimsIdentity(_context.User.Claims.Append(new Claim(SessionClaims.ProviderScheme, scheme)), "aad");
+        _context.User = new ClaimsPrincipal(identity);
+        var properties = new AuthenticationProperties();
+        properties.Items[SessionProvider.MarkerStateKey] = scheme;
+        _context.Features.Set<IAuthenticateResultFeature>(
+            new EstablishedSession(AuthenticateResult.Success(new AuthenticationTicket(_context.User, properties, CookieAuthenticationDefaults.AuthenticationScheme))));
+    }
+
+    /// <summary>
+    /// Makes the request look like a browser navigating to a page.
+    /// </summary>
+    protected void Navigate() => _context.Request.Headers["Sec-Fetch-Dest"] = "document";
+
+    /// <summary>
+    /// Denies the caller's identity the way a service's identity details do.
+    /// </summary>
+    protected void DenyIdentity() =>
+        _resolver
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>())
+            .Returns(_ => new IdentityProviderResult("user-1", "User One", true, false, [], new object()));
 
     /// <summary>
     /// Enables local session termination when identity verification refuses the caller.
@@ -122,4 +157,9 @@ public class an_identity_middleware : Specification
             Arg.Any<HttpContext>(),
             Arg.Any<string>(),
             Arg.Any<AuthenticationProperties?>());
+
+    sealed class EstablishedSession(AuthenticateResult result) : IAuthenticateResultFeature
+    {
+        public AuthenticateResult? AuthenticateResult { get; set; } = result;
+    }
 }

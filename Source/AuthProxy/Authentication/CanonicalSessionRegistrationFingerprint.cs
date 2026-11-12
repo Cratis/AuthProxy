@@ -32,20 +32,38 @@ internal static class CanonicalSessionRegistrationFingerprint
     /// <param name="provider">The provider registration.</param>
     /// <param name="options">The effective OIDC handler options.</param>
     /// <returns>The opaque version-one registration fingerprint.</returns>
-    internal static string Create(string scheme, C.OidcProvider provider, OpenIdConnectOptions options) => Create(
-        "oidc",
-        scheme,
-        provider.CanonicalIdentity!.ProviderKey,
-        provider.CanonicalIdentity.InvitationCompletionEnabled.ToString(),
-        provider.CanonicalIdentity.InvitationIdentityBindingCompletionEnabled.ToString(),
-        provider.CanonicalIdentity.SubjectClaimType,
-        provider.CanonicalIdentity.EmailClaimType,
-        provider.CanonicalIdentity.EmailVerifiedClaimType,
-        provider.CanonicalIdentity.AssuranceClaimType,
-        provider.ClientId,
-        options.ClientId,
-        provider.Authority,
-        options.MetadataAddress);
+    /// <remarks>
+    /// Configured authorization parameters are included only when there are any, so a provider without them keeps
+    /// the fingerprint every existing session already carries.
+    /// </remarks>
+    internal static string Create(string scheme, C.OidcProvider provider, OpenIdConnectOptions options)
+    {
+        var fields = new List<string?>
+        {
+            "oidc",
+            scheme,
+            provider.CanonicalIdentity!.ProviderKey,
+            provider.CanonicalIdentity.InvitationCompletionEnabled.ToString(),
+            provider.CanonicalIdentity.InvitationIdentityBindingCompletionEnabled.ToString(),
+            provider.CanonicalIdentity.SubjectClaimType,
+            provider.CanonicalIdentity.EmailClaimType,
+            provider.CanonicalIdentity.EmailVerifiedClaimType,
+            provider.CanonicalIdentity.AssuranceClaimType,
+            provider.ClientId,
+            options.ClientId,
+            provider.Authority,
+            options.MetadataAddress
+        };
+
+        foreach (var parameter in provider.AuthorizationParameters.OrderBy(_ => _.Key, StringComparer.Ordinal))
+        {
+            fields.Add("configured-authorization-parameter");
+            fields.Add(parameter.Key);
+            fields.Add(parameter.Value);
+        }
+
+        return Create([.. fields]);
+    }
 
     /// <summary>
     /// Creates a fingerprint for an OAuth provider from its configuration and effective named handler options.

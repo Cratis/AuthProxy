@@ -114,6 +114,7 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddSingleton<ICanonicalIdentityResolver, CanonicalIdentityResolver>();
         services.AddSingleton<IValidateOptions<C.Authentication>, CanonicalIdentityConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.Authentication>, OidcAuthorizationParametersConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.AuthProxy>, ProviderSessionConfigurationValidator>();
@@ -388,6 +389,8 @@ public static class AuthenticationServiceCollectionExtensions
             options.Scope.Add(scope);
         }
 
+        OidcProviderGating.MapVerifiedEmailClaims(options, provider);
+
         if (CratisIdentityProfile.AppliesTo(provider))
         {
             CratisIdentityProfile.Configure(options, provider);
@@ -428,6 +431,8 @@ public static class AuthenticationServiceCollectionExtensions
         {
             OnRedirectToIdentityProvider = context =>
             {
+                // Configured parameters go first so the framework's fresh-authentication values always win.
+                OidcProviderGating.ApplyAuthorizationParameters(context.ProtocolMessage, provider);
                 if (FreshAuthenticationChallenge.TryGetMaxAge(context.Properties, out var maxAge))
                 {
                     context.ProtocolMessage.Prompt = "login";
@@ -468,7 +473,8 @@ public static class AuthenticationServiceCollectionExtensions
                     provider,
                     (OpenIdConnectOptions)context.Options),
                 provider.CanonicalIdentity,
-                "oidc")
+                "oidc",
+                OidcProviderGating.CreateAdmission(provider))
         };
     }
 
@@ -612,6 +618,7 @@ public static class AuthenticationServiceCollectionExtensions
     /// <param name="createRegistrationFingerprint">Creates the fingerprint that binds a canonical session to its provider registration.</param>
     /// <param name="canonicalIdentity">The canonical identity contract configured for the provider, when present.</param>
     /// <param name="protocolAssurance">The assurance AuthProxy derives from the successful provider protocol.</param>
+    /// <param name="admission">An optional check the callback principal must pass before anything else happens; a refusal fails like a remote failure.</param>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     /// <remarks>
     /// This handler only runs when a provider callback delivers a fresh ticket — that is, on the exact
@@ -622,9 +629,20 @@ public static class AuthenticationServiceCollectionExtensions
         TicketReceivedContext context,
         Func<string> createRegistrationFingerprint,
         C.CanonicalIdentity? canonicalIdentity,
-        string protocolAssurance)
+        string protocolAssurance,
+        Func<ClaimsPrincipal?, bool>? admission = null)
     {
         ClearLeftoverCookies(context);
+
+        // Refuse before any side effect (link, invitation, notification, session) can happen.
+        if (admission is not null && !admission(context.Principal))
+        {
+            context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger(typeof(OidcProviderGating).FullName!)
+                .VerifiedEmailRequired(context.Scheme.Name);
+            context.Fail("Verified e-mail is required.");
+            return;
+        }
 
         var canonicalResolution = ResolveFreshCanonicalIdentity(context);
         var route = TicketReceivedPolicy.Route(canonicalResolution, context.Properties);

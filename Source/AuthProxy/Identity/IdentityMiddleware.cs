@@ -16,6 +16,7 @@ namespace Cratis.AuthProxy.Identity;
 /// </summary>
 /// <param name="next">The next middleware in the pipeline.</param>
 /// <param name="config">The auth proxy configuration monitor.</param>
+/// <param name="authentication">The authentication provider configuration monitor.</param>
 /// <param name="identityDetailsResolver">The identity details resolver.</param>
 /// <param name="errorPageProvider">The error page provider used to serve custom error pages.</param>
 /// <param name="logger">The logger.</param>
@@ -30,6 +31,7 @@ namespace Cratis.AuthProxy.Identity;
 public class IdentityMiddleware(
     RequestDelegate next,
     IOptionsMonitor<C.AuthProxy> config,
+    IOptionsMonitor<C.Authentication> authentication,
     IIdentityDetailsResolver identityDetailsResolver,
     IErrorPageProvider errorPageProvider,
     ILogger<IdentityMiddleware> logger)
@@ -110,6 +112,11 @@ public class IdentityMiddleware(
         {
             await OnBehalfSessionTermination.End(context, OnBehalfSessionEndReason.RepresentedIdentityDenied);
             context.Response.Headers[Headers.OnBehalfEnded] = OnBehalfSessionEndReason.RepresentedIdentityDenied.ToWireValue();
+        }
+        else if (DeniedSignInResponse.Applies(context, authentication.CurrentValue))
+        {
+            await DeniedSignInResponse.Write(context, config);
+            return;
         }
         else if (config.Session.TerminateOnIdentityDenial)
         {
