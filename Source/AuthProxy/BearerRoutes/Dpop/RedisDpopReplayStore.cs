@@ -41,8 +41,9 @@ internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimePr
         try
         {
             if (_healthCheckedAt is { } checkedAt && clock.GetElapsedTime(checkedAt, clock.GetTimestamp()) < _healthInterval) return _healthResult;
+            var startedAt = clock.GetTimestamp();
             _healthResult = await Execute(null, cancellationToken);
-            _healthCheckedAt = clock.GetTimestamp();
+            _healthCheckedAt = startedAt;
             return _healthResult;
         }
         finally
@@ -90,23 +91,38 @@ internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimePr
             var replayDatabase = database ?? (await Connection(cancellationToken)).GetDatabase();
             if (database is null && _connection?.IsConnected != true) return DpopReplayResult.Unavailable;
             var prefix = "{" + settings.KeyPrefix + "}:";
+            var startedAt = clock.GetTimestamp();
             var local = clock.GetUtcNow().ToUnixTimeMilliseconds();
             var operation = replayDatabase.ScriptEvaluateAsync(
                 Script,
                 [prefix + "coverage", prefix + (key ?? "health")],
                 [local, key is null ? "0" : "1"]);
             var result = (RedisResult[]?)await operation.WaitAsync(cancellationToken);
-            if (result is not { Length: 2 } || Math.Abs((decimal)(long)result[1] - local) > 30000) return DpopReplayResult.Unavailable;
-            return (int)result[0] switch
-            {
-                1 => DpopReplayResult.Accepted,
-                2 => DpopReplayResult.Replay,
-                _ => DpopReplayResult.Unavailable,
-            };
+            return ReadResult(result, local, startedAt);
         }
-        catch (Exception exception) when (exception is RedisException or TimeoutException or ArgumentException or InvalidOperationException or OperationCanceledException or InvalidCastException)
+        catch (Exception exception) when (exception is RedisException or TimeoutException or ArgumentException or InvalidOperationException or OperationCanceledException or InvalidCastException or FormatException or OverflowException)
         {
             return DpopReplayResult.Unavailable;
         }
+    }
+
+    DpopReplayResult ReadResult(RedisResult[]? result, long local, long startedAt)
+    {
+        if (result is not { Length: 2 }) return DpopReplayResult.Unavailable;
+        if (result.Any(field => field.IsNull)) return DpopReplayResult.Unavailable;
+        if (clock.GetElapsedTime(startedAt, clock.GetTimestamp()) >= _healthInterval) return DpopReplayResult.Unavailable;
+        if (!ClockIsCurrent((long)result[1], local)) return DpopReplayResult.Unavailable;
+        return (int)result[0] switch
+        {
+            1 => DpopReplayResult.Accepted,
+            2 => DpopReplayResult.Replay,
+            _ => DpopReplayResult.Unavailable,
+        };
+    }
+
+    bool ClockIsCurrent(decimal serverTime, long startedAt)
+    {
+        var completedAt = clock.GetUtcNow().ToUnixTimeMilliseconds();
+        return Math.Abs(serverTime - startedAt) <= 30000 && Math.Abs(serverTime - completedAt) <= 30000;
     }
 }
