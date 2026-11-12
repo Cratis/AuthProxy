@@ -1,0 +1,9 @@
+<Project>
+    <!-- Deliberately empty: stops MSBuild from importing the repository root props, so the sample and the client
+         are built with their own minimal settings and never take part in the AuthProxy analyzer gate. -->
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,10 @@
+<Project>
+    <!-- Own central package management: the repository root file does not apply here. -->
+    <PropertyGroup>
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- Pin: the lane intentionally fails when Arc's wire format drifts away from what AuthProxy forwards. -->
+        <PackageVersion Include="Cratis.Arc" Version="22.186.2" />
+    </ItemGroup>
+</Project>

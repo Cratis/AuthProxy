@@ -7,6 +7,11 @@ using Cratis.Specifications;
 
 namespace Cratis.AuthProxy.Security.for_ArcCratisPaths;
 
+/// <summary>
+/// Generic upgrade forwarding only: <c language="text">/.cratis/ws</c> is not an Arc endpoint. Arc multiplexes queries on
+/// <c language="text">/.cratis/queries/ws</c> (see <see cref="when_the_query_websocket_is_upgraded"/>).
+/// </summary>
+/// <param name="harness">The shared Arc harness.</param>
 [Collection(ArcCratisSpecCollection.Name)]
 public class when_a_websocket_is_upgraded(ArcCratisHarness harness) : given.an_arc_proxy(harness)
 {

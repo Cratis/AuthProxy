@@ -25,9 +25,17 @@ public sealed class ArcCratisBackend : IAsyncDisposable
 
     public ConcurrentQueue<ForwardedRequest> Received { get; } = new();
 
-    public TaskCompletionSource FirstEventRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource FirstEventRead { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public TaskCompletionSource<string> SocketMessage { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource<string> SocketMessage { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Forgets recorded requests and the one-shot coordination of earlier specs sharing this origin.</summary>
+    public void Reset()
+    {
+        Received.Clear();
+        FirstEventRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        SocketMessage = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
 
     public static async Task<ArcCratisBackend> Start()
     {
@@ -50,6 +58,15 @@ public sealed class ArcCratisBackend : IAsyncDisposable
         app.MapPost("/.cratis/commands/publish", () => Results.Text("arc-command-result", "text/plain", statusCode: StatusCodes.Status201Created));
         app.MapGet("/.cratis/queries/sse", backend.StreamEvents);
         app.MapGet("/.cratis/ws", backend.Echo);
+
+        // The remaining Arc-owned discovery, health and multiplexed-query endpoints (Arc.Core).
+        app.MapPost("/.cratis/queries/sse/subscribe", async context => await Results.Text("subscribe:" + await new StreamReader(context.Request.Body).ReadToEndAsync(), "text/plain", statusCode: StatusCodes.Status202Accepted).ExecuteAsync(context));
+        app.MapPost("/.cratis/queries/sse/unsubscribe", async context => await Results.Text("unsubscribe:" + await new StreamReader(context.Request.Body).ReadToEndAsync(), "text/plain", statusCode: StatusCodes.Status202Accepted).ExecuteAsync(context));
+        app.MapGet("/.cratis/queries/ws", backend.Echo);
+        app.MapGet("/.cratis/queries/health", () => Results.Text("arc-query-health", "text/plain", statusCode: StatusCodes.Status200OK));
+        app.MapGet("/.cratis/users", () => Results.Text("arc-users", "text/plain", statusCode: StatusCodes.Status200OK));
+        app.MapGet("/.cratis/tenants", () => Results.Text("arc-tenants", "text/plain", statusCode: StatusCodes.Status200OK));
+        app.MapGet("/.cratis/identity-details/schema", () => Results.Text("arc-identity-schema", "text/plain", statusCode: StatusCodes.Status200OK));
 
         // A forwarded proxy-owned request must be distinguishable from AuthProxy's own response.
         app.MapFallback(() => Results.Text("unexpected-origin-request", statusCode: StatusCodes.Status418ImATeapot));
@@ -82,7 +99,7 @@ public sealed class ArcCratisBackend : IAsyncDisposable
         using var socket = await context.WebSockets.AcceptWebSocketAsync();
         var buffer = new byte[128];
         var message = await socket.ReceiveAsync(buffer.AsMemory(), deadline.Token);
-        SocketMessage.SetResult(Encoding.UTF8.GetString(buffer, 0, message.Count));
+        SocketMessage.TrySetResult(Encoding.UTF8.GetString(buffer, 0, message.Count));
         await socket.SendAsync(buffer.AsMemory(0, message.Count), message.MessageType, message.EndOfMessage, deadline.Token);
         await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", deadline.Token);
     }
