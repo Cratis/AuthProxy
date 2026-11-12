@@ -175,6 +175,39 @@ public static class ClientPrincipalExtensions
         }
     }
 
+    /// <summary>Adds AuthProxy's protected browser-session context to a copy of the outbound envelope.</summary>
+    /// <param name="principal">The envelope to enrich.</param>
+    /// <param name="context">The authenticated request.</param>
+    /// <returns>The enriched envelope, or the original for a non-cookie credential.</returns>
+    internal static ClientPrincipal WithSessionContext(this ClientPrincipal principal, HttpContext context)
+    {
+        var result = context.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult;
+        if (result?.Ticket?.AuthenticationScheme != CookieAuthenticationDefaults.AuthenticationScheme)
+        {
+            return principal;
+        }
+
+        var claims = principal.Claims.Where(_ => !SessionClaims.IsForwardedSessionContext(_.Type)).ToList();
+        if (SessionStart.TryRead(result.Properties, out var started))
+        {
+            claims.Add(new ClientPrincipalClaim { Type = SessionClaims.Started, Value = started.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) });
+        }
+        if (SessionProvider.TryRead(context.User, result.Properties, out var provider))
+        {
+            claims.Add(new ClientPrincipalClaim { Type = SessionClaims.SignInProvider, Value = provider });
+        }
+
+        return new ClientPrincipal
+        {
+            IdentityProvider = principal.IdentityProvider,
+            UserId = principal.UserId,
+            UserDetails = principal.UserDetails,
+            UserRoles = principal.UserRoles,
+            Claims = claims,
+            AccountProvider = principal.AccountProvider
+        };
+    }
+
     static CanonicalIdentityResolution? ResolveCanonicalIdentity(HttpContext context, ClaimsPrincipal user, string? authenticationScheme) =>
         context.RequestServices is { } requestServices
             ? requestServices.GetService<ICanonicalIdentityResolver>()?.Resolve(user, authenticationScheme)

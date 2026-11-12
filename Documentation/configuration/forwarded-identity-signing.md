@@ -47,6 +47,48 @@ The service block covers:
 
 A service whose frontend and backend verify proofs must provision the matching audience and key at both receivers, or be split into separately configured services. Anonymous requests without principal or on-behalf identity material remain unsigned; tenant or service selectors alone do not create an identity.
 
+## Optional browser-session context
+
+Set `Cratis:AuthProxy:Services:<name>:ForwardSessionContext` to `true` to add browser-session context
+only to that service's normal proxied `x-ms-client-principal` envelope. It defaults to `false`:
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Services": {
+        "orders": {
+          "ForwardSessionContext": true
+        }
+      }
+    }
+  }
+}
+```
+
+- `urn:cratis:session:started` is the original completed sign-in time in Unix seconds. AuthProxy records
+  it in protected cookie-ticket properties; sliding cookie renewal and provider-token refresh do not
+  move it. It is not `auth_time`, an identity-provider authentication or reauthentication assertion.
+- `urn:cratis:session:sign-in-provider` is AuthProxy's recorded scheme name, for example `microsoft`
+  or `github`. It names the sign-in handler, not an issuer, subject, actor, or tenant.
+
+Both values come from AuthProxy-authored protected session state, never upstream claims, invite
+metadata, or request headers. Legacy cookies without a recorded start omit `started`; AuthProxy does
+not fabricate a time from cookie issuance, expiry, current time, or `auth_time`. A missing recorded
+provider is likewise omitted. No new top-level envelope fields or separate headers are introduced.
+With the setting off, the existing envelope is unchanged except that forged reserved claims are removed.
+
+The route-selected service controls the opt-in, not caller-supplied service headers or query parameters.
+It does not add context to `/identity`, identity-details back channels, or callbacks, nor does it
+synthesize browser context for bearer, client-credential, or capability credentials. Token-supplied
+copies of these two reserved claims are removed from bearer envelopes.
+
+When forwarded-identity signing is enabled, the existing proof covers the complete principal envelope,
+including these claims. A backend must verify the proof before relying on session context; unsigned
+headers alone are not trusted evidence. Enabling this option does not enable signing, upgrade v1 to v2,
+or change v2's supported credential kinds or schema. A verified scheme still does not replace the
+canonical issuer/subject or actor attribution.
+
 ## Bearer resource and scheme
 
 A validated access-token principal carries exactly one `urn:cratis:bearer:resource` claim: the configured
