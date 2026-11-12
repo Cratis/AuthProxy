@@ -14,6 +14,8 @@
   href: unauthenticated-responses.md
 - name: Failed Sign-ins
   href: failed-sign-ins.md
+- name: E-mail Code Sign-in
+  href: email-code-sign-in.md
 - name: Tenancy
   href: tenancy.md
 - name: Tenant Selection Page

@@ -127,6 +127,9 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | `ClientCredential` | `object` | Optional certificate or federated credential used instead of `ClientSecret`. See [Client credentials](#client-credentials-certificates-and-federated-credentials). |
 | `Scopes` | `string[]` | Additional scopes to request (beyond `openid`, `profile`, `email`). |
 | `ResponseMode` | `string` | How the provider returns the authorization code: `Query` (default) or `FormPost`. See below. |
+| `AuthorizationParameters` | `object` | Static parameters added to every authorization request to this provider. See [Gating a weaker provider](#gating-a-weaker-provider). |
+| `RequireVerifiedEmail` | `bool` | Refuse the sign-in unless the principal carries exactly one e-mail address and the provider reports it as verified. Defaults to `false`. |
+| `DenialResponse` | `string` | How a signed-in person whom the identity details of a service deny is answered: `Forbidden` (default) or `FailedSignIn`. See [Gating a weaker provider](#gating-a-weaker-provider). |
 | `Session` | `object` | Optional [shorten-only browser-session policy](#per-provider-browser-session-lifetime). Omitted fields inherit the global policy. |
 
 #### Response mode and the handshake cookies
@@ -141,6 +144,50 @@ Setting `ResponseMode` to `FormPost` opts that provider into it, which also swit
 correlation and nonce cookies to `SameSite=None; Secure` — a cross-site POST only ever carries `None`
 cookies, and `None` requires HTTPS. Do not choose `FormPost` for providers that support `Query`; it trades
 away the `Lax` hardening for nothing.
+
+#### Gating a weaker provider
+
+Three optional settings let a provider that proves less than a full federated sign-in (an e-mail code, for
+example) be admitted with care. All three are off by default, so a provider that sets none of them behaves
+as before. Configuration is read at startup; changing it needs a restart.
+
+- `AuthorizationParameters` adds static query parameters to the authorization request, such as
+  `"connection": "email"` for Auth0. Parameters that AuthProxy owns (`client_id`, `scope`, `response_type`,
+  `redirect_uri`, `state`, `nonce`, `code_challenge`, `code_challenge_method`, `response_mode`, `request`,
+  `request_uri`, `max_age`, `id_token_hint`, and the client-assertion pair) are refused at startup. A
+  configured `prompt` is replaced when a [fresh authentication](fresh-authentication.md) is required.
+- `RequireVerifiedEmail` refuses the provider callback unless the principal has exactly one distinct e-mail
+  address (claim `email`, or the configured canonical e-mail claim) and exactly one verification claim
+  (`email_verified`, or the configured canonical claim) whose value is `true` — a JSON boolean or the text
+  `true`, in any case. A refusal creates no session, completes no link or invitation, notifies nothing, and
+  ends like any [failed sign-in](failed-sign-ins.md) with `reason=remote-failure`. The operator log records the
+  cause without the address.
+- `DenialResponse` set to `FailedSignIn` answers an identity denial like a failed sign-in instead of the
+  forbidden page: the session ends, a navigating browser is sent to provider selection with
+  `reason=remote-failure`, and any other caller receives `401`. It also applies when the person has no tenant
+  and the deployment requires identity verification. It overrides `Session:TerminateOnIdentityDenial` for that
+  provider and leaves other providers and on-behalf sessions unchanged.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Authentication": {
+        "OidcProviders": [
+          {
+            "Name": "Auth0",
+            "Authority": "https://tenant.example.auth0.com",
+            "ClientId": "client-id",
+            "AuthorizationParameters": { "connection": "email" },
+            "RequireVerifiedEmail": true,
+            "DenialResponse": "FailedSignIn"
+          }
+        ]
+      }
+    }
+  }
+}
+```
 
 #### Client credentials: certificates and federated credentials
 
@@ -591,7 +638,7 @@ context is **session-scoped or short-lived** — closing the browser ends them. 
 | `SlidingExpiration` | `false` | Whether activity extends the ticket lifetime. Disabled by default so `Lifetime` is a hard bound. |
 | `CookieName` | `.Cratis.AuthProxy.Auth.v2` | Name of the session cookie. Set it to keep two AuthProxy deployments under one parent domain from reading each other's sessions, or to retire an old cookie. Changing it signs users out once. It has to be a valid cookie name, and the `__Host-` prefix is refused when `CookieDomain` is set. |
 | `CookieDomain` | `""` (host-only) | Domain the session cookie is scoped to, for example `.example.com`, so one sign-in is honored on every host under it. Empty keeps today's host-only cookie. See [One proxy, several hosts](one-proxy-several-hosts.md). |
-| `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. |
+| `TerminateOnIdentityDenial` | `false` | Whether an identity-verification denial ends the local AuthProxy session before serving the forbidden response. This signs out of AuthProxy and clears its session cookies; it does not log the caller out of the external identity provider. For a provider that sets `DenialResponse` to `FailedSignIn` the session always ends, independent of this setting. |
 | `EmitIdentityDetailsCookie` | `true` | Whether AuthProxy writes the readable `.cratis-identity` cookie. Set `false` once every frontend reads identity from `/.cratis/me`; AuthProxy then stops writing it and expires any copy a browser still sends. Verification and the sealed authorization record are unaffected. |
 | `IdentityRevalidationInterval` | `00:10:00` | How long a resolved authorization is remembered before the identity details — and the authorization they represent — are re-resolved against the services. Zero or negative means no bound: with any Required service (the default) no authorization record is written; when every participating service is BestEffort it falls back to ten minutes. The independent in-memory result cache still applies. |
 | `TenantRevalidationInterval` | `00:10:00` | How long a tenant selected through the [tenant-selection flow](tenant-selection.md) is trusted before it is re-validated against `TenantsEndpoint`, so revoked tenant access takes effect without per-request backend calls. Zero or negative trusts a signed selection until it changes; a selection written by an earlier version is still confirmed against `TenantsEndpoint` once. |
