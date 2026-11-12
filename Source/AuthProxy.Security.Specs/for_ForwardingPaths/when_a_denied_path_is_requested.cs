@@ -36,7 +36,6 @@ public class when_a_denied_path_is_requested(ForwardingPathHarness harness)
     [InlineData("/pr%C4%B1vate", false)]
     [InlineData("/PRIVATE", false)]
     [InlineData("/.cratis/commands", false)]
-    [InlineData("/.cratis/commandsx", false)]
     [InlineData("/.cratis/QUERIES/x", false)]
     public async Task should_not_contact_the_origin(string target, bool kestrelMayReject)
     {
@@ -55,6 +54,7 @@ public class when_a_denied_path_is_requested(ForwardingPathHarness harness)
 
     [Theory]
     [InlineData("/openapix")]
+    [InlineData("/.cratis/commandsx")]
     [InlineData("/api/other")]
     public async Task should_forward_a_distinct_segment(string target)
     {

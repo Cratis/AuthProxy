@@ -133,4 +133,22 @@ public static class WellKnownPaths
     /// All requests under this prefix are always allowed anonymously.
     /// </summary>
     public const string Pages = "/_pages";
+
+    /// <summary>
+    /// The path prefixes under <see cref="Cratis"/> that AuthProxy itself serves. Each covers the prefix and every
+    /// path beneath it. Everything else under <see cref="Cratis"/> belongs to the service behind the proxy
+    /// (for example Arc's <c language="text">/.cratis/queries</c> and <c language="text">/.cratis/commands</c>) and is forwarded to it.
+    /// </summary>
+    public static readonly string[] AuthProxyOwned =
+    [
+        IdentityDetails,
+        Providers,
+        LoginPrefix,
+        Token,
+        LoginPage,
+        SelectTenant,
+        Logout,
+        Link,
+        OnBehalf,
+    ];
 }
