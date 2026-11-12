@@ -31,6 +31,7 @@ jobs:
       prerelease: ${{ steps.filter.outputs.prerelease }}
       azure-docs: ${{ steps.filter.outputs.azure-docs }}
       e2e: ${{ steps.filter.outputs.e2e }}
+      redis-replay: ${{ steps.filter.outputs.redis-replay }}
     steps:
       # The pull request files API lists at most 3,000 files, so a larger pull request could hide
       # changed paths from the filter and skip checks. Fail closed instead of filtering a partial list.
@@ -46,6 +47,21 @@ jobs:
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
+            redis-replay:
+              - "Source/AuthProxy/BearerRoutes/**"
+              - "Source/AuthProxy/Configuration/Dpop*.cs"
+              - "Source/AuthProxy/Configuration/BearerRoute*.cs"
+              - "Source/AuthProxy/Configuration/AuthProxy.cs"
+              - "Source/AuthProxy/AuthProxy.csproj"
+              - "Source/AuthProxy/Properties/AssemblyInfo.cs"
+              - "Source/AuthProxy.Specs/BearerRoutes/for_DpopProofVerifier/**"
+              - "Source/AuthProxy.Integration.Specs/**"
+              - "Directory.*"
+              - "global.json"
+              - "NuGet.config"
+              - "AuthProxy.slnx"
+              - ".github/workflows/redis-replay-specs.yml"
+              - ".github/workflows/pull-requests.yml"
             dotnet:
               - "Source/**"
               - ".github/workflows/**"
@@ -91,6 +107,13 @@ jobs:
     permissions:
       contents: read
 
+  redis-replay-specs:
+    needs: changes
+    if: ${{ needs.changes.outputs.redis-replay == 'true' }}
+    uses: ./.github/workflows/redis-replay-specs.yml
+    permissions:
+      contents: read
+
   # No filter: the security checks must always run (their old trigger had no paths).
   security:
     uses: ./.github/workflows/security.yml
@@ -108,7 +131,7 @@ jobs:
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [changes, dotnet-build, prerelease, azure-docs-specs, consumer-e2e, security, policy]
+    needs: [changes, dotnet-build, prerelease, azure-docs-specs, consumer-e2e, redis-replay-specs, security, policy]
     runs-on: ${{ vars.RUNNER_GATE || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions: {}
