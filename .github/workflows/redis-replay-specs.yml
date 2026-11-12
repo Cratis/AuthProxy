@@ -1,0 +1,38 @@
+# Copyright (c) Cratis. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+name: Redis replay specs
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  redis-replay-specs:
+    name: Redis replay specs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - name: Restore integration specs
+        run: dotnet restore Source/AuthProxy.Integration.Specs/AuthProxy.Integration.Specs.csproj -p:RunRedisReplaySpecs=true
+      - name: Build integration specs
+        run: dotnet build Source/AuthProxy.Integration.Specs/AuthProxy.Integration.Specs.csproj -c Release --no-restore -warnaserror -p:RunRedisReplaySpecs=true
+      - name: Run Redis integration specs
+        run: dotnet test Source/AuthProxy.Integration.Specs/AuthProxy.Integration.Specs.csproj -c Release --no-build -p:RunRedisReplaySpecs=true --logger trx --results-directory TestResults/redis-replay
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: redis-replay-results
+          path: TestResults/redis-replay
+          if-no-files-found: warn
