@@ -38,6 +38,9 @@ internal static partial class BearerRoutesLogging
     [LoggerMessage(LogLevel.Warning, "Bearer route '{Route}' of service '{Service}' does not call /.cratis/me, so a 403 from {Services} that would refuse a browser session does not refuse its tokens; the backend must decide membership. Set AcceptWithoutIdentityVerification on the route to state that this is intended.")]
     internal static partial void BearerRouteDoesNotConsultIdentityVerification(this ILogger logger, string route, string service, string services);
 
+    [LoggerMessage(LogLevel.Warning, "Bearer route '{Route}' of service '{Service}' requires HTTPS, but ingress trusts no proxies. With TLS terminated at ingress, all non-loopback HTTP bearer traffic is refused. Configure ingress trust or serve HTTPS directly.")]
+    internal static partial void BearerRouteWithoutTrustedIngress(this ILogger logger, string route, string service);
+
     [LoggerMessage(LogLevel.Warning, "Forwarding bearer route '{Route}' of service '{Service}' failed ({Error}).")]
     internal static partial void BearerRouteForwardingFailed(this ILogger logger, Exception? exception, string route, string service, Yarp.ReverseProxy.Forwarder.ForwarderError error);
 }

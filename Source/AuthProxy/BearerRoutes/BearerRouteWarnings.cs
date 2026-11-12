@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Ingress;
 using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.BearerRoutes;
@@ -24,6 +25,17 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// </remarks>
 public static class BearerRouteWarnings
 {
+    /// <summary>
+    /// Gets route warnings, including a deployment that cannot recognize TLS terminated at ingress.
+    /// </summary>
+    /// <param name="config">The auth proxy configuration.</param>
+    /// <param name="policy">The ingress trust boundary.</param>
+    /// <returns>The route and transport warnings.</returns>
+    public static IEnumerable<BearerRouteWarning> For(C.AuthProxy config, ITrustedProxyPolicy policy) =>
+        For(config).Concat(config.Profile != C.DeploymentProfile.LocalDevelopment && policy.TrustsNoOne
+            ? BearerRouteTable.All(config).Select(route => new BearerRouteWarning(BearerRouteWarningKind.NoTrustedIngress, route.ServiceName, route.Prefix, []))
+            : []);
+
     /// <summary>
     /// Gets the warnings for every resolvable bearer route in the configuration.
     /// </summary>

@@ -1,6 +1,8 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Identity;
+
 namespace Cratis.AuthProxy.Security.for_SignedForwarding;
 
 /// <summary>Verifies direct-forwarder bearer signing after path construction and token-field injection.</summary>
@@ -31,6 +33,19 @@ public class when_a_signed_bearer_request_reaches_the_backend(ForwardedIdentityH
     [Fact] public void should_replace_the_legacy_service_selector() => Assert.Equal("app", _observed.Headers[Headers.LegacyServiceId].Single());
     [Fact] public void should_cover_the_injected_client_id() => Assert.True(_observed.Headers.ContainsKey(Headers.TokenClientId));
     [Fact] public void should_cover_the_injected_scopes() => Assert.True(_observed.Headers.ContainsKey(Headers.TokenScope));
+    [Fact]
+    public void should_cover_the_exact_validated_resource_in_the_signed_principal()
+    {
+        Assert.True(ClientPrincipal.TryFromBase64(_observed.Headers[Headers.Principal].Single(), out var principal));
+        var claim = Assert.Single(principal!.Claims, claim => claim.Type == "urn:cratis:bearer:resource");
+        Assert.Equal(BearerRouteHarness.Audience, claim.Value);
+        var changed = new ClientPrincipalClaim { Type = claim.Type, Value = "different-resource" };
+        principal.Claims = principal.Claims.Select(item => item == claim ? changed : item).ToArray();
+        var headers = _observed.Headers.ToDictionary(header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
+        headers[Headers.Principal] = [principal.ToBase64()];
+        Assert.False(ForwardedIdentityVerifier.Verify(_observed with { Headers = headers }, harness.ApplicationOrigin.Audience, harness.ApplicationOrigin.KeyId, harness.ApplicationOrigin.Secret.ToArray()));
+    }
+
     [Fact] public void should_not_forward_the_bearer_token() => Assert.False(_observed.Headers.ContainsKey("Authorization"));
     [Theory]
     [InlineData("x-cratis-token-client-id")]

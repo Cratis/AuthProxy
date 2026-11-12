@@ -21,6 +21,11 @@ public static class BearerRouteClaims
     public const string Issuer = "urn:cratis:bearer:issuer";
 
     /// <summary>
+    /// The claim type for the single configured resource audience matched by the validated access token.
+    /// </summary>
+    public const string Resource = "urn:cratis:bearer:resource";
+
+    /// <summary>
     /// The claim type for the access token's own <c language="text">sub</c>, kept even when a claim mapping rewrites
     /// <c language="text">sub</c> for the backend.
     /// </summary>

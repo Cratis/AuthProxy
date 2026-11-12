@@ -39,6 +39,7 @@ public abstract class a_bearer_route_sharing_its_prefix_with_client_credentials 
     protected static DefaultHttpContext Request(string path, params string[] authorization)
     {
         var context = new DefaultHttpContext();
+        context.Request.Scheme = "https";
         context.Request.Method = HttpMethods.Get;
         context.Request.Path = path;
         context.Response.Body = new MemoryStream();

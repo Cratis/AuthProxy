@@ -27,6 +27,8 @@ public class BearerRouteHeadersTransform : RequestTransform
         headers.Remove(Headers.ServiceId);
         headers.Remove(Headers.LegacyServiceId);
         headers.Remove(HeaderNames.Cookie);
+        headers.Remove("X-Forwarded-Proto");
+        headers.TryAddWithoutValidation("X-Forwarded-Proto", context.HttpContext.Request.Scheme);
 
         var identity = context.HttpContext.Items.TryGetValue(BearerRouteDefaults.ForwardedIdentityItemKey, out var item)
             ? item as BearerForwardedIdentity

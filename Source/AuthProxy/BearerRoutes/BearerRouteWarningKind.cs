@@ -28,4 +28,9 @@ public enum BearerRouteWarningKind
     /// so a revoked token keeps working at the edge until it expires.
     /// </summary>
     RevocationNotEnforced = 2,
+
+    /// <summary>
+    /// No ingress proxy is trusted, so HTTP bearer traffic cannot be recognized as HTTPS after TLS termination.
+    /// </summary>
+    NoTrustedIngress = 3,
 }

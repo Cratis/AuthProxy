@@ -113,6 +113,16 @@ public static class BearerChallenge
     }
 
     /// <summary>
+    /// Refuses insecure bearer-route transport without inviting a client to retry with a credential.
+    /// </summary>
+    /// <param name="context">The request context.</param>
+    public static void HttpsRequired(HttpContext context)
+    {
+        NoStore(context);
+        MachineResponse.Write(context, StatusCodes.Status400BadRequest, "invalid_request");
+    }
+
+    /// <summary>
     /// Builds the value of a <c language="text">WWW-Authenticate</c> bearer challenge.
     /// </summary>
     /// <param name="resourceMetadataUrl">The protected-resource metadata URL to name, if any.</param>
