@@ -600,15 +600,15 @@ belongs to the one host that issued it unless you set `CookieDomain`.
 
 ### Per-provider browser-session lifetime
 
-Use a provider's optional `Session` block when its browser sessions should end sooner than the
-global policy. This configuration excerpt keeps the Entra provider on the global 12-hour lifetime
-and gives a weaker custom OIDC provider a one-hour hard cap:
+Use a custom OIDC provider's optional `Session` block to shorten browser sessions authenticated with
+an e-mail one-time code. This configuration excerpt keeps the stronger Entra provider on the global
+12-hour sliding lifetime and gives the custom provider a one-hour hard cap:
 
 ```json
 {
   "Cratis": {
     "AuthProxy": {
-      "Session": { "Lifetime": "12:00:00", "SlidingExpiration": false },
+      "Session": { "Lifetime": "12:00:00", "SlidingExpiration": true },
       "Authentication": {
         "OidcProviders": [
           {
@@ -619,6 +619,7 @@ and gives a weaker custom OIDC provider a one-hour hard cap:
           },
           {
             "Name": "Custom",
+            "Type": "Custom",
             "Authority": "https://id.example.com",
             "ClientId": "your-custom-client-id",
             "ClientSecret": "your-custom-client-secret",
@@ -630,6 +631,9 @@ and gives a weaker custom OIDC provider a one-hour hard cap:
   }
 }
 ```
+
+Global `SlidingExpiration: true` permits renewal for Entra, while the custom provider's
+`SlidingExpiration: false` prevents activity from renewing its one-hour session.
 
 The same `Session` block works on an `OAuthProviders` entry. For environment-variable configuration,
 including Aspire's `WithEnvironment`, the second OIDC provider's lifetime key is
@@ -650,11 +654,16 @@ Values come only from deployment configuration, never from provider claims, head
 parameters, or token contents. OIDC refresh-token retention follows the issued cookie's fixed
 deadline or shorter sliding span, including refresh-token rotation; OAuth token capture is unchanged.
 
-The policy applies on a new sign-in or reauthentication through that provider. Changing a provider's
-settings does not rewrite existing cookies or their token sessions; those keep their issued policy
-until they expire or the user signs in again. The global ceiling still limits token-retention rewrites. Linking a second identity does not change the primary session's policy.
-It does not affect bearer tokens or PATs. A shorter session is not proof of recent authentication:
-use [fresh-authentication rules](fresh-authentication.md) for sensitive operations.
+The policy applies on a new sign-in or reauthentication through that provider. Linking a second
+identity does not change the primary session's policy. It does not affect bearer tokens or PATs.
+
+Existing sessions keep their issued policy until they expire or the user signs in again; changing a
+provider's settings does not rewrite their cookies or token sessions. The global ceiling still limits
+token-retention rewrites.
+
+The provider and browser-session start time are not forwarded to the backend; AuthProxy enforces
+the cap, so the backend does not need to check session age. A shorter session is not proof of recent
+authentication: use [fresh-authentication rules](fresh-authentication.md) for sensitive operations.
 
 ### Sharing the session across hosts
 

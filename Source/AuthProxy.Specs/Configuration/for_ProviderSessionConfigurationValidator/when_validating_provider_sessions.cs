@@ -24,7 +24,15 @@ public class when_validating_provider_sessions : Specification
             else config.Authentication.OAuthProviders.Add(new OAuthProvider { Name = "oauth", Session = provider });
             var result = new ProviderSessionConfigurationValidator().Validate(null, config);
             result.Succeeded.ShouldEqual(accepted);
-            if (!accepted) result.FailureMessage.ShouldContain(oidc ? "oidc" : "oauth");
+            if (!accepted)
+            {
+                result.FailureMessage.ShouldContain($"Provider '{(oidc ? "oidc" : "oauth")}'");
+                result.FailureMessage.ShouldContain($"'{TimeSpan.FromHours(hours):c}'");
+                result.FailureMessage.ShouldContain("The effective global Cratis:AuthProxy:Session:Lifetime ceiling is '12:00:00'");
+                result.FailureMessage.ShouldContain($"Cratis:AuthProxy:Authentication:{(oidc ? "OidcProviders" : "OAuthProviders")}[0]:Session:Lifetime");
+                result.FailureMessage.ShouldContain(hours <= 0 ? "must be greater than 00:00:00" : "exceeds the global session lifetime");
+                result.FailureMessage.ShouldContain("Set it to a value above 00:00:00 and no longer than '12:00:00', or remove the provider's Session:Lifetime to inherit the global value.");
+            }
         }
     }
 
@@ -35,7 +43,11 @@ public class when_validating_provider_sessions : Specification
     {
         var config = new AuthProxy { Session = new Session { Lifetime = TimeSpan.FromHours(globalHours) } };
         config.Authentication.OidcProviders.Add(new OidcProvider { Name = "work", Session = new ProviderSession { Lifetime = TimeSpan.FromHours(13) } });
-        new ProviderSessionConfigurationValidator().Validate(null, config).Failed.ShouldBeTrue();
+        var result = new ProviderSessionConfigurationValidator().Validate(null, config);
+        result.Failed.ShouldBeTrue();
+        result.FailureMessage.ShouldContain("'13:00:00' exceeds the global session lifetime");
+        result.FailureMessage.ShouldContain("The effective global Cratis:AuthProxy:Session:Lifetime ceiling is '12:00:00'");
+        result.FailureMessage.ShouldContain("Cratis:AuthProxy:Authentication:OidcProviders[0]:Session:Lifetime");
     }
 
     [Fact]
