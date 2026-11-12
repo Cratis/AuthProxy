@@ -10,6 +10,7 @@ This description is published verbatim as the release notes of a release-bound p
 - No "verified by/in/against ...", test counts, "not verified", stacking, retarget, merge or deploy instructions, also with `no-release`: any pull request may become release-bound. After merging main, re-check every bullet against the diff.
 - Absolute https:// links only; relative links 404 on the release page.
 - Replace the placeholder bullets and delete empty sections.
+- Does this change which paths are served, forwarded or refused, which response a request gets, which credential or provider is selected, or how credentials, sessions or forwarded identity are handled? Then start its bullet with `**Breaking:**`, name who is affected and how to check, whatever the label: https://github.com/Cratis/AuthProxy/blob/main/CONTRIBUTING.md#breaking-release-notes-for-path-forwarding-and-credential-changes
 -->
 
 ## Added
