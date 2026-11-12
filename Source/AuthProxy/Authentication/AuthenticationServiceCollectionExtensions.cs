@@ -116,6 +116,8 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<C.Authentication>, OAuthAuthorizationParametersConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.AuthProxy>, ProviderSessionConfigurationValidator>();
+        services.AddOptions<C.AuthProxy>().ValidateOnStart();
         services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
         services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
         services.TryAddSingleton(TimeProvider.System);
@@ -687,6 +689,12 @@ public static class AuthenticationServiceCollectionExtensions
 
     static async Task CompleteSignIn(TicketReceivedContext context, bool oidc)
     {
+        var services = context.HttpContext.RequestServices;
+        var globalSession = services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Session;
+        var authentication = services.GetRequiredService<IOptionsMonitor<C.Authentication>>().CurrentValue;
+        SessionLifetimePolicy.Resolve(globalSession, authentication, context.Scheme.Name)
+            .Apply(context.Properties!, services.GetRequiredService<TimeProvider>());
+
         // A non-link ticket means a real sign-in is completing. Record which provider established this session so
         // a later RP-initiated logout can target the correct identity provider's end-session endpoint (persisted
         // into the auth cookie by the RemoteAuthenticationHandler that signs the ticket in), and notify the

@@ -9,6 +9,11 @@ A session can stay valid for days. For an operation such as changing a payout ac
 
 It is opt-in. A service without `FreshAuthentication` behaves exactly as before.
 
+A [per-provider session lifetime](authentication.md#per-provider-browser-session-lifetime) limits how
+long a browser ticket remains valid, not how recently the user proved their identity. Sliding cookie
+renewal and access-token refresh do not establish a new authentication time. Keep `FreshAuthentication`
+rules for operations that require recent proof, even when the provider has a short session lifetime.
+
 ## Configure a service
 
 Set `Cratis:AuthProxy:Services:<name>:FreshAuthentication` to a list of rules:

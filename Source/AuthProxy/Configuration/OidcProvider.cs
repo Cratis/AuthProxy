@@ -72,4 +72,7 @@ public class OidcProvider
     /// When absent, the provider retains the legacy claim-selection and forwarding behavior.
     /// </summary>
     public CanonicalIdentity? CanonicalIdentity { get; set; }
+
+    /// <summary>Gets or sets optional shorten-only browser-session settings. Null inherits the global session policy.</summary>
+    public ProviderSession? Session { get; set; }
 }
