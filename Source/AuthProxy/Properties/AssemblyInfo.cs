@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("AuthProxy.Specs")]
 [assembly: InternalsVisibleTo("AuthProxy.Security.Specs")]
+[assembly: InternalsVisibleTo("AuthProxy.Integration.Specs")]

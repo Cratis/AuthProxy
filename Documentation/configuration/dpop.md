@@ -150,7 +150,9 @@ create a new proof and `jti` when retrying a nonce challenge.
 
 DPoP refusals are non-cacheable machine responses, never redirects or cookie
 challenges. Proof/store/clock/replay failures use HTTP 401 `invalid_dpop_proof`;
-valid proofs lacking scope use HTTP 403 `insufficient_scope`. DPoP challenges
+valid proofs lacking scope use HTTP 403 `insufficient_scope` after replay-store
+health and any required nonce are checked, without reserving the proof identifier.
+Successful authorization still requires an atomic replay reservation. DPoP challenges
 advertise `algs="ES256"` and do not suggest downgrading to Bearer. Logs contain
 fixed reason codes only, not tokens, proofs, keys, nonces or full request URLs.
 

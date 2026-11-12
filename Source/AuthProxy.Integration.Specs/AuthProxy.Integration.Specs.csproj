@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <!-- Keep root dotnet test container-free; the dedicated Redis workflow opts in. -->
+    <IsTestProject>false</IsTestProject>
+    <IsTestProject Condition="'$(RunRedisReplaySpecs)' == 'true'">true</IsTestProject>
+    <OutputType>Exe</OutputType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../AuthProxy/AuthProxy.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Cratis.Specifications.XUnit.v3" />
+    <PackageReference Include="xunit.v3.mtp-off" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <PackageReference Include="Testcontainers.Redis" />
+  </ItemGroup>
+</Project>

@@ -82,6 +82,7 @@ public sealed class DpopEnforcement(IDpopReplayStore store, IDataProtectionProvi
             DpopChallenge.Refuse(context, route, "use_dpop_nonce", new(Nonce: _nonce.Create(route, jkt)));
             return null;
         }
+        if (validation.Status == BearerTokenValidationStatus.InsufficientScope) return validation;
         return await Consume(context, route, validation, proof);
     }
 
