@@ -30,6 +30,7 @@ jobs:
       dotnet: ${{ steps.filter.outputs.dotnet }}
       prerelease: ${{ steps.filter.outputs.prerelease }}
       azure-docs: ${{ steps.filter.outputs.azure-docs }}
+      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       # The pull request files API lists at most 3,000 files, so a larger pull request could hide
       # changed paths from the filter and skip checks. Fail closed instead of filtering a partial list.
@@ -55,6 +56,12 @@ jobs:
               - "Documentation/azure/**"
               - ".github/workflows/azure-docs-specs.yml"
               - ".github/workflows/pull-requests.yml"
+            e2e:
+              - "Source/**"
+              - "E2E/**"
+              - "Docker/**"
+              - ".github/workflows/consumer-e2e.yml"
+              - ".github/workflows/pull-requests.yml"
 
   dotnet-build:
     needs: changes
@@ -77,6 +84,13 @@ jobs:
     permissions:
       contents: read
 
+  consumer-e2e:
+    needs: changes
+    if: ${{ needs.changes.outputs.e2e == 'true' }}
+    uses: ./.github/workflows/consumer-e2e.yml
+    permissions:
+      contents: read
+
   # No filter: the security checks must always run (their old trigger had no paths).
   security:
     uses: ./.github/workflows/security.yml
@@ -94,7 +108,7 @@ jobs:
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [changes, dotnet-build, prerelease, azure-docs-specs, security, policy]
+    needs: [changes, dotnet-build, prerelease, azure-docs-specs, consumer-e2e, security, policy]
     runs-on: ${{ vars.RUNNER_GATE || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions: {}

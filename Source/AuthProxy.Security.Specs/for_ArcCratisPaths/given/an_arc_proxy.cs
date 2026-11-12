@@ -22,7 +22,7 @@ public class an_arc_proxy(ArcCratisHarness harness) : Specification
         response.StatusCode.ShouldEqual(HttpStatusCode.NoContent);
         Cookies = SessionCookieHarness.SessionFrom(response);
         Cookies.Length.ShouldBeGreaterThan(0);
-        Harness.Arc.Received.Clear();
+        Harness.Arc.Reset();
     }
 
     protected HttpRequestMessage Request(string path) => SessionCookieHarness.Request(SessionCookieHarness.ConsoleHost, path, Cookies);
