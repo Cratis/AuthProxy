@@ -2,7 +2,9 @@
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
+    <!-- Keep root dotnet test container-free; the dedicated Redis workflow opts in. -->
+    <IsTestProject>false</IsTestProject>
+    <IsTestProject Condition="'$(RunRedisReplaySpecs)' == 'true'">true</IsTestProject>
     <OutputType>Exe</OutputType>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>

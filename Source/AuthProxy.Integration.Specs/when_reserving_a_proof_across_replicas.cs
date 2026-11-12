@@ -23,9 +23,12 @@ public class when_reserving_a_proof_across_replicas(RedisReplayFixture redis) : 
         var ttl = await Database.KeyTimeToLiveAsync(ReplayKey("synthetic-proof"));
         ttl.ShouldNotBeNull();
         (ttl.GetValueOrDefault() > TimeSpan.Zero && ttl.GetValueOrDefault() <= TimeSpan.FromSeconds(390)).ShouldBeTrue();
+        var shortenedRetention = TimeSpan.FromSeconds(60);
+        (await Database.KeyExpireAsync(ReplayKey("synthetic-proof"), shortenedRetention)).ShouldBeTrue();
         (await Consume(replicas[1])).ShouldEqual(DpopReplayResult.Replay);
         var remaining = await Database.KeyTimeToLiveAsync(ReplayKey("synthetic-proof"));
-        (remaining <= ttl).ShouldBeTrue();
+        remaining.ShouldNotBeNull();
+        (remaining > TimeSpan.Zero && remaining <= shortenedRetention).ShouldBeTrue();
     }
 
     /// <summary>A new replica observes evidence left by a disposed replica.</summary>

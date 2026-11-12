@@ -11,7 +11,8 @@ namespace Cratis.AuthProxy.BearerRoutes.Dpop;
 /// <param name="options">The deployment's dedicated Redis settings.</param>
 /// <param name="clock">The local clock compared with Redis on every operation.</param>
 /// <param name="database">An optional database supplied by deterministic specifications.</param>
-internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimeProvider clock, IDatabase? database = null) : IDpopReplayStore, IDisposable
+/// <param name="healthLockTimeout">An optional health-lock timeout supplied by deterministic specifications.</param>
+internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimeProvider clock, IDatabase? database = null, TimeSpan? healthLockTimeout = null) : IDpopReplayStore, IDisposable
 {
     /// <summary>The atomic Redis time, coverage, quarantine and SET NX operation; every key shares a cluster slot.</summary>
     internal const string Script =
@@ -30,6 +31,7 @@ internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimePr
     static readonly TimeSpan _healthInterval = TimeSpan.FromSeconds(10);
     readonly SemaphoreSlim _connect = new(1, 1);
     readonly SemaphoreSlim _healthLock = new(1, 1);
+    readonly TimeSpan _healthLockTimeout = healthLockTimeout ?? TimeSpan.FromSeconds(5);
     long? _healthCheckedAt;
     DpopReplayResult _healthResult = DpopReplayResult.Unavailable;
     ConnectionMultiplexer? _connection;
@@ -37,7 +39,7 @@ internal sealed class RedisDpopReplayStore(IOptions<C.AuthProxy> options, TimePr
     /// <inheritdoc/>
     public async Task<DpopReplayResult> CheckHealth(CancellationToken cancellationToken)
     {
-        await _healthLock.WaitAsync(cancellationToken);
+        if (!await _healthLock.WaitAsync(_healthLockTimeout, cancellationToken)) return DpopReplayResult.Unavailable;
         try
         {
             if (_healthCheckedAt is { } checkedAt && clock.GetElapsedTime(checkedAt, clock.GetTimestamp()) < _healthInterval) return _healthResult;

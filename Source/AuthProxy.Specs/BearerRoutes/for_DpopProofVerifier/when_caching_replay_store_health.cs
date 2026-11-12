@@ -41,6 +41,23 @@ public class when_caching_replay_store_health : Specification
         await database.Received(1).ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), Arg.Any<CommandFlags>());
     }
 
+    [Fact]
+    public async Task should_fail_closed_when_the_health_lock_times_out_without_releasing_the_owner()
+    {
+        var database = Substitute.For<IDatabase>();
+        var reply = new TaskCompletionSource<RedisResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        database.ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), Arg.Any<CommandFlags>()).Returns(reply.Task);
+        using var store = CreateStore(database, new ManualClock(), TimeSpan.Zero);
+        var owner = store.CheckHealth(CancellationToken.None);
+        (await store.CheckHealth(CancellationToken.None)).ShouldEqual(DpopReplayResult.Unavailable);
+        (await store.CheckHealth(CancellationToken.None)).ShouldEqual(DpopReplayResult.Unavailable);
+        owner.IsCompleted.ShouldBeFalse();
+        reply.SetResult(Result(1));
+        (await owner).ShouldEqual(DpopReplayResult.Accepted);
+        (await store.CheckHealth(CancellationToken.None)).ShouldEqual(DpopReplayResult.Accepted);
+        await database.Received(1).ScriptEvaluateAsync(Arg.Any<string>(), Arg.Any<RedisKey[]>(), Arg.Any<RedisValue[]>(), Arg.Any<CommandFlags>());
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(1, 31)]
@@ -177,11 +194,11 @@ public class when_caching_replay_store_health : Specification
 
     static RedisResult Result(int status, long seconds = Now) => RedisResult.Create([RedisResult.Create((RedisValue)status), RedisResult.Create((RedisValue)(seconds * 1000))]);
 
-    static RedisDpopReplayStore CreateStore(IDatabase database, TimeProvider clock)
+    static RedisDpopReplayStore CreateStore(IDatabase database, TimeProvider clock, TimeSpan? healthLockTimeout = null)
     {
         var options = new C.AuthProxy();
         options.Dpop.ReplayStore.Redis = new() { ConnectionString = "replay.example.test:6379", KeyPrefix = "synthetic-prefix" };
-        return new(Microsoft.Extensions.Options.Options.Create(options), clock, database);
+        return new(Microsoft.Extensions.Options.Options.Create(options), clock, database, healthLockTimeout);
     }
 
     sealed class ManualClock : TimeProvider
