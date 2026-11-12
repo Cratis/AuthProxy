@@ -1,0 +1,32 @@
+name: authproxy-e2e
+
+services:
+  arc:
+    build:
+      context: .
+      dockerfile: ArcSample/Dockerfile
+    environment:
+      # A throwaway constant for this lane only; it protects nothing.
+      E2E_CLIENT_SECRET: e2e-throwaway-secret
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET / HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q 200 <&3'"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  authproxy:
+    image: ${AUTHPROXY_IMAGE:-authproxy-e2e:local}
+    depends_on:
+      arc:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+    volumes:
+      - ./authproxy/appsettings.Production.json:/app/appsettings.Production.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
