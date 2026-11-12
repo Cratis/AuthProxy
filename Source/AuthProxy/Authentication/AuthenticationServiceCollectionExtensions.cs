@@ -721,6 +721,7 @@ public static class AuthenticationServiceCollectionExtensions
         // The same scheme is also recorded as a claim on the session itself, so an account from a provider without
         // canonical identity is named by the provider it signed in with.
         SessionProvider.Stamp(context.Principal!, context.Properties, context.Scheme.Name);
+        SessionStart.Stamp(context.Properties!, services.GetRequiredService<TimeProvider>().GetUtcNow());
         FreshAuthenticationChallenge.Stamp(context.Principal!, context.Properties!, oidc);
         BrowserSessionEvidence.Stamp(context.HttpContext, context.Principal!, context.Properties!, oidc ? context.Scheme.Name : null);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);

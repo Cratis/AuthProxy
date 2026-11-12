@@ -8,7 +8,7 @@ namespace Cratis.AuthProxy.Authentication;
 /// </summary>
 /// <remarks>
 /// AuthProxy removes any claim in this namespace supplied by a provider before it records its own value when a
-/// sign-in completes. The claim is never forwarded to applications.
+/// sign-in completes. Only explicitly enabled session-context claims are forwarded to applications.
 /// </remarks>
 public static class SessionClaims
 {
@@ -19,6 +19,19 @@ public static class SessionClaims
 
     /// <summary>The Unix time of the authentication recorded by AuthProxy.</summary>
     public const string AuthenticationTime = "urn:cratis:session:auth_time";
+
+    /// <summary>The original session start forwarded in Unix seconds when enabled for a service.</summary>
+    public const string Started = "urn:cratis:session:started";
+
+    /// <summary>The sign-in provider scheme forwarded when enabled for a service.</summary>
+    public const string SignInProvider = "urn:cratis:session:sign-in-provider";
+
+    /// <summary>Determines whether a type is reserved for forwarded session context.</summary>
+    /// <param name="claimType">The claim type to inspect.</param>
+    /// <returns>Whether the type is one of the two AuthProxy-authored forwarded claims.</returns>
+    public static bool IsForwardedSessionContext(string claimType) =>
+        string.Equals(claimType, Started, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(claimType, SignInProvider, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Determines whether a claim type belongs to the namespace reserved for AuthProxy-authored session metadata.
