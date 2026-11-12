@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Identity;
 
 namespace Cratis.AuthProxy.BearerRoutes;
@@ -50,7 +51,7 @@ public sealed record BearerForwardedIdentity(
             UserId = subject,
             UserDetails = details,
             UserRoles = ["anonymous", "authenticated"],
-            Claims = [.. user.Claims.Select(_ => new ClientPrincipalClaim { Type = _.Type, Value = _.Value })],
+            Claims = [.. user.Claims.Where(_ => !SessionClaims.IsForwardedSessionContext(_.Type)).Select(_ => new ClientPrincipalClaim { Type = _.Type, Value = _.Value })],
         };
 
         if (validation.Resource is { } resource)

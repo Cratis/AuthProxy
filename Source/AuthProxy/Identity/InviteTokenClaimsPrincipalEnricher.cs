@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Invites;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -52,16 +53,13 @@ public class InviteTokenClaimsPrincipalEnricher(
                 ? mapping.FromClaimType
                 : mapping.ToClaimType;
 
-            if (claims.Exists(_ => _.Type == targetClaimType && _.Value == value))
+            var claim = new ClientPrincipalClaim { Type = targetClaimType, Value = value };
+            if (SessionClaims.IsForwardedSessionContext(targetClaimType) || IsDuplicate(claims, claim))
             {
                 continue;
             }
 
-            claims.Add(new ClientPrincipalClaim
-            {
-                Type = targetClaimType,
-                Value = value,
-            });
+            claims.Add(claim);
             changed = true;
         }
 
@@ -80,4 +78,7 @@ public class InviteTokenClaimsPrincipalEnricher(
             AccountProvider = principal.AccountProvider,
         };
     }
+
+    static bool IsDuplicate(List<ClientPrincipalClaim> claims, ClientPrincipalClaim claim) =>
+        claims.Exists(_ => _.Type == claim.Type && _.Value == claim.Value);
 }

@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using Cratis.AuthProxy.OnBehalfSessions;
+using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Transforms;
+using C = Cratis.AuthProxy.Configuration;
 
 namespace Cratis.AuthProxy.Identity;
 
@@ -29,10 +31,11 @@ public class InjectIdentityHeadersTransform : RequestTransform
         // the tenancy middleware having run, so nothing a caller sent survives whatever path led here.
         SpoofableHeaders.Strip(context.ProxyRequest.Headers);
 
+        var service = ServiceSelection.FromRoute(httpContext);
         var principal = AnonymousPaths.PassesCallerAuthorization(httpContext) ? null : httpContext.BuildClientPrincipal();
         if (principal is not null)
         {
-            context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
+            SetPrincipalHeaders(context, principal);
         }
 
         // During an on-behalf session the principal above is the represented user. The actor and the signed assertion
@@ -53,7 +56,6 @@ public class InjectIdentityHeadersTransform : RequestTransform
 
         // Both backend contracts identify the destination, not a caller-supplied selector that may have
         // lost to an anonymous-path, query, or single-service catch-all route.
-        var service = ServiceSelection.FromRoute(httpContext);
         context.ProxyRequest.Headers.Remove(Headers.ServiceId);
         context.ProxyRequest.Headers.Remove(Headers.LegacyServiceId);
         if (!string.IsNullOrWhiteSpace(service))
@@ -64,5 +66,22 @@ public class InjectIdentityHeadersTransform : RequestTransform
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    static void SetPrincipalHeaders(RequestTransformContext context, ClientPrincipal principal)
+    {
+        if (ForwardsSessionContext(context.HttpContext))
+        {
+            principal = principal.WithSessionContext(context.HttpContext);
+        }
+        context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
+    }
+
+    static bool ForwardsSessionContext(HttpContext context)
+    {
+        var service = ServiceSelection.FromRoute(context);
+        var config = context.RequestServices?.GetService<IOptionsMonitor<C.AuthProxy>>()?.CurrentValue;
+        return service is not null && config is not null
+            && config.Services.TryGetValue(service, out var selected) && selected.ForwardSessionContext;
     }
 }

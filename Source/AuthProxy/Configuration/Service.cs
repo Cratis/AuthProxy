@@ -107,6 +107,12 @@ public class Service
     public TimeSpan? ActivityTimeout { get; set; }
 
     /// <summary>
+    /// Gets or sets whether to add the session start and the sign-in provider to the principal envelope
+    /// for this service. Off by default.
+    /// </summary>
+    public bool ForwardSessionContext { get; set; }
+
+    /// <summary>
     /// Gets or sets the request paths on this service that are served to unauthenticated callers.
     /// </summary>
     /// <remarks>
