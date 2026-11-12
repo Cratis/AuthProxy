@@ -35,11 +35,7 @@ public class InjectIdentityHeadersTransform : RequestTransform
         var principal = AnonymousPaths.PassesCallerAuthorization(httpContext) ? null : httpContext.BuildClientPrincipal();
         if (principal is not null)
         {
-            if (ForwardsSessionContext(httpContext))
-            {
-                principal = principal.WithSessionContext(httpContext);
-            }
-            context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
+            SetPrincipalHeaders(context, principal);
         }
 
         // During an on-behalf session the principal above is the represented user. The actor and the signed assertion
@@ -70,6 +66,15 @@ public class InjectIdentityHeadersTransform : RequestTransform
         }
 
         return ValueTask.CompletedTask;
+    }
+
+    static void SetPrincipalHeaders(RequestTransformContext context, ClientPrincipal principal)
+    {
+        if (ForwardsSessionContext(context.HttpContext))
+        {
+            principal = principal.WithSessionContext(context.HttpContext);
+        }
+        context.ProxyRequest.SetMicrosoftIdentityHeaders(principal);
     }
 
     static bool ForwardsSessionContext(HttpContext context)
