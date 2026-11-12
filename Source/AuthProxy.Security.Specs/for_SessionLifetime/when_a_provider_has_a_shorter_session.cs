@@ -48,7 +48,10 @@ public class when_a_provider_has_a_shorter_session
         await using var harness = new given.a_provider_session("13:00:00");
         var exception = Assert.Throws<OptionsValidationException>(harness.CreateSecurityClient);
         Assert.Contains("Provider One", exception.Message);
-        Assert.Contains("positive and no longer than the global session lifetime", exception.Message);
+        Assert.Contains("'13:00:00' exceeds the global session lifetime", exception.Message);
+        Assert.Contains("The effective global Cratis:AuthProxy:Session:Lifetime ceiling is '12:00:00'", exception.Message);
+        Assert.Contains("Cratis:AuthProxy:Authentication:OidcProviders[0]:Session:Lifetime", exception.Message);
+        Assert.Contains("Set it to a value above 00:00:00 and no longer than '12:00:00', or remove the provider's Session:Lifetime to inherit the global value.", exception.Message);
     }
 
     [Theory]
