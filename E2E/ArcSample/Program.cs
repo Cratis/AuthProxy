@@ -7,7 +7,13 @@ using ArcSample;
 var builder = WebApplication.CreateBuilder(args);
 
 // AuthProxy is the trusted ingress in front of this app and forwards the caller's identity in headers.
-builder.AddCratisArc(options => options.TrustForwardedIdentityHeaders = true);
+// Generated command routes live under /.cratis so one client-credentials route prefix (which scopes a bearer
+// token) covers the whole Arc surface the lane drives.
+builder.AddCratisArc(options =>
+{
+    options.TrustForwardedIdentityHeaders = true;
+    options.GeneratedApis.RoutePrefix = ".cratis";
+});
 
 var app = builder.Build();
 app.UseRouting();

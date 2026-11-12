@@ -14,22 +14,30 @@ namespace ArcSample;
 /// <param name="ClientSecret">The client secret.</param>
 public record VerifyRequest(string Service, string RoutePrefix, string ClientId, string ClientSecret);
 
-/// <summary>An observable read model that emits its greeting at once on every subscription.</summary>
+/// <summary>An observable read model that emits the current greeting at once and every later change.</summary>
 /// <param name="Message">The message.</param>
 [ReadModel]
 public record Greeting(string Message)
 {
+    /// <summary>The state the <see cref="Greet"/> command changes.</summary>
+    public static readonly BehaviorSubject<Greeting> Current = new(new("hello-through-authproxy"));
+
     /// <summary>Observes the greeting.</summary>
-    /// <returns>A subject that has already emitted its first value.</returns>
-    public static ISubject<Greeting> Observe() => new BehaviorSubject<Greeting>(new("hello-through-authproxy"));
+    /// <returns>A subject that has already emitted its current value.</returns>
+    public static ISubject<Greeting> Observe() => Current;
 }
 
-/// <summary>A command with no events and no Chronicle: it only returns a value.</summary>
+/// <summary>A command with no events and no Chronicle: it changes the greeting the query observes.</summary>
 /// <param name="Name">Who to greet.</param>
 [Command]
 public record Greet(string Name)
 {
     /// <summary>Handles the command.</summary>
     /// <returns>The greeting.</returns>
-    public string Handle() => $"hello {Name}";
+    public string Handle()
+    {
+        var message = $"hello {Name}";
+        Greeting.Current.OnNext(new(message));
+        return message;
+    }
 }

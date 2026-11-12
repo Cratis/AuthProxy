@@ -2,7 +2,9 @@
 
 Builds the AuthProxy image from this working tree, runs a minimal real Arc app behind it, and drives
 Arc's `/.cratis` surface from outside with a client-credentials bearer token: the refused unauthenticated
-stream, the token exchange, an observable query over SSE and over WebSocket.
+stream, the token exchange, an observable query over SSE, a command that changes what that query observes (seen on
+the open stream), and the changed value over WebSocket. The sample serves generated commands under `/.cratis`
+(`GeneratedApis.RoutePrefix`) so one bearer prefix covers the whole surface.
 
 ```shell
 bash E2E/run.sh

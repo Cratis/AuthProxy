@@ -12,7 +12,8 @@ using System.Text.Json;
 var baseAddress = new Uri(Environment.GetEnvironmentVariable("E2E_BASE_URL") ?? "http://localhost:8080");
 var clientSecret = Environment.GetEnvironmentVariable("E2E_CLIENT_SECRET") ?? "e2e-throwaway-secret";
 const string QueryName = "ArcSample.Greeting.Observe";
-const string ExpectedMessage = "hello-through-authproxy";
+const string InitialMessage = "hello-through-authproxy";
+const string CommandMessage = "hello authproxy";
 var deadline = TimeSpan.FromSeconds(15);
 
 using var http = new HttpClient { BaseAddress = baseAddress, Timeout = Timeout.InfiniteTimeSpan };
@@ -68,7 +69,19 @@ await Step("observable query is delivered over SSE", async cancellation =>
     using var subscribed = await http.SendAsync(subscribe, cancellation);
     subscribed.EnsureSuccessStatusCode();
 
-    var result = await ReadUntilMessage(() => NextData(reader, cancellation));
+    var initial = await ReadUntilMessage(() => NextData(reader, cancellation), InitialMessage);
+
+    using var command = Authorized(HttpMethod.Post, "/.cratis/arc-sample/greet");
+    command.Content = new StringContent("""{"name":"authproxy"}""", Encoding.UTF8, "application/json");
+    using var executed = await http.SendAsync(command, cancellation);
+    var commandBody = await executed.Content.ReadAsStringAsync(cancellation);
+    executed.EnsureSuccessStatusCode();
+    if (!JsonDocument.Parse(commandBody).RootElement.GetProperty("isSuccess").GetBoolean())
+    {
+        throw new InvalidOperationException($"the command did not succeed: {commandBody}");
+    }
+
+    var changed = await ReadUntilMessage(() => NextData(reader, cancellation), CommandMessage);
 
     using var unsubscribe = Authorized(HttpMethod.Post, "/.cratis/queries/sse/unsubscribe");
     unsubscribe.Content = new StringContent(
@@ -77,7 +90,7 @@ await Step("observable query is delivered over SSE", async cancellation =>
         "application/json");
     using var unsubscribed = await http.SendAsync(unsubscribe, cancellation);
     unsubscribed.EnsureSuccessStatusCode();
-    return result;
+    return $"{initial}, command succeeded, then {changed} on the open stream";
 });
 
 await Step("observable query is delivered over WebSocket", async cancellation =>
@@ -88,7 +101,7 @@ await Step("observable query is delivered over WebSocket", async cancellation =>
 
     var subscribe = JsonSerializer.Serialize(new { type = "Subscribe", queryId = "ws-1", payload = new { queryName = QueryName } });
     await socket.SendAsync(Encoding.UTF8.GetBytes(subscribe), WebSocketMessageType.Text, true, cancellation);
-    var result = await ReadUntilMessage(() => NextSocketMessage(socket, cancellation));
+    var result = await ReadUntilMessage(() => NextSocketMessage(socket, cancellation), CommandMessage);
     await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "done", cancellation);
     return result;
 });
@@ -139,7 +152,7 @@ static async Task<string> NextSocketMessage(ClientWebSocket socket, Cancellation
 }
 
 // Skips protocol messages (connected, ping) until the query result carrying the expected data arrives.
-async Task<string> ReadUntilMessage(Func<Task<string>> next)
+static async Task<string> ReadUntilMessage(Func<Task<string>> next, string expected)
 {
     while (true)
     {
@@ -148,7 +161,7 @@ async Task<string> ReadUntilMessage(Func<Task<string>> next)
         {
             var data = message.GetProperty("payload").GetProperty("data");
             var text = data.GetProperty("message").GetString();
-            return text == ExpectedMessage
+            return text == expected
                 ? $"received {text}"
                 : throw new InvalidOperationException($"unexpected query data: {data}");
         }
