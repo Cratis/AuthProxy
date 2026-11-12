@@ -30,12 +30,14 @@ public class when_replay_coverage_is_quarantined(RedisReplayFixture redis) : giv
     [Fact]
     public async Task should_not_let_cached_ready_health_bypass_lost_coverage()
     {
+        const string proof = "synthetic-proof-after-coverage-loss";
         await SeedCoverage(TimeSpan.FromSeconds(391));
         var store = Replica();
         (await store.CheckHealth(CancellationToken.None)).ShouldEqual(DpopReplayResult.Accepted);
-        await Database.KeyDeleteAsync(CoverageKey);
+        (await Database.KeyExistsAsync(ReplayKey(proof))).ShouldBeFalse();
+        (await Database.KeyDeleteAsync(CoverageKey)).ShouldBeTrue();
         (await store.CheckHealth(CancellationToken.None)).ShouldEqual(DpopReplayResult.Accepted);
-        (await Consume(store)).ShouldEqual(DpopReplayResult.Unavailable);
-        (await Database.KeyExistsAsync(ReplayKey("synthetic-proof"))).ShouldBeFalse();
+        (await Consume(store, proof)).ShouldEqual(DpopReplayResult.Unavailable);
+        (await Database.KeyExistsAsync(ReplayKey(proof))).ShouldBeFalse();
     }
 }
