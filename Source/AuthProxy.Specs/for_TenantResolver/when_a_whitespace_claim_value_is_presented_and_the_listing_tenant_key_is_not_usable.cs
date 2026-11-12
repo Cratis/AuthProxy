@@ -21,5 +21,5 @@ public class when_a_whitespace_claim_value_is_presented_and_the_listing_tenant_k
 
     [Fact] void should_not_resolve() => _succeeded.ShouldBeFalse();
     [Fact] void should_not_return_a_tenant() => _result.TenantId.ShouldEqual(string.Empty);
-    [Fact] void should_log_that_the_identifier_is_not_usable() => UnusableIdentifierWasLogged.ShouldBeTrue();
+    [Fact] void should_not_inspect_the_listing_tenant_key() => UnusableIdentifierWasLogged.ShouldBeFalse();
 }

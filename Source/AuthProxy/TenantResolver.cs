@@ -81,6 +81,10 @@ public class TenantResolver(
     static bool TryMatchTenant(string sourceIdentifier, C.AuthProxy config, out string tenantId)
     {
         tenantId = string.Empty;
+        if (string.IsNullOrWhiteSpace(sourceIdentifier))
+        {
+            return false;
+        }
 
         // For all other strategies, look up the source identifier in the tenant map.
         foreach (var (id, tenantConfig) in config.Tenants)
