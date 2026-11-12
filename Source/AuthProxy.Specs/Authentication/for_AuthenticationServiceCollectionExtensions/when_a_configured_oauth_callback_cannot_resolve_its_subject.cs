@@ -15,17 +15,19 @@ public class when_a_configured_oauth_callback_cannot_resolve_its_subject : confi
 {
     TicketReceivedContext _ticketContext;
     ISignInNotifier _notifier;
+    DefaultHttpContext _context;
 
     async Task Because()
     {
-        var context = Context();
+        var context = _context = Context();
         _notifier = _services.GetRequiredService<ISignInNotifier>();
         var principal = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "wrong-subject-claim")], "github"));
         _ticketContext = TicketContext(context, "github", _oauthOptions, principal, new AuthenticationProperties());
         await _oauthOptions.Events.OnTicketReceived(_ticketContext);
     }
 
-    [Fact] void should_fail_the_callback() => _ticketContext.Result.Failure.ShouldNotBeNull();
+    [Fact] void should_end_the_callback_as_a_handled_remote_failure() => _ticketContext.Result.Handled.ShouldBeTrue();
+    [Fact] void should_redirect_to_provider_selection_with_the_remote_failure_reason() => _context.Response.Headers.Location.ToString().ShouldContain("remote-failure");
     [Fact] void should_not_apply_an_enriched_principal() => _ticketContext.Principal.FindFirst(CanonicalIdentityClaims.ProviderKey).ShouldBeNull();
     [Fact] void should_not_add_protocol_assurance() => _ticketContext.Principal.FindFirst("acr").ShouldBeNull();
     [Fact] void should_not_stamp_the_provider() => _ticketContext.Properties.Items.ContainsKey(AuthenticationServiceCollectionExtensions.AuthenticationSchemeStateKey).ShouldBeFalse();

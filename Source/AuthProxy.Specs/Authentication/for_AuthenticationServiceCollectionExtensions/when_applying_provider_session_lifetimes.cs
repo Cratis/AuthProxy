@@ -89,7 +89,7 @@ public class when_applying_provider_session_lifetimes : given.configured_provide
         var properties = new AuthenticationProperties();
         var context = Ticket(services, true, properties);
         await Receive(context);
-        context.Result.Failure.ShouldNotBeNull();
+        context.Result.Handled.ShouldBeTrue();
         properties.ExpiresUtc.ShouldBeNull();
         properties.AllowRefresh.ShouldBeNull();
     }

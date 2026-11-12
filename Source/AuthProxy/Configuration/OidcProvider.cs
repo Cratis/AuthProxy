@@ -73,6 +73,28 @@ public class OidcProvider
     /// </summary>
     public CanonicalIdentity? CanonicalIdentity { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the provider callback is refused unless the principal has exactly one
+    /// e-mail address and the provider reports it as verified. A refusal ends like a failed sign-in and issues no session.
+    /// Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool RequireVerifiedEmail { get; set; }
+
+    /// <summary>
+    /// Gets or sets how a signed-in person whom the identity details of a service deny is answered.
+    /// Defaults to <see cref="OidcDenialResponse.Forbidden"/>; <see cref="OidcDenialResponse.FailedSignIn"/> answers like a failed sign-in.
+    /// </summary>
+    public OidcDenialResponse DenialResponse { get; set; } = OidcDenialResponse.Forbidden;
+
+    /// <summary>
+    /// Gets or sets additional static parameters included in every authorization request to this provider.
+    /// </summary>
+    /// <remarks>
+    /// Framework-owned OIDC parameters such as <c language="text">state</c>, <c language="text">nonce</c>, <c language="text">redirect_uri</c>, and <c language="text">client_id</c> cannot be configured here.
+    /// A <c language="text">prompt</c> configured here is replaced when a fresh authentication is required.
+    /// </remarks>
+    public IDictionary<string, string> AuthorizationParameters { get; set; } = new Dictionary<string, string>();
+
     /// <summary>Gets or sets optional shorten-only browser-session settings. Null inherits the global session policy.</summary>
     public ProviderSession? Session { get; set; }
 }

@@ -47,6 +47,36 @@ public static class RemoteAuthenticationFailureHandler
         return Handle(context, context.Properties, SignInFailureReason.AccessDenied);
     }
 
+    /// <summary>
+    /// Refuses a ticket the provider callback delivered, answering exactly like <see cref="HandleRemoteFailure"/>.
+    /// </summary>
+    /// <param name="context">The ticket-received context to refuse.</param>
+    /// <param name="message">Why the ticket is refused, for the log.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    /// <remarks>
+    /// Failing the context from the ticket-received event does not raise the remote-failure event and does not
+    /// stop the handler from signing in, so the refusal is answered here and the response is marked handled.
+    /// </remarks>
+    internal static Task RefuseTicket(TicketReceivedContext context, string message)
+    {
+        GetLogger(context.HttpContext).RemoteSignInFailed(context.Scheme.Name, message);
+        return Handle(context, context.Properties, SignInFailureReason.RemoteFailure);
+    }
+
+    /// <summary>
+    /// Builds the provider-selection location a failed sign-in redirects to.
+    /// </summary>
+    /// <param name="reason">The failure reason to carry.</param>
+    /// <param name="returnUrl">The validated same-site relative destination to resume after a successful retry.</param>
+    /// <returns>The relative location.</returns>
+    internal static string FailedSignInLocation(string reason, string returnUrl)
+    {
+        var location = $"{WellKnownPaths.LoginPage}?{SignInFailureReason.QueryKey}={reason}";
+        return returnUrl == RelativeRedirect.ApplicationRoot
+            ? location
+            : $"{location}&returnUrl={Uri.EscapeDataString(returnUrl)}";
+    }
+
     static async Task Handle(
         HandleRequestContext<RemoteAuthenticationOptions> context,
         AuthenticationProperties? properties,
@@ -70,16 +100,11 @@ public static class RemoteAuthenticationFailureHandler
             return;
         }
 
-        var location = $"{WellKnownPaths.LoginPage}?{SignInFailureReason.QueryKey}={reason}";
-
         // Carry the original destination forward when the challenge recorded one, so a successful retry
         // still lands where the person was heading. The value comes from protected authentication state,
         // but it is validated as same-site relative all the same.
         var returnUrl = RelativeRedirect.Resolve(properties?.RedirectUri);
-        if (returnUrl != RelativeRedirect.ApplicationRoot)
-        {
-            location += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
-        }
+        var location = FailedSignInLocation(reason, returnUrl);
 
         if (properties is not null && FreshAuthenticationChallenge.TryGetMaxAge(properties, out var maxAge))
         {

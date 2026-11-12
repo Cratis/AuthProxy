@@ -24,6 +24,11 @@ The selection page is opened with a `reason` query-string parameter describing w
 | `access-denied` | The identity provider reported that access was denied — typically the person cancelled the sign-in or declined the consent prompt. |
 | `invalid-session` | An authenticated session could no longer be turned into a forwardable identity, so it was terminated and a fresh sign-in is required. |
 
+Two refusals deliberately arrive as `remote-failure` as well, so they cannot be told apart from a provider
+failure: a callback refused because `RequireVerifiedEmail` is not satisfied, and an identity denial for a
+provider whose `DenialResponse` is `FailedSignIn`. The operator log carries the real cause. See
+[Gating a weaker provider](authentication.md#gating-a-weaker-provider).
+
 The bundled `select-provider.html` shows a matching message above the provider buttons; a custom page
 (see [Well-Known Pages](well-known-pages.md)) can rely on the same contract. When the original
 destination is known it is carried along in `returnUrl` (validated as same-site relative), so a
