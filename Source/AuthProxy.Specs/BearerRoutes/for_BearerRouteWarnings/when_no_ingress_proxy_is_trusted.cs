@@ -25,7 +25,7 @@ public class when_no_ingress_proxy_is_trusted : Specification
                 },
             },
         };
-        var policy = new TrustedProxyPolicy(new C.Ingress { TrustedProxies = trusted ? ["203.0.113.9"] : [] });
+        var policy = new TrustedProxyPolicy(Options.Create(new C.Ingress { TrustedProxies = trusted ? ["203.0.113.9"] : [] }));
 
         var warnings = BearerRouteWarnings.For(config, policy).Where(warning => warning.Kind == BearerRouteWarningKind.NoTrustedIngress).ToArray();
 

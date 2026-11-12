@@ -114,9 +114,13 @@ public class BearerRouteMiddleware(
         || current.Profile == C.DeploymentProfile.LocalDevelopment
         || IsLoopbackRequest(context);
 
+    /// <summary>
+    /// Requires both the effective peer and the host to be loopback: neither a forged Host header nor
+    /// a loopback ingress serving a public hostname may exempt a remote caller from HTTPS.
+    /// </summary>
+    /// <param name="context">The request context after trusted forwarded-header processing.</param>
+    /// <returns>Whether both the effective remote address and host are loopback.</returns>
     static bool IsLoopbackRequest(HttpContext context) =>
-        // Require both the effective peer and the host to be loopback: neither a forged Host header nor
-        // a loopback ingress serving a public hostname may exempt a remote caller from HTTPS.
         context.Connection.RemoteIpAddress is { } peer
         && IPAddress.IsLoopback(peer)
         && Uri.TryCreate($"http://{context.Request.Host}/", UriKind.Absolute, out var uri)

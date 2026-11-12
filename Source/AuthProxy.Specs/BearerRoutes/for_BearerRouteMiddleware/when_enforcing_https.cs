@@ -4,8 +4,8 @@
 using System.Net;
 using Cratis.AuthProxy.Ingress;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cratis.AuthProxy.BearerRoutes.for_BearerRouteMiddleware;
@@ -22,6 +22,7 @@ public class when_enforcing_https : given_a_credential_dispatching_gate
     public async Task should_refuse_http_before_reading_or_validating_credentials(string? credential)
     {
         var context = HttpRequest(credential: credential);
+
         // No credential header may be read on the refused path, including a malformed proof or cookie.
         var headers = context.Request.Headers;
         var unreadHeaders = Substitute.For<IHeaderDictionary>();
@@ -43,7 +44,7 @@ public class when_enforcing_https : given_a_credential_dispatching_gate
     [Fact]
     public async Task should_permit_explicit_local_development_http()
     {
-        Config.Profile = C.DeploymentProfile.LocalDevelopment;
+        Current.Profile = C.DeploymentProfile.LocalDevelopment;
         await Accepted(HttpRequest());
     }
 
@@ -74,7 +75,7 @@ public class when_enforcing_https : given_a_credential_dispatching_gate
     {
         var context = HttpRequest();
         context.Request.Headers["X-Forwarded-Proto"] = "https";
-        var policy = new TrustedProxyPolicy(new C.Ingress { TrustedProxies = trusted ? ["203.0.113.9"] : [] });
+        var policy = new TrustedProxyPolicy(Microsoft.Extensions.Options.Options.Create(new C.Ingress { TrustedProxies = trusted ? ["203.0.113.9"] : [] }));
         var options = new ForwardedHeadersOptions();
         policy.ApplyTo(options);
         var forwarded = new ForwardedHeadersMiddleware(Middleware.InvokeAsync, NullLoggerFactory.Instance, Microsoft.Extensions.Options.Options.Create(options));
@@ -84,7 +85,7 @@ public class when_enforcing_https : given_a_credential_dispatching_gate
         if (trusted)
         {
             context.Request.Scheme.ShouldEqual("https");
-            await Forwarder.Received(1).Forward(context, Arg.Any<ResolvedBearerRoute>(), Arg.Any<BearerTokenValidation>());
+            await Forwarder.Received(1).Forward(context, Arg.Any<ResolvedBearerRoute>(), Arg.Any<BearerForwardedIdentity>());
         }
         else
         {
@@ -99,10 +100,10 @@ public class when_enforcing_https : given_a_credential_dispatching_gate
     public async Task should_leave_public_metadata_available_over_http()
     {
         var context = HttpRequest();
-        context.Request.Path = new Uri(Metadata).AbsolutePath;
+        context.Request.Path = BearerRouteTable.All(Current).Single(route => route.Prefix == OAuthPath).ResourceMetadataPath;
         await Middleware.InvokeAsync(context);
         context.Response.StatusCode.ShouldEqual(StatusCodes.Status200OK);
-        Body(context).ShouldContain("authorization_servers");
+        await Forwarder.Received(1).Forward(context, Arg.Any<ResolvedBearerRoute>(), null);
         Validator.ReceivedCalls().ShouldBeEmpty();
     }
 
@@ -129,7 +130,7 @@ public class when_enforcing_https : given_a_credential_dispatching_gate
     {
         await Middleware.InvokeAsync(context);
         await Validator.Received(1).Validate(context.Request, Arg.Any<ResolvedBearerRoute>(), Arg.Any<CancellationToken>());
-        await Forwarder.Received(1).Forward(context, Arg.Any<ResolvedBearerRoute>(), Arg.Any<BearerTokenValidation>());
+        await Forwarder.Received(1).Forward(context, Arg.Any<ResolvedBearerRoute>(), Arg.Any<BearerForwardedIdentity>());
     }
 
     static void Refused(DefaultHttpContext context)

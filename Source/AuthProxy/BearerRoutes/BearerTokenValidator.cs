@@ -171,7 +171,12 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
             return BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, reason);
         }
 
-        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with { Issuer = issuer, SenderConstraint = senderConstraint };
+        return BearerTokenValidation.Success(new ClaimsPrincipal(identity), tenantId, environment) with
+        {
+            Issuer = issuer,
+            SenderConstraint = senderConstraint,
+            Resource = MatchedResource(route, claims),
+        };
     }
 
     /// <summary>
@@ -207,6 +212,13 @@ public sealed class BearerTokenValidator(IBearerIssuerMetadata metadata) : IBear
 
         return DpopPresentation.Check(request, route, await ValidateSignedToken(token, route, issuer, cancellationToken));
     }
+
+    static string? MatchedResource(ResolvedBearerRoute route, Claim[] claims) =>
+        route.Route.Audiences.Where(audience => !string.IsNullOrWhiteSpace(audience))
+            .Select(audience => audience.Trim())
+            .Intersect(claims.Where(claim => string.Equals(claim.Type, "aud", StringComparison.Ordinal)).Select(claim => claim.Value), StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .FirstOrDefault();
 
     static (ClaimsIdentity? Identity, string Reason) BuildIdentity(ResolvedBearerRoute route, ResolvedBearerIssuer issuer, Claim[] claims, string[] scopes)
     {

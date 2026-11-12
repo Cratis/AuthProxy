@@ -113,6 +113,7 @@ public class when_forwarding_requires_fresh_authentication(FreshAuthenticationHa
         var context = await harness.Server.SendAsync(
             request =>
             {
+                request.Request.Scheme = "https";
                 request.Request.Method = "POST";
                 request.Request.Path = path;
                 request.Request.Headers[header] = new StringValues(["POST", "DELETE"]);

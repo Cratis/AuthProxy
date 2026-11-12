@@ -16,6 +16,16 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="policy">The ingress trust boundary.</param>
 public sealed class BearerRouteStartupReport(IOptionsMonitor<C.AuthProxy> config, ILogger<BearerRouteStartupReport> logger, ITrustedProxyPolicy policy) : IHostedService
 {
+    /// <summary>
+    /// Initializes a report without a trusted ingress boundary.
+    /// </summary>
+    /// <param name="config">The auth proxy configuration.</param>
+    /// <param name="logger">The logger.</param>
+    public BearerRouteStartupReport(IOptionsMonitor<C.AuthProxy> config, ILogger<BearerRouteStartupReport> logger)
+        : this(config, logger, new TrustedProxyPolicy(Options.Create(new C.Ingress())))
+    {
+    }
+
     /// <inheritdoc/>
     public Task StartAsync(CancellationToken cancellationToken)
     {

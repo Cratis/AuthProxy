@@ -20,10 +20,10 @@ public class when_http_is_used(BearerRouteHarness harness)
             ? BearerRouteHarness.WithToken(HttpMethod.Get, path, harness.Issuer.Token())
             : new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
-        using var response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("{\"error\":\"invalid_request\"}", await response.Content.ReadAsStringAsync());
+        Assert.Equal("{\"error\":\"invalid_request\"}", await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.True(response.Headers.CacheControl?.NoStore);
         Assert.Empty(response.Headers.WwwAuthenticate);
         Assert.Null(response.Headers.Location);
