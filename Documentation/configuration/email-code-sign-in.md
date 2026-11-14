@@ -1,6 +1,6 @@
 ---
 title: "E-mail Code Sign-in"
-description: "Admit people who sign in with an e-mailed one-time code through an OpenID Connect provider such as Auth0, while refusing unverified addresses and unrecognized identities."
+description: "Admit people who sign in with an e-mailed one-time code through an OpenID Connect provider such as Auth0, refusing unverified addresses and unknown identities."
 ---
 
 # E-mail Code Sign-in
