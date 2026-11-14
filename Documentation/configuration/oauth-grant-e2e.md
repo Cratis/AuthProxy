@@ -1,6 +1,6 @@
 ---
 title: Verify OAuth-grant forwarding
-description: Run an isolated local issuer and an independent receiver to exercise AuthProxy's OAuth-grant envelope boundary.
+description: Run an isolated local issuer and an independent receiver to verify the OAuth-grant envelopes AuthProxy forwards, end to end.
 ---
 <!-- Copyright (c) Cratis. All rights reserved. -->
 <!-- Licensed under the MIT license. See LICENSE file in the project root for full license information. -->
