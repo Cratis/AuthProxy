@@ -44,6 +44,8 @@
   href: dpop.md
 - name: Forwarded Identity Signing
   href: forwarded-identity-signing.md
+- name: Verify OAuth-grant Forwarding
+  href: oauth-grant-e2e.md
 - name: Backend TLS
   href: backend-tls.md
 - name: One Proxy, Several Hosts
