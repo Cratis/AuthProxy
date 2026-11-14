@@ -27,16 +27,22 @@ public sealed class ForwardedIdentitySigningConfigurationValidator : IValidateOp
             var path = $"{C.AuthProxy.SectionKey}:Services:{serviceName}";
             var key = Validate(service.ForwardedIdentity, path, failures);
             if (key is null) continue;
-            foreach (var existing in services)
-            {
-                if (SameSecret(existing.Key, key) && !IsAlias(existing.Key, key, existing.Service.Backend, service.Backend))
-                {
-                    failures.Add($"{existing.Path}:ForwardedIdentity; {path}:ForwardedIdentity");
-                }
-            }
+            ReportCollisions(services, (key, path, service), failures);
             services.Add((key, path, service));
         }
         return services;
+    }
+
+    static void ReportCollisions(
+        List<(ForwardedIdentitySigningKey Key, string Path, C.Service Service)> services,
+        (ForwardedIdentitySigningKey Key, string Path, C.Service Service) candidate,
+        List<string> failures)
+    {
+        foreach (var existing in services.Where(existing => SameSecret(existing.Key, candidate.Key) &&
+            !IsAlias(existing.Key, candidate.Key, existing.Service.Backend, candidate.Service.Backend)))
+        {
+            failures.Add($"{existing.Path}:ForwardedIdentity; {candidate.Path}:ForwardedIdentity");
+        }
     }
 
     static void ValidateTenantSelection(C.AuthProxy options, List<(ForwardedIdentitySigningKey Key, string Path, C.Service Service)> services, List<string> failures)
@@ -83,26 +89,35 @@ public sealed class ForwardedIdentitySigningConfigurationValidator : IValidateOp
         address = null!;
 
         // DNS-discovered replicas do not identify a single destination that can establish alias ownership.
-        if (backend?.StickyRouting?.Enabled == true || !Uri.TryCreate(backend?.BaseUrl, UriKind.Absolute, out var parsed)) return false;
-        if (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps) return false;
-        if (!parsed.IsWellFormedOriginalString() || parsed.Query.Length != 0 || parsed.Fragment.Length != 0) return false;
+        if (!IsSingleDestination(backend)) return false;
+        if (!Uri.TryCreate(backend?.BaseUrl, UriKind.Absolute, out var parsed)) return false;
+        if (!IsHttpOrigin(parsed)) return false;
+        if (!parsed.IsWellFormedOriginalString() || !HasNoQueryOrFragment(parsed)) return false;
         address = parsed;
         return true;
     }
 
+    static bool IsSingleDestination(C.ServiceEndpoint? backend) => backend?.StickyRouting?.Enabled != true;
+
+    static bool IsHttpOrigin(Uri address) => address.Scheme == Uri.UriSchemeHttp || address.Scheme == Uri.UriSchemeHttps;
+
+    static bool HasNoQueryOrFragment(Uri address) => address.Query.Length == 0 && address.Fragment.Length == 0;
+
     static bool IsOwnBackend(ForwardedIdentitySigningKey service, ForwardedIdentitySigningKey tenant, C.ServiceEndpoint? backend, string endpoint)
     {
-        if (!string.Equals(service.Audience, tenant.Audience, StringComparison.Ordinal) ||
-            !TryGetBackendAddress(backend, out var backendUri) ||
-            !Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
-        {
-            return false;
-        }
+        if (!string.Equals(service.Audience, tenant.Audience, StringComparison.Ordinal)) return false;
+        if (!TryGetBackendAddress(backend, out var backendUri)) return false;
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)) return false;
 
         // Selection options have no service reference: only the configured backend origin and path scope establish ownership.
         if (!SameOrigin(backendUri, endpointUri)) return false;
-        var path = backendUri.AbsolutePath.TrimEnd('/');
-        return string.Equals(endpointUri.AbsolutePath, path, StringComparison.Ordinal) || endpointUri.AbsolutePath.StartsWith(path + "/", StringComparison.Ordinal);
+        return IsWithinPath(backendUri, endpointUri);
+    }
+
+    static bool IsWithinPath(Uri backend, Uri endpoint)
+    {
+        var path = backend.AbsolutePath.TrimEnd('/');
+        return string.Equals(endpoint.AbsolutePath, path, StringComparison.Ordinal) || endpoint.AbsolutePath.StartsWith(path + "/", StringComparison.Ordinal);
     }
 
     static bool SameOrigin(Uri first, Uri second) =>
