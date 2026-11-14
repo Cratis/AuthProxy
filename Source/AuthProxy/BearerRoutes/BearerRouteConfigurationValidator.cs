@@ -58,6 +58,23 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
             ValidateServicePath(location, service, state.Failures);
             ValidateServiceOverlaps(location, route, options, state.Failures);
             ValidateIdentityVerification(location, route, options, state.Failures);
+            if (service.ForwardedIdentity?.Version == "v2" && route.Issuers.Count > 0) ValidateOAuthGrantRoute(route, location.At, state.Failures);
+        }
+    }
+
+    static void ValidateOAuthGrantRoute(C.BearerRoute route, string location, List<string> failures)
+    {
+        if (!route.ForwardAuthorizationHeader)
+        {
+            failures.Add($"{location}.ForwardAuthorizationHeader must be true for v2 OAuth grant signing.");
+        }
+        if (route.Dpop is not null)
+        {
+            failures.Add($"{location}.Dpop is not supported for v2 OAuth grant signing.");
+        }
+        foreach (var issuer in route.Issuers.Where(issuer => issuer.Introspection is null))
+        {
+            failures.Add($"{location} requires introspection for issuer '{issuer.Issuer}' for v2 OAuth grant signing.");
         }
     }
 

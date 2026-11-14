@@ -36,27 +36,31 @@ public sealed class BearerTokenIntrospector(
     static readonly Answer _unavailable = new(IntrospectionVerdict.Unavailable, TimeSpan.MaxValue);
     static readonly Answer _inactive = new(IntrospectionVerdict.Inactive, TimeSpan.MaxValue);
 
-    readonly ConcurrentDictionary<string, Lazy<Task<IntrospectionVerdict>>> _flights = new(StringComparer.Ordinal);
+    readonly ConcurrentDictionary<string, Lazy<Task<IntrospectionResult>>> _flights = new(StringComparer.Ordinal);
 
     /// <inheritdoc/>
-    public async Task<IntrospectionVerdict> Introspect(string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, CancellationToken cancellationToken)
+    public async Task<IntrospectionVerdict> Introspect(string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, CancellationToken cancellationToken) =>
+        (await IntrospectWithEvidence(token, validated, issuer, cancellationToken)).Verdict;
+
+    /// <inheritdoc/>
+    public async Task<IntrospectionResult> IntrospectWithEvidence(string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, CancellationToken cancellationToken)
     {
         if (issuer.Introspection is not { } settings)
         {
-            return IntrospectionVerdict.Unavailable;
+            return new(IntrospectionVerdict.Unavailable);
         }
 
         // Neither cached answers nor in-flight calls may cross cache-window policies.
         var cacheDuration = Min(settings.CacheDuration, C.BearerIssuerIntrospection.MaximumCacheDuration);
         var key = string.Create(CultureInfo.InvariantCulture, $"{IntrospectionCache.CreateKey(settings.Endpoint, settings.ClientId, token)}:{cacheDuration.Ticks}");
-        if (cache.IsActive(key))
+        if (cache.TryGet(key, out var cached))
         {
-            return IntrospectionVerdict.Active;
+            return cached;
         }
 
         var flight = _flights.GetOrAdd(
             key,
-            static (flightKey, state) => new Lazy<Task<IntrospectionVerdict>>(() => state.Introspector.Ask(flightKey, state.Token, state.Validated, state.Issuer, state.Settings)),
+            static (flightKey, state) => new Lazy<Task<IntrospectionResult>>(() => state.Introspector.Ask(flightKey, state.Token, state.Validated, state.Issuer, state.Settings)),
             new FlightState(this, token, validated, issuer, settings));
         return await flight.Value.WaitAsync(cancellationToken);
     }
@@ -149,19 +153,52 @@ public sealed class BearerTokenIntrospector(
         return request;
     }
 
-    async Task<IntrospectionVerdict> Ask(string key, string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, C.BearerIssuerIntrospection settings)
+    static IntrospectionCredential? Credential(JsonElement root)
+    {
+        if (!IsGrantAnswer(root)) return null;
+        if (!root.TryGetProperty(IntrospectionMembers.CredentialId, out var value)) return null;
+        if (value.ValueKind != JsonValueKind.String || !IsCanonicalId(value.GetString())) return null;
+        if (root.TryGetProperty("exp", out var expiration) && !TryReadInstant(expiration, out _)) return null;
+        return new(value.GetString()!, Epoch(root));
+    }
+
+    static bool IsGrantAnswer(JsonElement root)
+    {
+        var names = root.EnumerateObject().Select(field => field.Name).ToArray();
+        if (names.Distinct(StringComparer.OrdinalIgnoreCase).Count() != names.Length) return false;
+        if (names.Contains("cnf", StringComparer.OrdinalIgnoreCase)) return false;
+        return root.TryGetProperty(IntrospectionMembers.CredentialKind, out var kind)
+            && kind.ValueKind == JsonValueKind.String && kind.GetString() == IntrospectionMembers.OAuthGrant;
+    }
+
+    static bool IsCanonicalId(string? value) => Guid.TryParseExact(value, "D", out var id) && id.ToString("D") == value;
+
+    static string? Epoch(JsonElement root)
+    {
+        if (!root.TryGetProperty(IntrospectionMembers.CacheEpoch, out var epoch)) return null;
+        return epoch.ValueKind switch
+        {
+            JsonValueKind.String => epoch.GetString(),
+            JsonValueKind.Number => epoch.GetRawText(),
+            _ => null
+        };
+    }
+
+    static DateTimeOffset? Expiration(JsonElement root) =>
+        root.TryGetProperty("exp", out var value) && TryReadInstant(value, out var instant) ? instant : null;
+
+    async Task<IntrospectionResult> Ask(string key, string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, C.BearerIssuerIntrospection settings)
     {
         try
         {
             using var deadline = new CancellationTokenSource(settings.Timeout);
             var answer = await Query(token, validated, issuer, settings, deadline.Token);
-            if (answer.Verdict == IntrospectionVerdict.Active)
-            {
-                var lifetime = Min(Min(settings.CacheDuration, C.BearerIssuerIntrospection.MaximumCacheDuration), answer.LifetimeLimit);
-                cache.Store(key, Min(lifetime, TokenRemainingLifetime(validated)), settings.MaximumCachedTokens);
-            }
-
-            return answer.Verdict;
+            if (answer.Verdict != IntrospectionVerdict.Active) return answer.Result;
+            var lifetime = Min(Min(settings.CacheDuration, C.BearerIssuerIntrospection.MaximumCacheDuration), answer.LifetimeLimit);
+            var freshLifetime = settings.CacheDuration > TimeSpan.Zero ? lifetime : Min(C.BearerIssuerIntrospection.MaximumCacheDuration, answer.LifetimeLimit);
+            var result = answer.Result with { ValidUntil = timeProvider.GetUtcNow() + Min(freshLifetime, TokenRemainingLifetime(validated)) };
+            cache.Store(key, Min(lifetime, TokenRemainingLifetime(validated)), settings.MaximumCachedTokens, result);
+            return result;
         }
         finally
         {
@@ -240,10 +277,13 @@ public sealed class BearerTokenIntrospector(
         var limit = root.TryGetProperty("exp", out var exp) && TryReadInstant(exp, out var expiresAt)
             ? expiresAt - timeProvider.GetUtcNow()
             : TimeSpan.MaxValue;
-        return new Answer(IntrospectionVerdict.Active, limit);
+        return new Answer(IntrospectionVerdict.Active, limit, Credential(root), Expiration(root));
     }
 
     sealed record FlightState(BearerTokenIntrospector Introspector, string Token, BearerTokenValidation Validated, ResolvedBearerIssuer Issuer, C.BearerIssuerIntrospection Settings);
 
-    sealed record Answer(IntrospectionVerdict Verdict, TimeSpan LifetimeLimit);
+    sealed record Answer(IntrospectionVerdict Verdict, TimeSpan LifetimeLimit, IntrospectionCredential? Credential = null, DateTimeOffset? ExpiresAt = null)
+    {
+        public IntrospectionResult Result => new(Verdict, Credential, ExpiresAt);
+    }
 }

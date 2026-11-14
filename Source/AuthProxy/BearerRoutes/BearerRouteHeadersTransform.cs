@@ -24,6 +24,7 @@ public class BearerRouteHeadersTransform : RequestTransform
     {
         var headers = context.ProxyRequest.Headers;
         SpoofableHeaders.Strip(headers);
+        ((IDictionary<string, object?>)context.ProxyRequest.Options).Remove(ForwardedIdentity.ForwardedIdentityTrustedContext.OptionsKey.Key);
         headers.Remove(Headers.ServiceId);
         headers.Remove(Headers.LegacyServiceId);
         headers.Remove(HeaderNames.Cookie);
@@ -43,6 +44,11 @@ public class BearerRouteHeadersTransform : RequestTransform
         if (identity is null)
         {
             return ValueTask.CompletedTask;
+        }
+
+        if (identity.TrustedContext is { } trusted)
+        {
+            context.ProxyRequest.Options.Set(ForwardedIdentity.ForwardedIdentityTrustedContext.OptionsKey, trusted);
         }
 
         context.ProxyRequest.SetMicrosoftIdentityHeaders(identity.Principal);

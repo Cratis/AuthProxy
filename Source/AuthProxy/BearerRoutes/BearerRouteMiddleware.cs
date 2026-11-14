@@ -27,6 +27,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="tokenProtector">Recognizes access tokens AuthProxy issued through its client-credentials grant.</param>
 /// <param name="logger">The logger.</param>
 /// <param name="dpop">The opt-in per-request proof enforcement service.</param>
+/// <param name="timeProvider">The clock for grant evidence expiration.</param>
 /// <remarks>
 /// Placed after endpoint selection but ahead of static files, authentication and everything after them, so a
 /// request on a bearer route never reaches the cookie session, provider selection, tenant selection or reverse-proxy
@@ -66,7 +67,8 @@ public class BearerRouteMiddleware(
     IBearerRouteForwarder forwarder,
     ClientCredentialsTokenProtector tokenProtector,
     ILogger<BearerRouteMiddleware> logger,
-    Dpop.DpopEnforcement? dpop = null)
+    Dpop.DpopEnforcement? dpop = null,
+    TimeProvider? timeProvider = null)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -108,6 +110,11 @@ public class BearerRouteMiddleware(
 
         await next(context);
     }
+
+    static bool RequiresGrant(C.AuthProxy current, string serviceName) => current.Services[serviceName].ForwardedIdentity?.Version == "v2";
+
+    static bool AcceptsUnavailable(ResolvedBearerRoute route, bool requireEvidence) => !requireEvidence
+        && route.Route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept && Dpop.DpopIntrospection.AllowsUnavailable(route);
 
     static bool AllowsTransport(HttpContext context, C.AuthProxy current) =>
         context.Request.IsHttps
@@ -209,24 +216,57 @@ public class BearerRouteMiddleware(
 
     async Task AuthenticateExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
+        var validation = await ValidateExternal(context, route);
+        if (validation is null) return;
+
+        var requiresGrant = RequiresGrant(current, route.ServiceName);
+        var activity = await ConfirmActive(context, route, validation, requiresGrant);
+        if (activity is null) return;
+
+        validation = await AuthorizeExternal(context, route, current, validation);
+        if (validation is null) return;
+
+        var identity = requiresGrant ? CreateOAuthIdentity(context, route, validation, activity) : BearerForwardedIdentity.From(validation, route);
+        await ForwardExternal(context, route, validation, identity);
+    }
+
+    async Task<BearerTokenValidation?> ValidateExternal(HttpContext context, ResolvedBearerRoute route)
+    {
         var validation = await Dpop.DpopEnforcement.ValidateToken(dpop, validator, context, route);
-        if (validation is null) return;
-        if (!validation.Succeeded)
-        {
-            logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
-            Dpop.DpopChallenge.Write(context, validation, route);
-            return;
-        }
+        if (validation?.Succeeded is not false) return validation;
+        RefuseExternal(context, route, validation);
+        return null;
+    }
 
-        if (!await IsConfirmedActive(context, route, validation)) return;
+    void RefuseExternal(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
+    {
+        logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
+        Dpop.DpopChallenge.Write(context, validation, route);
+    }
 
-        validation = await Dpop.DpopEnforcement.Verify(dpop, context, route, validation);
-        if (validation is null) return;
-        if (!await MayForwardExternal(context, route, current, validation)) return;
+    async Task<BearerTokenValidation?> AuthorizeExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current, BearerTokenValidation validation)
+    {
+        var verified = await Dpop.DpopEnforcement.Verify(dpop, context, route, validation);
+        if (verified is null) return null;
+        return await MayForwardExternal(context, route, current, verified) ? verified : null;
+    }
 
+    async Task ForwardExternal(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation, BearerForwardedIdentity? identity)
+    {
+        if (identity is null) return;
         context.User = validation.Principal!;
         Dpop.DpopEnforcement.PrepareForward(context, validation);
-        await forwarder.Forward(context, route, BearerForwardedIdentity.From(validation, route));
+        await forwarder.Forward(context, route, identity);
+    }
+
+    BearerForwardedIdentity? CreateOAuthIdentity(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation, IntrospectionResult activity)
+    {
+        var trusted = BearerTokenValidator.TryReadStrictBearerToken(context.Request, out var token)
+            ? new OAuthGrantEvidence(route, (timeProvider ?? TimeProvider.System).GetUtcNow()).Create(token, validation, activity)
+            : null;
+        if (trusted is not null) return BearerForwardedIdentity.From(validation, route) with { TrustedContext = trusted };
+        BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "The OAuth grant evidence is unavailable."), route);
+        return null;
     }
 
     async Task<bool> MayForwardExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current, BearerTokenValidation validation)
@@ -291,37 +331,41 @@ public class BearerRouteMiddleware(
         await next(context);
     }
 
-    async Task<bool> IsConfirmedActive(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
+    async Task<IntrospectionResult> ConfirmTokenActivity(HttpContext context, BearerTokenValidation validation, bool requireEvidence)
+    {
+        if (!BearerTokenValidator.TryReadStrictBearerToken(context.Request, out var token)) return new(IntrospectionVerdict.Inactive);
+        if (requireEvidence) return await introspector.IntrospectWithEvidence(token, validation, validation.Issuer!, context.RequestAborted);
+        return new(await introspector.Introspect(token, validation, validation.Issuer!, context.RequestAborted));
+    }
+
+    async Task<IntrospectionResult?> ConfirmActive(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation, bool requireEvidence)
     {
         if (validation.Issuer is not { Introspection: not null } issuer)
         {
-            return true;
+            return new(IntrospectionVerdict.Unavailable);
         }
 
         // The token was read once already, by the same strict reading; failing to read it again refuses, never trusts.
-        var verdict = BearerTokenValidator.TryReadStrictBearerToken(context.Request, out var token)
-            ? await introspector.Introspect(token, validation, issuer, context.RequestAborted)
-            : IntrospectionVerdict.Inactive;
+        var result = await ConfirmTokenActivity(context, validation, requireEvidence);
 
-        switch (verdict)
+        switch (result.Verdict)
         {
             case IntrospectionVerdict.Active:
-                return true;
+                return result;
 
-            case IntrospectionVerdict.Unavailable when route.Route.IntrospectionUnavailable == C.IntrospectionFailurePolicy.Accept
-                && Dpop.DpopIntrospection.AllowsUnavailable(route):
+            case IntrospectionVerdict.Unavailable when AcceptsUnavailable(route, requireEvidence):
                 logger.IntrospectionUnavailableAccepted(issuer.Issuer, route.Prefix, route.ServiceName);
-                return true;
+                return result;
 
             case IntrospectionVerdict.Unavailable:
                 logger.BearerIntrospectionRefused(issuer.Issuer, route.Prefix, route.ServiceName);
                 BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.IntrospectionUnavailable, "The issuer's introspection endpoint is unavailable."), route);
-                return false;
+                return null;
 
             default:
                 logger.BearerTokenRevoked(route.Prefix, route.ServiceName);
                 Dpop.DpopChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Revoked, "The issuer reports the token is not active."), route);
-                return false;
+                return null;
         }
     }
 

@@ -17,4 +17,13 @@ public interface IBearerTokenIntrospector
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The verdict. Never throws for an endpoint failure; that is <see cref="IntrospectionVerdict.Unavailable"/>.</returns>
     Task<IntrospectionVerdict> Introspect(string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, CancellationToken cancellationToken);
+
+    /// <summary>Asks for activity and authoritative grant evidence; legacy implementations supply activity only.</summary>
+    /// <param name="token">The access token, already validated locally.</param>
+    /// <param name="validated">The local validation result.</param>
+    /// <param name="issuer">The configured issuer.</param>
+    /// <param name="cancellationToken">The request cancellation.</param>
+    /// <returns>The narrowed activity and grant evidence.</returns>
+    async Task<IntrospectionResult> IntrospectWithEvidence(string token, BearerTokenValidation validated, ResolvedBearerIssuer issuer, CancellationToken cancellationToken) =>
+        new(await Introspect(token, validated, issuer, cancellationToken));
 }

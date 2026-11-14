@@ -24,6 +24,9 @@ public sealed record BearerForwardedIdentity(
     /// <summary>Gets the standard-base64 JSON evidence from successful per-request DPoP verification.</summary>
     public string SenderBinding { get; init; } = "none";
 
+    /// <summary>Gets independently verified per-request grant evidence, never reconstructed from forwarded headers.</summary>
+    internal ForwardedIdentity.ForwardedIdentityTrustedContext? TrustedContext { get; init; }
+
     /// <summary>
     /// Creates the forwarded identity for a successfully validated token.
     /// </summary>
@@ -64,6 +67,7 @@ public sealed record BearerForwardedIdentity(
             validation.TenantId!,
             [.. user.FindAll(BearerRouteClaims.Scope).Select(_ => _.Value)],
             user.FindFirst(BearerRouteClaims.ClientId)?.Value,
-            route.Route.ForwardAuthorizationHeader) { SenderBinding = validation.SenderBinding };
+            route.Route.ForwardAuthorizationHeader)
+        { SenderBinding = validation.SenderBinding };
     }
 }

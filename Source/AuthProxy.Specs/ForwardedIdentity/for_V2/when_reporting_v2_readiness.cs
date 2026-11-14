@@ -31,6 +31,64 @@ public class when_reporting_v2_readiness : Specification
         Assert.DoesNotContain(messages, message => message.Contains("v2-app: signed", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void should_report_only_verified_oauth_grants_on_a_mixed_bearer_route()
+    {
+        var config = Configuration();
+        var route = OAuthRoute();
+        route.PersonalAccessTokens = new() { ResourceKey = "backend" };
+        config.Services["v2-app"].BearerRoutes.Add(route);
+        var rows = ForwardedIdentitySigningReport.For(config);
+        var bearer = rows.Single(row => row.Flow == ForwardedIdentityFlow.BearerRoute);
+        Assert.True(bearer.IsSigned);
+        Assert.Equal("verified-oauth-grant-only (PAT-excluded)", bearer.State);
+        Assert.Equal("browser-session-only", rows.Single(row => row.Flow == ForwardedIdentityFlow.ProxiedRequest && row.ServiceName == "v2-app").State);
+    }
+
+    [Theory]
+    [InlineData("dpop")]
+    [InlineData("client-credentials")]
+    [InlineData("pat-only")]
+    [InlineData("no-introspection")]
+    [InlineData("no-authorization")]
+    [InlineData("http-issuer")]
+    public void should_not_report_unsupported_or_incomplete_bearer_producers_as_ready(string scenario)
+    {
+        var config = Configuration();
+        var service = config.Services["v2-app"];
+        var route = OAuthRoute();
+        service.BearerRoutes.Add(route);
+        if (scenario == "dpop") route.Dpop = new() { PublicOrigin = "https://public.example.test" };
+        if (scenario == "client-credentials")
+        {
+            route.Issuers.Clear();
+            service.ClientCredentials = new();
+        }
+        if (scenario == "pat-only")
+        {
+            route.Issuers.Clear();
+            route.PersonalAccessTokens = new() { ResourceKey = "backend" };
+        }
+        if (scenario == "no-introspection") route.Issuers[0].Introspection = null;
+        if (scenario == "no-authorization") route.ForwardAuthorizationHeader = false;
+        if (scenario == "http-issuer") route.Issuers[0].Issuer = "http://identity.example.test";
+        var row = ForwardedIdentitySigningReport.For(config).Single(row => row.Flow == ForwardedIdentityFlow.BearerRoute);
+        Assert.True(row.IsSigned);
+        Assert.Equal("not ready", row.State);
+    }
+
+    static C.BearerRoute OAuthRoute() => new()
+    {
+        PathPrefix = "/api",
+        ForwardAuthorizationHeader = true,
+        Audiences = ["backend"],
+        Issuers = [new()
+        {
+            Issuer = "https://identity.example.test",
+            Introspection = new() { Endpoint = "https://identity.example.test/connect/introspect", ClientId = "authproxy" }
+        }]
+    };
+
     static C.AuthProxy Configuration() => new()
     {
         Services = new Dictionary<string, C.Service>

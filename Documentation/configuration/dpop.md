@@ -6,7 +6,8 @@ description: "Enable RFC 9449 proofs on OAuth-only AuthProxy routes with a trust
 DPoP is **off by default**. An OAuth-only bearer route can opt in by adding `Dpop`.
 A bound token must then use `Authorization: DPoP <access-token>` and exactly one
 `DPoP` header containing a signed proof. A bound token sent as Bearer is refused;
-it never becomes an ordinary bearer credential.
+it never becomes an ordinary bearer credential. DPoP routes and tokens containing `cnf` do not produce
+[v2 OAuth-grant envelopes](forwarded-identity-signing.md#v2-infrastructure); v2 envelope routes must leave `Dpop` unset.
 
 ```json
 {
