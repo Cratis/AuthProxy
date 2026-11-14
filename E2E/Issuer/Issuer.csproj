@@ -1,0 +1,8 @@
+<!-- Copyright (c) Cratis. All rights reserved. -->
+<!-- Licensed under the MIT license. See LICENSE file in the project root for full license information. -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

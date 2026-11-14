@@ -14,17 +14,84 @@ services:
       timeout: 5s
       retries: 30
 
+  issuer:
+    build:
+      context: .
+      dockerfile: Service.Dockerfile
+      args:
+        PROJECT: Issuer
+    command: ["Issuer.dll"]
+    environment:
+      # A throwaway client secret for this isolated lane, supplied only through runtime environment.
+      E2E_INTROSPECTION_SECRET: e2e-throwaway-introspection
+      ASPNETCORE_URLS: https://+:8443
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /run/tls/issuer.crt
+      ASPNETCORE_Kestrel__Certificates__Default__KeyPath: /run/tls/issuer.key
+    volumes:
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/issuer.crt:/run/tls/issuer.crt:ro
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/issuer.key:/run/tls/issuer.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8443'"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  receiver:
+    build:
+      context: .
+      dockerfile: Service.Dockerfile
+      args:
+        PROJECT: OAuthGrantReceiver
+    command: ["OAuthGrantReceiver.dll"]
+    environment:
+      SSL_CERT_FILE: /run/tls/ca.crt
+    volumes:
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/ca.crt:/run/tls/ca.crt:ro
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/public.pem:/run/envelope/public.pem:ro
+    depends_on:
+      issuer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /health HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q 200 <&3'"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  grant-client:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: Service.Dockerfile
+      args:
+        PROJECT: OAuthGrantClient
+    command: ["OAuthGrantClient.dll"]
+    environment:
+      SSL_CERT_FILE: /run/tls/ca.crt
+    volumes:
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/ca.crt:/run/tls/ca.crt:ro
+    depends_on:
+      authproxy:
+        condition: service_healthy
+
   authproxy:
     image: ${AUTHPROXY_IMAGE:-authproxy-e2e:local}
     depends_on:
       arc:
         condition: service_healthy
+      receiver:
+        condition: service_healthy
+    env_file:
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/signing.conf
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       ASPNETCORE_URLS: http://+:8080
+      Cratis__AuthProxy__Services__grants__BearerRoutes__0__Issuers__0__Introspection__ClientSecret: e2e-throwaway-introspection
+      Cratis__AuthProxy__Services__grants__BearerRoutes__1__Issuers__0__Introspection__ClientSecret: e2e-throwaway-introspection
+      SSL_CERT_FILE: /run/tls/ca.crt
     volumes:
       - ./authproxy/appsettings.Production.json:/app/appsettings.Production.json:ro
+      - ${OAUTH_GRANT_RUNTIME:?Run E2E/run.sh}/ca.crt:/run/tls/ca.crt:ro
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
       interval: 2s

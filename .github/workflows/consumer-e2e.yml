@@ -3,7 +3,7 @@
 
 name: Consumer E2E
 
-# Builds the AuthProxy image and drives a real minimal Arc app through it (E2E/run.sh).
+# Builds AuthProxy and exercises the real Arc sample and independent OAuth-grant receiver (E2E/run.sh).
 on:
   workflow_call:
   workflow_dispatch:
@@ -41,5 +41,6 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: consumer-e2e-logs
-          path: .ai-work/e2e
+          # Never upload the per-run TLS/envelope private material, even if container cleanup fails.
+          path: .ai-work/e2e/compose.log
           if-no-files-found: ignore
