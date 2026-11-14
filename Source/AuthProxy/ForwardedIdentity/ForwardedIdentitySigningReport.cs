@@ -17,7 +17,13 @@ public static class ForwardedIdentitySigningReport
         foreach (var (name, service) in config.Services)
         {
             if (service.Backend is not null || service.Frontend is not null) rows.Add(Row(ForwardedIdentityFlow.ProxiedRequest, name, service.ForwardedIdentity, service.Backend?.BaseUrl ?? service.Frontend?.BaseUrl, config));
-            if (service.BearerRoutes.Count > 0) rows.Add(Row(ForwardedIdentityFlow.BearerRoute, name, service.ForwardedIdentity, service.Backend?.BaseUrl, config));
+            if (service.BearerRoutes.Count > 0)
+            {
+                rows.Add(Row(ForwardedIdentityFlow.BearerRoute, name, service.ForwardedIdentity, service.Backend?.BaseUrl, config) with
+                {
+                    HasOAuthGrantProducer = service.BearerRoutes.Any(ProducesOAuthGrant)
+                });
+            }
             if (service.ParticipatesInIdentityResolution) rows.Add(Row(ForwardedIdentityFlow.IdentityDetails, name, service.ForwardedIdentity, service.Backend?.BaseUrl, config));
         }
         if (TenantSelectionMiddleware.TryGetSelectionOptions(config, out var selection)) rows.Add(Row(ForwardedIdentityFlow.TenantList, null, selection.ForwardedIdentity, selection.TenantsEndpoint, config));
@@ -26,6 +32,12 @@ public static class ForwardedIdentitySigningReport
         rows.AddRange(BodyFlows(config));
         return rows;
     }
+
+    static bool ProducesOAuthGrant(C.BearerRoute route) => route.ForwardAuthorizationHeader && route.Dpop is null
+        && route.Issuers.Count > 0 && route.Issuers.All(HasGrantIssuer);
+
+    static bool HasGrantIssuer(C.BearerIssuer issuer) => issuer.Introspection is not null
+        && Uri.TryCreate(issuer.Issuer, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
 
     static IEnumerable<ForwardedIdentityFlowStatus> Callbacks(C.AuthProxy config) => config.Services
         .Where(pair => pair.Value.SignInCallback is not null && pair.Value.Backend is not null)

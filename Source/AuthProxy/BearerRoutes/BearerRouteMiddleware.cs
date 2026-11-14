@@ -216,24 +216,43 @@ public class BearerRouteMiddleware(
 
     async Task AuthenticateExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
-        var validation = await Dpop.DpopEnforcement.ValidateToken(dpop, validator, context, route);
+        var validation = await ValidateExternal(context, route);
         if (validation is null) return;
-        if (!validation.Succeeded)
-        {
-            logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
-            Dpop.DpopChallenge.Write(context, validation, route);
-            return;
-        }
 
         var requiresGrant = RequiresGrant(current, route.ServiceName);
         var activity = await ConfirmActive(context, route, validation, requiresGrant);
         if (activity is null) return;
 
-        validation = await Dpop.DpopEnforcement.Verify(dpop, context, route, validation);
+        validation = await AuthorizeExternal(context, route, current, validation);
         if (validation is null) return;
-        if (!await MayForwardExternal(context, route, current, validation)) return;
 
         var identity = requiresGrant ? CreateOAuthIdentity(context, route, validation, activity) : BearerForwardedIdentity.From(validation, route);
+        await ForwardExternal(context, route, validation, identity);
+    }
+
+    async Task<BearerTokenValidation?> ValidateExternal(HttpContext context, ResolvedBearerRoute route)
+    {
+        var validation = await Dpop.DpopEnforcement.ValidateToken(dpop, validator, context, route);
+        if (validation?.Succeeded is not false) return validation;
+        RefuseExternal(context, route, validation);
+        return null;
+    }
+
+    void RefuseExternal(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
+    {
+        logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
+        Dpop.DpopChallenge.Write(context, validation, route);
+    }
+
+    async Task<BearerTokenValidation?> AuthorizeExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current, BearerTokenValidation validation)
+    {
+        var verified = await Dpop.DpopEnforcement.Verify(dpop, context, route, validation);
+        if (verified is null) return null;
+        return await MayForwardExternal(context, route, current, verified) ? verified : null;
+    }
+
+    async Task ForwardExternal(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation, BearerForwardedIdentity? identity)
+    {
         if (identity is null) return;
         context.User = validation.Principal!;
         Dpop.DpopEnforcement.PrepareForward(context, validation);

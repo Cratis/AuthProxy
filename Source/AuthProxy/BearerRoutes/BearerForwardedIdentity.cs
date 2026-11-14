@@ -67,6 +67,7 @@ public sealed record BearerForwardedIdentity(
             validation.TenantId!,
             [.. user.FindAll(BearerRouteClaims.Scope).Select(_ => _.Value)],
             user.FindFirst(BearerRouteClaims.ClientId)?.Value,
-            route.Route.ForwardAuthorizationHeader) { SenderBinding = validation.SenderBinding };
+            route.Route.ForwardAuthorizationHeader)
+        { SenderBinding = validation.SenderBinding };
     }
 }
