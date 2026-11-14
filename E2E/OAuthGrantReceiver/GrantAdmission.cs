@@ -11,22 +11,40 @@ sealed class GrantAdmission(string publicKey, string issuer, AccessTokenVerifier
 {
     readonly NonceStore _nonces = new();
     readonly object _gate = new();
+    DisabledCheck _disabled;
+
+    // Each hostile case owns its nonce store; normal HTTP admission never selects a fault.
+    public GrantAdmission FreshReplayState(DisabledCheck disabled = DisabledCheck.None) => new(publicKey, issuer, bearer) { _disabled = disabled };
 
     public async Task Admit(string method, string path, Header[] headers)
     {
-        ValidateHeaders(headers);
-        string Read(string name) => headers.Single(header => header.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
+        ValidateHeaders(headers, _disabled);
+        string Read(string name) => headers.First(header => header.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).Value;
+        var envelope = headers.FirstOrDefault(header => header.Name.Equals("x-cratis-forwarded-identity-signature", StringComparison.OrdinalIgnoreCase))?.Value;
+        if (envelope is null && _disabled != DisabledCheck.Envelope) throw new Rejected("missing-envelope");
         var authorization = Read("authorization");
         var verified = await bearer.Verify(authorization);
         if (Read("x-cratis-credential-kind") != "oauth-grant") throw new Rejected("kind");
         if (Read("x-cratis-credential-id") != "00000000-0000-4000-8000-000000000348") throw new Rejected("credential");
         var inputs = new Inputs(method, path, "grant-receiver", DateTimeOffset.UtcNow.ToUnixTimeSeconds(), headers,
             TenantHeader: "x-cratis-tenant-id", AuthenticatedTls: true, RealmIssuer: issuer, VerifiedBearer: verified.Bearer);
-        Outcome outcome;
-        lock (_gate) outcome = Reference.Verify(new("live", inputs, Read("x-cratis-forwarded-identity-signature"), "", new("", "")), [new("runtime", ["runtime-key"], "", publicKey)], _nonces);
-        if (outcome.Result != "accept") throw new Rejected(outcome.Reason);
+        if (envelope is not null) VerifyEnvelope(inputs, envelope);
         ValidateEvidence(Read, verified.AuthTime);
         if (headers.Any(header => header.Name is "x-cratis-act" or "x-cratis-grant-id")) throw new Rejected("unexpected-actor");
+    }
+
+    void VerifyEnvelope(Inputs inputs, string envelope)
+    {
+        var vector = new Vector("live", inputs, envelope, "", new("", ""));
+        TestKey[] keys = [new("runtime", ["runtime-key"], "", publicKey)];
+        Outcome outcome;
+        lock (_gate)
+        {
+            outcome = _disabled is DisabledCheck.Signature or DisabledCheck.BearerBinding or DisabledCheck.Replay
+                ? Reference.VerifyWithDisabledCheck(vector, keys, _nonces, _disabled)
+                : Reference.Verify(vector, keys, _nonces);
+        }
+        if (outcome.Result != "accept") throw new Rejected(outcome.Reason);
     }
 
     void ValidateEvidence(Func<string, string> read, long authTime)
@@ -51,7 +69,9 @@ sealed class GrantAdmission(string publicKey, string issuer, AccessTokenVerifier
         if (amr.RootElement.GetArrayLength() != 1 || amr.RootElement[0].GetString() != "pwd") throw new Rejected("amr");
     }
 
-    public static void ValidateHeaders(Header[] headers)
+    public static void ValidateHeaders(Header[] headers) => ValidateHeaders(headers, DisabledCheck.None);
+
+    static void ValidateHeaders(Header[] headers, DisabledCheck disabled)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -63,9 +83,9 @@ sealed class GrantAdmission(string publicKey, string issuer, AccessTokenVerifier
         };
         foreach (var header in headers)
         {
-            if (!names.Add(header.Name)) throw new Rejected("duplicate-header");
+            if (!names.Add(header.Name) && disabled != DisabledCheck.DuplicateHeader) throw new Rejected("duplicate-header");
             if (header.Value.Any(InvalidCharacter)) throw new Rejected("control-header");
-            if (UnknownContext(header.Name, allowed)) throw new Rejected("unknown-header");
+            if (UnknownContext(header.Name, allowed) && disabled != DisabledCheck.UnknownHeader) throw new Rejected("unknown-header");
         }
     }
 

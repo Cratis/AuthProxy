@@ -61,8 +61,7 @@ dotnet run --project E2E/OAuthGrantReceiver/OAuthGrantReceiver.csproj -c Release
 
 echo "== Publishing AuthProxy"
 # Keep disposable build output outside Source, and keep private runtime material outside the image context.
-image_context="$logs/image-context"
-mkdir -p "$image_context"
+image_context=$(mktemp -d "$logs/image-context.XXXXXX")
 dotnet publish Source/AuthProxy/AuthProxy.csproj -c Release -o "$image_context/Source/AuthProxy/out" \
   -p:CreateHardLinksForPublishFilesIfPossible=false -p:CreateSymbolicLinksForPublishFilesIfPossible=false
 
