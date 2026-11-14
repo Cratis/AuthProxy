@@ -68,7 +68,7 @@ public static partial class AuthProxyExtensions
         where T : IResourceWithEnvironment
     {
         GetOrCreateAnnotation(builder.Resource).ServiceBackends[serviceName] = serviceResource.Resource;
-        WithEndpointUrl(builder, $"{ConfigPrefix}__Services__{serviceName}__Backend__BaseUrl", serviceResource, endpointName, "/");
+        WithEndpointUrl(builder, $"{ConfigPrefix}__Services__{serviceName}__Backend__BaseUrl", serviceResource.GetEndpoint(endpointName), "/");
 
         if (resolveIdentityDetails.HasValue)
         {
@@ -237,7 +237,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        return WithEndpointUrl(builder, $"{ConfigPrefix}__Services__{serviceName}__Frontend__BaseUrl", serviceResource, endpointName, "/");
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Services__{serviceName}__Frontend__BaseUrl", serviceResource.GetEndpoint(endpointName), "/");
     }
 
     /// <summary>
@@ -269,7 +269,7 @@ public static partial class AuthProxyExtensions
         params string[] hosts)
         where T : IResourceWithEnvironment
     {
-        return AppendIndexedValues(builder, GetOrCreateAnnotation(builder.Resource).ServiceHostCounts, serviceName, "Hosts", hosts);
+        return AppendIndexedValues(builder, GetOrCreateAnnotation(builder.Resource).ServiceHostCounts, new(serviceName, "Hosts", hosts));
     }
 
     /// <summary>
@@ -406,7 +406,7 @@ public static partial class AuthProxyExtensions
         params string[] paths)
         where T : IResourceWithEnvironment
     {
-        return AppendIndexedValues(builder, GetOrCreateAnnotation(builder.Resource).AnonymousPathCounts, serviceName, "AnonymousPaths", paths);
+        return AppendIndexedValues(builder, GetOrCreateAnnotation(builder.Resource).AnonymousPathCounts, new(serviceName, "AnonymousPaths", paths));
     }
 
     /// <summary>
@@ -1064,7 +1064,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        return WithEndpointUrl(builder, $"{ConfigPrefix}__TenantVerification__UrlTemplate", serviceResource, endpointName, routeTemplate);
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__TenantVerification__UrlTemplate", serviceResource.GetEndpoint(endpointName), routeTemplate);
     }
 
     /// <summary>
@@ -1108,7 +1108,13 @@ public static partial class AuthProxyExtensions
             .WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem)
             .WithEnvironment($"{prefix}__ExchangeUrl", exchangeUrl);
 
-        return WithOptionalInviteSettings(builder, issuer, audience, tenantClaim, subjectAlreadyExistsUrl);
+        return WithOptionalInviteSettings(builder, new()
+        {
+            Issuer = issuer,
+            Audience = audience,
+            TenantClaim = tenantClaim,
+            SubjectAlreadyExistsUrl = subjectAlreadyExistsUrl
+        });
     }
 
     /// <summary>
@@ -1204,9 +1210,15 @@ public static partial class AuthProxyExtensions
         const string prefix = $"{ConfigPrefix}__Invite";
 
         builder.WithEnvironment($"{prefix}__PublicKeyPem", publicKeyPem);
-        WithEndpointUrl(builder, $"{prefix}__ExchangeUrl", exchangeServiceResource, exchangeEndpointName, exchangeRoute);
+        WithEndpointUrl(builder, $"{prefix}__ExchangeUrl", exchangeServiceResource.GetEndpoint(exchangeEndpointName), exchangeRoute);
 
-        return WithOptionalInviteSettings(builder, issuer, audience, tenantClaim, subjectAlreadyExistsUrl);
+        return WithOptionalInviteSettings(builder, new()
+        {
+            Issuer = issuer,
+            Audience = audience,
+            TenantClaim = tenantClaim,
+            SubjectAlreadyExistsUrl = subjectAlreadyExistsUrl
+        });
     }
 
     /// <summary>
@@ -1319,7 +1331,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Frontend__BaseUrl", serviceResource, endpointName, "/");
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Frontend__BaseUrl", serviceResource.GetEndpoint(endpointName), "/");
     }
 
     /// <summary>
@@ -1338,7 +1350,7 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Backend__BaseUrl", serviceResource, endpointName, "/");
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Backend__BaseUrl", serviceResource.GetEndpoint(endpointName), "/");
     }
 
     /// <summary>
@@ -1371,18 +1383,16 @@ public static partial class AuthProxyExtensions
         string endpointName = "http")
         where T : IResourceWithEnvironment
     {
-        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl", serviceResource, endpointName, route);
+        return WithEndpointUrl(builder, $"{ConfigPrefix}__Invite__Lobby__Registration__BaseUrl", serviceResource.GetEndpoint(endpointName), route);
     }
 
     static IResourceBuilder<T> WithEndpointUrl<T>(
         IResourceBuilder<T> builder,
         string key,
-        IResourceBuilder<IResourceWithEndpoints> serviceResource,
-        string endpointName,
+        EndpointReference endpoint,
         string route)
         where T : IResourceWithEnvironment
     {
-        var endpoint = serviceResource.GetEndpoint(endpointName);
         return builder.WithEnvironment(context =>
             context.EnvironmentVariables[key] = ReferenceExpression.Create($"{endpoint}{route}"));
     }
@@ -1391,38 +1401,31 @@ public static partial class AuthProxyExtensions
         where T : IResourceWithEnvironment =>
         string.IsNullOrEmpty(value) ? builder : builder.WithEnvironment(key, value);
 
-    static IResourceBuilder<T> WithOptionalInviteSettings<T>(
-        IResourceBuilder<T> builder,
-        string? issuer,
-        string? audience,
-        string? tenantClaim,
-        string? subjectAlreadyExistsUrl)
+    static IResourceBuilder<T> WithOptionalInviteSettings<T>(IResourceBuilder<T> builder, InviteSettings settings)
         where T : IResourceWithEnvironment
     {
         const string prefix = $"{ConfigPrefix}__Invite";
-        WithOptionalEnvironment(builder, $"{prefix}__Issuer", issuer);
-        WithOptionalEnvironment(builder, $"{prefix}__Audience", audience);
-        WithOptionalEnvironment(builder, $"{prefix}__TenantClaim", tenantClaim);
-        return WithOptionalEnvironment(builder, $"{prefix}__SubjectAlreadyExistsUrl", subjectAlreadyExistsUrl);
+        WithOptionalEnvironment(builder, $"{prefix}__Issuer", settings.Issuer);
+        WithOptionalEnvironment(builder, $"{prefix}__Audience", settings.Audience);
+        WithOptionalEnvironment(builder, $"{prefix}__TenantClaim", settings.TenantClaim);
+        return WithOptionalEnvironment(builder, $"{prefix}__SubjectAlreadyExistsUrl", settings.SubjectAlreadyExistsUrl);
     }
 
     static IResourceBuilder<T> AppendIndexedValues<T>(
         IResourceBuilder<T> builder,
         Dictionary<string, int> counts,
-        string serviceName,
-        string setting,
-        string[] values)
+        IndexedServiceSetting setting)
         where T : IResourceWithEnvironment
     {
-        counts.TryGetValue(serviceName, out var index);
+        counts.TryGetValue(setting.ServiceName, out var index);
 
-        foreach (var value in values)
+        foreach (var value in setting.Values)
         {
-            builder.WithEnvironment($"{ConfigPrefix}__Services__{serviceName}__{setting}__{index}", value);
+            builder.WithEnvironment($"{ConfigPrefix}__Services__{setting.ServiceName}__{setting.Name}__{index}", value);
             index++;
         }
 
-        counts[serviceName] = index;
+        counts[setting.ServiceName] = index;
 
         return builder;
     }
@@ -1504,4 +1507,14 @@ public static partial class AuthProxyExtensions
         resource.Annotations.Add(newAnnotation);
         return newAnnotation;
     }
+
+    sealed record InviteSettings
+    {
+        public string? Issuer { get; init; }
+        public string? Audience { get; init; }
+        public string? TenantClaim { get; init; }
+        public string? SubjectAlreadyExistsUrl { get; init; }
+    }
+
+    sealed record IndexedServiceSetting(string ServiceName, string Name, string[] Values);
 }
