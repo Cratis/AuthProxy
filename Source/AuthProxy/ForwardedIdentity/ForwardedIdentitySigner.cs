@@ -63,10 +63,15 @@ public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config,
     /// <inheritdoc/>
     public void Dispose() => _v2Keys.Dispose();
 
-    static bool IsCurrentBrowserContext(ForwardedIdentityTrustedContext? context, DateTimeOffset now)
+    static bool IsCurrentTrustedContext(ForwardedIdentityTrustedContext? context, DateTimeOffset now)
     {
-        if (context is not { CredentialKind: "browser-session", SenderBinding: "none", Actor: null, GrantId: null, Bearer: null }) return false;
-        return context.SnapshotExpiresUtc is not { } expires || now < expires;
+        var supported = context switch
+        {
+            { CredentialKind: "browser-session", SenderBinding: "none", Actor: null, GrantId: null, Bearer: null } => true,
+            { CredentialKind: "oauth-grant", SenderBinding: "none", Actor: null, GrantId: null, Person: not null, Bearer.Verifier: "oauth-verifier", SnapshotExpiresUtc: not null } => true,
+            _ => false
+        };
+        return supported && (context!.SnapshotExpiresUtc is not { } expires || now < expires);
     }
 
     static bool TryApply(HttpRequestMessage request, ForwardedIdentityTrustedContext context) => ForwardedIdentityTenantHeader.Apply(request, context.TenantHeader)
@@ -110,7 +115,7 @@ public sealed class ForwardedIdentitySigner(IOptionsMonitor<C.AuthProxy> config,
         var timestamp = now.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
         var nonce = ForwardedIdentityV2Envelope.Encode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
         var context = TrustedContext(request, settings.TenantHeader);
-        if (!IsCurrentBrowserContext(context, now)) return null;
+        if (!IsCurrentTrustedContext(context, now)) return null;
         if (!TryApply(request, context!)) return null;
         if (!ForwardedIdentityV2CanonicalInput.TryCreate(request, context!, settings.Audience, settings.KeyId, timestamp, nonce, out var canonical)) return null;
         return new(timestamp, nonce, canonical);

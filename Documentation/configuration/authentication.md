@@ -1123,9 +1123,9 @@ issuer must allow that client to introspect tokens for every audience its routes
 - **A revoked token is refused within `CacheDuration`** (at most thirty seconds): an *active* answer is reused for
   that long, never longer than the token's own expiry. Set `CacheDuration` to zero to ask on every request.
 - Only an active answer is cached, so a refusal or a failure is asked again on the next request.
-- Only whether the token is active is used. Nothing else the endpoint returns reaches the forwarded identity, so
-  introspection can narrow who gets through but never widen it. An answer naming a different subject, issuer,
-  client or token type than the validated token is treated as inactive.
+- Introspection can narrow who gets through but never widen the JWT's permissions. An answer naming a different
+  subject, issuer, client or token type than the validated token is treated as inactive. Ordinary bearer routes use
+  only activity; v2 OAuth-grant envelopes also require the authoritative credential evidence described below.
 - The endpoint receives the token and AuthProxy's client credential only, over an HTTP client that follows no
   redirects and sends no cookies. Only tokens that passed local validation are sent. Concurrent requests with the
   same token share one call.
@@ -1136,6 +1136,20 @@ issuer must allow that client to introspect tokens for every audience its routes
   the generic [JWT Bearer](#jwt-bearer-api) scheme is not covered.
 - Introspection adds a dependency on the issuer to each uncached request; size `Timeout` and `CacheDuration`
   for it.
+
+A service using [v2 forwarded identity signing](forwarded-identity-signing.md#v2-infrastructure) requires
+`ForwardAuthorizationHeader: true` and issuer introspection on its OAuth bearer routes. An active answer must
+include `credential_kind: "oauth-grant"` and a lowercase canonical UUID `credential_id`. An optional JWT `cid`
+must match that ID; it cannot supply a missing credential ID. An optional numeric, non-negative `cache_epoch`
+becomes the signed policy epoch. Credential evidence shares the original active-answer cache deadline, at most
+30 seconds and never past token or answer expiry. Failed and inactive answers remain uncached.
+
+The verified JWT must also contain the Cratis Identity person issuer/subject, `idp`, original `auth_time` and
+`acr: "basic"`. Missing credential evidence, a `cnf` member, or unavailable introspection refuses an envelope
+request even with `IntrospectionUnavailable: Accept`. DPoP routes are not supported for these envelopes.
+The raw bearer travels to the backend together with a signed SHA-256 token hash; configure the backend to
+verify both rather than treating the hash as a replacement for Authorization. PAT bearer routes remain
+unwrapped and do not use OAuth-grant evidence.
 
 ---
 

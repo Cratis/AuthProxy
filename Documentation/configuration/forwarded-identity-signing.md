@@ -5,7 +5,7 @@ description: Sign the identity headers AuthProxy forwards to backends: default v
 
 # Forwarded Identity Signing
 
-**Version selection:** `ForwardedIdentity.Version` defaults to `v1`, preserving existing behavior. Explicit `v2` selects ES256 with no negotiation, unsigned bypass, or v1 fallback. The v2 trusted-context producer supports only newly signed-in Cratis Identity browser sessions; legacy sessions and every other credential kind are refused. See [v2 infrastructure](#v2-infrastructure) before configuring it.
+**Version selection:** `ForwardedIdentity.Version` defaults to `v1`, preserving existing behavior. Explicit `v2` selects ES256 with no negotiation, unsigned bypass, or v1 fallback. The v2 trusted-context producers support newly signed-in Cratis Identity browser sessions and verified, unbound Cratis Identity OAuth grants for people. PATs pass through bearer routes without an envelope; legacy browser sessions and unsupported identity kinds cannot produce a v2 proof. See [v2 infrastructure](#v2-infrastructure) before configuring it.
 
 AuthProxy can attach an HMAC-SHA256 proof to the identity headers it sends to a backend. Signing is **opt-in per flow**. An installation with no `ForwardedIdentity` blocks keeps its existing unsigned forwarding behavior.
 
@@ -172,7 +172,7 @@ Signing is not tenant membership, authorization, a replacement for on-behalf ass
 
 ## V2 infrastructure
 
-V2 implements the [Arc signed-forwarded-identity v2 contract](https://github.com/Cratis/Arc/blob/de9e176d5/Documentation/backend/csharp/asp-net-core/signed-forwarded-identity-v2.md). The built-in producer supports **Cratis Identity browser sessions only**. Existing sessions must sign in again to obtain protected v2 evidence; enabling v2 does not upgrade legacy tickets. V1 remains the default. Do not switch a production flow to v2 until its credential pipeline supplies verified evidence and its receiver explicitly supports v2.
+V2 implements the [Arc signed-forwarded-identity v2 contract](https://github.com/Cratis/Arc/blob/de9e176d5/Documentation/backend/csharp/asp-net-core/signed-forwarded-identity-v2.md). The built-in producers support **Cratis Identity browser sessions and unbound OAuth grants for people**. Existing sessions must sign in again to obtain protected v2 evidence; enabling v2 does not upgrade legacy tickets. V1 remains the default. Do not switch a production flow to v2 until its credential pipeline supplies verified evidence and its receiver explicitly supports v2.
 
 For any existing per-flow `ForwardedIdentity` block:
 
@@ -189,10 +189,35 @@ A trusted pipeline supplies one immutable `ForwardedIdentityTrustedContext` thro
 
 At a completed sign-in, only an explicitly configured `CratisIdentity` OIDC provider can create browser evidence. The realm issuer, UUID-v4 subject, upstream `idp` and original `auth_time` must come from verified realm tokens and agree with the canonical principal and the preserved authentication time. Missing evidence is refused, independently of sign-in notification configuration. An arbitrary canonical provider is not a Cratis Identity realm. A fresh random credential ID is protected in the cookie ticket and survives sliding renewal alongside the original authentication time. Browser cookies are unbound credentials (`sender-binding: none`); assurance is conservatively `basic`.
 
-PATs, OAuth bearer grants, on-behalf sessions, machine principals and workloads remain unsupported by this browser-session envelope producer and fail closed, including explicit contexts of these kinds. [DPoP-enabled OAuth-only routes](dpop.md) can independently verify proofs and carry standard-base64 JSON sender evidence internally; this does not enable signing OAuth-grant envelopes. An inbound Authorization or DPoP header alongside a cookie is also refused. No client ID, token `jti`, caller header, cookie renewal time or proof issuance timestamp can substitute for session evidence.
+For OAuth grants, configure the service with `ForwardedIdentity.Version: "v2"`, each trusted bearer issuer with [introspection](authentication.md#revocation-edge-introspection), and the bearer route with `ForwardAuthorizationHeader: true`. Do not configure `Dpop` on an envelope route. The JWT must pass local signature, issuer, audience, lifetime and route authorization checks, and introspection must confirm an active `credential_kind: "oauth-grant"` with a canonical UUID `credential_id`. The optional JWT `cid` must equal that introspected ID; neither `cid` alone nor `jti` can supply it.
+
+With the service's v2 signing material configured as above, an OAuth bearer route can use the following options. Supply `Issuers[0].Introspection.ClientSecret` through the deployment's secret mechanism; it is intentionally omitted here.
+
+```json
+{
+  "PathPrefix": "/api",
+  "Issuers": [
+    {
+      "Issuer": "https://identity.example.com",
+      "Introspection": {
+        "Endpoint": "https://identity.example.com/connect/introspect",
+        "ClientId": "authproxy"
+      }
+    }
+  ],
+  "Audiences": ["backend-api"],
+  "ForwardAuthorizationHeader": true
+}
+```
+
+The JWT supplies the allowlisted HTTPS realm issuer, lowercase UUID-v4 person subject, original `idp`, NumericDate `auth_time`, and reviewed `acr: "basic"`. Missing or conflicting evidence is refused. The envelope carries `x-cratis-credential-kind: oauth-grant`, `x-cratis-credential-id`, person evidence and `x-cratis-sender-binding: none`. It binds the forwarded `Authorization: Bearer <token>` with `x-cratis-forwarded-token-sha256`: SHA-256 of the UTF-8 raw token, excluding `Bearer `, encoded as unpadded base64url. Arc must receive both the token and its hash. A numeric, non-negative introspection `cache_epoch` is carried as `x-cratis-policy-epoch`; other epoch values are omitted.
+
+Active answers and their credential evidence are reused for at most 30 seconds, never past token or introspection expiry. Cache hits do not renew that deadline; inactive and failed answers are not cached. Introspection unavailability refuses an envelope request even when its route sets `IntrospectionUnavailable: Accept`. There is no unsigned or v1 fallback for a failed OAuth grant.
+
+PATs remain unwrapped on their configured bearer routes: their Authorization header passes through without v2 context or a proof, and caller-supplied context and signature headers are stripped. Client-credentials tokens, on-behalf sessions, machine principals and workloads do not produce OAuth-grant envelopes. Tokens containing `cnf` and [DPoP-enabled OAuth routes](dpop.md) remain excluded from v2 envelopes. An inbound Authorization or DPoP header alongside a cookie is also refused. No client ID, token `jti`, caller header, cookie renewal time or proof issuance timestamp can substitute for browser-session evidence.
 
 The signer replaces all inbound v2 context headers with independently verified evidence, validates principal/account-key agreement, and covers the entire v2 allowlist plus `context.TenantHeader` (default `x-cratis-tenant-id`). Duplicate covered headers, including duplicates in content headers, are refused. The canonical input starts with `Cratis.AuthProxy.ForwardedIdentity.v2`; the envelope is `v2.keyId.timestamp.nonce.signature`, with a fresh 16-byte unpadded base64url nonce and a 64-byte IEEE P1363 ES256 signature. Query strings and bodies remain outside the signature; authenticated transport and receiver authorization remain mandatory.
 
-**Absent or incomplete trusted context returns `ForwardedIdentitySigningOutcome.Refused`, even for a request without identity headers.** The normal signed transports then stop the request. No unsigned or v1 fallback is permitted. Proxied browser requests, identity-details calls and tenant-list calls use only the selected protected cookie ticket. Sign-in callbacks carry an immutable snapshot of that evidence across queueing and retries. The snapshot expires 60 seconds after it is queued; every attempt checks that original deadline, and retries cannot extend it. A custom signer host without `IHttpContextAccessor` logs a warning on first v2 use and must supply an explicit trusted snapshot. Per-flow diagnostics include the wire version and report v2 as `browser-session-only`, not universal credential support. Receiver freshness checks, nonce stores and replay policy are receiver responsibilities; this producer does not implement them.
+**Absent or incomplete trusted context returns `ForwardedIdentitySigningOutcome.Refused`, even for a request without identity headers.** The normal signed transports then stop the request. No unsigned or v1 fallback is permitted. Proxied browser requests, identity-details calls and tenant-list calls use only the selected protected cookie ticket. Sign-in callbacks carry an immutable snapshot of that evidence across queueing and retries. The snapshot expires 60 seconds after it is queued; every attempt checks that original deadline, and retries cannot extend it. A custom signer host without `IHttpContextAccessor` logs a warning on first v2 use and must supply an explicit trusted snapshot. Per-flow diagnostics include the wire version; v2 does not imply universal credential support. Receiver freshness checks, nonce stores and replay policy are receiver responsibilities; this producer does not implement them.
 
 The conformance specs vendor all 220 Arc vectors from commit `de9e176d5`. They reproduce every accepting canonical input byte-for-byte and verify generated P1363 signatures against the supplied public keys, exercise all reference outcomes with a test-only consumer, and separately refuse producer-applicable malformed snapshots and metadata. All published fixture keys are **TEST ONLY** and must never be deployed.

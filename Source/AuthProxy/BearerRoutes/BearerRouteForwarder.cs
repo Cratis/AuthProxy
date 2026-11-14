@@ -8,6 +8,7 @@ using Cratis.AuthProxy.Telemetry;
 using Microsoft.Extensions.Options;
 using Yarp.ReverseProxy.Configuration;
 using Yarp.ReverseProxy.Forwarder;
+using Yarp.ReverseProxy.Transforms;
 using Yarp.ReverseProxy.Transforms.Builder;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -38,7 +39,9 @@ public sealed class BearerRouteForwarder(
     readonly HttpTransformer _transformer = transformBuilder.Create(context =>
     {
         context.RequestTransforms.Add(new BearerRouteHeadersTransform());
-        context.RequestTransforms.Add(new ForwardedIdentitySigningTargetTransform(ForwardedIdentityFlow.BearerRoute));
+        context.AddRequestTransform(transform => transform.HttpContext.Items[BearerRouteDefaults.ForwardedIdentityItemKey] is BearerForwardedIdentity
+            ? new ForwardedIdentitySigningTargetTransform(ForwardedIdentityFlow.BearerRoute).ApplyAsync(transform)
+            : ValueTask.CompletedTask);
     });
 
     readonly HttpMessageInvoker _invoker = clientFactory.CreateClient(new ForwarderHttpClientContext
