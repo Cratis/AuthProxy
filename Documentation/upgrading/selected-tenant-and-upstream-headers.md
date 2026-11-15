@@ -11,7 +11,7 @@ without falling back to another authentication type.** Failed session cookies ar
 local logout, login selection, and provider sign-in remain reachable so the browser can recover.
 
 Browser clients using the AuthProxy session must stop attaching their own bearer token to those requests.
-If the service needs a delegated token, configure [`AccessToken`](../configuration/services.md#access-token)
+If the service needs a delegated token, configure [`AccessToken`](../configuration/services.md#forwarding-the-users-access-token)
 in AuthProxy instead. Clients using their own bearer token must omit the AuthProxy session cookie; for browser
 `fetch` calls, use `credentials: 'omit'` on those bearer-authenticated requests rather than sending both.
 Keep session-cookie requests cookie-authenticated only, and send users through `/.cratis/login/{scheme}`

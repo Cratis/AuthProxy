@@ -142,8 +142,8 @@ AuthProxy serves dedicated pages for each invitation error:
 | `invitation-invalid.html` | The token is malformed or has an invalid signature. | 401 |
 | `invitation-select-provider.html` | The token is valid and multiple identity providers are configured. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated subject is already associated with an existing account. | 409 |
-| `invitation-email-unavailable.html` | Legacy unsigned mode only: email binding is enabled, but the provider supplied no authenticated-session address. | 403 |
-| `invitation-email-mismatch.html` | Legacy unsigned mode only: email binding is enabled, and the provider supplied another address or explicitly reported `email_verified=false`. | 403 |
+| `invitation-email-unavailable.html` | The invitation is bound to an email (signed email-recipient mode, or legacy unsigned mode with email binding), but the provider supplied no authenticated-session address. | 403 |
+| `invitation-email-mismatch.html` | The invitation is bound to an email (signed email-recipient mode, or legacy unsigned mode with email binding), and the provider supplied another address or explicitly reported `email_verified=false`. | 403 |
 
 See [Error pages](../error-pages.md) for customization details and
 [Custom Invitation Provider-Selection Page](../invitation-provider-selection.md) for a full branded

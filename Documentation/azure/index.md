@@ -24,14 +24,16 @@ flowchart LR
 
 ## Backends trust AuthProxy, so only AuthProxy may reach them
 
-Plan backend isolation before deploying the apps. The identity headers described below are not signed,
-so a backend that accepts them must not also accept direct requests from untrusted callers.
+Plan backend isolation before deploying the apps. The identity headers described below are not signed by
+default, so a backend that accepts them must not also accept direct requests from untrusted callers.
 
 AuthProxy strips the identity headers a caller sends, authenticates the caller, and writes
 `x-ms-client-principal`, `x-ms-client-principal-id` and `x-ms-client-principal-name` itself. Your backend
-believes them. They are **not signed**: a backend cannot tell a request that went through AuthProxy from one
+believes them. Unless you opt in to [forwarded identity signing](../configuration/forwarded-identity-signing.md),
+they are **not signed**: a backend cannot tell a request that went through AuthProxy from one
 that did not, except by the network it arrived on. See
 [Forwarded identity headers](../configuration/authentication.md#forwarded-identity-headers).
+Signing does not replace backend ingress restrictions.
 
 So a backend that anyone other than AuthProxy can open a connection to is a backend anyone can impersonate any
 user on, by sending the header. The platform features that prevent this differ, and getting them wrong is

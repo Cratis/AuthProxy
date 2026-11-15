@@ -223,7 +223,7 @@ material.
           "Issuer": "https://auth.example.com",
           "Audience": "studio",
           "ActiveKeyId": "sign-in-2026-08",
-          "Lifetime": "00:00:60",
+          "Lifetime": "00:01:00",
           "SigningKeys": [
             {
               "KeyId": "sign-in-2026-08",

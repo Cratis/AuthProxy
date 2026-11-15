@@ -64,6 +64,12 @@ Services are configured under `Cratis:AuthProxy:Services`, keyed by a friendly n
 | `BearerRoutes` | `BearerRouteConfig[]` | `[]` | Path prefixes authenticated by an access token from an external authorization server instead of a browser session. See [Bearer routes](#bearer-routes). |
 | `CallerAuthorizationHeader` | `Default` \| `Forward` \| `Strip` | `Default` | Whether the `Authorization` header a caller sent reaches this service. `Default` removes it on requests authenticated by the AuthProxy session and keeps it on requests without a session. See [Caller Authorization header](#caller-authorization-header). |
 | `AccessToken` | `ServiceAccessTokenConfig` | `null` | Forwards the signed-in user's access token for this service's audience to its backend. See [Forwarding the user's access token](#forwarding-the-users-access-token). |
+| `ForwardSessionContext` | `bool` | `false` | Adds the session start and the sign-in provider to the principal envelope forwarded to this service. See [Optional browser-session context](forwarded-identity-signing.md#optional-browser-session-context). |
+| `FreshAuthentication` | `FreshAuthenticationRule[]` | `null` | Opt-in rules requiring a recent sign-in on this service's protected paths. See [Fresh authentication](fresh-authentication.md). |
+| `FreshAuthenticationMethodOverrideUnsupported` | `bool` | `false` | Operator attestation that the backend does not honor HTTP method overrides. Required when a fresh-authentication rule lists methods. See [Fresh authentication](fresh-authentication.md#configure-a-service). |
+| `Authorization` | `Authorization` | `null` | Claim requirements applied to requests routed to this service, in addition to the root requirements. See [Narrowing one service](authorization.md#narrowing-one-service). |
+| `Registration` | `ServiceEndpointConfig` | `null` | Where new users are sent after the AuthProxy registration flow completes. Used by the [lobby](lobby/index.md). |
+| `SignInCallback` | `SignInCallback` | `null` | Server-to-server notification when a user signs in and when a returning session makes its first request. See [Sign-in callback](sign-in-callback.md). |
 
 ### ForwardingPathRuleConfig properties
 
@@ -805,7 +811,7 @@ caller is.
 
 ### Turning the memory off
 
-Two settings under [`Session`](authentication.md#session) bound how long an answer is reused:
+Two settings under [`Session`](authentication.md#session-lifetime-and-re-validation) bound how long an answer is reused:
 
 - `IdentityResultCacheDuration` (default 30 seconds) — the proxy's own in-memory cache, which collapses a
   page load's burst of requests into one round-trip per user and tenant. Set it to zero to resolve on
@@ -1014,6 +1020,7 @@ every token-authenticated request instead.
 | `RequiredClaims` | `{ Claim, AnyOf }[]` | `[]` | Claim requirements of the route's own, checked against the token's principal after `ClaimMappings`, in addition to the deployment's. Same shape and rules as [`Authorization:RequiredClaims`](authorization.md); a requirement on a role claim is refused at startup, because a token never carries a role. |
 | `IgnoreDeploymentRequiredClaims` | `bool` | `false` | Leave the deployment's claim requirements — proxy-wide and the service's — out on this route. For a deployment whose requirements name a claim the token issuer does not mint. Logged as a warning at startup. |
 | `AcceptWithoutIdentityVerification` | `bool` | `false` | State that this route's callers are accepted without any service's `/.cratis/me` being asked about them. Required when a service declares `IdentityVerification: Required`; under `BestEffort` it silences the startup warning. See [What a bearer route changes](#what-a-bearer-route-changes). |
+| `Dpop` | `BearerRouteDpop` | `null` | Opt-in DPoP policy for sender-constrained tokens. Leave unset to keep refusing them. See [DPoP proof verification](dpop.md#route-policy-and-public-target). |
 | `IntrospectionUnavailable` | `Refuse` \| `Accept` | `Refuse` | What the route does with a token whose issuer has `Introspection` configured when that endpoint cannot be asked. `Refuse` answers `503`. `Accept` proceeds on local validation alone and logs a warning; it is a startup error on an MCP route (prefix starting with `mcp`). A token the endpoint reports inactive is always refused. See [Revocation: edge introspection](authentication.md#revocation-edge-introspection). |
 
 ### BearerIssuerConfig properties
@@ -1254,7 +1261,7 @@ caller headers only.
 Browser clients must choose one mode per request: omit their own bearer header when using the session,
 or omit the AuthProxy session cookie when using a bearer token (`credentials: 'omit'` for browser `fetch`).
 For session-authenticated callers whose backend needs a delegated bearer token, configure
-[`AccessToken`](#access-token) instead of forwarding a browser-supplied token. See the
+[`AccessToken`](#forwarding-the-users-access-token) instead of forwarding a browser-supplied token. See the
 [upgrade migration](../upgrading/selected-tenant-and-upstream-headers.md#authentication-selection-behavior-change).
 
 | Value | Requests authenticated by the AuthProxy session | Requests without a session |

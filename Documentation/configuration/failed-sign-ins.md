@@ -23,6 +23,7 @@ The selection page is opened with a `reason` query-string parameter describing w
 | `remote-failure` | The provider callback could not be validated — correlation failed, the OAuth state was missing or invalid, or the provider reported an error. |
 | `access-denied` | The identity provider reported that access was denied — typically the person cancelled the sign-in or declined the consent prompt. |
 | `invalid-session` | An authenticated session could no longer be turned into a forwardable identity, so it was terminated and a fresh sign-in is required. |
+| `fresh-authentication-required` | A [fresh authentication](fresh-authentication.md) was requested, but the OpenID Connect provider's identity token did not prove a recent enough sign-in (`auth_time` missing or too old). |
 
 Two refusals deliberately arrive as `remote-failure` as well, so they cannot be told apart from a provider
 failure: a callback refused because `RequireVerifiedEmail` is not satisfied, and an identity denial for a

@@ -65,7 +65,9 @@ What the proxy still does:
 
 - Forwards no identity on anonymous routes: principal, tenant (`x-cratis-tenant-id` and legacy `Tenant-ID`),
   on-behalf/actor, token metadata, forwarded-identity signature, and `Authorization` headers are removed
-  before transport, including caller-supplied copies.
+  before transport, including caller-supplied copies. The one opt-in exception: a path listed in
+  [`PassCallerAuthorizationPaths`](services.md#passing-the-callers-authorization-header) forwards the
+  caller's `Authorization` header unchanged for the backend to validate.
 - Applies the same rule to signed-out callers, authenticated sessions, and bearer-token callers.
   A declared path is identity-free. Use a non-anonymous route when the application needs forwarded identity.
 
@@ -95,7 +97,8 @@ header boundary holds and the invariant stays whole.
 
 An unauthenticated request to a declared path should reach the application. If it comes back as the
 sign-in chooser, the declaration was not accepted — an entry that is not a rooted path of literal segments
-is discarded silently, so check its spelling first. See
+is refused and stays authenticated, and AuthProxy logs a warning at startup naming the entry and the reason,
+so check that warning and the entry's spelling first. See
 [Anonymous paths](services.md#anonymous-paths) for the exact rule.
 
 If it comes back as a bare `404 Not Found` and so does every other path — including `/.cratis/providers` —
