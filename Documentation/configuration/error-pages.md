@@ -17,14 +17,16 @@ condition is detected:
 
 | File name | Condition | HTTP status |
 |-----------|-----------|-------------|
-| `404.html` | The requested resource was not found. | 404 |
+| `404.html` | Included, but not currently served: a request for a missing resource receives a bare `404` without an HTML page. | 404 |
 | `403.html` | The identity resolver denied access. | 403 |
+| `not-authorized.html` | The caller is signed in but does not satisfy the claim requirements declared in [`Cratis:AuthProxy:Authorization`](authorization.md). | 403 |
 | `tenant-not-found.html` | The resolved tenant does not exist in the platform (see [Tenant verification](tenancy.md#tenant-verification)). | 404 |
 | `no-organization.html` | The caller is signed in and tenant resolutions are configured, but no tenant could be resolved and no lobby redirect applies (see [Tenancy](tenancy.md) and [Tenant selection](tenant-selection.md)). | 403 |
 | `select-tenant.html` | Tenant selection is enabled and the authenticated user has not selected a tenant yet. The page reads the `.cratis-tenants` cookie to render selectable tenants. | 200 |
 | `service-unavailable.html` | The tenant selection endpoint (`TenantsEndpoint`) could not be reached or did not return a usable answer, so the caller's tenants could not be determined. | 503 |
 | `invitation-expired.html` | An invite link was followed but the JWT token has passed its expiry time. | 401 |
-| `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature. | 401 |
+| `invitation-invalid.html` | An invite link was followed but the JWT token is malformed or has an invalid signature (`401`), or, with `Invite.Attestation` configured, the signed invitation exchange failed (`403`). | 401 or 403 |
+| `invitation-required.html` | An unauthenticated caller reaches a lobby-mode proxy (`Invite.RedirectToLobbyWhenTenantUnresolved` is `true` and `Invite.Lobby.Frontend.BaseUrl` is set) without a valid invitation token or pending invite cookie. | 401 |
 | `invitation-select-provider.html` | A valid invite link was followed and multiple identity providers are configured. The page reads the `.cratis-providers` cookie to render a sign-in button for each available provider. | 200 |
 | `invitation-subject-already-exists.html` | The authenticated user's subject is already associated with an existing account during invite exchange (Phase 2). | 409 |
 | `invitation-email-unavailable.html` | Email binding is enabled, but the identity provider supplied no authenticated-session email address during invite exchange (Phase 2). | 403 |

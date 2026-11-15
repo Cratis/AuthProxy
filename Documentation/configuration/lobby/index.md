@@ -66,6 +66,26 @@ The `Lobby` object uses the standard [`Service`](../services.md) shape.
 
 Tenant resolution runs before invite and registration handling.
 
-When AuthProxy cannot resolve a tenant and a lobby frontend is configured, it redirects the user to
+When AuthProxy cannot resolve a tenant, a lobby frontend is configured, and
+`Invite.RedirectToLobbyWhenTenantUnresolved` is `true`, it redirects the user to
 `Lobby.Frontend.BaseUrl` unless the request is already an onboarding bootstrap path such as
 `/invite/<token>` or `/register`.
+
+`RedirectToLobbyWhenTenantUnresolved` defaults to `false`. Without it, a configured lobby does not change
+the unresolved-tenant response: when `TenantResolutions` is non-empty, a signed-in user receives
+`no-organization.html` with `403 Forbidden` and an anonymous caller receives `401 Unauthorized`.
+
+```json
+{
+  "Cratis": {
+    "AuthProxy": {
+      "Invite": {
+        "RedirectToLobbyWhenTenantUnresolved": true,
+        "Lobby": {
+          "Frontend": { "BaseUrl": "http://lobby-service:3000/" }
+        }
+      }
+    }
+  }
+}
+```

@@ -111,7 +111,8 @@ service anonymous, so it is rejected. Name a real path.
 - `!response.ok` is now a correct check against AuthProxy for any non-navigating caller. It was not
   before.
 - A client that deliberately wants the selection page — a custom login shell rendering it in a frame, for
-  instance — should send `Sec-Fetch-Dest: document`, or navigate to `/.cratis/select-provider` directly.
-  That path is in the authentication UI skip list and is never intercepted.
+  instance — should send `Sec-Fetch-Dest: document` (navigating to `/.cratis/select-provider` directly does).
+  `/.cratis/select-provider` is served by the same provider-selection step, so a non-navigating request to it
+  without a session receives the same `401` as any other path.
 - Paths a service declares in [`AnonymousPaths`](services.md#anonymous-paths) never reach any of this.
   They are forwarded to the application, which answers them itself.

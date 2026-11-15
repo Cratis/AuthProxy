@@ -153,7 +153,8 @@ This is the case the feature was built for, and it needs one extra thing.
 GitHub's user endpoint — `https://api.github.com/user`, the one you configure as
 `UserInformationEndpoint` — returns a profile and **nothing about membership**. There is no organization
 field to map to a claim, so no amount of `ClaimMappings` produces one. Membership lives behind
-`/user/orgs` and `/user/teams`, and reading those requires the `read:org` scope.
+`/user/orgs` and `/user/teams`, and reading those requires the `read:org` scope (or the broader `write:org` or
+`admin:org`, which also enable membership claims).
 
 **Ask for `read:org` and AuthProxy fetches it for you**, once, while the sign-in completes, and adds it to
 the session as claims:
@@ -169,7 +170,7 @@ a slug is only unique within one: two organizations may both have a `developers`
 claim would let membership of either satisfy a requirement written for one.
 
 The scope **is** the opt-in. There is no second switch to forget, and no way for the two to disagree.
-Without `read:org` nothing extra is requested, no extra call is made, and sign-in is exactly what it was.
+Without `read:org`, `write:org` or `admin:org` nothing extra is requested, no extra call is made, and sign-in is exactly what it was.
 
 Here is a complete configuration restricting a host to the `planner` team in the `Cratis` organization:
 

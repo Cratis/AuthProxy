@@ -204,7 +204,7 @@ unparseable JSON, AuthProxy responds with `503 Service Unavailable` instead of r
 user has no organization. Document navigations and tenant-selection callbacks receive
 `service-unavailable.html`; other callers receive a bare `503` without an HTML page.
 An authoritative empty list or `401`/`403` response still proceeds to the normal no-tenant handling
-(`no-organization.html` at `403` when no lobby is configured).
+(`no-organization.html` at `403` when no lobby redirect applies).
 
 If the signed-in session no longer has a forwardable identity, AuthProxy signs the user out instead
 of reporting a service outage. Navigations redirect to provider selection with `reason=invalid-session`;
@@ -242,9 +242,9 @@ Whitespace-only entries in a tenant's `SourceIdentifiers` or `Domains` are rejec
 
 ## Lobby fallback
 
-When no tenant can be resolved and the [lobby](lobby/index.md) is configured, AuthProxy redirects the user to the lobby frontend instead of returning `401 Unauthorized`.
+When no tenant can be resolved, the [lobby](lobby/index.md) frontend is configured, and `Invite.RedirectToLobbyWhenTenantUnresolved` is `true`, AuthProxy redirects the user to the lobby frontend. The setting defaults to `false`.
 
-If no lobby is configured and `TenantResolutions` is non-empty, AuthProxy returns `401 Unauthorized`.
+Otherwise, when `TenantResolutions` is non-empty, a signed-in user receives `no-organization.html` with `403 Forbidden` and an anonymous caller receives `401 Unauthorized`.
 When `TenantResolutions` is empty, the request proceeds without a tenant.
 
 ---

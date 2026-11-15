@@ -58,11 +58,13 @@ of AuthProxy.
 
 Both the local logout and the post-logout callback:
 
-1. Sign the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2` unless you set
+1. End any active [on-behalf session](on-behalf-sessions.md) the user holds as actor: the `.cratis-on-behalf`
+   cookie is deleted and the application is notified with the reason `actor-session-ended`.
+2. Sign the user out of the authentication cookie (`.Cratis.AuthProxy.Auth.v2` unless you set
    [`Session:CookieName`](authentication.md#session-lifetime-and-re-validation)), including any chunked variants.
    With `Session:CookieDomain` the deletion carries the domain, so it ends the session on every host under it,
    and the stale host-only copy an earlier deployment left behind is deleted too.
-2. Delete every AuthProxy session cookie:
+3. Delete every AuthProxy session cookie:
    - `.cratis-identity`
    - `.cratis-identity-authorization`
    - `.cratis-tenant`
@@ -71,10 +73,10 @@ Both the local logout and the post-logout callback:
    - `.cratis-invite-state`
    - `.cratis-registration`
    - `.cratis-providers`
-3. Delete every transient sign-in handshake cookie the browser sent (`.AspNetCore.Correlation.*`,
+4. Delete every transient sign-in handshake cookie the browser sent (`.AspNetCore.Correlation.*`,
    `.AspNetCore.OpenIdConnect.Nonce.*`) — the leftovers of abandoned handshakes that would otherwise
    poison the next sign-in. See [Failed Sign-ins](failed-sign-ins.md#handshake-cookie-hygiene).
-4. Delete any **additional cookies** the deployment configured under
+5. Delete any **additional cookies** the deployment configured under
    `Cratis:AuthProxy:Logout:AdditionalCookies` — cookies AuthProxy does not issue itself but that must
    not survive a logout. See [Clearing additional cookies](#clearing-additional-cookies).
 

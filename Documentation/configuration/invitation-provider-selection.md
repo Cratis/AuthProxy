@@ -45,8 +45,8 @@ identity provider:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | `string` | Human-readable display name taken from `Authentication:OidcProviders[].Name`. |
-| `type` | `string` | Provider brand — `Microsoft`, `Google`, `GitHub`, `Apple`, or `Custom`. Use this to pick logos or apply brand-specific styling. |
+| `name` | `string` | Human-readable display name taken from `Authentication:OidcProviders[].Name` or `Authentication:OAuthProviders[].Name`. |
+| `type` | `string` | Provider brand — `Microsoft`, `Google`, `GitHub`, `Apple`, `CratisIdentity`, or `Custom`. Use this to pick logos or apply brand-specific styling. |
 | `loginUrl` | `string` | AuthProxy-relative URL that initiates the OIDC/OAuth challenge for this provider. Navigating to this URL starts the login flow and, after a successful login, redirects the user back to the original destination. |
 
 For invitations, each `loginUrl` includes a `returnUrl` pointing to the pending `/invite/{token}` path.
