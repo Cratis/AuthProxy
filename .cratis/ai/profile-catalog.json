@@ -279,6 +279,7 @@
         "cratis-arc-command-validation",
         "cratis-arc-configuration",
         "cratis-arc-hosting",
+        "cratis-arc-mcp",
         "cratis-arc-neo4j",
         "cratis-arc-observable-query-http",
         "cratis-arc-query-paging"
@@ -382,7 +383,8 @@
       ],
       "availableTargets": [
         "cratis-application-react-specifications",
-        "cratis-arc-react-page"
+        "cratis-arc-react-page",
+        "cratis-ux-review"
       ],
       "languages": [
         "react",
@@ -700,7 +702,8 @@
         "cratis-components-schema-editor",
         "cratis-components-stepper-command-dialog",
         "cratis-components-styling",
-        "cratis-components-toolbar"
+        "cratis-components-toolbar",
+        "cratis-ux-review"
       ],
       "languages": [
         "react",
@@ -979,6 +982,7 @@
         "cratis-rtk",
         "cratis-screenplay-authentication-and-onboarding",
         "cratis-screenplay-automations-and-translations",
+        "cratis-screenplay-availability",
         "cratis-screenplay-captures-and-reactions",
         "cratis-screenplay-command-surface",
         "cratis-screenplay-delivery-planning",
@@ -1107,8 +1111,10 @@
         "cratis-engineering-docs-authoring",
         "cratis-engineering-effect-boundaries",
         "cratis-engineering-issue-hygiene",
+        "cratis-engineering-inherited-work",
         "cratis-engineering-issue-design-note",
         "cratis-engineering-local-cross-repo-verification",
+        "cratis-engineering-post-mortem",
         "cratis-engineering-regression-cluster",
         "cratis-engineering-release-trains",
         "cratis-engineering-review-rounds",
