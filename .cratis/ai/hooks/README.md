@@ -35,6 +35,8 @@ searches with secret/certificate/key-like prefixes also remain blocked. For ripg
 symlinks, not filename-only mode. Literal directory checks retain the process-cwd fallback when the
 payload omits cwd; glob probing does not. Filesystem check/use races remain: this is not a sandbox.
 
+The Bash write guard checks manifest and environment-file names against both logical and resolved physical basenames; run `cratis ai update` to receive this change.
+
 A Pi session runs guards from its starting checkout. Refresh the corpus there with `cratis ai update`,
 or start a new session in the checkout you change. Selecting a newer installed guard corpus per call
 is tracked in [Cratis/AI#1114](https://github.com/Cratis/AI/issues/1114).
@@ -66,6 +68,8 @@ copy runs. A write-target word with expansion syntax (`$`, backtick, `~`, parent
 suffix that follows a slash in it (`$PWD/.cratis/x` and `~+/.cratis/x` are treated as `.cratis/x` in the working
 directory), without parsing the expansion, and refused if a suffix is protected, which includes a read of a protected path through a variable. This is a
 best-effort lexical check, not enforcement: a variable holding the whole path still passes.
+
+Git reflog selectors with unprotected prefixes (`stash@{0}`, `HEAD@{1}`, `branch@{upstream}`) are revisions, not paths.
 
 The shell-write reference scan keeps conservative leading-dot intersections: a tool named `Bash`,
 `SHELL`, and the hook process's options do not establish the execution shell's options. Globbed writes
@@ -108,6 +112,20 @@ including code-like braces. Interpreter syntax does not exempt embedded shell st
 script is blocked, write it with the edit/write tool and run the script file instead.
 Portable bracket classes are kept; ambiguous backslash-bearing classes are widened instead of passed
 as invalid awk regexes.
+
+**Allowlisted safe shapes (Cratis/AI#1076, #1153).** A command naming a protected file is admitted only when
+it matches one of these shapes; everything else is refused. Each shape has sibling allow and refuse specs.
+
+| Shape | Admitted | Still refused |
+| --- | --- | --- |
+| Source file whose name only contains a credential word (`RecordingCredentials.ts`) for `git add`, `diff`, `checkout`, `restore`, `rm`, `mv` | Files are classified by real secret patterns (whole file stems such as the env file family, key and certificate extensions, cloud and cluster config files), not by substring | Every real secret pattern in any case or subfolder, and index-stage forms (`:2:`, `:3:`) of them |
+| Leading `NAME=value` before another allowlisted shape | A plain value on a name that does not change how programs load or resolve | Loader, path, shell, git and tool-config names, values naming a protected file, expansions |
+| Quoted message, title or body of `git commit` and `gh pr\|issue create\|edit\|comment` | Literal quoted text is data | File-valued options (`-F`, `--file`, `--body-file`), substitutions, trailing positional paths |
+| Here-document body | Quoted delimiter body, or an unquoted body without substitutions, fed to a plain consumer | Substitutions in an unquoted body, any body fed to an interpreter or shell (permanent: write a script file with the edit tool instead) |
+
+A symbolic link, or a path below a linked directory, is followed through the working directory (bounded hops);
+a chain that ends at a protected name, loops or cannot be followed is refused, so a source-looking link name
+gives no exemption.
 
 Literal `git ls-files` pathspecs are filename metadata, including `-s`/`--stage` and `--debug`,
 so credential-worded source directories do not taint that single command. Literal non-verbose
@@ -260,8 +278,6 @@ Rule numbers refer to the numbered list in [`../rules/general.md`](../rules/gene
 
 **Blocked outright** (`PreToolUse`, exit 2):
 
-- Editing a file whose header marks it as Cratis-generated output — rule 15 `[contract]`
-- Writing content that opens with such a header (hand-authoring a "generated" proxy)
 - `package.json`, `Directory.Packages.props`, `global.json`, `NuGet.config` (also `NuGet.Config` and `nuget.config`),
   `yarn.lock`, `package-lock.json`, `pnpm-lock.yaml`, `packages.lock.json` — unless the
   repository's dependency-manifest policy allows them (see below)
@@ -336,7 +352,7 @@ allowances, not general shell execution permission. Output-to-file options such 
 `git diff --output=...` are never exempt, even with a non-protected destination on a line
 that references a protected file.
 
-`gh` (all subcommands), `ag`, `sort`, `uniq`, `cut`, `jq`, `yq`, `less`, `more`, `stat`,
+`gh` (apart from the literal publish shape above), `ag`, `sort`, `uniq`, `cut`, `jq`, `yq`, `less`, `more`, `stat`,
 `file`, `diff`, `cmp`, checksum tools, `realpath`, `dirname`, `basename`, `which` and `type`
 are not on this list: their option surfaces are deliberately not analysed here.
 
@@ -363,13 +379,15 @@ this deliberately over-conservative.
 
 This is **best-effort, not a sandbox**. Runtime names assembled from variables without a
 protected name appearing literally are out of scope, as are aliases/functions, external
-scripts, tool configuration/hooks and symlinks created during execution. Existing generated
-headers are classified; content that would create a new generated header is not inspected by
-the shell filter. OS permissions/sandboxing remain the primary boundary. Do not use another
+scripts, tool configuration/hooks and symlinks created during execution.
+OS permissions/sandboxing remain the primary boundary. Do not use another
 route to work around a refusal.
 
-The generated-file check is anchored: the marker must be a comment opener at the start of one of
-the first five lines. A rule file or a document that merely *mentions* the marker is not blocked.
+Generated-file headers do not trigger a block in either write guard. Regenerating proxies with
+`dotnet build`, staging, restoring, committing and other Git index/worktree operations, and direct
+writes (including copies, moves and redirections) are allowed for generated files. For durable
+proxy changes, change the C# source and rebuild rather than hand-editing generated output.
+Other protected classes still apply regardless of a generated header.
 
 ### Dependency-manifest writes
 
@@ -392,9 +410,8 @@ and Pi:
 
 `false` re-enables the manifest block in a Cratis repository; `true` allows manifest writes
 in any repository. Merge this property into the existing configuration. An absent, malformed,
-or non-boolean setting uses the origin-based default. This setting never permits generated
-output or `.env` writes. The protected basename list is unchanged; `package.json` is not
-part of this guard's manifest category.
+or non-boolean setting uses the origin-based default. This setting never permits `.env` writes.
+The protected basename list is unchanged; `package.json` is not part of this guard's manifest category.
 
 This allowance is not authorization for unrelated upgrades: keep changes task-focused and
 call out version bumps in the PR description. Other repositories retain the rule requiring
@@ -923,7 +940,7 @@ Each is an explicit, auditable opt-out — none of them is a default.
 
 | Variable | Effect |
 |---|---|
-| `CRATIS_HOOKS_ALLOW_PROTECTED_WRITES=1` | bypasses both Write/Edit and shell-write guards, including generated files, `.env`, agent controls and installed trees, while set in the harness environment; use only for an explicitly requested protected write. Repository-scoped manifest allowance uses `.cratis/ai.json` instead and never bypasses those protections |
+| `CRATIS_HOOKS_ALLOW_PROTECTED_WRITES=1` | bypasses both Write/Edit and shell-write guards, including `.env`, agent controls and installed trees, while set in the harness environment; use only for an explicitly requested protected write. Repository-scoped manifest allowance uses `.cratis/ai.json` instead and never bypasses those protections |
 | `CRATIS_HOOKS_SKIP_SCAN=1` | disables the pattern pass |
 | `CRATIS_HOOKS_SKIP_GATE=1` | disables the quality gate |
 | `CRATIS_HOOKS_GATE_DRYRUN=1` | prints which gates would run, and why, then exits 0 |
