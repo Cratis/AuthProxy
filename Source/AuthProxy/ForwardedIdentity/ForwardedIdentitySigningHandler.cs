@@ -11,6 +11,20 @@ internal sealed class ForwardedIdentitySigningHandler(IForwardedIdentitySigner s
     /// <inheritdoc/>
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        // Before anything is signed, so the proof covers the tenant that is actually sent, and for every route, signed or not.
+        try
+        {
+            if (TenantHeaders.Sanitize(request.Headers))
+            {
+                logger.TenantHeaderRepeated();
+            }
+        }
+        catch (TenantHeaderIsAmbiguous)
+        {
+            logger.TenantHeaderRefused();
+            throw;
+        }
+
         if (request.Options.TryGetValue(AnonymousPaths.ForwardWithoutIdentity, out var anonymous) && anonymous)
         {
             // Last outbound boundary: remove caller-supplied and proxy-generated identity alike.
