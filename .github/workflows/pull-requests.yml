@@ -86,11 +86,23 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.dotnet == 'true' && !contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) }}
     uses: ./.github/workflows/dotnet-build.yml
+    with:
+      build-release: false
+    permissions:
+      contents: read
+
+  # Release consumers wait only for Release, not for the parallel Debug spec run.
+  release-build:
+    needs: changes
+    if: ${{ !contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) }}
+    uses: ./.github/workflows/dotnet-release-build.yml
+    with:
+      build-solution: ${{ needs.changes.outputs.dotnet == 'true' || needs.changes.outputs.prerelease == 'true' || needs.changes.outputs.redis-replay == 'true' || needs.changes.outputs.e2e == 'true' }}
     permissions:
       contents: read
 
   prerelease:
-    needs: changes
+    needs: [changes, release-build]
     if: ${{ needs.changes.outputs.prerelease == 'true' && !contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) }}
     uses: ./.github/workflows/pr-prerelease.yml
     permissions:
@@ -104,14 +116,16 @@ jobs:
       contents: read
 
   consumer-e2e:
-    needs: changes
+    needs: [changes, release-build]
     if: ${{ needs.changes.outputs.e2e == 'true' && !contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) }}
     uses: ./.github/workflows/consumer-e2e.yml
+    with:
+      reuse-release: true
     permissions:
       contents: read
 
   redis-replay-specs:
-    needs: changes
+    needs: [changes, release-build]
     if: ${{ needs.changes.outputs.redis-replay == 'true' && !contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) }}
     uses: ./.github/workflows/redis-replay-specs.yml
     permissions:
@@ -119,8 +133,11 @@ jobs:
 
   # No filter on code runs: the security checks must always run (their old trigger had no paths).
   security:
+    needs: release-build
     if: ${{ !contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) }}
     uses: ./.github/workflows/security.yml
+    with:
+      reuse-release: true
     permissions:
       contents: read
 
@@ -135,7 +152,7 @@ jobs:
   gate:
     name: gate
     if: ${{ always() }}
-    needs: [changes, dotnet-build, prerelease, azure-docs-specs, consumer-e2e, redis-replay-specs, security, policy]
+    needs: [changes, dotnet-build, release-build, prerelease, azure-docs-specs, consumer-e2e, redis-replay-specs, security, policy]
     runs-on: ${{ vars.RUNNER_GATE || 'ubuntu-latest' }}
     timeout-minutes: ${{ contains(fromJSON('["edited","labeled","unlabeled"]'), github.event.action) && 95 || 5 }}
     permissions:

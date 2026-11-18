@@ -4,6 +4,7 @@
 #
 # Consumer lane: builds the AuthProxy image from this working tree, runs a real minimal Arc app behind it and
 # drives it from outside (E2E/Client). Same entry point for CI and developers. Needs docker and the .NET SDK.
+# AUTHPROXY_PREBUILT_OUTPUT optionally names an existing publish directory (relative to the repository root).
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -62,8 +63,14 @@ dotnet run --project E2E/OAuthGrantReceiver/OAuthGrantReceiver.csproj -c Release
 echo "== Publishing AuthProxy"
 # Keep disposable build output outside Source, and keep private runtime material outside the image context.
 image_context=$(mktemp -d "$logs/image-context.XXXXXX")
-dotnet publish Source/AuthProxy/AuthProxy.csproj -c Release -o "$image_context/Source/AuthProxy/out" \
-  -p:CreateHardLinksForPublishFilesIfPossible=false -p:CreateSymbolicLinksForPublishFilesIfPossible=false
+if [ -n "${AUTHPROXY_PREBUILT_OUTPUT:-}" ]; then
+  test -f "$AUTHPROXY_PREBUILT_OUTPUT/AuthProxy.dll"
+  mkdir -p "$image_context/Source/AuthProxy/out"
+  cp -a "$AUTHPROXY_PREBUILT_OUTPUT/." "$image_context/Source/AuthProxy/out/"
+else
+  dotnet publish Source/AuthProxy/AuthProxy.csproj -c Release -o "$image_context/Source/AuthProxy/out" \
+    -p:CreateHardLinksForPublishFilesIfPossible=false -p:CreateSymbolicLinksForPublishFilesIfPossible=false
+fi
 
 echo "== Building the AuthProxy image"
 docker build -f "$root/Docker/Development/Dockerfile" -t "$AUTHPROXY_IMAGE" "$image_context"

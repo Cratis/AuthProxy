@@ -13,6 +13,11 @@ env:
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      build-release:
+        description: Also build Release when it is not built separately by the caller.
+        type: boolean
+        default: true
 
 jobs:
   dotnet-build:
@@ -50,9 +55,6 @@ jobs:
       - name: Build (Debug)
         run: dotnet build --configuration Debug -warnaserror
 
-      - name: Build (Release)
-        run: dotnet build --configuration Release -warnaserror
-
       # xUnit v3 spec projects are executables; the process exit code fails the step.
       - name: Test
         run: |
@@ -73,3 +75,10 @@ jobs:
           name: spec-results
           path: TestResults
           retention-days: 7
+
+  # Preserve both configuration gates for standalone callers and manual runs.
+  release-build:
+    if: inputs.build-release || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/dotnet-release-build.yml
+    permissions:
+      contents: read

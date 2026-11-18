@@ -6,6 +6,11 @@ name: Consumer E2E
 # Builds AuthProxy and exercises the real Arc sample and independent OAuth-grant receiver (E2E/run.sh).
 on:
   workflow_call:
+    inputs:
+      reuse-release:
+        description: Reuse published output from the pull request build.
+        type: boolean
+        default: false
   workflow_dispatch:
 
 concurrency:
@@ -33,7 +38,16 @@ jobs:
             10.0.x
             11.0.x
 
+      - name: Download published output
+        if: inputs.reuse-release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pr-dotnet-out
+          path: Source/AuthProxy/out
+
       - name: Run the consumer lane
+        env:
+          AUTHPROXY_PREBUILT_OUTPUT: ${{ inputs.reuse-release && 'Source/AuthProxy/out' || '' }}
         run: bash E2E/run.sh
 
       - name: Upload container logs
@@ -44,3 +58,4 @@ jobs:
           # Never upload the per-run TLS/envelope private material, even if container cleanup fails.
           path: .ai-work/e2e/compose.log
           if-no-files-found: ignore
+          retention-days: 7
