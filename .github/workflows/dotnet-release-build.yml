@@ -1,0 +1,86 @@
+# Copyright (c) Cratis. All rights reserved.
+# Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+name: .NET Release Build
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '11.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+on:
+  workflow_call:
+    inputs:
+      build-solution:
+        description: Build the solution; otherwise build only the unconditional security specs.
+        type: boolean
+        default: true
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: Cratis/Workflows/.github/actions/dotnet-cache@3f8a8a7ef75f72b6b089638b68ec2f9af8f593e3
+        with:
+          mode: restore
+          path: ~/.nuget/packages
+          key-files: |
+            **/*.csproj
+            **/*.props
+            **/*.targets
+            **/packages.lock.json
+            **/[Nn]u[Gg]et.[Cc]onfig
+            global.json
+            AuthProxy.slnx
+
+      - name: Build (Release)
+        if: inputs.build-solution
+        run: dotnet build --configuration Release -warnaserror -p:RunRedisReplaySpecs=true
+
+      - name: Build security specs (Release)
+        if: ${{ !inputs.build-solution }}
+        run: dotnet build Source/AuthProxy.Security.Specs/AuthProxy.Security.Specs.csproj --configuration Release -warnaserror
+
+      - name: Publish without rebuilding
+        if: inputs.build-solution
+        run: dotnet publish Source/AuthProxy/AuthProxy.csproj --configuration Release --no-build --no-restore -o Source/AuthProxy/out
+
+      - name: Upload published output
+        if: inputs.build-solution
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-dotnet-out
+          path: Source/AuthProxy/out
+          retention-days: 1
+          include-hidden-files: true
+          if-no-files-found: error
+
+      # Tar preserves the executable bits needed by the xUnit v3 spec runners.
+      - name: Archive Release binaries
+        run: tar -cf "$RUNNER_TEMP/release-binaries.tar" Source/*/bin/Release
+
+      - name: Upload Release binaries
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-binaries
+          path: ${{ runner.temp }}/release-binaries.tar
+          retention-days: 1
+          if-no-files-found: error

@@ -47,30 +47,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+      - name: Download published output
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Cache NuGet packages
-        uses: Cratis/Workflows/.github/actions/dotnet-cache@3f8a8a7ef75f72b6b089638b68ec2f9af8f593e3
-        with:
-          mode: restore
-          path: ~/.nuget/packages
-          key-files: |
-            **/*.csproj
-            **/*.props
-            **/*.targets
-            **/packages.lock.json
-            **/[Nn]u[Gg]et.[Cc]onfig
-            global.json
-            AuthProxy.slnx
-
-      - name: Build
-        run: dotnet build --configuration Release -warnaserror
-
-      - name: Publish
-        run: dotnet publish Source/AuthProxy/AuthProxy.csproj --configuration Release -o Source/AuthProxy/out
+          name: pr-dotnet-out
+          path: Source/AuthProxy/out
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
