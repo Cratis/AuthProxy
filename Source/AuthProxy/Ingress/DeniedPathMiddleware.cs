@@ -22,11 +22,10 @@ public class DeniedPathMiddleware(RequestDelegate next, IOptions<C.Ingress> ingr
     {
         if (_prefixes.Length == 0) return next(context);
 
-        // Match what downstream routing and forwarding actually use. In particular, do not collapse
-        // empty segments before the server resolves dot segments, or decode the raw target again.
+        // Check the server's path and the alternative exposed by separator normalization followed
+        // by dot-segment resolution. Never decode the raw target again or rewrite the request.
         var path = string.Concat(context.Request.PathBase.Value, context.Request.Path.Value);
-        var alternative = DeniedPathNormalization.NormalizeSeparators(path);
-        if (!_prefixes.Any(prefix => Matches(path, prefix) || Matches(alternative, prefix)))
+        if (!IsDenied(path))
         {
             return next(context);
         }
@@ -40,4 +39,10 @@ public class DeniedPathMiddleware(RequestDelegate next, IOptions<C.Ingress> ingr
         prefix.Length == 0
         || path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
         || path.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase);
+
+    bool IsDenied(string path)
+    {
+        if (!DeniedPathNormalization.TryNormalize(path, out var alternative)) return true;
+        return _prefixes.Any(prefix => Matches(path, prefix) || Matches(alternative, prefix));
+    }
 }

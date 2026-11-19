@@ -37,13 +37,20 @@ in configured prefixes. `/` refuses every request, including probes and sign-in 
 
 The guard checks `Request.PathBase.Value + Request.Path.Value`, using ordinal, case-insensitive
 segment-boundary comparisons. Kestrel has already decoded the path (except encoded slashes) and
-resolved dot segments; routing and YARP use that path. The guard does not decode it again or implement
-its own dot-segment resolver. Query strings never participate in matching.
+resolved visible dot segments; routing and YARP use that path. Query strings never participate in matching.
 
-Both the unchanged combined path and a separator-only alternative are checked. The alternative maps
-remaining `%2F`/`%2f`, `%5C`/`%5c` and literal backslashes to `/`, then collapses repeated slashes. If
-either form equals the prefix without its trailing slash, or starts with that prefix followed by `/`,
-the request is refused. The alternative is only compared: the forwarded request is never rewritten.
+Both the unchanged combined path and a normalized alternative are checked. The alternative maps
+remaining `%2F`/`%2f`, `%5C`/`%5c` and literal backslashes to `/`, collapses repeated slashes, then
+resolves `.` and `..` segments using RFC 3986 remove-dot-segments semantics. This order also resolves
+dot segments revealed by encoded separators. If either form equals the prefix without its trailing
+slash, or starts with that prefix followed by `/`, the request is refused. The alternative is only
+compared: the forwarded request is never rewritten.
+
+When prefixes are configured, normalization fails closed with the same empty 404 if `..` would climb
+above root, encoded `%2E`/`%2e` forms remain after Kestrel decoding, the combined path is nonempty and
+not absolute, or separator normalization times out. Remaining encoded dots are refused rather than
+decoded again, including double-encoded dots that survive Kestrel. Other ordinary path characters
+are unchanged. With no prefixes configured, normalization is not attempted.
 
 With `/internal/` configured:
 
@@ -52,7 +59,10 @@ With `/internal/` configured:
 | `/internal`, `/INTERNAL/x`, `//internal/x` | 404 |
 | `/internal%2Fx`, `/internal%5Cx` | 404 because the separator alternative matches |
 | `/internal//../secret`, `/internal//%2e%2e/secret` | 404: Kestrel resolves these to `/internal/secret` |
-| `/a/../internal/x` | 404: Kestrel resolves this to `/internal/x` |
+| `/a/../internal/x`, `/a/%2e%2e/internal/x` | 404: Kestrel resolves these to `/internal/x` |
+| `/a%2f../internal/x`, `/a%2F..%2Finternal/x`, `/a\..\internal\x` | 404: separator normalization followed by dot-segment resolution yields `/internal/x` |
+| `/a%2f..%2f..%2fpublic/x`, `/a/%252e%252e/public/x` | 404: above-root traversal or remaining encoded dots fail closed |
+| `/a/../public/x`, `/a%2F..%2Fpublic/x`, `/internal-not/x` | Pass: the normalized path is outside the prefix |
 | `/internal/../x`, `/internal/%2e%2e/x` | Pass: Kestrel resolves these to `/x`, which is outside the prefix |
 | `/internally`, `/api/internal/x` | Pass: neither matches the prefix boundary |
 | `/x/%20name`, `/x/a;b`, `/x/%25`, `/x/name%2Fchild` | Pass: encoded names and parameters outside the prefix are not blanket-refused |

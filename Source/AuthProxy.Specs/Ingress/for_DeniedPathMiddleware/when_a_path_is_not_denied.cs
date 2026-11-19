@@ -9,6 +9,9 @@ public class when_a_path_is_not_denied
 {
     [Theory]
     [InlineData("", "/internally")]
+    [InlineData("", "/internal-not/x")]
+    [InlineData("", "/a/../public/x")]
+    [InlineData("", "/a%2f..%2fpublic/x")]
     [InlineData("", "/internalx/child")]
     [InlineData("", "/public/internal")]
     [InlineData("/api", "/internal/x")]

@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 namespace Cratis.AuthProxy.Ingress;
 
 /// <summary>
-/// Produces a separator-only alternative to the path already decoded and normalized by the server.
+/// Produces alternatives to the path already decoded and normalized by the server.
 /// </summary>
 public static partial class DeniedPathNormalization
 {
@@ -26,4 +26,63 @@ public static partial class DeniedPathNormalization
             .Replace('\\', '/');
         return RepeatedSlashes.Replace(separators, "/");
     }
+
+    /// <summary>
+    /// Normalizes separators before resolving dot segments, refusing ambiguous or above-root paths.
+    /// </summary>
+    /// <param name="path">The combined Request.PathBase and Request.Path values.</param>
+    /// <param name="normalized">The normalized alternative, or an empty string on failure.</param>
+    /// <returns>Whether the path could be safely normalized.</returns>
+    public static bool TryNormalize(string path, out string normalized)
+    {
+        normalized = string.Empty;
+        try
+        {
+            path = NormalizeSeparators(path);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // A normalization timeout must fail closed just like an ambiguous path.
+            return false;
+        }
+
+        if (path.Contains("%2E", StringComparison.OrdinalIgnoreCase)) return false;
+        if (path.Length == 0) return true;
+        if (!path.StartsWith('/')) return false;
+
+        return TryResolveDotSegments(path, out normalized);
+    }
+
+    static bool TryResolveDotSegments(string path, out string normalized)
+    {
+        normalized = string.Empty;
+        var segments = new List<string>();
+        foreach (var segment in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!TryApplySegment(segments, segment)) return false;
+        }
+
+        normalized = "/" + string.Join('/', segments);
+        if (segments.Count > 0 && HasTrailingSeparator(path)) normalized += "/";
+        return true;
+    }
+
+    static bool TryApplySegment(List<string> segments, string segment)
+    {
+        if (segment == ".") return true;
+        if (segment != "..")
+        {
+            segments.Add(segment);
+            return true;
+        }
+
+        if (segments.Count == 0) return false;
+        segments.RemoveAt(segments.Count - 1);
+        return true;
+    }
+
+    static bool HasTrailingSeparator(string path) =>
+        path.EndsWith('/')
+        || path.EndsWith("/.", StringComparison.Ordinal)
+        || path.EndsWith("/..", StringComparison.Ordinal);
 }
