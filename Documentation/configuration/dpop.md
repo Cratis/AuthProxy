@@ -4,6 +4,8 @@ description: "Enable RFC 9449 proofs on OAuth-only AuthProxy routes with a trust
 ---
 
 DPoP is **off by default**. An OAuth-only bearer route can opt in by adding `Dpop`.
+A route cannot combine `Dpop` with [Identity token exchange](token-exchange.md);
+that combination fails startup validation. Exchange does not bypass the normal DPoP/cnf checks on returned tokens.
 A bound token must then use `Authorization: DPoP <access-token>` and exactly one
 `DPoP` header containing a signed proof. A bound token sent as Bearer is refused;
 it never becomes an ordinary bearer credential. DPoP routes and tokens containing `cnf` do not produce

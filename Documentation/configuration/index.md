@@ -45,6 +45,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | Topic | Description |
 |-------|-------------|
 | [Authentication](authentication.md) | OIDC providers, OAuth 2.0 providers such as GitHub, JWT Bearer configuration, and bearer routes for access tokens from an external authorization server. |
+| [Identity Token Exchange](token-exchange.md) | Exchanging allow-listed external issuer tokens for tenant-bound Identity tokens on bearer routes. |
 | [Application Configuration Contract](application-contract.md) | Starting AuthProxy from a Screenplay model's provider list and a Cratis environment's values, including secrets from mounted files and the application's Ante. |
 | [Authorization](authorization.md) | Requiring a claim — a role, a group, a GitHub organization or team — before any request is forwarded. |
 | [Admission](admission.md) | Answering nothing at all until a caller presents a capability your own verifier admits, for a deployment whose existence is not meant to be discoverable. |

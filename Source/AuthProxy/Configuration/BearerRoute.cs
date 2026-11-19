@@ -46,6 +46,9 @@ public class BearerRoute
     /// </summary>
     public IList<BearerIssuer> Issuers { get; set; } = [];
 
+    /// <summary>Gets or sets opt-in Identity exchange for external tokens. Absent disables exchange.</summary>
+    public BearerTokenExchange? TokenExchange { get; set; }
+
     /// <summary>
     /// Gets or sets the audiences this route accepts. A token is accepted only when its <c language="text">aud</c> claim names
     /// at least one of them.

@@ -18,6 +18,9 @@ public static class BearerRouteDefaults
     /// </summary>
     public const string IntrospectionHttpClientName = "Cratis.AuthProxy.BearerRoutes.Introspection";
 
+    /// <summary>The non-redirecting HTTP client used only for configured Identity token exchange.</summary>
+    public const string TokenExchangeHttpClientName = "Cratis.AuthProxy.BearerRoutes.TokenExchange";
+
     /// <summary>
     /// The JWT signing algorithms accepted on a bearer route. Symmetric algorithms and <c language="text">none</c> are
     /// never accepted.
