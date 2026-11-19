@@ -2,6 +2,7 @@
   href: index.md
 - name: Authentication
   href: authentication.md
+- { name: Identity Token Exchange, href: token-exchange.md }
 - name: Application Configuration Contract
   href: application-contract.md
 - name: Authorization

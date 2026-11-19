@@ -19,6 +19,9 @@ releases sent only `Tenant-ID`; see [Upgrading](../upgrading/tenant-and-service-
 
 ---
 
+[Identity token exchange](token-exchange.md) requires an independently addressed, verified tenant;
+only configured Host, SubHost and Route resolvers can supply its target.
+
 ## Tenant resolution strategies
 
 Resolution strategies run **in order** until one strategy resolves a tenant.
