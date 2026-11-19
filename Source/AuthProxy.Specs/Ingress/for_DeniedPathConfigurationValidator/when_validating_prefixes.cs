@@ -20,6 +20,14 @@ public class when_validating_prefixes
     [InlineData("/internal\n")]
     [InlineData("/internal child")]
     [InlineData("/é")]
+    [InlineData("/internal/*")]
+    [InlineData("/internal?")]
+    [InlineData("/internal/[id]")]
+    [InlineData("/internal/{id}")]
+    [InlineData("/internal|other")]
+    [InlineData("/internal^other")]
+    [InlineData("/internal<other>")]
+    [InlineData("/internal/./child")]
     public void should_reject_invalid_entries_with_the_configuration_key(string? prefix)
     {
         var result = new DeniedPathConfigurationValidator().Validate(null, new C.Ingress { DeniedPathPrefixes = [prefix] });
@@ -31,7 +39,8 @@ public class when_validating_prefixes
     [InlineData("/")]
     [InlineData("/internal")]
     [InlineData("/INTERNAL/")]
-    [InlineData("//internal/./child")]
+    [InlineData("//internal/child")]
+    [InlineData("/internal-name_~!$&'()+,=:@/child")]
     public void should_accept_plain_absolute_paths(string prefix) =>
         new DeniedPathConfigurationValidator().Validate(null, new C.Ingress { DeniedPathPrefixes = [prefix] }).Succeeded.ShouldBeTrue();
 

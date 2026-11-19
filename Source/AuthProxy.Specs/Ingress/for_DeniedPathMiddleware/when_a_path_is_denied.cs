@@ -8,29 +8,27 @@ namespace Cratis.AuthProxy.Ingress.for_DeniedPathMiddleware;
 public class when_a_path_is_denied
 {
     [Theory]
-    [InlineData("/internal")]
-    [InlineData("/internal/")]
-    [InlineData("/internal/child")]
-    [InlineData("/INTERNAL/CHILD")]
-    [InlineData("/internal//child")]
-    [InlineData("//internal")]
-    [InlineData("/./internal")]
-    [InlineData("/public/../internal")]
-    [InlineData("/public/%2e%2E/internal")]
-    [InlineData("/%69nternal")]
-    [InlineData("/internal?code=do-not-log-this")]
-    [InlineData("/internal%2fchild")]
-    [InlineData("/%2569nternal")]
-    [InlineData("/public%0a")]
-    [InlineData(null)]
-    public async Task should_answer_an_empty_404_without_running_any_downstream_handler(string? rawTarget)
+    [InlineData("", "/internal")]
+    [InlineData("", "/internal/")]
+    [InlineData("", "/internal/child")]
+    [InlineData("", "/INTERNAL/CHILD")]
+    [InlineData("", "/internal//child")]
+    [InlineData("", "//internal")]
+    [InlineData("", "/internal%2fchild")]
+    [InlineData("", "/internal%2Fchild")]
+    [InlineData("", "/internal%5Cchild")]
+    [InlineData("", "/internal\\child")]
+    [InlineData("/internal", "/child")]
+    [InlineData("/shared", "/internal/child")]
+    public async Task should_answer_an_empty_404_without_running_any_downstream_handler(string pathBase, string path)
     {
         var downstreamCalls = 0;
         var logger = Substitute.For<ILogger<DeniedPathMiddleware>>();
         var context = new DefaultHttpContext();
-        context.Features.Get<IHttpRequestFeature>().RawTarget = rawTarget;
-        context.Request.Path = "/safe-decoded-path";
-        context.Request.PathBase = "/different-path-base";
+        context.Features.Get<IHttpRequestFeature>().RawTarget = "/unrelated-raw-target";
+        context.Request.Path = new PathString(path);
+        context.Request.PathBase = pathBase;
+        context.Request.QueryString = new QueryString("?code=do-not-log-this");
         context.Response.Body = new MemoryStream();
         context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "authenticated-user")], "test"));
         var guard = new DeniedPathMiddleware(
@@ -39,7 +37,7 @@ public class when_a_path_is_denied
                 downstreamCalls++;
                 return Task.CompletedTask;
             },
-            Options.Create(new C.Ingress { DeniedPathPrefixes = ["/internal/"] }),
+            Options.Create(new C.Ingress { DeniedPathPrefixes = ["/internal/", "/shared/internal/"] }),
             logger);
 
         await guard.InvokeAsync(context);

@@ -54,6 +54,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
 | [Data Protection Keys](data-protection.md) | Sharing the key ring that encrypts sessions and tokens between replicas: a file system, Azure Blob Storage or Redis, with optional Azure Key Vault key protection. |
 | [Trusted Proxies](trusted-proxies.md) | Which callers may speak for the client through `X-Forwarded-For` and `X-Forwarded-Proto`, and how many hops to follow. |
+| [Denied Paths](denied-paths.md) | Refusing configured public-host path prefixes before routing or authentication. |
 | [DPoP Proof Verification](dpop.md) | Opt-in OAuth-only route proof verification with trusted public origins, nonces and a fleet-shared Redis replay store. |
 | [Backend TLS](backend-tls.md) | Client certificates, private CA trust and required HTTPS for backend connections (`BackendTls`), and the deployment `Profile` (`Default`, or `LocalDevelopment` on developer machines only). |
 | [Services](services.md) | Routing requests to backend and frontend services, and the idle timeout that applies to proxied requests, WebSockets and SSE streams. |
@@ -65,46 +66,3 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Search-Index Exclusion](search-indexing.md) | Asking search engines to keep AuthProxy hosts out of their indexes (`SearchIndexing`). |
 | [Lobby](lobby/index.md) | Invite and registration flows that hand users off to the lobby experience. |
 | [Well-Known Pages](well-known-pages.md) | Built-in HTML pages (provider selection, errors, tenant not found) and how to override them via a mounted volume. |
-
-## Refusing public paths before routing
-
-To keep an internal endpoint off the public host, configure `Ingress:DeniedPathPrefixes`:
-
-```json
-{
-  "Cratis": {
-    "AuthProxy": {
-      "Ingress": {
-        "DeniedPathPrefixes": [ "/internal/" ]
-      }
-    }
-  }
-}
-```
-
-The equivalent environment variable is `Cratis__AuthProxy__Ingress__DeniedPathPrefixes__0=/internal/`.
-The list defaults to empty; when empty, it does not inspect or refuse any paths. Invalid entries fail
-startup: each prefix must start with `/` and contain only plain ASCII, without `%`, `\`, `..`,
-whitespace, controls, `;`, `?` or `#`. `/` refuses every request, including probes and sign-in callbacks.
-
-When enabled, the guard answers with an empty 404 before routing, authentication, anonymous-path
-handling, tenant resolution, static assets, management answers or gRPC/YARP forwarding. It matches
-case-insensitively on segment boundaries: `/internal`, `/INTERNAL/x` and `/internal//x` are refused,
-but `/internalx` and `/api/internal/x` are not. It decodes once, merges repeated slashes and resolves
-`.` and `..` segments before comparing. Query strings do not participate in the comparison.
-
-The guard reads `IHttpRequestFeature.RawTarget`, not `Request.Path`: Kestrel has already decoded and
-may have normalized the latter. The raw target preserves encoded separators and the original path on
-the public host, before any `PathBase` split or service-prefix stripping. For example, if the public
-path is `/shared/internal`, configure `/shared/internal`, not `/internal`. There is no
-`RequireSharedPrefixSupport` setting in AuthProxy; service `PathPrefix`/`StripPathPrefix` rewriting
-happens later. An embedding host must call `UseDeniedPathPrefixes()` before its own request handlers.
-An external ingress that rewrites paths before AuthProxy must enforce the original public boundary
-itself, or preserve the public path when forwarding.
-
-With any prefix configured, ambiguous paths also get 404, even outside the listed prefixes: encoded
-slashes or backslashes, literal backslashes, malformed escapes, invalid UTF-8, controls, whitespace,
-`;` path parameters, literal or decoded `#`, decoded `?`, any residual `%` after decoding (including
-double encoding), or `..` above the root. Only origin-form raw targets starting with `/` are accepted;
-missing targets, absolute-form targets and unescaped non-ASCII bytes are refused rather than guessed.
-Well-formed percent-encoded UTF-8 is accepted. Refusal logs are Debug-level and contain no path or query.

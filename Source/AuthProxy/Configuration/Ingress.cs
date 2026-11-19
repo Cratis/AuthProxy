@@ -46,9 +46,9 @@ public class Ingress
     /// Gets or sets public-host path prefixes refused with 404 before request handling. Empty by default.
     /// </summary>
     /// <remarks>
-    /// Prefixes must be absolute plain ASCII paths without escapes, backslashes or dot-dot.
-    /// Matching is case-insensitive on segment boundaries after decoding once, merging slashes and
-    /// resolving dot segments. When configured, ambiguous paths are refused even outside these prefixes.
+    /// Prefixes must be absolute plain ASCII paths without escapes, backslashes, dot segments or wildcards.
+    /// Matching is case-insensitive on segment boundaries against the server's PathBase plus Path, and
+    /// a separator-normalized alternative. Unrelated paths are not refused for containing encoded names.
     /// </remarks>
     public IList<string> DeniedPathPrefixes { get; set; } = [];
 

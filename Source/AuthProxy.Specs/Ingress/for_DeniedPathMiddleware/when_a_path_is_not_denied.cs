@@ -8,22 +8,25 @@ namespace Cratis.AuthProxy.Ingress.for_DeniedPathMiddleware;
 public class when_a_path_is_not_denied
 {
     [Theory]
-    [InlineData("/internalx")]
-    [InlineData("/internalx/child")]
-    [InlineData("/public/internal")]
-    [InlineData("/api/internal/x")]
-    [InlineData("/shared/internal")]
-    [InlineData("/internal/../public")]
-    [InlineData("/public?destination=/internal")]
-    [InlineData("/tenant/.auth/login")]
-    [InlineData("/.auth/callback")]
-    [InlineData("/api/items")]
-    public async Task should_pass_the_original_request_through_unchanged(string rawTarget)
+    [InlineData("", "/internally")]
+    [InlineData("", "/internalx/child")]
+    [InlineData("", "/public/internal")]
+    [InlineData("/api", "/internal/x")]
+    [InlineData("/shared", "/internal")]
+    [InlineData("", "/x/ name")]
+    [InlineData("", "/x/a;b")]
+    [InlineData("", "/x/%")]
+    [InlineData("", "/x/%2Fname")]
+    [InlineData("", "/x/%5Cname")]
+    [InlineData("", "/x\\child")]
+    [InlineData("", "/tenant/.auth/login")]
+    [InlineData("", "/.auth/callback")]
+    public async Task should_pass_the_original_request_through_unchanged(string pathBase, string path)
     {
         var context = new DefaultHttpContext();
-        context.Features.Get<IHttpRequestFeature>().RawTarget = rawTarget;
-        context.Request.Path = "/original-path";
-        context.Request.PathBase = "/original-base";
+        context.Features.Get<IHttpRequestFeature>().RawTarget = "/internal";
+        context.Request.Path = new PathString(path);
+        context.Request.PathBase = pathBase;
         var next = Substitute.For<RequestDelegate>();
         next(context).Returns(Task.CompletedTask);
         var guard = new DeniedPathMiddleware(next, Options.Create(new C.Ingress { DeniedPathPrefixes = ["/internal"] }), Substitute.For<ILogger<DeniedPathMiddleware>>());
@@ -31,8 +34,8 @@ public class when_a_path_is_not_denied
         await guard.InvokeAsync(context);
 
         await next.Received(1).Invoke(context);
-        context.Request.Path.Value.ShouldEqual("/original-path");
-        context.Request.PathBase.Value.ShouldEqual("/original-base");
-        context.Features.Get<IHttpRequestFeature>().RawTarget.ShouldEqual(rawTarget);
+        context.Request.Path.Value.ShouldEqual(path);
+        context.Request.PathBase.Value.ShouldEqual(pathBase);
+        context.Features.Get<IHttpRequestFeature>().RawTarget.ShouldEqual("/internal");
     }
 }

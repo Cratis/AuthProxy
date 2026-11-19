@@ -17,7 +17,7 @@ public class DeniedPathConfigurationValidator : IValidateOptions<C.Ingress>
         var failures = options.DeniedPathPrefixes
             .Select((entry, index) => (Entry: entry, Index: index))
             .Where(_ => !IsValid(_.Entry))
-            .Select(_ => $"{C.Ingress.SectionKey}:{nameof(C.Ingress.DeniedPathPrefixes)}:{_.Index} must be an absolute plain ASCII path without escapes, backslashes, dot-dot, path parameters, whitespace or query/fragment delimiters.")
+            .Select(_ => $"{C.Ingress.SectionKey}:{nameof(C.Ingress.DeniedPathPrefixes)}:{_.Index} must be an absolute plain ASCII path without escapes, backslashes, dot segments, path parameters, whitespace, wildcards or other non-path syntax.")
             .ToArray();
 
         return failures.Length > 0 ? ValidateOptionsResult.Fail(failures) : ValidateOptionsResult.Success;
@@ -25,9 +25,11 @@ public class DeniedPathConfigurationValidator : IValidateOptions<C.Ingress>
 
     static bool IsValid(string? entry) =>
         !string.IsNullOrEmpty(entry)
-        && entry.All(_ => _ <= 127)
-        && !entry.Contains('%')
+        && entry.StartsWith('/')
+        && entry.All(IsPathCharacter)
         && !entry.Contains("..", StringComparison.Ordinal)
-        && DeniedPathNormalization.TryNormalize(entry, out _)
-        && !entry.Contains('?');
+        && !entry.Split('/').Contains(".", StringComparer.Ordinal);
+
+    static bool IsPathCharacter(char character) =>
+        char.IsAsciiLetterOrDigit(character) || "/-._~!$&'()+,=:@".Contains(character);
 }
