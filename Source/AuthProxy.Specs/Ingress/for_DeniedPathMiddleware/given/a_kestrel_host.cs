@@ -24,7 +24,7 @@ public class a_kestrel_host : IAsyncLifetime
         _app.UseDeniedPathPrefixes();
         _app.UseRouting();
         _app.MapGet("/x", ServeX);
-        _app.MapFallback(Serve);
+        _app.MapFallback("{**path}", (HttpContext context, string? path) => Serve(context));
         await _app.StartAsync(TestContext.Current.CancellationToken);
     }
 
