@@ -16,6 +16,7 @@ public class when_no_prefixes_are_configured
     {
         var context = new DefaultHttpContext();
         context.Features.Get<IHttpRequestFeature>().RawTarget = rawTarget;
+        context.Request.Path = "/a%2f..%2f..%2f%2e/public";
         var next = Substitute.For<RequestDelegate>();
         next(context).Returns(Task.CompletedTask);
         var guard = new DeniedPathMiddleware(next, Options.Create(new C.Ingress()), Substitute.For<ILogger<DeniedPathMiddleware>>());

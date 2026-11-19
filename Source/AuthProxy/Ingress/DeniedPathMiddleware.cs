@@ -1,6 +1,7 @@
 // Copyright (c) Cratis. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
 
@@ -22,11 +23,10 @@ public class DeniedPathMiddleware(RequestDelegate next, IOptions<C.Ingress> ingr
     {
         if (_prefixes.Length == 0) return next(context);
 
-        // Match what downstream routing and forwarding actually use. In particular, do not collapse
-        // empty segments before the server resolves dot segments, or decode the raw target again.
+        // Retain the server's path checks and also normalize the original target: Kestrel may
+        // remove dot segments before encoded separators or repeated slashes are normalized.
         var path = string.Concat(context.Request.PathBase.Value, context.Request.Path.Value);
-        var alternative = DeniedPathNormalization.NormalizeSeparators(path);
-        if (!_prefixes.Any(prefix => Matches(path, prefix) || Matches(alternative, prefix)))
+        if (!IsDenied(path, context.Features.Get<IHttpRequestFeature>()?.RawTarget))
         {
             return next(context);
         }
@@ -40,4 +40,18 @@ public class DeniedPathMiddleware(RequestDelegate next, IOptions<C.Ingress> ingr
         prefix.Length == 0
         || path.Equals(prefix, StringComparison.OrdinalIgnoreCase)
         || path.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase);
+
+    bool IsDenied(string path, string? rawTarget)
+    {
+        if (!DeniedPathNormalization.TryNormalize(path, out var alternative)) return true;
+        if (_prefixes.Any(prefix => Matches(path, prefix) || Matches(alternative, prefix))) return true;
+        return IsRawTargetDenied(rawTarget);
+    }
+
+    bool IsRawTargetDenied(string? rawTarget)
+    {
+        if (string.IsNullOrEmpty(rawTarget)) return false;
+        if (!DeniedPathNormalization.TryNormalizeRawTarget(rawTarget, out var path)) return true;
+        return _prefixes.Any(prefix => Matches(path, prefix));
+    }
 }
