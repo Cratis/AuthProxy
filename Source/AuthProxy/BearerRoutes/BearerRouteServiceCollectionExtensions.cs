@@ -58,6 +58,12 @@ public static class BearerRouteServiceCollectionExtensions
 
             // The endpoint cannot redirect AuthProxy, and the token is never replayed anywhere else.
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
+        builder.Services.AddHttpClient(BearerRouteDefaults.TokenExchangeHttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+            .RemoveAllLoggers()
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false });
+        builder.Services.AddSingleton<TokenExchange.ITokenExchangeClient, TokenExchange.IdentityTokenExchangeClient>();
+        builder.Services.AddSingleton<TokenExchange.TokenExchangeCache>();
+        builder.Services.AddSingleton<TokenExchange.BearerTokenExchange>();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<Dpop.IDpopReplayStore, Dpop.RedisDpopReplayStore>();
         builder.Services.AddSingleton<Dpop.DpopEnforcement>();

@@ -169,6 +169,7 @@ public class BearerRouteConfigurationValidator : IValidateOptions<C.AuthProxy>
         ValidateScopes(location, route, failures);
         ValidateResourceMetadata(location, route, state);
         ValidateIntrospection(location, route, failures);
+        TokenExchange.TokenExchangeConfigurationValidation.Validate(route, location.At, failures);
         ValidateClockSkew(location, route, failures);
         ValidateRequiredClaims(location, route, failures);
         ValidateClaimMappings(location, route, failures);
