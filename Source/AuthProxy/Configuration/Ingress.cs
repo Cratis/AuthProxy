@@ -43,6 +43,16 @@ public class Ingress
     public IList<string> TrustedProxies { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets public-host path prefixes refused with 404 before request handling. Empty by default.
+    /// </summary>
+    /// <remarks>
+    /// Prefixes must be absolute plain ASCII paths without escapes, backslashes or dot-dot.
+    /// Matching is case-insensitive on segment boundaries after decoding once, merging slashes and
+    /// resolving dot segments. When configured, ambiguous paths are refused even outside these prefixes.
+    /// </remarks>
+    public IList<string> DeniedPathPrefixes { get; set; } = [];
+
+    /// <summary>
     /// Gets or sets how many forwarded entries are consumed from the right of <c language="text">X-Forwarded-For</c>,
     /// which is how many trusted proxies a request legitimately passes through. Defaults to <c language="text">1</c>.
     /// </summary>
