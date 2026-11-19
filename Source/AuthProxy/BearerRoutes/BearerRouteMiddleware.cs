@@ -28,6 +28,7 @@ namespace Cratis.AuthProxy.BearerRoutes;
 /// <param name="logger">The logger.</param>
 /// <param name="dpop">The opt-in per-request proof enforcement service.</param>
 /// <param name="timeProvider">The clock for grant evidence expiration.</param>
+/// <param name="tokenExchange">The optional external-token exchange.</param>
 /// <remarks>
 /// Placed after endpoint selection but ahead of static files, authentication and everything after them, so a
 /// request on a bearer route never reaches the cookie session, provider selection, tenant selection or reverse-proxy
@@ -68,7 +69,8 @@ public class BearerRouteMiddleware(
     ClientCredentialsTokenProtector tokenProtector,
     ILogger<BearerRouteMiddleware> logger,
     Dpop.DpopEnforcement? dpop = null,
-    TimeProvider? timeProvider = null)
+    TimeProvider? timeProvider = null,
+    TokenExchange.BearerTokenExchange? tokenExchange = null)
 {
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
@@ -216,19 +218,49 @@ public class BearerRouteMiddleware(
 
     async Task AuthenticateExternal(HttpContext context, ResolvedBearerRoute route, C.AuthProxy current)
     {
-        var validation = await ValidateExternal(context, route);
+        var validation = await ValidatePresentation(context, route);
         if (validation is null) return;
 
         var requiresGrant = RequiresGrant(current, route.ServiceName);
         var activity = await ConfirmActive(context, route, validation, requiresGrant);
-        if (activity is null) return;
+        if (activity is null)
+        {
+            DiscardExchange(context);
+            return;
+        }
 
         validation = await AuthorizeExternal(context, route, current, validation);
-        if (validation is null) return;
+        if (validation is null)
+        {
+            DiscardExchange(context);
+            return;
+        }
 
         var identity = requiresGrant ? CreateOAuthIdentity(context, route, validation, activity) : BearerForwardedIdentity.From(validation, route);
         await ForwardExternal(context, route, validation, identity);
     }
+
+    async Task<BearerTokenValidation?> ValidatePresentation(HttpContext context, ResolvedBearerRoute route)
+    {
+        if (!await PrepareExchange(context, route)) return null;
+        var validation = await ValidateExternal(context, route);
+        if (validation is null)
+        {
+            DiscardExchange(context);
+            return null;
+        }
+        return tokenExchange?.Confirm(context, route, validation) is false ? null : validation;
+    }
+
+    async Task<bool> PrepareExchange(HttpContext context, ResolvedBearerRoute route)
+    {
+        if (tokenExchange is not null) return await tokenExchange.Prepare(context, route);
+        if (route.Route.TokenExchange is null) return true;
+        BearerChallenge.Write(context, BearerTokenValidation.Refused(BearerTokenValidationStatus.Invalid, "Token exchange unavailable."), route);
+        return false;
+    }
+
+    void DiscardExchange(HttpContext context) => tokenExchange?.Evict(context);
 
     async Task<BearerTokenValidation?> ValidateExternal(HttpContext context, ResolvedBearerRoute route)
     {
@@ -241,6 +273,7 @@ public class BearerRouteMiddleware(
     void RefuseExternal(HttpContext context, ResolvedBearerRoute route, BearerTokenValidation validation)
     {
         logger.BearerTokenRefused(route.Prefix, route.ServiceName, validation.Status, validation.Reason ?? string.Empty);
+        if (tokenExchange?.RefuseValidationFailure(context, route, validation) is true) return;
         Dpop.DpopChallenge.Write(context, validation, route);
     }
 

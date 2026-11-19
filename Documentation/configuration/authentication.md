@@ -941,6 +941,8 @@ authenticated by an access token from an external authorization server — for e
 than by a browser session. AuthProxy remains an edge and relying party: it validates the token and forwards the
 request with the same trusted headers a browser session gets.
 
+For opted-in external issuers, [Identity token exchange](token-exchange.md) obtains a tenant-bound local token before bearer-route validation.
+
 ### Validation
 
 A token is accepted only when all of these hold:
