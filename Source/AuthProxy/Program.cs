@@ -7,6 +7,7 @@ using Cratis.AuthProxy.Authentication;
 using Cratis.AuthProxy.Authorization;
 using Cratis.AuthProxy.Grpc;
 using Cratis.AuthProxy.Identity;
+using Cratis.AuthProxy.Ingress;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.Management;
@@ -45,7 +46,10 @@ builder.AddGrpcListener();
 
 var app = builder.Build();
 
-// Outermost: the caller's baggage must not reach anything, not even the management listener's answers.
+// Before every handler, including management and gRPC, using the client's original public-host path.
+app.UseDeniedPathPrefixes();
+
+// The caller's baggage must not reach anything after the path boundary, not even management answers.
 app.UseTelemetryBaggageStripping();
 
 // Wrap even the management listener's early answers; this adds no routes or authentication decisions.

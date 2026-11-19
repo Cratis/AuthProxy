@@ -55,6 +55,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [Tenant Selection Page](tenant-selection.md) | How selection-based tenant resolution works and how to build/override `select-tenant.html`. |
 | [Data Protection Keys](data-protection.md) | Sharing the key ring that encrypts sessions and tokens between replicas: a file system, Azure Blob Storage or Redis, with optional Azure Key Vault key protection. |
 | [Trusted Proxies](trusted-proxies.md) | Which callers may speak for the client through `X-Forwarded-For` and `X-Forwarded-Proto`, and how many hops to follow. |
+| [Denied Paths](denied-paths.md) | Refusing configured public-host path prefixes before routing or authentication. |
 | [DPoP Proof Verification](dpop.md) | Opt-in OAuth-only route proof verification with trusted public origins, nonces and a fleet-shared Redis replay store. |
 | [Backend TLS](backend-tls.md) | Client certificates, private CA trust and required HTTPS for backend connections (`BackendTls`), and the deployment `Profile` (`Default`, or `LocalDevelopment` on developer machines only). |
 | [Services](services.md) | Routing requests to backend and frontend services, and the idle timeout that applies to proxied requests, WebSockets and SSE streams. |

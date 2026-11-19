@@ -71,6 +71,7 @@ public static class IngressExtensions
 
         builder.Services.AddBackendTls();
         builder.Services.AddSingleton<IValidateOptions<C.Ingress>, TrustedProxyConfigurationValidator>();
+        builder.Services.AddSingleton<IValidateOptions<C.Ingress>, DeniedPathConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, IdentityVerificationConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, ForwardedIdentitySigningConfigurationValidator>();
         builder.Services.AddSingleton<IValidateOptions<C.AuthProxy>, SessionConfigurationValidator>();
@@ -144,6 +145,7 @@ public static class IngressExtensions
     /// <returns>The same <see cref="WebApplication"/> for chaining.</returns>
     public static WebApplication UseIngress(this WebApplication app)
     {
+        app.UseDeniedPathPrefixes();
         app.LogStartupWarnings();
         app.UseRequestBoundary();
         app.UseStaticContent();
