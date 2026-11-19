@@ -59,7 +59,7 @@ public sealed class BearerTokenExchange(ITokenExchangeClient client, TokenExchan
             Evict(context);
             return Refuse(context, route, new(TokenExchangeVerdict.Refused));
         }
-        if (MatchesBinding(validation, jwt!, attempt))
+        if (MatchesBinding(validation, jwt!, attempt, route))
         {
             return true;
         }
@@ -92,13 +92,13 @@ public sealed class BearerTokenExchange(ITokenExchangeClient client, TokenExchan
     static bool MatchesToken(JsonWebToken? jwt, Configuration.BearerTokenExchange configuration) =>
         jwt?.Issuer == configuration.ResultIssuer && jwt.Audiences.Contains(configuration.Audience, StringComparer.Ordinal);
 
-    static bool MatchesBinding(BearerTokenValidation validation, JsonWebToken jwt, Attempt attempt) =>
+    static bool MatchesBinding(BearerTokenValidation validation, JsonWebToken jwt, Attempt attempt, ResolvedBearerRoute route) =>
         CredentialTarget.Matches(validation.TenantId, attempt.Tenant)
-        && SingleClaim(jwt, "idp", attempt.Issuer) && SingleClaim(jwt, "tenant_id", attempt.Tenant);
+        && SingleClaim(jwt, "idp", attempt.Issuer) && SingleClaim(jwt, route.TenantClaimType, attempt.Tenant);
 
-    static bool HasTenant(JsonWebToken? jwt)
+    static bool HasTenant(JsonWebToken? jwt, ResolvedBearerRoute route)
     {
-        var tenants = jwt?.Claims.Where(_ => _.Type == "tenant_id").ToArray();
+        var tenants = jwt?.Claims.Where(_ => _.Type == route.TenantClaimType).ToArray();
         return tenants is { Length: 1 } && TenantIdentifier.IsUsable(tenants[0].Value);
     }
 
@@ -139,10 +139,10 @@ public sealed class BearerTokenExchange(ITokenExchangeClient client, TokenExchan
     {
         var configuration = route.Route.TokenExchange!;
         var key = TokenExchangeCache.CreateKey(configuration, issuer.Issuer, tenant, token);
-        var result = await cache.GetOrExchange(key, configuration.MaximumCachedTokens, () => client.Exchange(configuration, issuer, token, tenant, context.RequestAborted), context.RequestAborted);
+        var result = await cache.GetOrExchange(key, configuration.MaximumCachedTokens, () => ExchangeWithDeadline(configuration, issuer, token, tenant), context.RequestAborted);
         if (result.Verdict != TokenExchangeVerdict.Success) return Refuse(context, route, result);
         var jwt = Read(result.Token);
-        if (jwt?.Issuer != configuration.ResultIssuer || !HasTenant(jwt))
+        if (jwt?.Issuer != configuration.ResultIssuer || !HasTenant(jwt, route))
         {
             cache.Evict(key);
             return Refuse(context, route, new(TokenExchangeVerdict.Refused));
@@ -150,6 +150,12 @@ public sealed class BearerTokenExchange(ITokenExchangeClient client, TokenExchan
         context.Request.Headers.Authorization = "Bearer " + result.Token;
         context.Items[_attemptKey] = new Attempt(key, tenant, issuer.Issuer, result.Token!);
         return true;
+    }
+
+    async Task<TokenExchangeResult> ExchangeWithDeadline(Configuration.BearerTokenExchange configuration, Configuration.BearerTokenExchangeIssuer issuer, string token, string tenant)
+    {
+        using var deadline = new CancellationTokenSource(configuration.Timeout);
+        return await client.Exchange(configuration, issuer, token, tenant, deadline.Token).WaitAsync(deadline.Token);
     }
 
     string? Target(HttpContext context)

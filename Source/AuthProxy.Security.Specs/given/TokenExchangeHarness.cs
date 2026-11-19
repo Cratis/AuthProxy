@@ -59,7 +59,7 @@ public sealed class TokenExchangeHarness : AddressedBearerRouteHarness
     public string Exchanged(string audience = "direct-mcp", string tenant = "tenant-a", string idp = ExternalIssuer, string scope = "direct-mcp:read") => Issuer.Token(new StubIssuer.TokenRequest
     {
         Audience = audience,
-        Claims = new Dictionary<string, object> { ["tenant_id"] = tenant, ["idp"] = idp, ["scope"] = scope, ["env"] = "staging", ["sub"] = "identity-subject" },
+        Claims = new Dictionary<string, object> { ["tid"] = tenant, ["idp"] = idp, ["scope"] = scope, ["env"] = "staging", ["sub"] = "identity-subject" },
         Expires = DateTime.UtcNow.AddMinutes(5),
     });
 
@@ -69,7 +69,7 @@ public sealed class TokenExchangeHarness : AddressedBearerRouteHarness
         base.AddSettings(settings);
         const string route = $"{C.AuthProxy.SectionKey}:Services:app:BearerRoutes:0";
         settings[$"{route}:Audiences:0"] = "direct-mcp";
-        settings[$"{route}:TenantClaimType"] = "tenant_id";
+        settings[$"{route}:TenantClaimType"] = C.BearerRoute.DefaultTenantClaimType;
         settings[$"{route}:RequiredScopes:0"] = "direct-mcp:read";
         settings[$"{route}:ForwardAuthorizationHeader"] = "true";
         settings[$"{route}:TokenExchange:Endpoint"] = "https://identity.example/connect/token";

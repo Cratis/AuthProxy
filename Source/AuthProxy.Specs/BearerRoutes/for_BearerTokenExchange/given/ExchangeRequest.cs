@@ -36,12 +36,17 @@ internal sealed class ExchangeRequest
     internal void Targets(params TenantResolutionResult[] results) => Resolver.ResolveEach(Context).Returns(results);
 
     internal BearerTokenValidation Validation(string tenant = "tenant-a") => BearerTokenValidation.Success(
-        new ClaimsPrincipal(new ClaimsIdentity([new Claim("tenant_id", tenant)], "Bearer")), tenant) with { Issuer = Resolved.Issuers[0] };
+        new ClaimsPrincipal(new ClaimsIdentity([new Claim(Resolved.TenantClaimType, tenant)], "Bearer")), tenant) with { Issuer = Resolved.Issuers[0] };
 
     internal static string Jwt(string issuer = "https://external.example", string audience = "direct-mcp", string tenant = "tenant-a", string? idp = "https://external.example")
     {
-        var claims = new Dictionary<string, object?> { ["iss"] = issuer, ["aud"] = audience, ["tenant_id"] = tenant, ["exp"] = _expiration };
+        var claims = new Dictionary<string, object?> { ["iss"] = issuer, ["aud"] = audience, ["tid"] = tenant, ["exp"] = _expiration };
         if (idp is not null) claims["idp"] = idp;
+        return Jwt(claims);
+    }
+
+    internal static string Jwt(Dictionary<string, object?> claims)
+    {
         var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(claims))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         return $"eyJhbGciOiJSUzI1NiJ9.{payload}.c2ln";
     }

@@ -16,7 +16,7 @@ SubHost or Route tenant resolver:
 ```json
 {
   "PathPrefix": "/mcp",
-  "TenantClaimType": "tenant_id",
+  "TenantClaimType": "tid",
   "Issuers": [{ "Issuer": "https://identity.example" }],
   "Audiences": ["direct-mcp"],
   "RequiredScopes": ["direct-mcp:read"],
@@ -55,8 +55,8 @@ No target, conflicting targets or a nonexistent tenant returns 403 without calli
 
 Only the exchanged token goes through the normal signature, issuer, audience, lifetime, scope, DPoP and
 activity checks. It must have the configured `ResultIssuer`, an `aud` containing `Audience`, the exact requested
-`tenant_id`, and an `idp` equal to the original external issuer. A tenant or idp mismatch after successful validation
-returns 403. Missing, repeated or unusable tenant claims and invalid tokens return 401. External subject or idp
+tenant in the route's `TenantClaimType` (default `tid`, as issued by Identity), and an `idp` equal to the original
+external issuer. A tenant or idp mismatch after successful validation returns 403. Missing, repeated or unusable tenant claims and invalid tokens return 401. External subject or idp
 values are not copied into the validated result. Existing policy and forwarding rules still apply.
 
 The HTTPS endpoint cannot contain credentials, query or fragment and is never followed through a redirect.
@@ -69,4 +69,9 @@ never a login redirect or fallback to the raw token. A bounded integer `Retry-Af
 to 10,000 (1–1,000,000 allowed). Concurrent identical exchanges share one request. Successful results are
 cached by a SHA-256 key covering the subject token, exact tenant, issuer, resource, scopes and configuration,
 only until the shorter of `expires_in` and JWT `exp`. Failures are not cached and failed validation evicts a result.
+
+Identity accepts each subject token only once. One external token therefore gives access to one tenant for at
+most the cache lifetime (≤300 seconds). Addressing a second tenant, or exchanging again after cache expiry,
+requires a fresh external token.
+
 [Online activity checks](authentication.md#revocation-edge-introspection) remain independent; exchange is not a revocation check.

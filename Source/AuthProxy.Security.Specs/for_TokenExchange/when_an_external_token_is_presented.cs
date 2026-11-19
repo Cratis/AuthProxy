@@ -48,6 +48,7 @@ public class when_an_external_token_is_presented
     [InlineData("missing-tenant")]
     [InlineData("several-tenants")]
     [InlineData("unusable-tenant")]
+    [InlineData("tenant-id-only")]
     public async Task should_refuse_a_hostile_exchange_result_and_evict_it(string hostile)
     {
         await using var harness = new TokenExchangeHarness();
@@ -128,7 +129,7 @@ public class when_an_external_token_is_presented
         "case-tenant" => harness.Exchanged(tenant: "TENANT-A"),
         "wrong-idp" => harness.Exchanged(idp: "https://other.example"),
         "missing-idp" => harness.Issuer.Token(new StubIssuer.TokenRequest { Audience = "direct-mcp", Without = ["idp"], Claims = RequiredClaims() }),
-        "missing-tenant" or "several-tenants" or "unusable-tenant" => HostileTenant(harness, hostile),
+        "missing-tenant" or "several-tenants" or "unusable-tenant" or "tenant-id-only" => HostileTenant(harness, hostile),
         _ => InvalidToken(harness, hostile),
     };
 
@@ -146,12 +147,13 @@ public class when_an_external_token_is_presented
     {
         var claims = RequiredClaims();
         claims["idp"] = TokenExchangeHarness.ExternalIssuer;
-        if (hostile == "missing-tenant") claims.Remove("tenant_id");
-        else claims["tenant_id"] = hostile == "several-tenants" ? new[] { "tenant-a", "tenant-b" } : "../tenant-a";
-        return harness.Issuer.Token(new StubIssuer.TokenRequest { Audience = "direct-mcp", Claims = claims });
+        claims.Remove("tid");
+        if (hostile == "tenant-id-only") claims["tenant_id"] = "tenant-a";
+        else if (hostile != "missing-tenant") claims["tid"] = hostile == "several-tenants" ? new[] { "tenant-a", "tenant-b" } : "../tenant-a";
+        return harness.Issuer.Token(new StubIssuer.TokenRequest { Audience = "direct-mcp", Without = ["tid"], Claims = claims });
     }
 
-    static Dictionary<string, object> RequiredClaims() => new() { ["scope"] = "direct-mcp:read", ["env"] = "staging", ["tenant_id"] = "tenant-a" };
+    static Dictionary<string, object> RequiredClaims() => new() { ["scope"] = "direct-mcp:read", ["env"] = "staging", ["tid"] = "tenant-a" };
 
     static string BoundToken(TokenExchangeHarness harness)
     {
