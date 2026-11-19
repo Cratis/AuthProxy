@@ -10,10 +10,9 @@ public class when_a_path_cannot_be_normalized_safely
     [InlineData("/../internal/x")]
     [InlineData("/a/../../public/x")]
     [InlineData("/a%2f..%2f..%2fpublic/x")]
-    [InlineData("/a/%2e%2e/internal/x")]
-    [InlineData("/a/.%2E/internal/x")]
-    [InlineData("/a/%2E./internal/x")]
-    [InlineData("/public/%2ename")]
+    [InlineData("/%2e%2e/internal/x")]
+    [InlineData("/.%2E/internal/x")]
+    [InlineData("/%2E./internal/x")]
     [InlineData("relative/path")]
     public void should_report_failure_without_an_alternative_path(string path)
     {

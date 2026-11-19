@@ -46,12 +46,20 @@ public static partial class DeniedPathNormalization
             return false;
         }
 
-        if (path.Contains("%2E", StringComparison.OrdinalIgnoreCase)) return false;
         if (path.Length == 0) return true;
         if (!path.StartsWith('/')) return false;
 
         return TryResolveDotSegments(path, out normalized);
     }
+
+    /// <summary>
+    /// Decodes the original request-target path once before normalizing separators and dot segments.
+    /// </summary>
+    /// <param name="target">The original request target, including the full public path.</param>
+    /// <param name="normalized">The normalized path, or an empty string on failure.</param>
+    /// <returns>Whether the target could be safely normalized.</returns>
+    public static bool TryNormalizeRawTarget(string target, out string normalized) =>
+        DeniedPathRawTargetNormalization.TryNormalize(target, out normalized);
 
     static bool TryResolveDotSegments(string path, out string normalized)
     {
@@ -69,8 +77,9 @@ public static partial class DeniedPathNormalization
 
     static bool TryApplySegment(List<string> segments, string segment)
     {
-        if (segment == ".") return true;
-        if (segment != "..")
+        var dots = DecodeDots(segment);
+        if (dots == ".") return true;
+        if (dots != "..")
         {
             segments.Add(segment);
             return true;
@@ -81,8 +90,11 @@ public static partial class DeniedPathNormalization
         return true;
     }
 
-    static bool HasTrailingSeparator(string path) =>
-        path.EndsWith('/')
-        || path.EndsWith("/.", StringComparison.Ordinal)
-        || path.EndsWith("/..", StringComparison.Ordinal);
+    static bool HasTrailingSeparator(string path)
+    {
+        var last = DecodeDots(path[(path.LastIndexOf('/') + 1)..]);
+        return path.EndsWith('/') || last == "." || last == "..";
+    }
+
+    static string DecodeDots(string segment) => segment.Replace("%2E", ".", StringComparison.OrdinalIgnoreCase);
 }

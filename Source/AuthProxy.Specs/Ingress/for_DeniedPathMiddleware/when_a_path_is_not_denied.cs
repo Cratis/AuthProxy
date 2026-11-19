@@ -9,6 +9,8 @@ public class when_a_path_is_not_denied
 {
     [Theory]
     [InlineData("", "/internally")]
+    [InlineData("", "/files/report%2Epdf")]
+    [InlineData("", "/public/%2ename")]
     [InlineData("", "/internal-not/x")]
     [InlineData("", "/a/../public/x")]
     [InlineData("", "/a%2f..%2fpublic/x")]
@@ -27,7 +29,7 @@ public class when_a_path_is_not_denied
     public async Task should_pass_the_original_request_through_unchanged(string pathBase, string path)
     {
         var context = new DefaultHttpContext();
-        context.Features.Get<IHttpRequestFeature>().RawTarget = "/internal";
+        context.Features.Get<IHttpRequestFeature>().RawTarget = "/unrelated-raw-target?next=/internal";
         context.Request.Path = new PathString(path);
         context.Request.PathBase = pathBase;
         var next = Substitute.For<RequestDelegate>();
@@ -39,6 +41,6 @@ public class when_a_path_is_not_denied
         await next.Received(1).Invoke(context);
         context.Request.Path.Value.ShouldEqual(path);
         context.Request.PathBase.Value.ShouldEqual(pathBase);
-        context.Features.Get<IHttpRequestFeature>().RawTarget.ShouldEqual("/internal");
+        context.Features.Get<IHttpRequestFeature>().RawTarget.ShouldEqual("/unrelated-raw-target?next=/internal");
     }
 }

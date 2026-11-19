@@ -39,18 +39,28 @@ The guard checks `Request.PathBase.Value + Request.Path.Value`, using ordinal, c
 segment-boundary comparisons. Kestrel has already decoded the path (except encoded slashes) and
 resolved visible dot segments; routing and YARP use that path. Query strings never participate in matching.
 
-Both the unchanged combined path and a normalized alternative are checked. The alternative maps
-remaining `%2F`/`%2f`, `%5C`/`%5c` and literal backslashes to `/`, collapses repeated slashes, then
-resolves `.` and `..` segments using RFC 3986 remove-dot-segments semantics. This order also resolves
-dot segments revealed by encoded separators. If either form equals the prefix without its trailing
-slash, or starts with that prefix followed by `/`, the request is refused. The alternative is only
-compared: the forwarded request is never rewritten.
+The guard checks three forms: the unchanged combined path, its normalized alternative, and a
+normalized path from `IHttpRequestFeature.RawTarget`. The original target matters because Kestrel
+can remove dot segments before encoded separators and repeated slashes are normalized. For example,
+`/internal%2fa/../x` becomes Kestrel's `/x`, but the original target normalizes to `/internal/x`.
 
-When prefixes are configured, normalization fails closed with the same empty 404 if `..` would climb
-above root, encoded `%2E`/`%2e` forms remain after Kestrel decoding, the combined path is nonempty and
-not absolute, or separator normalization times out. Remaining encoded dots are refused rather than
-decoded again, including double-encoded dots that survive Kestrel. Other ordinary path characters
-are unchanged. With no prefixes configured, normalization is not attempted.
+For the raw target, query and fragment suffixes are stripped before percent-decoding the path exactly
+once as strict UTF-8. Malformed escapes, invalid UTF-8 and decoded control characters are refused;
+`+` remains `+`. Absolute-form HTTP/HTTPS targets are validated, then their original path is extracted
+without URI dot-segment normalization. A missing absolute-form path means `/`. Asterisk-form,
+authority-form and unparseable non-origin-form targets have no supported path and are refused.
+
+Both normalized alternatives map remaining `%2F`/`%2f`, `%5C`/`%5c` and literal backslashes to `/`,
+collapse repeated slashes, then resolve `.` and `..` segments using RFC 3986 remove-dot-segments
+semantics. Remaining `%2E`/`%2e` is treated as `.` only when identifying complete dot segments:
+`.%2E` means `..`, while `report%2Epdf` remains an ordinary filename. This conservatively covers
+double-encoded separators and dot segments without recursively unescaping ordinary names.
+
+If any form equals the prefix without its trailing slash, or starts with that prefix followed by
+`/`, the request is refused. The alternatives are only compared: the forwarded request is never
+rewritten. Normalization also fails closed with the same empty 404 if `..` would climb above root,
+a nonempty combined path is not absolute, or separator normalization times out. With no prefixes
+configured, neither the path nor the raw target is inspected.
 
 With `/internal/` configured:
 
@@ -61,16 +71,20 @@ With `/internal/` configured:
 | `/internal//../secret`, `/internal//%2e%2e/secret` | 404: Kestrel resolves these to `/internal/secret` |
 | `/a/../internal/x`, `/a/%2e%2e/internal/x` | 404: Kestrel resolves these to `/internal/x` |
 | `/a%2f../internal/x`, `/a%2F..%2Finternal/x`, `/a\..\internal\x` | 404: separator normalization followed by dot-segment resolution yields `/internal/x` |
-| `/a%2f..%2f..%2fpublic/x`, `/a/%252e%252e/public/x` | 404: above-root traversal or remaining encoded dots fail closed |
+| `/internal%2fa/../x`, `/a//../internal/x` | 404: the original target normalizes to `/internal/x` despite Kestrel removing segments differently |
+| `/internal%252Fx`, `/a/%252e%252e/internal/x` | 404: remaining encoded separators and dot segments are normalized |
+| `/a%2f..%2f..%2fpublic/x`, `/%252e%252e/public/x` | 404: above-root traversal fails closed |
+| `/a/%252e%252e/public/x`, `/files/report%252Epdf` | Pass: traversal resolves outside the prefix; encoded dots within filenames are ordinary characters |
 | `/a/../public/x`, `/a%2F..%2Fpublic/x`, `/internal-not/x` | Pass: the normalized path is outside the prefix |
 | `/internal/../x`, `/internal/%2e%2e/x` | Pass: Kestrel resolves these to `/x`, which is outside the prefix |
 | `/internally`, `/api/internal/x` | Pass: neither matches the prefix boundary |
 | `/x/%20name`, `/x/a;b`, `/x/%25`, `/x/name%2Fchild` | Pass: encoded names and parameters outside the prefix are not blanket-refused |
 
-The server can still reject invalid HTTP syntax independently of this guard. Absolute-form targets
-also use Kestrel's path-only `Request.Path`; their scheme and authority are not part of the comparison.
-`RawTarget` is not consulted, so its absence (for example in TestServer) does not change the decision.
-An absent `PathBase` contributes an empty string; normal matching still applies to `Path`.
+The server can still reject invalid HTTP syntax independently of this guard. Scheme and authority
+are not part of prefix comparisons. A missing or empty `RawTarget` (for example in TestServer) skips
+only the raw-target check; both downstream-path checks still apply. An absent `PathBase` contributes
+an empty string. The raw target already contains the full public path, so `PathBase` is not prepended
+to it again.
 
 ## Shared prefixes and upstream rewriting
 

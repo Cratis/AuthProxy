@@ -27,7 +27,7 @@ public class when_a_path_is_denied
     [InlineData("", "/internal/../public/x")]
     [InlineData("", "/..")]
     [InlineData("", "/a%2f..%2f..%2fpublic/x")]
-    [InlineData("", "/public/%2ename")]
+    [InlineData("", "/%2e%2e/public/x")]
     [InlineData("/a", "/../internal/x")]
     [InlineData("/internal", "/child")]
     [InlineData("/shared", "/internal/child")]
