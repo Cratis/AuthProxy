@@ -13,7 +13,7 @@ namespace Cratis.AuthProxy.Security.for_AccessControl;
 public class when_identity_denial_terminates_the_local_session(
     RequiredVerificationHarness harness) : IAsyncLifetime
 {
-    // Outcomes where the caller was refused: the session ends.
+    /// <summary>Outcomes where the caller was refused: the session ends.</summary>
     static readonly Action<RequiredVerificationHarness>[] _denials =
     [
         _ => _.DenyEveryCaller(),
@@ -21,8 +21,7 @@ public class when_identity_denial_terminates_the_local_session(
         _ => _.AnswerWithConflictingVerdicts()
     ];
 
-    // Outcomes where verification could not be completed: nobody refused anyone, so the caller is told the service is
-    // unavailable and the session is left alone.
+    /// <summary>Outcomes where verification could not be completed: nobody refused anyone, so the caller is told the service is unavailable and the session is left alone.</summary>
     static readonly Action<RequiredVerificationHarness>[] _unavailable =
     [
         _ => _.FailEveryVerification(),
