@@ -1,6 +1,6 @@
 ---
 title: "Identity Token Exchange"
-description: "Exchange allow-listed external issuer tokens for tenant-bound Identity access tokens on opted-in bearer routes."
+description: "Exchange allow-listed external issuer tokens for tenant-bound Identity access tokens on opted-in bearer routes, with the required configuration."
 ---
 
 # Identity token exchange
