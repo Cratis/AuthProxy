@@ -31,6 +31,6 @@ public class and_the_verification_times_out : given.a_required_verification_reso
     [Fact] void should_warn_once_for_the_timeout() => _logger.Levels.Count(_ => _ == LogLevel.Warning).ShouldEqual(1);
     [Fact] void should_not_log_an_error_for_the_timeout() => _logger.Levels.ShouldNotContain(LogLevel.Error);
     [Fact] void should_not_be_authorized() => _result.IsAuthorized.ShouldBeFalse();
-    [Fact] void should_serve_the_forbidden_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+    [Fact] void should_serve_the_service_unavailable_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
     [Fact] void should_clear_any_recorded_authorization() => _authorizationCache.Received(1).Clear(_context);
 }

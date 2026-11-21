@@ -50,6 +50,6 @@ public class and_the_service_answers_an_unsuccessful_status : given.a_required_v
     }
 
     [Fact] void should_authorize_for_none_of_them() => _authorizedFor.ShouldBeEmpty();
-    [Fact] void should_serve_the_forbidden_status_for_all_of_them() => _responseStatuses.Distinct().ShouldContainOnly([StatusCodes.Status403Forbidden]);
+    [Fact] void should_serve_the_service_unavailable_status_for_all_of_them() => _responseStatuses.Distinct().ShouldContainOnly([StatusCodes.Status503ServiceUnavailable]);
     [Fact] void should_have_asked_the_service_for_each_of_them() => _handler.Calls.ShouldEqual(_statuses.Length);
 }
