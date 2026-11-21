@@ -32,7 +32,7 @@ public class when_signed_internal_endpoints_redirect(ForwardedIdentityHarness ha
         return ValueTask.CompletedTask;
     }
     [Fact] public void should_not_follow_either_redirect() => Assert.Empty(harness.Origin.Received);
-    [Fact] public void should_preserve_the_existing_identity_refusal() => Assert.Equal(HttpStatusCode.Forbidden, _identityStatus);
+    [Fact] public void should_not_admit_the_caller_when_verification_redirects() => Assert.Equal(HttpStatusCode.ServiceUnavailable, _identityStatus);
     [Fact] public void should_return_the_tenant_unavailable_result() => Assert.Equal(HttpStatusCode.ServiceUnavailable, _tenantStatus);
     [Fact] public void should_have_signed_the_original_identity_request() => Assert.True(harness.ApplicationOrigin.Received.Single().Verified);
     [Fact] public void should_have_signed_the_original_tenant_request() => Assert.True(harness.Tenants.Received.Single().Verified);
