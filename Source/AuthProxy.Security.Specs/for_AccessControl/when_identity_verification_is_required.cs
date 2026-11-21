@@ -68,12 +68,12 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
     }
 
     [Fact]
-    public void should_refuse_a_caller_whose_verification_failed() =>
-        Assert.Equal(HttpStatusCode.Forbidden, _refusedPage!.StatusCode);
+    public void should_answer_service_unavailable_when_verification_could_not_be_completed() =>
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, _refusedPage!.StatusCode);
 
     [Fact]
-    public void should_explain_the_refusal_with_the_forbidden_page() =>
-        Assert.Contains(RequiredVerificationHarness.ForbiddenMarker, _refusedBody, StringComparison.Ordinal);
+    public void should_say_the_service_is_unavailable_instead_of_access_denied() =>
+        Assert.Contains(RequiredVerificationHarness.UnavailableMarker, _refusedBody, StringComparison.Ordinal);
 
     [Fact]
     public void should_forward_nothing_to_the_backend_for_the_protected_route() =>
@@ -81,7 +81,7 @@ public class when_identity_verification_is_required(RequiredVerificationHarness 
 
     [Fact]
     public void should_refuse_the_static_asset_too() =>
-        Assert.Equal(HttpStatusCode.Forbidden, _refusedAsset!.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, _refusedAsset!.StatusCode);
 
     [Fact]
     public void should_forward_nothing_to_the_backend_for_the_static_asset() =>

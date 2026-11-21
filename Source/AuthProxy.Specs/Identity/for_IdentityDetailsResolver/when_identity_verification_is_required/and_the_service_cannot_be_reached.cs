@@ -20,7 +20,7 @@ public class and_the_service_cannot_be_reached : given.a_required_verification_r
     async Task Because() => _result = await _resolver.Resolve(_context, Principal(), TenantId);
 
     [Fact] void should_not_be_authorized() => _result.IsAuthorized.ShouldBeFalse();
-    [Fact] void should_serve_the_forbidden_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+    [Fact] void should_serve_the_service_unavailable_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
     [Fact] void should_not_record_an_authorization() => _authorizationCache.DidNotReceive().Record(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>(), Arg.Any<IReadOnlyCollection<string>>());
     [Fact] void should_clear_any_recorded_authorization() => _authorizationCache.Received(1).Clear(_context);
     [Fact] void should_expire_the_identity_cookie() => _context.Response.Headers.SetCookie.ToString().ShouldContain("expires=Thu, 01 Jan 1970");

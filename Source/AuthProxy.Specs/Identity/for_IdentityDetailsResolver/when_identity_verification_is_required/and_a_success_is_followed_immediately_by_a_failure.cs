@@ -44,5 +44,5 @@ public class and_a_success_is_followed_immediately_by_a_failure : given.a_requir
     [Fact] void should_ask_the_service_again_rather_than_reuse_the_success() => _handler.Calls.ShouldEqual(2);
     [Fact] void should_clear_the_recorded_authorization() => _authorizationCache.Received(1).Clear(_failingContext);
     [Fact] void should_expire_the_identity_cookie() => _failingContext.Response.Headers.SetCookie.ToString().ShouldContain("expires=Thu, 01 Jan 1970");
-    [Fact] void should_serve_the_forbidden_status() => _failingContext.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+    [Fact] void should_serve_the_service_unavailable_status() => _failingContext.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
 }

@@ -44,8 +44,8 @@ public class when_identity_denial_session_termination_is_disabled : IAsyncLifeti
     }
 
     [Fact]
-    public void should_still_return_forbidden() =>
-        Assert.Equal(HttpStatusCode.Forbidden, _denial!.StatusCode);
+    public void should_say_the_service_is_unavailable() =>
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, _denial!.StatusCode);
 
     [Fact]
     public void should_not_forward_the_denied_request() =>

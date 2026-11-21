@@ -130,6 +130,24 @@ public class an_identity_middleware : Specification
             .Returns(_ => new IdentityProviderResult("user-1", "User One", true, false, [], new object()));
 
     /// <summary>
+    /// Makes the resolver report that verification could not be completed, the way it does when the service times out.
+    /// </summary>
+    protected void MakeVerificationUnavailable() =>
+        _resolver
+            .Resolve(Arg.Any<HttpContext>(), Arg.Any<ClientPrincipal>(), Arg.Any<string>())
+            .Returns(call =>
+            {
+                call.Arg<HttpContext>().Items[IdentityMiddleware.VerificationUnavailableItemKey] = true;
+                return IdentityProviderResult.Unauthorized;
+            });
+
+    /// <summary>
+    /// Asserts that the request was answered as unavailable rather than refused.
+    /// </summary>
+    protected void ShouldHaveBeenAnsweredAsUnavailable() =>
+        _errorPages.Received(1).WriteErrorPageAsync(_context, WellKnownPageNames.ServiceUnavailable, StatusCodes.Status503ServiceUnavailable);
+
+    /// <summary>
     /// Enables local session termination when identity verification refuses the caller.
     /// </summary>
     protected void EnableSessionTermination() => _config.Session.TerminateOnIdentityDenial = true;

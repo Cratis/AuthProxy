@@ -57,6 +57,9 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
     /// <summary>The body of the page a refused caller is served, so a spec can recognize it.</summary>
     public const string ForbiddenMarker = "forbidden-page";
 
+    /// <summary>The text of the service-unavailable page the harness serves.</summary>
+    public const string UnavailableMarker = "service-unavailable-page";
+
     /// <summary>An application-owned cookie configured for deletion with the session.</summary>
     public const string AdditionalSessionCookie = "security-spec-session";
 
@@ -97,6 +100,7 @@ public class RequiredVerificationHarness : WebApplicationFactory<Program>
         Directory.CreateDirectory(_pagesPath);
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.SelectProvider), "<html><body>Select Provider</body></html>");
         File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.Forbidden), $"<html><body>{ForbiddenMarker}</body></html>");
+        File.WriteAllText(Path.Combine(_pagesPath, WellKnownPageNames.ServiceUnavailable), $"<html><body>{UnavailableMarker}</body></html>");
 
         Origin = RecordingBackend.Start().GetAwaiter().GetResult();
     }

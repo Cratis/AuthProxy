@@ -16,5 +16,5 @@ public class and_a_best_effort_failure_cookie_is_reused_after_upgrade : given.an
     [Fact] void should_have_admitted_the_enrichment_only_request() => _previousResult.IsAuthorized.ShouldBeTrue();
     [Fact] void should_check_the_endpoint_again() => _handler.Calls.ShouldEqual(2);
     [Fact] void should_deny_the_unverified_caller() => _result.IsAuthorized.ShouldBeFalse();
-    [Fact] void should_return_forbidden() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+    [Fact] void should_return_service_unavailable() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
 }
