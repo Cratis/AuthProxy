@@ -36,6 +36,12 @@ public class IdentityMiddleware(
     IErrorPageProvider errorPageProvider,
     ILogger<IdentityMiddleware> logger)
 {
+    /// <summary>
+    /// The <see cref="HttpContext.Items"/> key the resolver sets when verification could not be completed, as opposed to
+    /// the service refusing the caller.
+    /// </summary>
+    internal const string VerificationUnavailableItemKey = "Cratis.AuthProxy.IdentityVerificationUnavailable";
+
     /// <inheritdoc cref="IMiddleware.InvokeAsync"/>
     public async Task InvokeAsync(HttpContext context)
     {
@@ -106,6 +112,19 @@ public class IdentityMiddleware(
 
     async Task Refuse(HttpContext context, C.AuthProxy config)
     {
+        // The service could not be asked. Nobody refused anyone: say that the service is unavailable, and keep the
+        // session, so the person is let straight back in when it recovers.
+        if (context.Items.ContainsKey(VerificationUnavailableItemKey))
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            context.Response.Headers.RetryAfter = "30";
+            await errorPageProvider.WriteErrorPageAsync(
+                context,
+                WellKnownPageNames.ServiceUnavailable,
+                StatusCodes.Status503ServiceUnavailable);
+            return;
+        }
+
         // During an on-behalf session the identity refused is the represented user's, not the actor's. The on-behalf
         // session ends; the actor's own session is not theirs to lose over it.
         if (context.TryGetOnBehalf(out _))

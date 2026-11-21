@@ -563,6 +563,13 @@ public class IdentityDetailsResolver(
             memoryCache.Remove(state.CacheKey);
         }
 
+        if (reason.IsUnavailable())
+        {
+            state.Context.Items[IdentityMiddleware.VerificationUnavailableItemKey] = true;
+            state.Context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            return IdentityProviderResult.Unauthorized;
+        }
+
         state.Context.Response.StatusCode = StatusCodes.Status403Forbidden;
 
         return IdentityProviderResult.Unauthorized;

@@ -20,6 +20,6 @@ public class and_the_service_answers_unparseable_json : given.a_required_verific
     async Task Because() => _result = await _resolver.Resolve(_context, Principal(), TenantId);
 
     [Fact] void should_not_be_authorized() => _result.IsAuthorized.ShouldBeFalse();
-    [Fact] void should_serve_the_forbidden_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status403Forbidden);
+    [Fact] void should_serve_the_service_unavailable_status() => _context.Response.StatusCode.ShouldEqual(StatusCodes.Status503ServiceUnavailable);
     [Fact] void should_clear_any_recorded_authorization() => _authorizationCache.Received(1).Clear(_context);
 }
