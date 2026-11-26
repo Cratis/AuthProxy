@@ -4,6 +4,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.Authentication;
+using Cratis.AuthProxy.Invites;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 using C = Cratis.AuthProxy.Configuration;
@@ -72,7 +73,7 @@ public class LinkSubjectExchanger(
         }
 
         using var client = httpClientFactory.CreateClient();
-        using var request = BuildRequest(exchangeUrl, linkToken!, BuildPayload(canonicalResolution, subject, IdentityProviderOf(canonicalResolution, principal, scheme)));
+        using var request = BuildRequest(exchangeUrl, linkToken!, BuildPayload(canonicalResolution, subject, IdentityProviderOf(canonicalResolution, principal, scheme), principal));
         return await Send(client, request, exchangeUrl);
     }
 
@@ -83,16 +84,31 @@ public class LinkSubjectExchanger(
             Content = payload
         };
 
-    static JsonContent BuildPayload(CanonicalIdentityResolution resolution, string subject, string identityProvider) =>
-        resolution.Identity is { } canonicalIdentity
-            ? JsonContent.Create(new
+    static JsonContent BuildPayload(CanonicalIdentityResolution resolution, string subject, string identityProvider, ClaimsPrincipal? principal)
+    {
+        var payload = new Dictionary<string, object?> { ["subject"] = subject };
+        if (resolution.Identity is { } canonicalIdentity)
+        {
+            payload["providerKey"] = canonicalIdentity.ProviderKey;
+            payload["issuer"] = canonicalIdentity.NormalizedIssuer;
+        }
+
+        payload["identityProvider"] = identityProvider;
+        if (principal is not null)
+        {
+            var email = InvitationClaimReader.ResolveAuthenticatedEmail(principal);
+            if (!string.IsNullOrWhiteSpace(email.Address))
             {
-                subject,
-                providerKey = canonicalIdentity.ProviderKey,
-                issuer = canonicalIdentity.NormalizedIssuer,
-                identityProvider
-            })
-            : JsonContent.Create(new { subject, identityProvider });
+                payload["email"] = email.Address;
+                if (email.Verified is { } verified)
+                {
+                    payload["emailVerified"] = verified;
+                }
+            }
+        }
+
+        return JsonContent.Create(payload, options: JsonSerializerOptions.Web);
+    }
 
     static bool TryReadLinkToken(AuthenticationProperties properties, out string? linkToken) =>
         properties.Items.TryGetValue(LinkMiddleware.LinkTokenPropertyKey, out linkToken)
