@@ -30,6 +30,12 @@ public class Authentication
     public IList<OAuthProvider> OAuthProviders { get; set; } = [];
 
     /// <summary>
+    /// Gets or sets the directory holding the state of in-flight code sign-ins. Mount a volume here so challenges survive a
+    /// restart and, on a shared ReadWriteMany volume, are seen by every replica. Empty uses a directory under the temp path.
+    /// </summary>
+    public string CodeStatePath { get; set; } = string.Empty;
+
+    /// <summary>
     /// Gets the combined count of all configured authentication providers.
     /// </summary>
     public int TotalProviderCount => OidcProviders.Count + OAuthProviders.Count;

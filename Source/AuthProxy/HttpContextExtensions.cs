@@ -231,8 +231,9 @@ public static class HttpContextExtensions
         var authentication = context.RequestServices?.GetService<IOptionsMonitor<C.Authentication>>()?.CurrentValue;
         if (authentication is null) return false;
 
-        return authentication.OidcProviders.Any(provider =>
-            IsCallback<OpenIdConnectOptions>(context, provider.Name))
+        return authentication.OidcProviders.Any(provider => provider.Type == C.OidcProviderType.Code
+                ? IsCallback<Code.CodeAuthenticationOptions>(context, provider.Name)
+                : IsCallback<OpenIdConnectOptions>(context, provider.Name))
             || authentication.OAuthProviders.Any(provider =>
                 IsCallback<OAuthOptions>(context, provider.Name));
     }

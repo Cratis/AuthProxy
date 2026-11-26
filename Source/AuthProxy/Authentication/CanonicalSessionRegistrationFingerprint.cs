@@ -66,6 +66,26 @@ internal static class CanonicalSessionRegistrationFingerprint
     }
 
     /// <summary>
+    /// Creates the fingerprint that binds a canonical session to the registration of a code provider.
+    /// </summary>
+    /// <param name="scheme">The provider scheme.</param>
+    /// <param name="provider">The configured provider.</param>
+    /// <param name="options">The scheme options.</param>
+    /// <returns>The fingerprint.</returns>
+    internal static string Create(string scheme, C.OidcProvider provider, Code.CodeAuthenticationOptions options) =>
+        Create(
+            "code",
+            scheme,
+            provider.CanonicalIdentity!.ProviderKey,
+            provider.CanonicalIdentity.InvitationCompletionEnabled.ToString(),
+            provider.CanonicalIdentity.InvitationIdentityBindingCompletionEnabled.ToString(),
+            provider.CanonicalIdentity.SubjectClaimType,
+            provider.CanonicalIdentity.EmailClaimType,
+            provider.CanonicalIdentity.EmailVerifiedClaimType,
+            provider.CanonicalIdentity.AssuranceClaimType,
+            options.Issuer);
+
+    /// <summary>
     /// Creates a fingerprint for an OAuth provider from its configuration and effective named handler options.
     /// </summary>
     /// <param name="scheme">The derived authentication scheme.</param>

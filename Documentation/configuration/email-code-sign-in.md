@@ -12,6 +12,10 @@ application.
 
 ---
 
+If you would rather not run an external issuer, a [Code provider](code-sign-in.md) lets AuthProxy issue and verify the code itself.
+
+---
+
 ## Configure the provider
 
 ```json

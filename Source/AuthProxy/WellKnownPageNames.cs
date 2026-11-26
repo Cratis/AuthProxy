@@ -134,4 +134,14 @@ public static class WellKnownPageNames
     /// broadcasts the completion on the link flow's <c language="text">BroadcastChannel</c> and closes its window.
     /// </summary>
     public const string LinkComplete = "link-complete.html";
+
+    /// <summary>
+    /// The page where a person enters the e-mail address a code is sent to.
+    /// </summary>
+    public const string CodeEmail = "code-email.html";
+
+    /// <summary>
+    /// The page where a person enters the code they received.
+    /// </summary>
+    public const string CodeVerify = "code-verify.html";
 }

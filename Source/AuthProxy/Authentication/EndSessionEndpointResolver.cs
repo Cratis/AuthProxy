@@ -31,7 +31,7 @@ public class EndSessionEndpointResolver(
         // cannot be force-logged-out via a redirect, so anything that is not a configured OIDC provider
         // resolves to null and the caller performs a local-only logout.
         var isOidcProvider = authConfig.CurrentValue.OidcProviders
-            .Any(provider => OidcProviderScheme.FromName(provider.Name) == scheme);
+            .Any(provider => provider.Type != C.OidcProviderType.Code && OidcProviderScheme.FromName(provider.Name) == scheme);
         if (!isOidcProvider)
         {
             return null;

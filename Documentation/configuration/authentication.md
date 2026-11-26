@@ -120,7 +120,7 @@ This allows a common callback endpoint while still restoring tenant-specific beh
 | Property | Type | Description |
 | ---------- | ------ | ------------- |
 | `Name` | `string` | Display name shown on the login selection page. |
-| `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). `CratisIdentity` also applies the [Cratis Identity profile](#cratis-identity-profile). |
+| `Type` | `string` | Provider type hint (`Microsoft`, `Google`, or `Custom`). `Code` signs people in with a [code AuthProxy issues](code-sign-in.md) and needs no `Authority` or `ClientId`. `CratisIdentity` also applies the [Cratis Identity profile](#cratis-identity-profile). |
 | `Authority` | `string` | OIDC authority URL. |
 | `ClientId` | `string` | OAuth 2.0 client ID. |
 | `ClientSecret` | `string` | OAuth 2.0 client secret. Leave empty when `ClientCredential` selects a certificate or federated credential. |

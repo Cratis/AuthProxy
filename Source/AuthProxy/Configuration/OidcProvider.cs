@@ -97,4 +97,9 @@ public class OidcProvider
 
     /// <summary>Gets or sets optional shorten-only browser-session settings. Null inherits the global session policy.</summary>
     public ProviderSession? Session { get; set; }
+
+    /// <summary>
+    /// Gets or sets the code sign-in settings. Required when <see cref="Type"/> is <see cref="OidcProviderType.Code"/>.
+    /// </summary>
+    public CodeSignIn? Code { get; set; }
 }
