@@ -18,7 +18,7 @@ public class Link
     /// <summary>
     /// Gets or sets the absolute URL of the application endpoint that records the freshly authenticated
     /// subject for a link, e.g. <c language="text">https://studio.example.com/api/internal/identity-providers/link</c>.
-    /// AuthProxy posts <c language="text">{ subject, identityProvider }</c> to it with the one-time link token supplied by
+    /// AuthProxy posts <c language="text">{ subject, identityProvider }</c> (plus the authenticated <c language="text">email</c> and <c language="text">emailVerified</c> when the provider supplied them) to it with the one-time link token supplied by
     /// the application as the bearer token, exactly as the invite exchange does.
     /// Leave empty to disable the link callback.
     /// </summary>

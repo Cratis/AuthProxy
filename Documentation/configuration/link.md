@@ -123,6 +123,10 @@ Canonical providers add the stable provider-aware identity fields:
 
 with `Authorization: Bearer <one-time-link-token>`.
 
+Both bodies also carry `email` and `emailVerified` when the provider supplied them, resolved the same way as for invitation
+completion (`email`, then an address-shaped `preferred_username`; `email_verified`). Either is left out when unknown. Use them
+to apply your own rule, such as linking only a login whose verified address equals the account's address.
+
 Canonical identity is opt-in per provider. During migration, the application endpoint must accept both
 bodies. For a canonical body, bind the account with the complete `(providerKey, issuer, subject)` tuple;
 never treat `subject` alone or the compatibility `identityProvider` field as the stable account key.
