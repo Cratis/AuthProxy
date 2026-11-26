@@ -178,6 +178,13 @@ static class CanonicalSessionPolicy
             return false;
         }
 
+        if (oidcProviders.Length == 1 && oidcProviders[0].CanonicalIdentity is not null && oidcProviders[0].Type == C.OidcProviderType.Code)
+        {
+            var codeOptions = services.GetRequiredService<IOptionsMonitor<Code.CodeAuthenticationOptions>>().Get(scheme);
+            fingerprint = CanonicalSessionRegistrationFingerprint.Create(scheme, oidcProviders[0], codeOptions);
+            return true;
+        }
+
         if (oidcProviders.Length == 1 && oidcProviders[0].CanonicalIdentity is not null)
         {
             var options = services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get(scheme);

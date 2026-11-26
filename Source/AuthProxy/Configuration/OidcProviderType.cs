@@ -29,5 +29,10 @@ public enum OidcProviderType
     /// <c language="text">openid profile</c> scopes plus those configured, and the account <c language="text">sub</c>
     /// mapped to the canonical identity claims.
     /// </summary>
-    CratisIdentity = 5
+    CratisIdentity = 5,
+
+    /// <summary>
+    /// A code that AuthProxy itself issues and verifies, sent to the person's e-mail address by the application.
+    /// </summary>
+    Code = 6
 }

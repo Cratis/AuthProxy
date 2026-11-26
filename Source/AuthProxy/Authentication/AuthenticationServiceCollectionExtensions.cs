@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Security.Claims;
 using Cratis.AuthProxy.AccessTokens;
 using Cratis.AuthProxy.BearerRoutes;
+using Cratis.AuthProxy.Code;
 using Cratis.AuthProxy.Invites;
 using Cratis.AuthProxy.Links;
 using Cratis.AuthProxy.SignInCallbacks;
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Abstractions;
@@ -41,7 +43,10 @@ public static class AuthenticationServiceCollectionExtensions
     /// </summary>
     public const string SelectedSchemeItemKey = "Cratis.AuthProxy.SelectedAuthenticationScheme";
 
-    const string ValidatedIssuerStateKey = "Cratis.AuthProxy.ValidatedIssuer";
+    /// <summary>
+    /// The authentication-properties key a sign-in records the issuer it was validated against, which a canonical identity is attributed to.
+    /// </summary>
+    internal const string ValidatedIssuerStateKey = "Cratis.AuthProxy.ValidatedIssuer";
 
     /// <summary>
     /// Registers cookie authentication, all configured OIDC providers, all configured OAuth providers,
@@ -105,6 +110,13 @@ public static class AuthenticationServiceCollectionExtensions
 
     static void RegisterIngressAuthenticationServices(IServiceCollection services)
     {
+        services.AddSingleton<ICodeChallengeStore>(serviceProvider =>
+        {
+            var configured = serviceProvider.GetRequiredService<IOptionsMonitor<C.Authentication>>().CurrentValue.CodeStatePath;
+            var path = string.IsNullOrWhiteSpace(configured) ? Path.Combine(Path.GetTempPath(), "cratis-authproxy-code") : configured;
+            return new FileCodeChallengeStore(path, serviceProvider.GetRequiredService<TimeProvider>());
+        });
+        services.AddSingleton<ICodeDelivery, CodeDelivery>();
         services.AddSingleton<IProviderClaimsEnricher, GitHubMembershipClaimsEnricher>();
         services.AddSingleton<ClientCredentialsServiceResolver>();
         services.AddSingleton<ClientCredentialsVerifier>();
@@ -118,6 +130,7 @@ public static class AuthenticationServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<C.Authentication>, OidcClientCredentialConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.AuthProxy>, CratisIdentityProfileConfigurationValidator>();
         services.AddSingleton<IValidateOptions<C.AuthProxy>, ProviderSessionConfigurationValidator>();
+        services.AddSingleton<IValidateOptions<C.AuthProxy>, CodeProviderConfigurationValidator>();
         services.AddOptions<C.AuthProxy>().ValidateOnStart();
         services.AddSingleton<IValidateOptions<C.Authentication>, ExternalTokenTenantBindingConfigurationValidator>();
         services.AddHostedService<ExternalTokenTenantBindingStartupReport>();
@@ -333,6 +346,12 @@ public static class AuthenticationServiceCollectionExtensions
         {
             var scheme = OidcProviderScheme.FromName(provider.Name);
             var capturedProvider = provider;
+            if (provider.Type == C.OidcProviderType.Code)
+            {
+                RegisterCodeProvider(authBuilder, capturedProvider, scheme);
+                continue;
+            }
+
             authBuilder.AddOpenIdConnect(scheme, options =>
             {
                 ConfigureOidcOptions(options, capturedProvider, scheme);
@@ -345,6 +364,36 @@ public static class AuthenticationServiceCollectionExtensions
                 authBuilder.Services.PostConfigure<OpenIdConnectOptions>(scheme, options => CratisIdentityProfile.UseVerifiedDiscovery(options, capturedProvider));
             }
         }
+    }
+
+    static void RegisterCodeProvider(AuthenticationBuilder authBuilder, C.OidcProvider provider, string scheme)
+    {
+        authBuilder.AddRemoteScheme<CodeAuthenticationOptions, CodeAuthenticationHandler>(scheme, provider.Name, options =>
+        {
+            options.Provider = provider;
+            options.Issuer = provider.Code?.Issuer ?? string.Empty;
+            options.CallbackPath = $"/signin-{scheme}";
+            options.CorrelationCookie.SameSite = SameSiteMode.Lax;
+            options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.CorrelationCookie.Path = "/";
+            options.Events = new RemoteAuthenticationEvents
+            {
+                OnRemoteFailure = RemoteAuthenticationFailureHandler.HandleRemoteFailure,
+                OnAccessDenied = RemoteAuthenticationFailureHandler.HandleAccessDenied,
+                OnTicketReceived = context => HandleTicketReceived(
+                    context,
+                    () => CanonicalSessionRegistrationFingerprint.Create(scheme, provider, (CodeAuthenticationOptions)context.Options),
+                    provider.CanonicalIdentity,
+                    "code",
+                    OidcProviderGating.CreateAdmission(provider) ?? (principal => VerifiedEmailGate.IsSatisfied(principal, "email", "email_verified", false))),
+            };
+        });
+
+        authBuilder.Services.AddOptions<CodeAuthenticationOptions>(scheme).PostConfigure<IDataProtectionProvider>((options, dataProtection) =>
+        {
+            options.SignInScheme ??= CookieAuthenticationDefaults.AuthenticationScheme;
+            options.StateDataFormat = new PropertiesDataFormat(dataProtection.CreateProtector(typeof(CodeAuthenticationHandler).FullName!, scheme, "v1"));
+        });
     }
 
     static void ConfigureOidcOptions(OpenIdConnectOptions options, C.OidcProvider provider, string scheme)
@@ -673,7 +722,7 @@ public static class AuthenticationServiceCollectionExtensions
             context.Properties!.Items[CanonicalSessionRegistrationFingerprint.StateKey] = createRegistrationFingerprint();
         }
 
-        await CompleteSignIn(context, protocolAssurance == "oidc");
+        await CompleteSignIn(context, protocolAssurance == "oidc", protocolAssurance == "oidc" || protocolAssurance == "code");
     }
 
     static CanonicalIdentityResolution ResolveFreshCanonicalIdentity(TicketReceivedContext context)
@@ -705,7 +754,7 @@ public static class AuthenticationServiceCollectionExtensions
         AdditionalLogoutCookies.Clear(context.HttpContext, logout.AdditionalCookies);
     }
 
-    static async Task CompleteSignIn(TicketReceivedContext context, bool oidc)
+    static async Task CompleteSignIn(TicketReceivedContext context, bool oidc, bool provesFreshness)
     {
         var services = context.HttpContext.RequestServices;
         var globalSession = services.GetRequiredService<IOptionsMonitor<C.AuthProxy>>().CurrentValue.Session;
@@ -722,7 +771,7 @@ public static class AuthenticationServiceCollectionExtensions
         // canonical identity is named by the provider it signed in with.
         SessionProvider.Stamp(context.Principal!, context.Properties, context.Scheme.Name);
         SessionStart.Stamp(context.Properties!, services.GetRequiredService<TimeProvider>().GetUtcNow());
-        FreshAuthenticationChallenge.Stamp(context.Principal!, context.Properties!, oidc);
+        FreshAuthenticationChallenge.Stamp(context.Principal!, context.Properties!, provesFreshness);
         BrowserSessionEvidence.Stamp(context.HttpContext, context.Principal!, context.Properties!, oidc ? context.Scheme.Name : null);
         context.Properties?.Items.TryAdd(AuthenticationSchemeStateKey, context.Scheme.Name);
         var notifier = context.HttpContext.RequestServices.GetRequiredService<ISignInNotifier>();

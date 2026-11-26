@@ -39,4 +39,9 @@ public static class SignInAttestationClaims
     /// The purpose value for a sign-in notification envelope.
     /// </summary>
     public const string NotificationPurpose = "sign-in-notification";
+
+    /// <summary>
+    /// The purpose of an attestation that authenticates a code request to the application.
+    /// </summary>
+    public const string CodeRequestPurpose = "code-request";
 }

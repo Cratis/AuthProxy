@@ -63,6 +63,7 @@ Cratis AuthProxy is configured entirely through the `Cratis:AuthProxy` section o
 | [One Proxy, Several Hosts](one-proxy-several-hosts.md) | Giving each application its own host behind one AuthProxy and one sign-in, with a shared session cookie and a single identity-provider callback. |
 | [Telemetry](telemetry.md) | OpenTelemetry traces and metrics, exported only when an OTLP endpoint is configured. |
 | [Management Listener](management-listener.md) | An opt-in private listener carrying liveness and readiness endpoints, so a probe tests more than "a process accepted a socket". |
+| [Code Sign-in](code-sign-in.md) | Signing people in with a one-time code AuthProxy issues and the application delivers (`Type: Code`). |
 | [Credential Linking](link.md) | Letting a signed-in user link another identity-provider login to their account (`Link`). |
 | [Search-Index Exclusion](search-indexing.md) | Asking search engines to keep AuthProxy hosts out of their indexes (`SearchIndexing`). |
 | [Lobby](lobby/index.md) | Invite and registration flows that hand users off to the lobby experience. |

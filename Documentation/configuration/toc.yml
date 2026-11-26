@@ -17,6 +17,8 @@
   href: failed-sign-ins.md
 - name: E-mail Code Sign-in
   href: email-code-sign-in.md
+- name: Code Sign-in
+  href: code-sign-in.md
 - name: Tenancy
   href: tenancy.md
 - name: Tenant Selection Page
