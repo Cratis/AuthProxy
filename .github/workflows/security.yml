@@ -29,6 +29,8 @@ on:
     branches:
       - main
 
+permissions: {}
+
 jobs:
   security-specs:
     name: Security specs
