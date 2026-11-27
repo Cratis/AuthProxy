@@ -15,6 +15,8 @@ on:
       - "Documentation/azure/**"
       - ".github/workflows/azure-docs-specs.yml"
 
+permissions: {}
+
 jobs:
   azure-docs-specs:
     runs-on: ubuntu-latest

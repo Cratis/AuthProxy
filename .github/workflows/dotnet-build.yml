@@ -19,6 +19,8 @@ on:
         type: boolean
         default: true
 
+permissions: {}
+
 jobs:
   dotnet-build:
     runs-on: ubuntu-latest
